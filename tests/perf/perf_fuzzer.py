@@ -92,6 +92,12 @@ RETURN_ADDR = 0x100
 # Apply functions
 # ---------------------------------------------------------------------------
 
+ZERO_FILL_OPTIONS = {
+    angr.sim_options.ZERO_FILL_UNCONSTRAINED_REGISTERS,
+    angr.sim_options.ZERO_FILL_UNCONSTRAINED_MEMORY,
+}
+
+
 def _apply_fn_simple(state: angr.SimState, input_bytes: bytes):
     """Apply function for simple shellcode: feed first byte into rax."""
     state.regs.rax = input_bytes[0] if input_bytes else 0
@@ -154,7 +160,7 @@ def bench_simple_shellcode(iterations=100):
     print("\n=== Benchmark: Simple Shellcode (Havoc Mutator) ===")
 
     project = angr.load_shellcode(SHELLCODE_SIMPLE, "amd64")
-    base_state = project.factory.entry_state()
+    base_state = project.factory.entry_state(add_options=ZERO_FILL_OPTIONS)
     corpus = InMemoryCorpus.from_list([b"\x00", b"A", b"B", b"C", b"D"])
     solutions = InMemoryCorpus()
 
@@ -176,7 +182,7 @@ def bench_simple_shellcode_deterministic(iterations=100):
     print("\n=== Benchmark: Simple Shellcode (Deterministic Mutator) ===")
 
     project = angr.load_shellcode(SHELLCODE_SIMPLE, "amd64")
-    base_state = project.factory.entry_state()
+    base_state = project.factory.entry_state(add_options=ZERO_FILL_OPTIONS)
     corpus = InMemoryCorpus.from_list([b"\x00"])
     solutions = InMemoryCorpus()
 
@@ -195,7 +201,7 @@ def bench_crash_detection(iterations=50):
     print("\n=== Benchmark: Crash Detection Shellcode ===")
 
     project = angr.load_shellcode(SHELLCODE_WITH_CRASH, "amd64")
-    base_state = project.factory.entry_state()
+    base_state = project.factory.entry_state(add_options=ZERO_FILL_OPTIONS)
     corpus = InMemoryCorpus.from_list([b"\x00"])
     solutions = InMemoryCorpus()
 
@@ -264,7 +270,7 @@ def bench_corpus_scaling():
     print("\n=== Benchmark: Corpus Size Scaling ===")
 
     project = angr.load_shellcode(SHELLCODE_SIMPLE, "amd64")
-    base_state = project.factory.entry_state()
+    base_state = project.factory.entry_state(add_options=ZERO_FILL_OPTIONS)
 
     iterations = 10
     for corpus_size in [1, 10, 50, 100]:
@@ -282,7 +288,7 @@ def bench_input_size_scaling():
     print("\n=== Benchmark: Input Size Scaling ===")
 
     project = angr.load_shellcode(SHELLCODE_SIMPLE, "amd64")
-    base_state = project.factory.entry_state()
+    base_state = project.factory.entry_state(add_options=ZERO_FILL_OPTIONS)
 
     iterations = 10
     for input_size in [1, 16, 64, 256, 1024, 4096]:
@@ -303,7 +309,7 @@ def bench_mutation_count_scaling():
     print("\n=== Benchmark: Mutation Count Scaling ===")
 
     project = angr.load_shellcode(SHELLCODE_SIMPLE, "amd64")
-    base_state = project.factory.entry_state()
+    base_state = project.factory.entry_state(add_options=ZERO_FILL_OPTIONS)
 
     iterations = 10
     for max_mutations in [1, 2, 5, 10, 25]:
@@ -325,7 +331,7 @@ def profile_fuzzer(iterations=200):
     print("\n=== cProfile: Fuzzer Hot Path ===")
 
     project = angr.load_shellcode(SHELLCODE_SIMPLE, "amd64")
-    base_state = project.factory.entry_state()
+    base_state = project.factory.entry_state(add_options=ZERO_FILL_OPTIONS)
     corpus = InMemoryCorpus.from_list([b"\x00", b"A", b"B", b"C", b"D"])
     solutions = InMemoryCorpus()
     fuzzer = Fuzzer(
@@ -361,7 +367,7 @@ def profile_apply_fn_overhead(iterations=200):
     print("\n=== Profile: apply_fn Overhead ===")
 
     project = angr.load_shellcode(SHELLCODE_SIMPLE, "amd64")
-    base_state = project.factory.entry_state()
+    base_state = project.factory.entry_state(add_options=ZERO_FILL_OPTIONS)
 
     apply_fn_total = 0.0
     apply_fn_calls = 0
