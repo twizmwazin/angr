@@ -40,6 +40,7 @@ class IcicleStateTranslationData:
     explicit_page_metadata: dict[int, int | None]
     initial_cpu_icount: int
     icicle_arch: str
+    snapshot_page_hashes: dict[int, int] | None = None  # hash of page content at snapshot time
 
 
 class IcicleEngine(ConcreteEngine):
@@ -363,9 +364,22 @@ class IcicleEngine(ConcreteEngine):
                 writable_pages.discard(page_num)
 
         # 3. Copy writable page contents.
+        # When snapshot mode is active, the Icicle VM was restored to the
+        # snapshot state.  Skip pages that can't have changed: if a page
+        # isn't present in the new state's page table, it was never touched
+        # (CoW means only accessed/written pages get materialized).  For
+        # pages that are present, compare by hash to avoid writing unchanged
+        # data.
+        snapshot_hashes = base_translation_data.snapshot_page_hashes
+        state_pages = state.memory._pages
         for page_num in writable_pages:
+            if snapshot_hashes is not None and page_num not in state_pages:
+                continue
             addr = page_num * page_size
             memory = state.memory.concrete_load(addr, page_size)
+            if snapshot_hashes is not None and page_num in snapshot_hashes \
+                    and hash(bytes(memory)) == snapshot_hashes[page_num]:
+                continue
             emu.mem_write(addr, memory)
 
         return IcicleStateTranslationData(
@@ -376,6 +390,7 @@ class IcicleEngine(ConcreteEngine):
             explicit_page_metadata=explicit_page_metadata,
             initial_cpu_icount=emu.cpu_icount,
             icicle_arch=icicle_arch,
+            snapshot_page_hashes=snapshot_hashes,
         )
 
     def enable_snapshot_mode(self) -> None:
@@ -415,6 +430,14 @@ class IcicleEngine(ConcreteEngine):
             if self._snapshot_mode and self._cached_emu is None:
                 emu.save_snapshot()
                 self._cached_emu = emu
+                # Save hashes of writable page content at snapshot time so we
+                # can skip re-writing unchanged pages on subsequent iterations.
+                page_hashes = {}
+                for page_num in translation_data.writable_pages:
+                    addr = page_num * state.memory.page_size
+                    page_data = state.memory.concrete_load(addr, state.memory.page_size)
+                    page_hashes[page_num] = hash(bytes(page_data))
+                translation_data.snapshot_page_hashes = page_hashes
                 self._base_translation_data = translation_data
 
         # Set extra stop points, skip the current PC. Track which ones were
