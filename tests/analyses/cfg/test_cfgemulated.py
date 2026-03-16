@@ -136,25 +136,21 @@ class TestCfgemulate(unittest.TestCase):
         cfg_path = binary_path + ".cfg"
         self.perform_single(binary_path, cfg_path)
 
-    @broken
     def test_cfg_1(self):
         binary_path = os.path.join(test_location, "x86_64", "cfg_1")
         cfg_path = binary_path + ".cfg"
         self.perform_single(binary_path, cfg_path)
 
-    @broken
     def test_cfg_2(self):
         binary_path = os.path.join(test_location, "armel", "test_division")
         cfg_path = binary_path + ".cfg"
         self.perform_single(binary_path, cfg_path)
 
-    @broken
     def test_cfg_3(self):
         binary_path = os.path.join(test_location, "mips", "test_arrays")
         cfg_path = binary_path + ".cfg"
         self.perform_single(binary_path, cfg_path)
 
-    @broken
     def test_cfg_4(self):
         binary_path = os.path.join(test_location, "mipsel", "darpa_ping")
         cfg_path = binary_path + ".cfg"
