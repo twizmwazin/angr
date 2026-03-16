@@ -17,7 +17,7 @@ from angr.errors import AngrTypeError
 from angr.knowledge_plugins import Function
 from angr.utils.library import get_cpp_function_name
 from angr.utils.formatting import ansi_color_enabled, ansi_color, add_edge_to_buffer
-from angr.block import DisassemblerInsn, CapstoneInsn, SootBlockNode
+from angr.block import DisassemblerInsn, CapstoneInsn, SleighInsn, SootBlockNode
 from angr.codenode import BlockNode
 from .disassembly_utils import decode_instruction
 
@@ -196,7 +196,11 @@ class Instruction(DisassemblyPiece):
         self.dissect_instruction()
 
     def dissect_instruction(self):
-        if isinstance(
+        if isinstance(self.insn, SleighInsn):
+            # SLEIGH instructions don't have capstone-specific operand
+            # details, so always use the default dissection path.
+            self.dissect_instruction_by_default()
+        elif isinstance(
             self.arch,
             (archinfo.ArchAArch64, archinfo.ArchARM, archinfo.ArchARMEL, archinfo.ArchARMHF, archinfo.ArchARMCortexM),
         ):
@@ -1102,6 +1106,35 @@ class Disassembly(Analysis):
             self._func_cache[f.addr] = f
             return f
 
+    def _sleigh_disasm_block(self, block: BlockNode, bs: BlockStart) -> bool:
+        """
+        Try to disassemble a block using the SLEIGH-based disassembler.
+        Returns True if successful, False if SLEIGH is not available.
+        """
+        from angr.block import _SleighAssembler, _sleigh_assembler_cache
+
+        if _SleighAssembler is None:
+            return False
+
+        try:
+            arch = self.project.arch
+            arch_key = getattr(arch, "linux_name", None) or arch.name
+            if arch_key not in _sleigh_assembler_cache:
+                _sleigh_assembler_cache[arch_key] = _SleighAssembler.from_arch(arch)
+            asm = _sleigh_assembler_cache[arch_key]
+
+            if block.bytestr is None:
+                bytestr = self.project.factory.block(block.addr, block.size).bytes
+            else:
+                bytestr = block.bytestr
+
+            self.block_to_insn_addrs[block.addr] = []
+            for si in asm.disasm(bytestr, block.addr):
+                self._add_instruction_to_results(block, SleighInsn(si), bs)
+            return True
+        except Exception:
+            return False
+
     def _add_instruction_to_results(self, block: BlockNode, insn: DisassemblerInsn, bs: BlockStart) -> None:
         """
         Add instruction to analysis results with associated labels and comments
@@ -1161,7 +1194,7 @@ class Disassembly(Analysis):
             self.raw_result_map["hooks"][block.addr] = hook
         elif self.project.arch.capstone_support:
             # Prefer Capstone first, where we are able to extract a bit more
-            # about the operands
+            # about the operands (instruction groups, operand types, etc.)
             if block.thumb:
                 aligned_block_addr = (block.addr >> 1) << 1
                 cs = self.project.arch.capstone_thumb
@@ -1175,6 +1208,8 @@ class Disassembly(Analysis):
             self.block_to_insn_addrs[block.addr] = []
             for cs_insn in cs.disasm(bytestr, block.addr):
                 self._add_instruction_to_results(block, CapstoneInsn(cs_insn), bs)
+        elif self._sleigh_disasm_block(block, bs):
+            pass  # Successfully used SLEIGH disassembly
         elif pcode is not None and isinstance(self.project.factory.default_engine, pcode.HeavyPcodeMixin):
             # When using the P-code engine, we can fall back on its disassembly
             # in the event that Capstone does not support it

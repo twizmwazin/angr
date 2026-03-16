@@ -15,6 +15,14 @@ try:
 except ImportError:
     pcode = None
 
+try:
+    from .assembler import Assembler as _SleighAssembler
+except ImportError:
+    _SleighAssembler = None
+
+# Cache for SleighAssembler instances, keyed by architecture string
+_sleigh_assembler_cache: dict[str, object] = {}
+
 if TYPE_CHECKING:
     from angr import Project
     from angr.engines.vex import VEXLifter
@@ -164,6 +172,48 @@ class PCodeInsn(DisassemblerInsn):
         raise AttributeError
 
 
+class SleighBlock(DisassemblerBlock):
+    """
+    Block of disassembled instructions from the SLEIGH-based disassembler.
+    """
+
+    __slots__ = ()
+
+
+class SleighInsn(DisassemblerInsn):
+    """
+    Represents a SLEIGH-disassembled instruction.
+    """
+
+    __slots__ = ("insn",)
+
+    def __init__(self, sleigh_insn):
+        self.insn = sleigh_insn
+
+    @property
+    def size(self) -> int:
+        return self.insn.size
+
+    @property
+    def address(self) -> int:
+        return self.insn.address
+
+    @property
+    def mnemonic(self) -> str:
+        return self.insn.mnemonic
+
+    @property
+    def op_str(self) -> str:
+        return self.insn.op_str
+
+    def __getattr__(self, item):
+        if item in ("__str__", "__repr__"):
+            return self.__getattribute__(item)
+        if hasattr(self.insn, item):
+            return getattr(self.insn, item)
+        raise AttributeError
+
+
 class Block(Serializable):
     """
     Represents a basic block in a binary or a program.
@@ -188,6 +238,7 @@ class Block(Serializable):
         "_opt_level",
         "_pcode",
         "_project",
+        "_sleigh",
         "_strict_block_end",
         "_traceflags",
         "_vex",
@@ -256,6 +307,7 @@ class Block(Serializable):
         self._disassembly = None
         self._capstone = None
         self._pcode = None
+        self._sleigh = None
         self._collect_data_refs = collect_data_refs
         self._strict_block_end = strict_block_end
         self._cross_insn_opt = cross_insn_opt
@@ -428,14 +480,48 @@ class Block(Serializable):
     @property
     def disassembly(self) -> DisassemblerBlock:
         """
-        Provide a disassembly object using whatever disassembler is available
+        Provide a disassembly object using whatever disassembler is available.
+
+        Prefers the SLEIGH-based disassembler when available, falling back to
+        capstone or pcode.
         """
         if self._disassembly is None:
-            if self._using_pcode_engine:
+            if _SleighAssembler is not None:
+                try:
+                    self._disassembly = self.sleigh
+                except Exception:
+                    if self._project is not None and self._using_pcode_engine:
+                        self._disassembly = self.vex.disassembly  # type: ignore
+                    else:
+                        self._disassembly = self.capstone
+            elif self._project is not None and self._using_pcode_engine:
                 self._disassembly = self.vex.disassembly  # type: ignore
             else:
                 self._disassembly = self.capstone
         return self._disassembly
+
+    @property
+    def sleigh(self) -> SleighBlock:
+        """Disassemble using the SLEIGH-based disassembler."""
+        if self._sleigh:
+            return self._sleigh
+
+        if _SleighAssembler is None:
+            raise ImportError("SLEIGH assembler is not available")
+
+        arch_key = getattr(self.arch, "linux_name", None) or self.arch.name
+        if arch_key not in _sleigh_assembler_cache:
+            _sleigh_assembler_cache[arch_key] = _SleighAssembler.from_arch(self.arch)
+        asm = _sleigh_assembler_cache[arch_key]
+
+        block_bytes = self.bytes
+        if self.size is not None:
+            block_bytes = block_bytes[: self.size]  # type: ignore
+        insns = [SleighInsn(si) for si in asm.disasm(block_bytes, self.addr)]
+        block = SleighBlock(self.addr, insns, self.thumb, self.arch)
+
+        self._sleigh = block
+        return block
 
     @property
     def capstone(self) -> CapstoneBlock:
