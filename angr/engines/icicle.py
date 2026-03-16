@@ -170,10 +170,11 @@ class IcicleEngine(ConcreteEngine):
         for register in state.arch.register_list:
             register = register.vex_name.lower() if register.vex_name is not None else register.name
             try:
-                emu.reg_write(
-                    register,
-                    state.solver.eval(state.registers.load(register), cast_to=int),
-                )
+                val = state.registers.load(register)
+                if val.concrete:
+                    emu.reg_write(register, val.concrete_value)
+                else:
+                    emu.reg_write(register, state.solver.eval(val, cast_to=int))
                 copied_registers.add(register)
             except KeyError:
                 log.debug("Register %s not found in icicle", register)
@@ -300,10 +301,11 @@ class IcicleEngine(ConcreteEngine):
         # 1. Copy register values
         for register in base_translation_data.registers:
             with suppress(KeyError):
-                emu.reg_write(
-                    register,
-                    state.solver.eval(state.registers.load(register), cast_to=int),
-                )
+                val = state.registers.load(register)
+                if val.concrete:
+                    emu.reg_write(register, val.concrete_value)
+                else:
+                    emu.reg_write(register, state.solver.eval(val, cast_to=int))
 
         # Handle thumb/ARM mode
         if IcicleEngine.__is_thumb(state.arch, icicle_arch, state.addr):
