@@ -1,3 +1,4 @@
+pub mod assembler;
 pub mod automaton;
 pub mod fuzzer;
 pub mod icicle;
@@ -25,6 +26,7 @@ fn import_submodule<'py>(
 
 #[pymodule]
 fn rustylib(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    import_submodule(m.py(), m, "angr.rustylib", "assembler", assembler::assembler)?;
     import_submodule(m.py(), m, "angr.rustylib", "fuzzer", fuzzer::fuzzer)?;
     import_submodule(m.py(), m, "angr.rustylib", "icicle", icicle::icicle)?;
     import_submodule(

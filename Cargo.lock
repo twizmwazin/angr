@@ -69,6 +69,8 @@ dependencies = [
  "rangemap",
  "send_wrapper",
  "serde",
+ "sleigh-compile",
+ "sleigh-runtime",
  "target-lexicon",
  "tempfile",
 ]

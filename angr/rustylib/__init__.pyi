@@ -1,6 +1,6 @@
 from typing_extensions import override
 
-from . import automaton, fuzzer, icicle
+from . import assembler, automaton, fuzzer, icicle
 
 class Segment:
     """
@@ -169,4 +169,4 @@ class SegmentList:
         :returns: A copy of the SegmentList instance.
         """
 
-__all__ = ["Segment", "SegmentList", "automaton", "fuzzer", "icicle"]
+__all__ = ["Segment", "SegmentList", "assembler", "automaton", "fuzzer", "icicle"]
