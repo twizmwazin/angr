@@ -28,6 +28,7 @@ from .javavm_classloader import SimJavaVmClassloader
 from .symbolizer import SimSymbolizer
 from .debug_variables import SimDebugVariable, SimDebugVariablePlugin
 from .edge_hitmap import SimStateEdgeHitmap
+from .exceptions import PendingException, SimStateExceptions
 from .icicle import SimStateIcicle
 
 __all__ = (
@@ -42,6 +43,7 @@ __all__ = (
     "InspectAttrs",
     "PTChunk",
     "PTChunkIterator",
+    "PendingException",
     "PosixDevFS",
     "PosixProcFS",
     "SimAction",
@@ -68,6 +70,7 @@ __all__ = (
     "SimSolver",
     "SimStateCGC",
     "SimStateEdgeHitmap",
+    "SimStateExceptions",
     "SimStateGlobals",
     "SimStateHistory",
     "SimStateIcicle",

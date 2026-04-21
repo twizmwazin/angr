@@ -12,6 +12,7 @@ import claripy
 import pypcode
 from archinfo import Arch, ArchARMCortexM, ArchPcode, Endness
 
+from angr.engines.exceptions import ExceptionMixin
 from angr.engines.failure import SimEngineFailure
 from angr.engines.hook import HooksMixin
 from angr.engines.successors import SimSuccessors, SuccessorsEngine
@@ -664,9 +665,20 @@ class IcicleEngine(SuccessorsEngine):
         return result
 
 
-class UberIcicleEngine(SimEngineFailure, SimEngineSyscall, HooksMixin, IcicleEngine):
+class UberIcicleEngine(
+    SimEngineFailure,
+    SimEngineSyscall,
+    HooksMixin,
+    ExceptionMixin,
+    IcicleEngine,
+):
     """
     An extension of the IcicleEngine that uses mixins to add support for
-    syscalls and hooks. Most users will prefer to use this engine instead of the
-    IcicleEngine directly.
+    syscalls, hooks, and asynchronous exceptions. Most users will prefer
+    to use this engine instead of the IcicleEngine directly.
+
+    The ``ExceptionMixin`` integrates with
+    :class:`angr.state_plugins.SimStateExceptions` and the arch's
+    :class:`angr.sim_exceptions.SimException` model to dispatch pending
+    interrupts/signals between execution batches.
     """
