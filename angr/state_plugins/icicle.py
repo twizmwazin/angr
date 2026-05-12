@@ -55,6 +55,7 @@ class SimStateIcicle(SimStatePlugin):
         base_translation_data: IcicleStateTranslationData | None = None,
         translation_data: IcicleStateTranslationData | None = None,
         dirty_pages: set[int] | None = None,
+        mem_breakpoints: set[tuple[int, int]] | None = None,
     ):
         super().__init__()
         self.vm_ref = vm_ref
@@ -62,6 +63,14 @@ class SimStateIcicle(SimStatePlugin):
         self.base_translation_data = base_translation_data
         self.translation_data = translation_data
         self.dirty_pages = dirty_pages if dirty_pages is not None else set()
+        #: Address ranges ``(start, end)`` (end-exclusive) on which
+        #: :class:`~angr.engines.icicle.IcicleEngine` should fire
+        #: ``mem_read`` / ``mem_write`` inspect breakpoints. The engine
+        #: arms icicle watchpoints on these pages, then replays any
+        #: trapping load/store through VEX so the inspect handler sees
+        #: it with the live PC and operand registers. Add ranges as
+        #: ``state.icicle.mem_breakpoints.add((start, end))``.
+        self.mem_breakpoints = mem_breakpoints if mem_breakpoints is not None else set()
 
     @property
     def is_live(self) -> bool:
@@ -79,6 +88,7 @@ class SimStateIcicle(SimStatePlugin):
             base_translation_data=self.base_translation_data,
             translation_data=self.translation_data,
             dirty_pages=set(self.dirty_pages),
+            mem_breakpoints=set(self.mem_breakpoints),
         )
 
     def merge(self, others, merge_conditions, common_ancestor=None):

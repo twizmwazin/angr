@@ -16,6 +16,7 @@ from angr.engines.failure import SimEngineFailure
 from angr.engines.hook import HooksMixin
 from angr.engines.successors import SimSuccessors, SuccessorsEngine
 from angr.engines.syscall import SimEngineSyscall
+from angr.engines.vex.heavy.heavy import HeavyVEXMixin
 from angr.errors import SimMemoryError
 from angr.rustylib.icicle import ExceptionCode, Icicle, VmExit
 from angr.sim_state import SimState
@@ -27,6 +28,12 @@ log = logging.getLogger(__name__)
 
 
 PROCESSORS_DIR = os.path.join(os.path.dirname(pypcode.__file__), "processors")
+
+
+class _VEXReplayEngine(HeavyVEXMixin):
+    """Single-instruction VEX engine used by :class:`IcicleEngine` to
+    replay a load/store through ``state.memory`` after a watchpoint trap.
+    """
 
 
 def _syscall_jumpkind(arch_name: str, emu) -> str:
@@ -179,7 +186,10 @@ class IcicleEngine(SuccessorsEngine):
         addr = page_num * page_size
         memory, bitmap = state.memory.concrete_load(addr, page_size, with_bitmap=True)
         if any(bitmap):
-            memory = state.solver.eval(state.memory.load(addr, page_size), cast_to=bytes)
+            # Host-side sync read; do not fire user ``mem_read`` breakpoints.
+            memory = state.solver.eval(
+                state.memory.load(addr, page_size, inspect=False), cast_to=bytes
+            )
         emu.mem_write(addr, memory)
 
     @staticmethod
@@ -235,7 +245,13 @@ class IcicleEngine(SuccessorsEngine):
         # 3.1 history.jumpkind
         exc = emu.exception_code
         if status == VmExit.UnhandledException:
-            if exc in (
+            if exc in (ExceptionCode.ReadWatch, ExceptionCode.WriteWatch):
+                # Watch traps are handled by ``_run_icicle`` (it replays
+                # the faulting instruction through VEX). Convert the
+                # intermediate state with Ijk_Boring so downstream
+                # consumers don't treat it as a fault.
+                state.history.jumpkind = "Ijk_Boring"
+            elif exc in (
                 ExceptionCode.ReadUnmapped,
                 ExceptionCode.ReadPerm,
                 ExceptionCode.WriteUnmapped,
@@ -370,6 +386,8 @@ class IcicleEngine(SuccessorsEngine):
                 continue
             IcicleEngine.__write_page(emu, state, page_num)
 
+        IcicleEngine._apply_memory_breakpoints(emu, state)
+
         # restore_snapshot zeroes the hitmap; full init starts with no
         # hitmap. Either way we (re-)copy.
         IcicleEngine.__sync_edge_hitmap(emu, state)
@@ -383,6 +401,41 @@ class IcicleEngine(SuccessorsEngine):
             initial_cpu_icount=emu.cpu_icount,
             icicle_arch=icicle_arch,
         )
+
+    @staticmethod
+    def _apply_memory_breakpoints(emu: Icicle, state: SimState[int, int]) -> None:
+        """Arm icicle watchpoints on every range in
+        ``state.icicle.mem_breakpoints``. Idempotent.
+        """
+        plugin = state.get_plugin("icicle") if state.has_plugin("icicle") else None
+        if not isinstance(plugin, SimStateIcicle) or not plugin.mem_breakpoints:
+            return
+        for start, end in plugin.mem_breakpoints:
+            emu.add_memory_breakpoint(start, end - start)
+
+    def _replay_instruction(self, state: SimState[int, int]) -> SimState[int, int]:
+        """Step the instruction at ``state.regs.pc`` through VEX, returning
+        the successor. Used to recover from a watchpoint trap: the load
+        or store routes through ``state.memory`` and fires the user's
+        inspect breakpoints.
+        """
+        engine = _VEXReplayEngine(self.project)
+        successors = engine.process(state, num_inst=1)
+        picked = (
+            successors.flat_successors[0]
+            if successors.flat_successors
+            else (successors.all_successors[0] if successors.all_successors else None)
+        )
+        if picked is None:
+            log.warning("VEX replay produced no successors at %#x", state.addr)
+            return state
+        # Break ancestry so the per-replay state graph can be collected.
+        hist = picked.history
+        if hist is not None:
+            hist.parent = None
+            hist.recent_bbl_addrs = []
+            hist.recent_events = []
+        return picked
 
     @staticmethod
     def _install_dirty_page_tracking(state: SimState[int, int]) -> None:
@@ -457,6 +510,9 @@ class IcicleEngine(SuccessorsEngine):
                 if perm_bits & 2:
                     writable_pages.add(page_num)
             IcicleEngine.__write_page(emu, state, page_num)
+
+        # Re-arm: newly mem_map'd pages above come in without watch state.
+        IcicleEngine._apply_memory_breakpoints(emu, state)
 
         return IcicleStateTranslationData(
             base_state=state,
@@ -562,8 +618,26 @@ class IcicleEngine(SuccessorsEngine):
         page_size = state.memory.page_size
         emu.reset_page_modification_tracking([page_num * page_size for page_num in translation_data.writable_pages])
 
-        # Run it
-        status = emu.run()
+        # On a watchpoint trap, replay the faulting instruction via VEX
+        # to route its load/store through state.memory and resume.
+        while True:
+            status = emu.run()
+            if status != VmExit.UnhandledException:
+                break
+            if emu.exception_code not in (ExceptionCode.ReadWatch, ExceptionCode.WriteWatch):
+                break
+            replay_state = IcicleEngine.__convert_icicle_state_to_angr(emu, translation_data, status)
+            # Snapshot page identities pre-replay; the VEX replay's store
+            # (if any) CoWs pages it touches. Compare post-replay to find
+            # the actual dirty set instead of resyncing every page.
+            pre_replay_pages = dict(replay_state.memory._pages)
+            replay_state = self._replay_instruction(replay_state)
+            dirty = [
+                page_num
+                for page_num, page in replay_state.memory._pages.items()
+                if pre_replay_pages.get(page_num) is not page
+            ]
+            translation_data = self.__sync_continuation(emu, replay_state, translation_data, dirty)
 
         # Clean up extra stop points
         for addr in added_breakpoints:

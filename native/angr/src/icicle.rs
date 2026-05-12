@@ -356,6 +356,44 @@ impl Icicle {
         Ok(())
     }
 
+    /// Arm read and write watchpoints on every mapped page covering
+    /// ``[addr, addr+size)``.
+    ///
+    /// A load or store on any armed page halts the VM with
+    /// ``ExceptionCode::ReadWatch`` / ``WriteWatch`` at the faulting PC.
+    /// Unmapped pages in the range are skipped silently. Watch state
+    /// lives in the icicle perm byte and survives ``save_snapshot`` /
+    /// ``restore_snapshot``.
+    pub fn add_memory_breakpoint(&mut self, addr: u64, size: u64) -> PyResult<()> {
+        if size == 0 {
+            return Err(PyRuntimeError::new_err("size must be > 0"));
+        }
+        let page_size = self.vm.cpu.mem.page_size();
+        let page_mask = !(page_size - 1);
+        let end = addr.saturating_add(size - 1);
+        let mut page = addr & page_mask;
+        let last = end & page_mask;
+        let watch = perm::READ_WATCH | perm::WRITE_WATCH;
+        loop {
+            // get_perm returns 0 for unmapped pages and the mapping's
+            // perm byte (without MAP for Unallocated entries) otherwise,
+            // so gate on "any perm" rather than checking the MAP bit.
+            // Skip the update_perm call when the page already carries the
+            // watch bits: update_perm invalidates the TLB range and
+            // rewrites the per-byte perm array, which would otherwise
+            // make idempotent re-arming expensive.
+            let cur = self.vm.cpu.mem.get_perm(page);
+            if cur != perm::NONE && cur & watch != watch {
+                let _ = self.vm.cpu.mem.update_perm(page, page_size, cur | watch);
+            }
+            if page == last {
+                break;
+            }
+            page += page_size;
+        }
+        Ok(())
+    }
+
     pub fn mem_read(&mut self, addr: u64, size: u64) -> PyResult<Vec<u8>> {
         let mut buf = vec![0; size as usize];
         self.vm

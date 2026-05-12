@@ -126,6 +126,18 @@ class Icicle:
         :arg perms: The new permissions for the memory region.
         """
 
+    def add_memory_breakpoint(self, addr: int, size: int) -> None:
+        """Arm read/write watchpoints over the pages covering [addr, addr+size).
+
+        A load or store to any mapped page in the range halts the VM
+        with ``ExceptionCode.ReadWatch`` / ``WriteWatch`` at the faulting
+        PC. Unmapped pages are skipped silently. Watch state is captured
+        in ``save_snapshot`` and restored by ``restore_snapshot``.
+
+        :arg addr: Start of the watched range.
+        :arg size: Range length in bytes (must be > 0).
+        """
+
     def mem_read(self, addr: int, size: int) -> bytes:
         """Read data from memory.
 
