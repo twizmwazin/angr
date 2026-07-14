@@ -15,6 +15,8 @@ concurrency:
 jobs:
   ci:
     uses: angr/ci-settings/.github/workflows/angr-ci.yml@master
+    with:
+      container_image: angr/ci:drop-claripy
 
   smoketest:
     name: Test installation
