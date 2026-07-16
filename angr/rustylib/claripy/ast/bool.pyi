@@ -1,0 +1,109 @@
+"""Type stubs for ``angr.rustylib.claripy.ast.bool``.
+
+The ``Bool`` AST sort and the boolean operation functions.
+
+Arguments typed ``Bool | bool | int | BV`` reflect the runtime coercion
+rules: Python bools and ints become concrete ``BoolV`` values, and a
+``BV`` argument is coerced to ``bv != 0``.
+"""
+
+from collections.abc import Iterable, Sequence
+from typing import Any, overload
+
+from angr.rustylib.claripy.annotation import Annotation
+from angr.rustylib.claripy.ast.base import Base
+from angr.rustylib.claripy.ast.bv import BV
+from angr.rustylib.claripy.ast.fp import FP
+from angr.rustylib.claripy.ast.strings import String
+
+type _BoolLike = Bool | bool | int | BV
+type _BVLike = BV | int | Bool | bytes | str
+
+class Bool(Base):
+    def __init__(self, op: str, args: Sequence[Any], annotations: Sequence[Annotation] | None = None) -> None:
+        """Reconstruct a node from ``(op, args, annotations)`` verbatim, without
+        simplifying (e.g. when unpickling)."""
+
+    def size(self) -> int: ...
+    def __len__(self) -> int: ...
+    def is_true(self) -> bool: ...
+    def is_false(self) -> bool: ...
+    @property
+    def concrete_value(self) -> bool | None: ...
+    @property
+    def cardinality(self) -> int: ...
+    def __invert__(self) -> Bool: ...
+    def __and__(self, value: _BoolLike, /) -> Bool: ...
+    def __or__(self, value: _BoolLike, /) -> Bool: ...
+    def __xor__(self, value: _BoolLike, /) -> Bool: ...
+    def __eq__(self, value: _BoolLike, /) -> Bool: ...  # type: ignore[override]
+    def __ne__(self, value: _BoolLike, /) -> Bool: ...  # type: ignore[override]
+    def __hash__(self) -> int: ...
+    def __reduce__(self) -> tuple[type[Bool], tuple[str, list[Any], list[Annotation]]]: ...
+
+def BoolS(name: str | bytes, explicit_name: bool = False) -> Bool: ...
+def BoolV(value: bool) -> Bool: ...
+@overload
+def Not(b: Bool) -> Bool: ...
+@overload
+def Not(b: BV) -> BV: ...
+@overload
+def And(*args: Bool | bool) -> Bool: ...
+@overload
+def And(lhs: _BVLike, rhs: _BVLike, /) -> BV: ...
+@overload
+def Or(*args: Bool | bool) -> Bool: ...
+@overload
+def Or(lhs: _BVLike, rhs: _BVLike, /) -> BV: ...
+@overload
+def xor(a: Bool, b: Bool | bool) -> Bool: ...
+@overload
+def xor(a: BV | int | bytes | str, b: _BVLike) -> BV: ...
+def Eq(a: Bool, b: Bool) -> Bool: ...
+@overload
+def If(cond: _BoolLike, then_: Bool, else_: Bool | bool) -> Bool: ...
+@overload
+def If(cond: _BoolLike, then_: Bool | bool, else_: Bool) -> Bool: ...
+@overload
+def If(cond: _BoolLike, then_: BV, else_: _BVLike) -> BV: ...
+@overload
+def If(cond: _BoolLike, then_: _BVLike, else_: BV) -> BV: ...
+@overload
+def If(cond: _BoolLike, then_: FP, else_: FP | float) -> FP: ...
+@overload
+def If(cond: _BoolLike, then_: FP | float, else_: FP) -> FP: ...
+@overload
+def If(cond: _BoolLike, then_: String, else_: String | str) -> String: ...
+@overload
+def If(cond: _BoolLike, then_: String | str, else_: String) -> String: ...
+def true() -> Bool: ...
+def false() -> Bool: ...
+def ite_cases(cases: Iterable[Iterable[Any]], default: Any) -> Base:
+    """Create an if-then-else tree from (condition, value) pairs with a default
+    value."""
+
+def reverse_ite_cases(ast: Base) -> list[tuple[Bool, Any]]:
+    """Given an expression created by ``ite_cases``, produce the
+    (condition, value) pairs that generated it."""
+
+def ite_dict(i: Base, d: dict[Any, Any], default: Any) -> Base:
+    """Create a binary search tree for large lookup tables: ``i`` is the
+    variable, ``d`` maps possible values of ``i`` to results, and ``default``
+    is used when ``i`` matches no key."""
+
+__all__ = [
+    "And",
+    "Bool",
+    "BoolS",
+    "BoolV",
+    "Eq",
+    "If",
+    "Not",
+    "Or",
+    "false",
+    "ite_cases",
+    "ite_dict",
+    "reverse_ite_cases",
+    "true",
+    "xor",
+]
