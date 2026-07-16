@@ -4,6 +4,9 @@ from collections.abc import Sequence
 from typing import Any, Self
 
 from angr.rustylib.claripy.annotation import Annotation
+from angr.rustylib.claripy.ast.fp import RM, FSort
+
+type ArgType = Base | bool | int | float | str | FSort | RM
 
 class Base:
     @property
@@ -50,4 +53,4 @@ class Base:
     def clear_annotations(self) -> Self: ...
     def clear_annotation_type(self, annotation_type: type[Annotation]) -> Self: ...
 
-__all__ = ["Base"]
+__all__ = ["ArgType", "Base"]
