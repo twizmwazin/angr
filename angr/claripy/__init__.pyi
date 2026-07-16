@@ -1,11 +1,5 @@
-"""Type stubs for ``angr.claripy``.
-
-At runtime ``angr.claripy`` is a ``sys.modules`` alias (created in
-``angr/__init__.py``) for ``angr.rustylib.claripy``, which type checkers
-cannot see. This stub-only package mirrors the alias by re-exporting the
-canonical ``angr.rustylib.claripy`` stubs; there is no runtime module
-behind it.
-"""
+"""Type stubs for ``angr.claripy``, the runtime ``sys.modules`` alias of
+``angr.rustylib.claripy``. Stub-only; there is no runtime module behind it."""
 
 from angr.rustylib.claripy import *
 

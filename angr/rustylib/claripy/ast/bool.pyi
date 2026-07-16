@@ -1,11 +1,4 @@
-"""Type stubs for ``angr.rustylib.claripy.ast.bool``.
-
-The ``Bool`` AST sort and the boolean operation functions.
-
-Arguments typed ``Bool | bool | int | BV`` reflect the runtime coercion
-rules: Python bools and ints become concrete ``BoolV`` values, and a
-``BV`` argument is coerced to ``bv != 0``.
-"""
+"""Type stubs for ``angr.rustylib.claripy.ast.bool``."""
 
 from collections.abc import Iterable, Sequence
 from typing import Any, overload
@@ -20,10 +13,7 @@ type _BoolLike = Bool | bool | int | BV
 type _BVLike = BV | int | Bool | bytes | str
 
 class Bool(Base):
-    def __init__(self, op: str, args: Sequence[Any], annotations: Sequence[Annotation] | None = None) -> None:
-        """Reconstruct a node from ``(op, args, annotations)`` verbatim, without
-        simplifying (e.g. when unpickling)."""
-
+    def __init__(self, op: str, args: Sequence[Any], annotations: Sequence[Annotation] | None = None) -> None: ...
     def size(self) -> int: ...
     def __len__(self) -> int: ...
     def is_true(self) -> bool: ...
@@ -78,18 +68,9 @@ def If(cond: _BoolLike, then_: String, else_: String | str) -> String: ...
 def If(cond: _BoolLike, then_: String | str, else_: String) -> String: ...
 def true() -> Bool: ...
 def false() -> Bool: ...
-def ite_cases(cases: Iterable[Iterable[Any]], default: Any) -> Base:
-    """Create an if-then-else tree from (condition, value) pairs with a default
-    value."""
-
-def reverse_ite_cases(ast: Base) -> list[tuple[Bool, Any]]:
-    """Given an expression created by ``ite_cases``, produce the
-    (condition, value) pairs that generated it."""
-
-def ite_dict(i: Base, d: dict[Any, Any], default: Any) -> Base:
-    """Create a binary search tree for large lookup tables: ``i`` is the
-    variable, ``d`` maps possible values of ``i`` to results, and ``default``
-    is used when ``i`` matches no key."""
+def ite_cases(cases: Iterable[Iterable[Any]], default: Any) -> Base: ...
+def reverse_ite_cases(ast: Base) -> list[tuple[Bool, Any]]: ...
+def ite_dict(i: Base, d: dict[Any, Any], default: Any) -> Base: ...
 
 __all__ = [
     "And",

@@ -1,7 +1,4 @@
-"""Type stubs for ``angr.rustylib.claripy.ast.strings``.
-
-The ``String`` AST sort and the string operation functions.
-"""
+"""Type stubs for ``angr.rustylib.claripy.ast.strings``."""
 
 from collections.abc import Sequence
 from typing import Any
@@ -14,10 +11,7 @@ from angr.rustylib.claripy.ast.bv import BV
 type _BVLike = BV | int | Bool | bytes | str
 
 class String(Base):
-    def __init__(self, op: str, args: Sequence[Any], annotations: Sequence[Annotation] | None = None) -> None:
-        """Reconstruct a node from ``(op, args, annotations)`` verbatim, without
-        simplifying (e.g. when unpickling)."""
-
+    def __init__(self, op: str, args: Sequence[Any], annotations: Sequence[Annotation] | None = None) -> None: ...
     @property
     def concrete_value(self) -> str | None: ...
     def __add__(self, value: String, /) -> String: ...

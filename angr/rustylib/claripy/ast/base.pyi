@@ -1,15 +1,4 @@
-"""Type stubs for ``angr.rustylib.claripy.ast.base``.
-
-``Base`` is the root of the claripy AST hierarchy. It holds the wrapped
-clarirs AST node and implements every operation that does not depend on
-the concrete sort (structure queries, hashing, simplification,
-replacement, annotation management). The sort-specific subclasses
-(``Bool``, ``BV``, ``FP``, ``String``) inherit these and add their own
-typed operations.
-
-``Base`` itself has no Python-visible constructor; instances are only
-created through the subclass constructors and the operation functions.
-"""
+"""Type stubs for ``angr.rustylib.claripy.ast.base``."""
 
 from collections.abc import Sequence
 from typing import Any, Self
@@ -43,26 +32,11 @@ class Base:
     def shallow_repr(self, max_depth: int = 2) -> str: ...
     def canonicalize(
         self, var_map: dict[int, Base] | None = None, counter: Any | None = None
-    ) -> tuple[dict[int, Base], Any, Self]:
-        """Canonicalize variable names to v0, v1, ...
-
-        ``var_map`` (hash -> canonical variable) is mutated in place when
-        provided, so a mapping can be shared across several expressions.
-        ``counter`` may be an int or any iterator of ints such as
-        ``itertools.count``; when an iterator is passed it is advanced in
-        place and returned as-is.
-        """
-
+    ) -> tuple[dict[int, Base], Any, Self]: ...
     def identical(self, other: Base) -> bool: ...
     def is_leaf(self) -> bool: ...
     def simplify(self, respect_annotations: bool = True) -> Self: ...
-    def replace(self, from_: Base, to: Base, /) -> Self:
-        """Replace occurrences of ``from_`` with ``to``.
-
-        The runtime parameter names are ``from`` and ``to``; since ``from``
-        is a Python keyword, the arguments are positional-only in practice.
-        """
-
+    def replace(self, from_: Base, to: Base, /) -> Self: ...
     def has_annotation_type(self, annotation_type: type[Annotation]) -> bool: ...
     def get_annotations_by_type(self, annotation_type: type[Annotation]) -> list[Annotation]: ...
     def get_annotation(self, annotation_type: type[Annotation]) -> Annotation | None: ...
@@ -70,9 +44,7 @@ class Base:
     def append_annotations(self, annotations: Sequence[Annotation]) -> Self: ...
     def annotate(self, *annotations: Annotation, remove_annotations: Sequence[Annotation] | None = None) -> Self: ...
     def insert_annotations(self, annotations: Sequence[Annotation]) -> Self: ...
-    def replace_annotations(self, annotations: Sequence[Annotation]) -> Self:
-        """Remove all annotations and add the given ones."""
-
+    def replace_annotations(self, annotations: Sequence[Annotation]) -> Self: ...
     def remove_annotation(self, annotation: Annotation) -> Self: ...
     def remove_annotations(self, annotations: Sequence[Annotation]) -> Self: ...
     def clear_annotations(self) -> Self: ...

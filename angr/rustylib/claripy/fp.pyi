@@ -1,8 +1,4 @@
-"""Type stubs for ``angr.rustylib.claripy.fp``.
-
-Compatibility module mirroring claripy's ``claripy.fp``: the rounding
-mode and float sort types plus the standard sort constants.
-"""
+"""Type stubs for ``angr.rustylib.claripy.fp``."""
 
 from angr.rustylib.claripy.ast.fp import RM as RM
 from angr.rustylib.claripy.ast.fp import FSort as FSort

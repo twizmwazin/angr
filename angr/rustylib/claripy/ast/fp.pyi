@@ -1,11 +1,4 @@
-"""Type stubs for ``angr.rustylib.claripy.ast.fp``.
-
-The ``FP`` (floating point) AST sort, the ``RM`` rounding-mode enum, the
-``FSort`` float sort, and the floating-point operation functions.
-
-Arguments typed ``FP | float`` reflect the runtime coercion rule that a
-Python float becomes a concrete ``FPV`` sized to match the other operand.
-"""
+"""Type stubs for ``angr.rustylib.claripy.ast.fp``."""
 
 from collections.abc import Sequence
 from typing import Any, ClassVar, overload
@@ -18,8 +11,6 @@ from angr.rustylib.claripy.ast.bv import BV
 type _FPLike = FP | float
 
 class RM:
-    """IEEE-754 rounding mode."""
-
     RM_NearestTiesEven: ClassVar[RM]
     RM_NearestTiesAwayFromZero: ClassVar[RM]
     RM_TowardsZero: ClassVar[RM]
@@ -32,8 +23,6 @@ class RM:
     def __hash__(self) -> int: ...
 
 class FSort:
-    """A floating-point sort (exponent/mantissa widths)."""
-
     @property
     def length(self) -> int: ...
     @property
@@ -52,10 +41,7 @@ FSORT_FLOAT: FSort
 FSORT_DOUBLE: FSort
 
 class FP(Bits):
-    def __init__(self, op: str, args: Sequence[Any], annotations: Sequence[Annotation] | None = None) -> None:
-        """Reconstruct a node from ``(op, args, annotations)`` verbatim, without
-        simplifying (e.g. when unpickling)."""
-
+    def __init__(self, op: str, args: Sequence[Any], annotations: Sequence[Annotation] | None = None) -> None: ...
     def is_true(self) -> bool: ...
     def is_false(self) -> bool: ...
     def size(self) -> int: ...

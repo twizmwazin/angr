@@ -1,11 +1,4 @@
-"""Type stubs for ``angr.rustylib.claripy.errors``.
-
-The claripy exception hierarchy.
-
-Note: the ``InvalidExtractBounds`` binding refers to a class whose
-``__name__`` is ``InvalidExtractBoundsError``; the module attribute is
-spelled without the ``Error`` suffix.
-"""
+"""Type stubs for ``angr.rustylib.claripy.errors``."""
 
 class ClaripyError(Exception): ...
 class ClaripyTypeError(ClaripyError): ...

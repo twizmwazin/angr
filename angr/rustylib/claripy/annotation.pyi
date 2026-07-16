@@ -1,9 +1,4 @@
-"""Type stubs for ``angr.rustylib.claripy.annotation``.
-
-Annotations attach sort-preserving metadata to AST nodes. ``Annotation``
-is the base class; user code can subclass it (subclasses are preserved
-losslessly by pickling), and the built-ins below are genuine subclasses.
-"""
+"""Type stubs for ``angr.rustylib.claripy.annotation``."""
 
 from typing import Any, ClassVar
 

@@ -1,9 +1,4 @@
-"""Type stubs for ``angr.rustylib.claripy.solver``.
-
-``Solver`` is the frontend over the clarirs solver backends. The
-subclasses select a backend: concrete-only, VSA, Z3 (cached or
-cacheless), hybrid VSA+Z3, replacement, or composite.
-"""
+"""Type stubs for ``angr.rustylib.claripy.solver``."""
 
 from collections.abc import Iterable, Sequence
 from typing import Any
@@ -22,11 +17,7 @@ class Solver:
     def constraints(self) -> list[Bool]: ...
     @property
     def variables(self) -> set[str]: ...
-    def split(self) -> list[Solver]:
-        """Split into one solver per independent (variable-connected)
-        constraint group. Each returned solver is a blank copy of this one
-        holding one group's constraints."""
-
+    def split(self) -> list[Solver]: ...
     def branch(self) -> Solver: ...
     def merge(
         self,
@@ -34,19 +25,10 @@ class Solver:
         merge_conditions: Sequence[Bool],
         common_ancestor: Solver | None = None,
     ) -> tuple[bool, Solver]: ...
-    def add(self, exprs: _BoolLike | Iterable[_BoolLike]) -> list[Bool]:
-        """Add one or more constraints. Returns only the constraints actually
-        added: trivially-true ones and duplicates are filtered out."""
-
+    def add(self, exprs: _BoolLike | Iterable[_BoolLike]) -> list[Bool]: ...
     def simplify(self) -> None: ...
-    def downsize(self) -> None:
-        """Free memory associated with the solver. A no-op that exists for
-        claripy API parity; it never affects results."""
-
-    def to_smt2(self) -> str:
-        """Render the solver's constraints as a self-contained SMT-LIB 2
-        benchmark string."""
-
+    def downsize(self) -> None: ...
+    def to_smt2(self) -> str: ...
     def satisfiable(self, extra_constraints: Sequence[_BoolLike] | None = None, exact: bool | None = None) -> bool: ...
     def unsat_core(self, extra_constraints: Sequence[_BoolLike] | None = None) -> list[int]: ...
     def eval_to_ast(
@@ -69,10 +51,7 @@ class Solver:
         n: int,
         extra_constraints: Sequence[_BoolLike] | None = None,
         exact: bool | None = None,
-    ) -> list[tuple[Any, ...]]:
-        """Return up to ``n`` tuples, each holding one value per expression,
-        with all values in a tuple drawn from a single model."""
-
+    ) -> list[tuple[Any, ...]]: ...
     def solution(
         self,
         expr: Base | bool | int,
@@ -118,12 +97,8 @@ class Solver:
         exact: bool | None = None,
         signed: bool = False,
     ) -> int: ...
-    def add_replacement(self, old: Base, new: Base) -> None:
-        """Add an explicit replacement mapping (SolverReplacement only)."""
-
-    def clear_replacements(self) -> None:
-        """Clear all replacements (SolverReplacement only)."""
-
+    def add_replacement(self, old: Base, new: Base) -> None: ...
+    def clear_replacements(self) -> None: ...
     def __getstate__(self) -> tuple[Any, ...]: ...
     def __setstate__(self, state: tuple[Any, ...]) -> None: ...
 

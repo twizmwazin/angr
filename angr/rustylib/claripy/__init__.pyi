@@ -1,17 +1,4 @@
-"""Type stubs for ``angr.rustylib.claripy`` -- the claripy API built from
-the vendored clarirs sources.
-
-The canonical module paths are ``angr.rustylib.claripy.*``;
-``angr/__init__.py`` additionally aliases the whole tree as
-``angr.claripy.*`` in ``sys.modules``. There is deliberately no top-level
-``claripy`` module.
-
-Everything here is re-exported from the canonical submodules
-(``ast.base``, ``ast.bool``, ``ast.bv``, ``ast.fp``, ``ast.strings``,
-``annotation``, ``solver``, ``vsa``, ``errors``) except for the handful
-of functions that only exist at the top level (``Neq``, ``simplify``,
-``replace``, ``excavate_ite``, ``is_true``, ``is_false``).
-"""
+"""Type stubs for ``angr.rustylib.claripy`` (aliased at runtime as ``angr.claripy``)."""
 
 from . import annotation, ast, errors, fp, solver, vsa
 from .annotation import (
@@ -148,14 +135,8 @@ def Neq(lhs: _BVLike, rhs: _BVLike) -> Bool: ...
 def simplify[T: Base](expr: T) -> T: ...
 def replace[T: Base](expr: T, old: Base, new: Base) -> T: ...
 def excavate_ite[T: Base](expr: T) -> T: ...
-def is_true(expr: object) -> bool:
-    """Whether ``expr`` is trivially (concretely) true. Anything that cannot
-    be proven true -- including symbolic expressions and non-AST objects --
-    yields False."""
-
-def is_false(expr: object) -> bool:
-    """Whether ``expr`` is trivially (concretely) false. Anything that cannot
-    be proven false yields False."""
+def is_true(expr: object) -> bool: ...
+def is_false(expr: object) -> bool: ...
 
 __all__ = [
     "BV",

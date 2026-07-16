@@ -1,8 +1,4 @@
-"""Type stubs for ``angr.rustylib.claripy.ast``.
-
-Exposes the AST sort classes and the ``base``/``bits``/``bool``/``bv``/
-``fp``/``strings`` submodules.
-"""
+"""Type stubs for ``angr.rustylib.claripy.ast``."""
 
 from . import base, bits, bool, bv, fp, strings
 from .base import Base
