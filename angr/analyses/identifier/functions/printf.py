@@ -22,7 +22,7 @@ class printf(Func):
     def num_args(self):
         return 1
 
-    def args(self):  # pylint disable=no-self-use
+    def args(self):  # pylint: disable=no-self-use
         return ["str"]
 
     def get_name(self):

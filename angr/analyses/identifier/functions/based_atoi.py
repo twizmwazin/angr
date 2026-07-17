@@ -54,7 +54,7 @@ class based_atoi(Func):
     def num_args(self):
         return OneTwoOrThree()
 
-    def args(self):  # pylint disable=no-self-use
+    def args(self):  # pylint: disable=no-self-use
         return ["buf", "size", "err"]
 
     def get_name(self):

@@ -32,10 +32,10 @@ class strtol(Func):
         self.skips_whitespace = False
         self.version = ""
 
-    def num_args(self):  # pylint disable=no-self-use
+    def num_args(self):
         return 3
 
-    def args(self):  # pylint disable=no-self-use
+    def args(self):  # pylint: disable=no-self-use
         return ["nptr", "endpointer", "base"]
 
     def get_name(self):

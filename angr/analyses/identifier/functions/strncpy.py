@@ -20,7 +20,7 @@ class strncpy(Func):
     def num_args(self):
         return 3
 
-    def args(self):  # pylint disable=no-self-use
+    def args(self):  # pylint: disable=no-self-use
         return ["dst", "src", "len"]
 
     def can_call_other_funcs(self):

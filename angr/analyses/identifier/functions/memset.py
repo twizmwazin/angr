@@ -9,7 +9,7 @@ class memset(Func):
     non_null = [chr(i) for i in range(1, 256)]
 
     def __init__(self):
-        super().__init__()  # pylint disable=useless-super-delegation
+        super().__init__()
 
     def get_name(self):
         return "memset"
@@ -17,7 +17,7 @@ class memset(Func):
     def num_args(self):
         return 3
 
-    def args(self):  # pylint disable=no-self-use
+    def args(self):  # pylint: disable=no-self-use
         return ["buf", "char", "size"]
 
     def can_call_other_funcs(self):

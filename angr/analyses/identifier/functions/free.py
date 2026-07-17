@@ -12,7 +12,7 @@ l = logging.getLogger(name=__name__)
 
 class free(Func):
     def __init__(self):
-        super().__init__()  # pylint disable=useless-super-delegation
+        super().__init__()
 
     def num_args(self):
         return 1
@@ -27,7 +27,7 @@ class free(Func):
         # free should not be identified here
         return False
 
-    def try_match(self, func, identifier, runner):  # pylint disable=no-self-use
+    def try_match(self, func, identifier, runner):  # pylint: disable=no-self-use
         malloc = None
         for k, v in identifier.matches.items():
             if v[0] == "malloc":
@@ -44,7 +44,7 @@ class free(Func):
 
         malloc_vals = []
         state = None
-        for _i in range(10):  # pylint disable=unused-variable
+        for _i in range(10):
             state = runner.get_out_state(malloc, malloc_test, initial_state=state)
             if state is None:
                 l.critical("malloc failed")

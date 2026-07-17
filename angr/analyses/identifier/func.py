@@ -62,13 +62,13 @@ class Func:
     def gen_input_output_pair(self):
         raise NotImplementedError
 
-    def var_args(self):  # pylint disable=no-self-use
+    def var_args(self):  # pylint: disable=no-self-use
         return False
 
-    def can_call_other_funcs(self):  # pylint disable=no-self-use
+    def can_call_other_funcs(self):  # pylint: disable=no-self-use
         return True
 
-    def pre_test(self, func, runner):  # pylint disable=no-self-use,unused-argument
+    def pre_test(self, func, runner):  # pylint: disable=no-self-use,unused-argument
         """
         custom tests run before, return False if it for sure is not the function
         Use tests here to pick which version of the function

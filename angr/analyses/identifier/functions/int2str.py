@@ -52,7 +52,7 @@ class int2str(Func):
     def num_args(self):
         return 3
 
-    def args(self):  # pylint disable=no-self-use
+    def args(self):  # pylint: disable=no-self-use
         return ["buf", "len", "val"]
 
     def get_name(self):
@@ -107,7 +107,7 @@ class int2str_v2(Func):
     def num_args(self):
         return TwoOrThree()
 
-    def args(self):  # pylint disable=no-self-use
+    def args(self):  # pylint: disable=no-self-use
         return ["val", "buf", "max"]
 
     def get_name(self):
@@ -162,7 +162,7 @@ class int2str_v3(Func):
     def num_args(self):
         return TwoOrThree()
 
-    def args(self):  # pylint disable=no-self-use
+    def args(self):  # pylint: disable=no-self-use
         return ["buf", "val", "max"]
 
     def get_name(self):
@@ -217,7 +217,7 @@ class int2str_v4(Func):
     def num_args(self):
         return ThreeOrFour()
 
-    def args(self):  # pylint disable=no-self-use
+    def args(self):  # pylint: disable=no-self-use
         return ["buf", "val", "base"]
 
     def get_name(self):

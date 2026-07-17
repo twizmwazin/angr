@@ -10,12 +10,12 @@ l = logging.getLogger(name=__name__)
 
 class realloc(Func):
     def __init__(self):
-        super().__init__()  # pylint disable=useless-super-delegation
+        super().__init__()
 
     def num_args(self):
         return 2
 
-    def args(self):  # pylint disable=no-self-use
+    def args(self):  # pylint: disable=no-self-use
         return ["ptr", "size"]
 
     def get_name(self):
@@ -50,7 +50,7 @@ class realloc(Func):
             return False
         returned_locs.append(state.solver.eval(state.regs.eax))
 
-        for _i in range(10):  # pylint disable=unused-variable
+        for _i in range(10):
             state = runner.get_out_state(func, test, initial_state=state)
             if state is None:
                 return False

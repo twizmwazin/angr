@@ -22,7 +22,7 @@ class fdprintf(Func):
     def num_args(self):
         return 2
 
-    def args(self):  # pylint disable=no-self-use
+    def args(self):  # pylint: disable=no-self-use
         return ["fd", "str"]
 
     def get_name(self):

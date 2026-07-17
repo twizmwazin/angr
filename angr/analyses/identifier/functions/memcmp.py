@@ -7,7 +7,7 @@ from angr.analyses.identifier.func import Func, TestData, rand_str
 
 class memcmp(Func):
     def __init__(self):
-        super().__init__()  # pylint disable=useless-super-delegation
+        super().__init__()
 
     def get_name(self):
         return "memcmp"
@@ -15,7 +15,7 @@ class memcmp(Func):
     def num_args(self):
         return 3
 
-    def args(self):  # pylint disable=no-self-use
+    def args(self):  # pylint: disable=no-self-use
         return ["buf1", "buf2", "len"]
 
     def gen_input_output_pair(self):

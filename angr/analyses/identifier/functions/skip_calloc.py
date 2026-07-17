@@ -6,7 +6,7 @@ from angr.errors import SimMemoryError
 
 class calloc(Func):
     def __init__(self):
-        super().__init__()  # pylint disable=useless-super-delegation
+        super().__init__()
 
     def num_args(self):
         return 2
@@ -14,7 +14,7 @@ class calloc(Func):
     def get_name(self):
         return "calloc"
 
-    def args(self):  # pylint disable=no-self-use
+    def args(self):  # pylint: disable=no-self-use
         return ["nmemb", "size"]
 
     def gen_input_output_pair(self):
@@ -46,7 +46,7 @@ class calloc(Func):
             return False
         returned_locs.append(state.solver.eval(state.regs.eax))
 
-        for _i in range(6):  # pylint disable=unused-variable
+        for _i in range(6):
             state = runner.get_out_state(func, test, initial_state=state)
             if state is None:
                 return False

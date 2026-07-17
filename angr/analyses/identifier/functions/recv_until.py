@@ -26,7 +26,7 @@ class receive_until_fd(Func):
     def num_args(self):
         return len(self.base_args())
 
-    def base_args(self):  # pylint disable=no-self-use
+    def base_args(self):  # pylint: disable=no-self-use
         return ["fd", "buf", "end_char", "max_len"]
 
     def args(self):
@@ -169,7 +169,7 @@ class receive_until(Func):
     def num_args(self):
         return len(self.base_args())
 
-    def base_args(self):  # pylint disable=no-self-use
+    def base_args(self):  # pylint: disable=no-self-use
         return ["buf", "end_char", "max_len"]
 
     def args(self):

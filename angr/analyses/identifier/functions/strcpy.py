@@ -9,7 +9,7 @@ class strcpy(Func):
     non_null = list(range(1, 256))
 
     def __init__(self):
-        super().__init__()  # pylint disable=useless-super-delegation
+        super().__init__()
 
     def get_name(self):
         return "strcpy"
@@ -17,7 +17,7 @@ class strcpy(Func):
     def num_args(self):
         return 2
 
-    def args(self):  # pylint disable=no-self-use
+    def args(self):  # pylint: disable=no-self-use
         return ["dst", "src"]
 
     def can_call_other_funcs(self):

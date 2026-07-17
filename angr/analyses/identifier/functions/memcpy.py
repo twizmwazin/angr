@@ -11,10 +11,10 @@ class memcpy(Func):
     non_null = [chr(i) for i in range(1, 256)]
 
     def __init__(self):
-        super().__init__()  # pylint disable=useless-super-delegation
+        super().__init__()
         self.memmove_safe = False
 
-    def get_name(self):  # pylint disable=no-self-use
+    def get_name(self):
         if self.memmove_safe:
             return "memmove"
         return "memcpy"
@@ -22,10 +22,10 @@ class memcpy(Func):
     def num_args(self):
         return 3
 
-    def args(self):
+    def args(self):  # pylint: disable=no-self-use
         return ["dst", "src", "len"]
 
-    def can_call_other_funcs(self):  # pylint disable=no-self-use
+    def can_call_other_funcs(self):
         return False
 
     def gen_input_output_pair(self):

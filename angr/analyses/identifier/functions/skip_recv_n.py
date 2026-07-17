@@ -11,7 +11,7 @@ class receive_n4(Func):
     # fd buf size
     # buf size
     def __init__(self):
-        super().__init__()  # pylint disable=useless-super-delegation
+        super().__init__()
 
     def get_name(self):
         return "receive_n4"
@@ -19,10 +19,10 @@ class receive_n4(Func):
     def num_args(self):
         return 4
 
-    def args(self):
+    def args(self):  # pylint: disable=no-self-use
         return ["fd", "buf", "len", "rxbytes"]
 
-    def gen_input_output_pair(self):  # pylint disable=no-self-use
+    def gen_input_output_pair(self):
         max_len = random.randint(1, 10)
         buf = rand_str(max_len + 5)
         result_buf = "ZZZZ"
@@ -43,7 +43,7 @@ class receive_n3(Func):
     # fd buf size
     # buf size
     def __init__(self):
-        super().__init__()  # pylint disable=useless-super-delegation
+        super().__init__()
 
     def get_name(self):
         return "receive_n3"
@@ -51,10 +51,10 @@ class receive_n3(Func):
     def num_args(self):
         return 3
 
-    def args(self):
+    def args(self):  # pylint: disable=no-self-use
         return ["fd", "buf", "len"]
 
-    def gen_input_output_pair(self):  # pylint disable=no-self-use
+    def gen_input_output_pair(self):
         max_len = random.randint(1, 10)
         buf = rand_str(max_len + 5)
         test_input = [0, buf, max_len]
@@ -74,7 +74,7 @@ class receive_n2(Func):
     # fd buf size
     # buf size
     def __init__(self):
-        super().__init__()  # pylint disable=useless-super-delegation
+        super().__init__()
 
     def get_name(self):
         return "receive_n2"
@@ -82,10 +82,10 @@ class receive_n2(Func):
     def num_args(self):
         return 2
 
-    def args(self):
+    def args(self):  # pylint: disable=no-self-use
         return ["buf", "len"]
 
-    def gen_input_output_pair(self):  # pylint disable=no-self-use
+    def gen_input_output_pair(self):
         max_len = random.randint(1, 10)
         buf = rand_str(max_len + 5)
         test_input = [buf, max_len]

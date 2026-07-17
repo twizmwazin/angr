@@ -1081,7 +1081,7 @@ class SimSolver(SimStatePlugin):
             raise SimValueError("unsatness during uniqueness check(ness)")
         return False
 
-    def symbolic(self, e):  # pylint:disable=R0201
+    def symbolic(self, e):  # pylint:disable=no-self-use
         """
         Returns True if the expression `e` is symbolic.
         """

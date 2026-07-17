@@ -19,7 +19,7 @@ class snprintf(Func):
     def num_args(self):
         return 3
 
-    def args(self):  # pylint disable=no-self-use
+    def args(self):  # pylint: disable=no-self-use
         return ["buf", "size", "format"]
 
     def get_name(self):
