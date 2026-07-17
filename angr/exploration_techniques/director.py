@@ -509,7 +509,8 @@ class Director(ExplorationTechnique):
 
         return simgr
 
-    def _check_goals(self, goal, state):  # pylint:disable=no-self-use
+    @staticmethod
+    def _check_goals(goal, state):
         """
         Check if the state is satisfying the goal.
 

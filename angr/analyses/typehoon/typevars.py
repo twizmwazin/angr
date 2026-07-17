@@ -315,8 +315,8 @@ class TypeVariableManager:
 
         return DerivedTypeVariable(type_var, label=label, labels=labels, idx=(self._func_addr, self.next_id()))
 
+    @staticmethod
     def new_dtv_with_merged_labels(
-        self,
         type_var: TypeVariable | TypeConstant,
         *,
         label: BaseLabel | None = None,

@@ -115,7 +115,8 @@ class SimEngineAILSimState(SimEngineLightAIL[StateType, DataType, bool, None]):
     def _ail_addr(self) -> tuple[int, int | None]:
         return (self.state.addr, self.state.scratch.ail_block_idx)
 
-    def _set_ail_successor(self, state, addr: int, block_idx: int | None) -> int:
+    @staticmethod
+    def _set_ail_successor(state, addr: int, block_idx: int | None) -> int:
         state.scratch.ail_block_idx = block_idx
         return addr
 

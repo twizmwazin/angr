@@ -1056,7 +1056,8 @@ class StructurerBase(Analysis):
                     new_sequences.append(new_seq_)
         self._new_sequences = new_sequences
 
-    def replace_nodes(self, graph, old_node_0, new_node, old_node_1=None, self_loop=True):  # pylint:disable=no-self-use
+    @staticmethod
+    def replace_nodes(graph, old_node_0, new_node, old_node_1=None, self_loop=True):
         in_edges = list(graph.in_edges(old_node_0, data=True))
         out_edges = list(graph.out_edges(old_node_0, data=True))
         if old_node_1 is not None:

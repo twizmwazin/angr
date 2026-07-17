@@ -76,7 +76,8 @@ class AnnotatedCFG:
 
                 self.add_statements_to_whitelist(addr2, (stmt_idx2,))
 
-    def get_addr(self, run):
+    @staticmethod
+    def get_addr(run):
         if isinstance(run, CFGNode):
             assert isinstance(run.addr, int)
             return run.addr

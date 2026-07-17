@@ -116,7 +116,8 @@ class SootClassHierarchy(Analysis):
 
         return package_from == package_to
 
-    def is_visible_class(self, cls_from, cls_to):
+    @staticmethod
+    def is_visible_class(cls_from, cls_to):
         if "PUBLIC" in cls_to.attrs:
             return True
 

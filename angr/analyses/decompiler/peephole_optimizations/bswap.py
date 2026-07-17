@@ -1,4 +1,4 @@
-# pylint:disable=missing-class-docstring,no-self-use
+# pylint:disable=missing-class-docstring
 from __future__ import annotations
 
 from angr.ailment.expression import BinaryOp, Call, Const, Convert, Expression
@@ -104,7 +104,8 @@ class Bswap(PeepholeOptimizationExprBase):
 
         return None
 
-    def _match_inner(self, or_first: BinaryOp, or_second: BinaryOp) -> tuple[bool, Expression | None]:
+    @staticmethod
+    def _match_inner(or_first: BinaryOp, or_second: BinaryOp) -> tuple[bool, Expression | None]:
         if (
             isinstance(or_first.operands[1], Const)
             and or_first.operands[1].value == 0xFF00FF00

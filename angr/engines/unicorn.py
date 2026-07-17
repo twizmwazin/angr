@@ -337,7 +337,8 @@ class SimEngineUnicorn(SuccessorsEngine):
                 ),
             )
 
-    def _set_correct_mem_read_val(self, state, value, taint_map):  # pylint: disable=no-self-use
+    @staticmethod
+    def _set_correct_mem_read_val(state, value, taint_map):
         state.inspect._breakpoints["mem_read"].pop()
         if taint_map.count(0) == state.inspect.attrs.mem_read_length:
             # The value is completely concrete

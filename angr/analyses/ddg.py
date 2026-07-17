@@ -884,7 +884,7 @@ class DDG(Analysis):
 
         return self._live_defs
 
-    def _def_lookup(self, variable):  # pylint:disable=no-self-use
+    def _def_lookup(self, variable):
         """
         This is a backward lookup in the previous defs. Note that, as we are using VSA, it is possible that `variable`
         is affected by several definitions.
@@ -911,7 +911,7 @@ class DDG(Analysis):
 
         return prevdefs
 
-    def _kill(self, variable, code_loc):  # pylint:disable=no-self-use
+    def _kill(self, variable, code_loc):
         """
         Kill previous defs. addr_list is a list of normalized addresses.
         """
@@ -1392,7 +1392,8 @@ class DDG(Analysis):
                     # Construct a tuple
                     data[k] = (v,)
 
-    def _simplify_data_graph(self, data_graph):  # pylint:disable=no-self-use
+    @staticmethod
+    def _simplify_data_graph(data_graph):
         """
         Simplify a data graph by removing all temp variable nodes on the graph.
 

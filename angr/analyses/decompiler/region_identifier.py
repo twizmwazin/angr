@@ -1225,7 +1225,8 @@ class RegionIdentifier(Analysis):
 
         return r
 
-    def _remove_node(self, graph: TGraph, node: TNode):  # pylint:disable=no-self-use
+    @staticmethod
+    def _remove_node(graph: TGraph, node: TNode):
         in_edges = [(src, dst, data) for (src, dst, data) in graph.in_edges(node, data=True) if src is not node]
         out_edges = [(src, dst, data) for (src, dst, data) in graph.out_edges(node, data=True) if dst is not node]
 

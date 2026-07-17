@@ -844,7 +844,8 @@ class SimulationManager:
             return self._stashes.get(stash[4:], [None])[0]
         raise AttributeError(f"No such stash: {stash}")
 
-    def _filter_states(self, filter_func, states):  # pylint:disable=no-self-use
+    @staticmethod
+    def _filter_states(filter_func, states):
         match, nomatch = [], []
         for state in states:
             (match if filter_func(state) else nomatch).append(state)

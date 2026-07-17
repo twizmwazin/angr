@@ -366,7 +366,6 @@ class CFGBase(Analysis):
                 continue
             setattr(copy_to, attr, value)
 
-    # pylint: disable=no-self-use
     def copy(self):
         raise NotImplementedError
 
@@ -2526,7 +2525,8 @@ class CFGBase(Analysis):
                     ):
                         stack.add(dst_key)
 
-    def _is_likely_function_thunk(self, src: CFGNode, src_funcaddr: int, all_edges: list | None) -> bool:
+    @staticmethod
+    def _is_likely_function_thunk(src: CFGNode, src_funcaddr: int, all_edges: list | None) -> bool:
         # A single-instruction block at function entry with a single Ijk_Boring successor that does not
         # jump to the next instruction is a thunk (e.g. jmp <target>).
         # Note that "nop" (or any other instruction that does not change the control flow) is not a thunk.

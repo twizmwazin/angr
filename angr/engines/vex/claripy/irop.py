@@ -519,7 +519,8 @@ class SimIROp:
 
         return getattr(claripy.ast.BV, o)(*sized_args)
 
-    def _translate_rm(self, rm_num):
+    @staticmethod
+    def _translate_rm(rm_num):
         if not rm_num.symbolic:
             return rm_map[rm_num.concrete_value]
         l.warning("symbolic rounding mode found, using default")

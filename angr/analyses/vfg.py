@@ -1223,7 +1223,7 @@ class VFG(ForwardAnalysis[SimState, VFGNode, VFGJob, BlockID, SimState], Analysi
         return widened_state, widening_occurred
 
     @staticmethod
-    def _narrow_states(node, old_state, new_state, previously_widened_state):  # pylint:disable=unused-argument,no-self-use
+    def _narrow_states(node, old_state, new_state, previously_widened_state):  # pylint:disable=unused-argument
         """
         Try to narrow the state!
 
@@ -1793,7 +1793,8 @@ class VFG(ForwardAnalysis[SimState, VFGNode, VFGJob, BlockID, SimState], Analysi
 
         return pending_ret_key
 
-    def _get_block_addr(self, b):  # pylint:disable=R0201
+    @staticmethod
+    def _get_block_addr(b):
         if isinstance(b, SimSuccessors):
             return b.addr
         raise TypeError(f"Unsupported block type {type(b)}")

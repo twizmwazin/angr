@@ -440,7 +440,8 @@ class Identifier(Analysis):
         state.regs.bp = input_state.regs.bp
         return state
 
-    def _prefilter_floats(self, func):  # pylint: disable=no-self-use
+    @staticmethod
+    def _prefilter_floats(func):
         # calling _get_block() from `func` respects the size of the basic block
         # in extreme cases (like at the end of a section where VEX cannot disassemble the instruction beyond the
         # section boundary), directly calling self.project.factory.block() on func.addr may lead to an

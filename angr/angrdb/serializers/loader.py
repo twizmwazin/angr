@@ -40,7 +40,8 @@ class LoadArgsJSONDecoder(json.JSONDecoder):
     def __init__(self):
         super().__init__(object_hook=self._objhook)
 
-    def _objhook(self, d: dict):  # pylint:disable=no-self-use
+    @staticmethod
+    def _objhook(d: dict):
         if "__custom_type__" in d:
             match d["__custom_type__"]:
                 case "bytes":

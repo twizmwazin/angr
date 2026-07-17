@@ -1,4 +1,3 @@
-# pylint:disable=no-self-use
 from __future__ import annotations
 
 import logging
@@ -540,7 +539,7 @@ class CallingConventionAnalysis(Analysis):
         self,
         max_analyzing_callsites: int = 3,
         include_callsite_preds: bool = False,
-    ) -> list[CallSiteFact]:  # pylint:disable=no-self-use
+    ) -> list[CallSiteFact]:
         """
         Analyze all call sites of the function and determine the possible number of arguments and if the function
         returns anything or not.
@@ -1041,8 +1040,8 @@ class CallingConventionAnalysis(Analysis):
 
         return reg_args + int_args + fp_args + stack_args
 
+    @staticmethod
     def _guess_arg_type(
-        self,
         arg: SimFunctionArgument,
         cc: SimCC | None = None,
         arg_uses: Mapping[tuple[int, int], list[tuple[Function | None, int]]] | None = None,

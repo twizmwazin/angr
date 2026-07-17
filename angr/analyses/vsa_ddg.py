@@ -383,7 +383,8 @@ class VSA_DDG(Analysis):
                     prevdefs[code_loc] = {"type": type_, "count": count}
         return prevdefs
 
-    def _kill(self, live_defs, variable, code_loc):
+    @staticmethod
+    def _kill(live_defs, variable, code_loc):
         """
         Kill previous defs. `addr_list` is a list of normalized addresses.
         """
