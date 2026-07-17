@@ -24,8 +24,6 @@ class SimStateHistory(SimStatePlugin):
     This class keeps track of historically-relevant information for paths.
     """
 
-    STRONGREF_STATE = True
-
     def __init__(self, parent=None, clone=None):
         SimStatePlugin.__init__(self)
 
@@ -128,9 +126,12 @@ class SimStateHistory(SimStatePlugin):
 
         return f"<StateHistory @ {addr_str}>"
 
-    def set_strongref_state(self, state):
+    def set_state(self, state):
+        super().set_state(state)
+        # Keep a strong reference to the state so it stays alive as a merge ancestor. Use _get_strongref() in case we
+        # were handed a weakref proxy.
         if sim_options.EFFICIENT_STATE_MERGING in state.options:
-            self.strongref_state = state
+            self.strongref_state = state._get_strongref()
 
     @property
     def addr(self):
