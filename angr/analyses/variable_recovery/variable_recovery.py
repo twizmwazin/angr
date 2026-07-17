@@ -376,11 +376,6 @@ class VariableRecoveryState(VariableRecoveryStateBase):
     # Util methods
     #
 
-    def _normalize_register_offset(self, offset):  # pylint:disable=no-self-use
-        # TODO:
-
-        return offset
-
     @staticmethod
     def _codeloc_from_state(state):
         return CodeLocation(state.scratch.bbl_addr, state.scratch.stmt_idx, ins_addr=state.scratch.ins_addr)

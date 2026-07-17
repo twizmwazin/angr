@@ -229,11 +229,6 @@ class VariableRecoveryFastState(VariableRecoveryStateBase):
     # Util methods
     #
 
-    def _normalize_register_offset(self, offset):  # pylint:disable=no-self-use
-        # TODO:
-
-        return offset
-
     def _to_signed(self, n):
         if n >= 2 ** (self.arch.bits - 1):
             # convert it to a negative number
@@ -652,7 +647,7 @@ class VariableRecoveryFast(ForwardAnalysis, VariableRecoveryBase):  # pylint:dis
             i = next_i
         return block
 
-    def _process_block(self, state, block):  # pylint:disable=no-self-use
+    def _process_block(self, state, block):
         """
         Scan through all statements and perform the following tasks:
         - Find stack pointers and the VEX temporary variable storing stack pointers
