@@ -128,10 +128,9 @@ class SimStateHistory(SimStatePlugin):
 
     def set_state(self, state):
         super().set_state(state)
-        # Keep a strong reference to the state so it stays alive as a merge ancestor. Use _get_strongref() in case we
-        # were handed a weakref proxy.
+        # keep a strong reference to the state so it stays alive as a merge ancestor
         if sim_options.EFFICIENT_STATE_MERGING in state.options:
-            self.strongref_state = state._get_strongref()
+            self.strongref_state = state
 
     @property
     def addr(self):

@@ -292,9 +292,6 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
     def _get_weakref(self):
         return weakref.proxy(self)
 
-    def _get_strongref(self):
-        return self
-
     def __repr__(self):
         try:
             addr = self.addr
