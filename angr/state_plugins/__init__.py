@@ -17,7 +17,7 @@ from .libc import SimStateLibc
 from .light_registers import SimLightRegisters
 from .log import SimStateLog
 from .loop_data import SimStateLoopData
-from .plugin import SimStatePlugin
+from .plugin import SimStatePlugin, SimStatePluginProtocol
 from .posix import PosixDevFS, PosixProcFS, SimSystemPosix
 from .preconstrainer import SimStatePreconstrainer
 from .scratch import SimStateScratch
@@ -76,6 +76,7 @@ __all__ = (
     "SimStateLog",
     "SimStateLoopData",
     "SimStatePlugin",
+    "SimStatePluginProtocol",
     "SimStatePreconstrainer",
     "SimStateScratch",
     "SimSymbolizer",

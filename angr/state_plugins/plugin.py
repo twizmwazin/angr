@@ -3,12 +3,14 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, Self, cast, runtime_checkable
 
 import angr
 from angr.misc.ux import once
 
 if TYPE_CHECKING:
+    import claripy
+
     from angr.sim_state import SimState
 
 
@@ -23,11 +25,70 @@ class _CopyFunc[S_co](Protocol):
     def __call__(self, _self: Any, memo: dict[int, Any] | None = None) -> S_co: ...
 
 
+@runtime_checkable
+class SimStatePluginProtocol(Protocol):
+    """
+    The structural interface that a SimState plugin must provide. ``SimState`` (and its ``PluginHub`` machinery) only
+    relies on this protocol, never on a concrete base class, so plugins do not need to inherit from
+    :class:`SimStatePlugin`. In particular, this makes it possible to implement state plugins in Rust (or any other
+    native language) via pyo3, where inheriting from a Python base class is not possible.
+
+    Python plugins will usually still want to subclass :class:`SimStatePlugin`, which provides a default
+    implementation of this protocol along with some conveniences (e.g. the ``memo`` decorator and pickling support).
+
+    Since this protocol is ``runtime_checkable``, ``isinstance(obj, SimStatePluginProtocol)`` may be used to verify
+    that an object provides all required members (note that runtime checks only verify member presence, not
+    signatures).
+    """
+
+    def set_state(self, state: SimState[Any, Any]) -> None:
+        """
+        Sets a new state (for example, if the state has been branched). Plugins that need to hold the state should
+        store a weak proxy of it (``state._get_weakref()``), which is what :class:`SimStatePlugin` does; a plugin
+        that needs a strong reference to the state (e.g. for state merging) may store ``state`` itself.
+        """
+
+    def init_state(self) -> None:
+        """
+        Perform any initialization on the state at plugin-add time.
+        """
+
+    def copy(self, memo: dict[int, Any] | None = None, /) -> SimStatePluginProtocol:
+        """
+        Return a copy of the plugin without any state attached.
+
+        :param memo:    A dictionary mapping object identifiers (``id(obj)``) to their copied instance. Use this to
+                        avoid infinite recursion and diverged copies. Implementations should check the memo for their
+                        own id and register their copy in it.
+        """
+        raise NotImplementedError
+
+    def merge(
+        self,
+        others: list[Self],
+        merge_conditions: list[claripy.ast.Bool] | None,
+        /,
+        common_ancestor: Self | None = None,
+    ) -> bool:
+        """
+        Merge this plugin with the provided others, mutating self.
+
+        :param others: the other state plugins to merge with; they are instances of this plugin's class
+        :param merge_conditions: a symbolic condition for each of the plugins, or None during static analysis
+        :param common_ancestor: a common ancestor of this plugin and the others being merged, if available
+        :returns: True if the state plugins are actually merged.
+        """
+        raise NotImplementedError
+
+
 class SimStatePlugin:
     """
     This is a base class for SimState plugins. A SimState plugin will be copied along with the state when the state is
     branched. They are intended to be used for things such as tracking open files, tracking heap details, and providing
     storage and persistence for SimProcedures.
+
+    Subclassing this is the recommended way to implement a state plugin in Python, but it is not required:
+    ``SimState`` accepts any object satisfying :class:`SimStatePluginProtocol`.
     """
 
     def __init__(self) -> None:
@@ -121,7 +182,7 @@ class SimStatePlugin:
         raise NotImplementedError(f"merge() not implement for {self.__class__.__name__}")
 
     @classmethod
-    def register_default(cls, name: str, xtr: type[SimStatePlugin] | str | None = None) -> None:
+    def register_default(cls, name: str, xtr: type[SimStatePluginProtocol] | str | None = None) -> None:
         if cls is SimStatePlugin:
             if once("simstateplugin_register_default deprecation"):
                 l.critical(

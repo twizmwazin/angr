@@ -14,7 +14,7 @@ of a state.
 My First Plugin
 ---------------
 
-Let's get started! All state plugins are implemented as subclasses of
+Let's get started! State plugins are usually implemented as subclasses of
 ``SimStatePlugin``. Once you've read this document, you can use the API
 reference for this class :py:class:`angr.state_plugins.plugin.SimStatePlugin` to
 quickly review the semantics of all the interfaces you should implement.
@@ -208,3 +208,30 @@ and registered with the state.
 .. code-block:: python
 
    MyPlugin.register_default('my_plugin')
+
+Plugins without inheritance
+---------------------------
+
+``SimState`` does not actually require plugins to inherit from
+``SimStatePlugin`` - it only requires that they satisfy the structural
+interface :py:class:`angr.state_plugins.plugin.SimStatePluginProtocol`. Any
+object providing ``set_state``, ``init_state``, ``copy``, and ``merge`` can
+be registered as a state plugin.
+
+This is primarily useful for implementing state plugins in native code: for
+example, a pyo3 (Rust) class cannot inherit from a Python base class, but it
+can implement the protocol directly.
+
+Since the protocol is ``runtime_checkable``, you can sanity-check an
+implementation with ``isinstance(my_plugin, angr.SimStatePluginProtocol)``
+(this verifies member presence, not signatures).
+
+When implementing a plugin from scratch instead of subclassing
+``SimStatePlugin``, keep in mind:
+
+* ``copy`` receives the memo dict positionally and should also be callable with
+  no arguments; handle the memoization yourself if your plugin can be
+  referenced more than once from a state.
+* ``merge`` should return a bool indicating whether anything was merged.
+* If states holding your plugin need to be pickled, implement pickle support
+  (e.g. ``__reduce__``) without including the state itself in the result.

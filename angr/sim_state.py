@@ -19,7 +19,7 @@ from . import sim_options as o
 from .errors import SimMergeError, SimSolverModeError, SimStateError, SimValueError
 from .misc.plugins import PluginHub, PluginPreset
 from .sim_state_options import SimStateOptions
-from .state_plugins.plugin import SimStatePlugin
+from .state_plugins.plugin import SimStatePluginProtocol
 
 if TYPE_CHECKING:
     from angr.project import Project
@@ -55,7 +55,7 @@ merge_counter = itertools.count()
 
 
 # pylint: disable=not-callable
-class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
+class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePluginProtocol]):
     """
     The SimState represents the state of a program, including its memory, registers, and so forth.
 
@@ -94,8 +94,8 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
     def __init__(
         self,
         project: Project | None = None,
-        arch: Arch | None = None,
-        plugins: dict[str, SimStatePlugin] | None = None,
+        arch: Arch | str | None = None,
+        plugins: dict[str, SimStatePluginProtocol] | None = None,
         mode: str | None = None,
         options: set[str] | list[str] | SimStateOptions | None = None,
         add_options: set[str] | None = None,
@@ -135,9 +135,9 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
             #       plugins that are getting toggled (=> mutual dependence).
             self.ip_is_soot_addr = False
         else:
+            if isinstance(arch, str):
+                arch = archinfo.arch_from_id(arch)
             self._arch = arch if arch is not None else project.arch.copy() if project is not None else None
-            if type(self._arch) is str:
-                self._arch = archinfo.arch_from_id(self._arch)
 
         # the options
         if options is None:
@@ -445,12 +445,12 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
         self._set_plugin_state(plugin, inhibit_init=inhibit_init)
         return super().register_plugin(name, plugin)
 
-    def _init_plugin(self, plugin_cls: type[SimStatePlugin]) -> SimStatePlugin:
+    def _init_plugin(self, plugin_cls: type[SimStatePluginProtocol]) -> SimStatePluginProtocol:
         plugin = plugin_cls()
         self._set_plugin_state(plugin)
         return plugin
 
-    def _set_plugin_state(self, plugin: SimStatePlugin, inhibit_init: bool = False):
+    def _set_plugin_state(self, plugin: SimStatePluginProtocol, inhibit_init: bool = False):
         plugin.set_state(self)
         if not inhibit_init:
             plugin.init_state()

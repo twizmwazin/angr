@@ -36,7 +36,7 @@ del Loggers
 del logging
 
 # angr.state_plugins and angr.sim_state are mutually dependent: the plugin modules register themselves
-# on SimState at import time, while SimState needs the SimStatePlugin base class. Importing the
+# on SimState at import time, while SimState needs the SimStatePluginProtocol definition. Importing the
 # state_plugins package to completion here, before anything pulls in sim_state, is the one ordering
 # that resolves the cycle.
 from . import state_plugins  # noqa: F401
@@ -186,7 +186,7 @@ from .sim_manager import SimulationManager
 from .sim_state import SimState
 from .simos import SimOS
 from .state_hierarchy import StateHierarchy
-from .state_plugins import SimStatePlugin
+from .state_plugins import SimStatePlugin, SimStatePluginProtocol
 from .state_plugins.filesystem import SimHostFilesystem, SimMount
 from .state_plugins.heap import PTChunk, SimHeapBrk, SimHeapPTMalloc
 from .state_plugins.inspect import BP, BP_AFTER, BP_BEFORE, BP_BOTH, BP_IPDB, BP_IPYTHON
@@ -334,6 +334,7 @@ __all__ = (
     "SimStateError",
     "SimStateOptionsError",
     "SimStatePlugin",
+    "SimStatePluginProtocol",
     "SimStatementError",
     "SimSymbolicFilesystemError",
     "SimTranslationError",
