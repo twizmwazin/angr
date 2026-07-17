@@ -1609,6 +1609,24 @@ class SimCCX86WindowsSyscall(SimCCSyscall):
         return state.regs.eax
 
 
+def _combine_arg_classes(cls1: str, cls2: str) -> str:
+    """
+    Combine the classification of two eightbyte chunks of an argument, following the merging rules of the System V
+    AMD64 ABI (also used by the ARM AAPCS and MIPS O32 implementations below).
+    """
+    if cls1 == cls2:
+        return cls1
+    if cls1 == "NO_CLASS":
+        return cls2
+    if cls2 == "NO_CLASS":
+        return cls1
+    if cls1 == "MEMORY" or cls2 == "MEMORY":
+        return "MEMORY"
+    if cls1 == "INTEGER" or cls2 == "INTEGER":
+        return "INTEGER"
+    return "SSE"
+
+
 class SimCCSystemVAMD64(SimCC):
     ARG_REGS = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"]
     FP_ARG_REGS = ["xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7"]
@@ -1774,7 +1792,7 @@ class SimCCSystemVAMD64(SimCC):
                     idx_end = (offset + ((subty.size or 0) // self.arch.byte_width) - 1) // chunksize
                     for i, idx in enumerate(range(idx_start, idx_end + 1)):
                         subclass = subresult[i * chunksize]
-                        result[idx] = self._combine_classes(result[idx], subclass)
+                        result[idx] = _combine_arg_classes(result[idx], subclass)
             if any(subresult == "MEMORY" for subresult in result):
                 return ["MEMORY"] * nchunks
             if nchunks > 2 and (result[0] != "SSE" or any(subresult != "SSEUP" for subresult in result[1:])):
@@ -1820,19 +1838,6 @@ class SimCCSystemVAMD64(SimCC):
         else:
             result[0].append(ty)
         return result
-
-    def _combine_classes(self, cls1, cls2):
-        if cls1 == cls2:
-            return cls1
-        if cls1 == "NO_CLASS":
-            return cls2
-        if cls2 == "NO_CLASS":
-            return cls1
-        if cls1 == "MEMORY" or cls2 == "MEMORY":
-            return "MEMORY"
-        if cls1 == "INTEGER" or cls2 == "INTEGER":
-            return "INTEGER"
-        return "SSE"
 
 
 class SimCCAMD64LinuxSyscall(SimCCSyscall):
@@ -1948,26 +1953,13 @@ class SimCCARM(SimCC):
                     idx_end = (offset + ((subty.size or 0) // self.arch.byte_width) - 1) // chunksize
                     for i, idx in enumerate(range(idx_start, idx_end + 1)):
                         subclass = subresult[i * chunksize]
-                        result[idx] = self._combine_classes(result[idx], subclass)
+                        result[idx] = _combine_arg_classes(result[idx], subclass)
             return result
         if isinstance(ty, SimTypeRef):
             # unresolved type; we must treat it as a native integer
             return ["INTEGER"]
         l.error("Ummmmm... not sure what goes here. report bug to @rhelmot")
         return ["INTEGER"]
-
-    def _combine_classes(self, cls1, cls2):
-        if cls1 == cls2:
-            return cls1
-        if cls1 == "NO_CLASS":
-            return cls2
-        if cls2 == "NO_CLASS":
-            return cls1
-        if cls1 == "MEMORY" or cls2 == "MEMORY":
-            return "MEMORY"
-        if cls1 == "INTEGER" or cls2 == "INTEGER":
-            return "INTEGER"
-        return "SSE"
 
     def _flatten(self, ty) -> dict[int, list[SimType]] | None:
         result: dict[int, list[SimType]] = defaultdict(list)
@@ -2392,26 +2384,13 @@ class SimCCO32(SimCC):
                     idx_end = (offset + ((subty.size or 0) // self.arch.byte_width) - 1) // chunksize
                     for i, idx in enumerate(range(idx_start, idx_end + 1)):
                         subclass = subresult[i * chunksize]
-                        result[idx] = self._combine_classes(result[idx], subclass)
+                        result[idx] = _combine_arg_classes(result[idx], subclass)
             return result
         if isinstance(ty, SimTypeRef):
             # unresolved type; we must treat it as a native integer
             return ["INTEGER"]
         l.error("Ummmmm... not sure what goes here. report bug to @rhelmot")
         return ["INTEGER"]
-
-    def _combine_classes(self, cls1, cls2):
-        if cls1 == cls2:
-            return cls1
-        if cls1 == "NO_CLASS":
-            return cls2
-        if cls2 == "NO_CLASS":
-            return cls1
-        if cls1 == "MEMORY" or cls2 == "MEMORY":
-            return "MEMORY"
-        if cls1 == "INTEGER" or cls2 == "INTEGER":
-            return "INTEGER"
-        return "SSE"
 
     def _flatten(self, ty) -> dict[int, list[SimType]] | None:
         result: dict[int, list[SimType]] = defaultdict(list)
