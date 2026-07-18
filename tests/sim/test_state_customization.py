@@ -50,5 +50,40 @@ class TestStateCustomization(unittest.TestCase):
                 assert s.solver.eval_one(s.posix.brk == n)
 
 
+class CustomPlugin(angr.SimStatePlugin):
+    @angr.SimStatePlugin.memo
+    def copy(self, memo):  # pylint: disable=unused-argument
+        return CustomPlugin()
+
+
+class TestPluginPresetPreservation(unittest.TestCase):
+    def test_copy_preserves_custom_preset(self):
+        preset = angr.sim_state.default_state_plugin_preset.copy()
+        preset.add_default_plugin("custom_plugin", CustomPlugin)
+        angr.SimState.register_preset("custom_preset_copy_test", preset)
+
+        state = angr.SimState(arch="AMD64", mode="symbolic", plugin_preset="custom_preset_copy_test")
+        assert state.plugin_preset is preset
+
+        # copying must not emit the "Overriding active preset" warning
+        with self.assertNoLogs("angr.misc.plugins", level="WARNING"):
+            copied = state.copy()
+
+        assert copied.plugin_preset is preset
+        # lazily requesting the custom plugin on the copy must resolve through the custom preset
+        assert type(copied.get_plugin("custom_plugin")) is CustomPlugin
+
+    def test_copy_preserves_absent_preset(self):
+        # build a fully-populated plugin dict so __init__'s "default" fallback doesn't kick in
+        base = angr.SimState(arch="AMD64", mode="symbolic")
+        plugins = base._copy_plugins()  # pylint: disable=protected-access
+
+        state = angr.SimState(arch="AMD64", mode="symbolic", plugins=plugins, plugin_preset=None)
+        assert state.plugin_preset is None
+
+        copied = state.copy()
+        assert copied.plugin_preset is None
+
+
 if __name__ == "__main__":
     unittest.main()

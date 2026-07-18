@@ -103,7 +103,7 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
         remove_options: set[str] | None = None,
         special_memory_filler: Callable[[str, int, int, SimState], Any] | None = None,
         os_name: str | None = None,
-        plugin_preset: str = "default",
+        plugin_preset: str | PluginPreset[SimStatePlugin] | None = "default",
         cle_memory_backer: Clemory | None = None,
         dict_memory_backer: dict[int, bytes] | None = None,
         permissions_map: dict[tuple[int, int], int] | None = None,
@@ -573,6 +573,7 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
             options=self.options.copy(),
             mode=self.mode,
             os_name=self.os_name,
+            plugin_preset=self._active_preset,
         )
         state._addr = self._addr
 
