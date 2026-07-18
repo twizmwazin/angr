@@ -30,6 +30,11 @@ class SimStatePlugin:
     storage and persistence for SimProcedures.
     """
 
+    # Whether init_state() has already run for this plugin's lineage. Set (as an instance
+    # attribute) once init_state runs, and propagated to copies by the memo decorator, so
+    # that attaching a copy to a new state does not re-run init_state.
+    _init_state_done: bool = False
+
     def __init__(self) -> None:
         self.state: SimState[Any, Any] = cast("SimState[Any, Any]", None)
 
@@ -58,6 +63,10 @@ class SimStatePlugin:
                 return memo[id(self)]
             c = f(self, memo)
             memo[id(self)] = c
+            if self._init_state_done:
+                # the copy inherits this lineage's initialization; init_state must not
+                # run again when the copy is attached to a state
+                c._init_state_done = True
             return c
 
         return cast(_CopyFunc[S_co], inner)
@@ -155,5 +164,12 @@ class SimStatePlugin:
 
     def init_state(self) -> None:
         """
-        Use this function to perform any initialization on the state at plugin-add time
+        Use this function to perform any initialization on the state at plugin-add time.
+
+        This is called exactly once per plugin instance, when the plugin is first attached
+        to a state (whether registered eagerly, instantiated lazily through plugin lookup,
+        or added explicitly via ``register_plugin``). It is NOT called again when the state
+        is copied: copies receive the plugin instances produced by ``copy()``, which are
+        considered already-initialized. Consequently, anything established here must be
+        carried over to new instances by the plugin's ``copy()`` implementation.
         """

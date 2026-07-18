@@ -271,8 +271,34 @@ class SimHeapPTMalloc(SimHeapFreelist):
         o = super().copy(memo)
         o._free_head_chunk_exists = self.free_head_chunk is not None
         o._free_head_chunk_init_base = self.free_head_chunk.base if self.free_head_chunk is not None else None
+        o._chunk_size_t_size = self._chunk_size_t_size
+        o._chunk_min_size = self._chunk_min_size
+        o._chunk_align_mask = self._chunk_align_mask
         o._initialized = self._initialized
+        # free_head_chunk is deliberately left unset here: it is a view into state memory
+        # and holds a state reference, so set_state() rebuilds it from the stashed base
+        # once this instance is bound to its new state. init_state() does not run again on
+        # copies, so the rebuild can no longer happen there.
         return o
+
+    def set_state(self, state):
+        super().set_state(state)
+        if not hasattr(self, "free_head_chunk"):
+            # This instance was just produced by copy(); rebuild the free list head against
+            # the new state. The chunk is assembled field-by-field rather than through
+            # PTChunk.__init__ because at this point other plugins (e.g. the solver) may not
+            # be registered on the new state yet, and the stashed base is already concrete.
+            if self._free_head_chunk_exists:
+                chunk = PTChunk.__new__(PTChunk)
+                chunk.state = self.state
+                chunk.base = self._free_head_chunk_init_base
+                chunk.heap = self
+                chunk._chunk_size_t_size = self._chunk_size_t_size
+                chunk._chunk_min_size = self._chunk_min_size
+                chunk._chunk_align_mask = self._chunk_align_mask
+                self.free_head_chunk = chunk
+            else:
+                self.free_head_chunk = None
 
     def chunks(self):
         return PTChunkIterator(PTChunk(self.heap_base, self.state))

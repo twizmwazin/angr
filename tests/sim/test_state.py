@@ -298,6 +298,74 @@ class TestState(unittest.TestCase):
         assert len(simgr.errored) == 0
         assert len(simgr.active) == 1
 
+    def test_init_state_runs_once_per_plugin_instance(self):
+        class CountingPlugin(angr.SimStatePlugin):
+            def __init__(self):
+                super().__init__()
+                self.init_count = 0
+
+            def init_state(self):
+                self.init_count += 1
+
+            @angr.SimStatePlugin.memo
+            def copy(self, memo):  # pylint: disable=unused-argument
+                o = CountingPlugin()
+                o.init_count = self.init_count
+                return o
+
+            def merge(self, others, merge_conditions, common_ancestor=None):
+                return False
+
+        s = SimState(arch="AMD64")
+        plugin = CountingPlugin()
+        s.register_plugin("counting_plugin", plugin)
+        assert plugin.init_count == 1
+
+        # copying the state must not re-run init_state, neither on the original
+        # instance nor on the copy
+        s2 = s.copy()
+        assert plugin.init_count == 1
+        assert s2.get_plugin("counting_plugin").init_count == 1
+
+        # copies of copies as well
+        s3 = s2.copy()
+        s4 = s3.copy()
+        assert s3.get_plugin("counting_plugin").init_count == 1
+        assert s4.get_plugin("counting_plugin").init_count == 1
+        assert plugin.init_count == 1
+
+    def test_init_state_runs_once_for_lazy_plugin(self):
+        class LazyCountingPlugin(angr.SimStatePlugin):
+            def __init__(self):
+                super().__init__()
+                self.init_count = 0
+
+            def init_state(self):
+                self.init_count += 1
+
+            @angr.SimStatePlugin.memo
+            def copy(self, memo):  # pylint: disable=unused-argument
+                o = LazyCountingPlugin()
+                o.init_count = self.init_count
+                return o
+
+            def merge(self, others, merge_conditions, common_ancestor=None):
+                return False
+
+        plugin_name = "lazy_counting_plugin_for_test"
+        LazyCountingPlugin.register_default(plugin_name)
+        try:
+            s = SimState(arch="AMD64")
+            # instantiated lazily through the preset on first access
+            plugin = s.get_plugin(plugin_name)
+            assert plugin.init_count == 1
+
+            s2 = s.copy()
+            assert plugin.init_count == 1
+            assert s2.get_plugin(plugin_name).init_count == 1
+        finally:
+            del SimState._presets["default"]._default_plugins[plugin_name]  # pylint: disable=protected-access
+
 
 if __name__ == "__main__":
     unittest.main()

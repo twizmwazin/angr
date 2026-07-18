@@ -274,8 +274,15 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
                 self.register_plugin("registers_soot", javavm_sim_registers, inhibit_init=True)
                 self.register_plugin("registers_vex", native_sim_registers, inhibit_init=True)
 
+        # Initialize the plugins that have not been initialized yet: the memory/registers
+        # plugins built above (registered with inhibit_init=True) and any fresh plugin
+        # passed in through the ``plugins`` parameter. Plugins whose lineage was already
+        # initialized (e.g. the copies that copy() passes in) are skipped, so init_state()
+        # runs exactly once per plugin lineage and never re-runs on state copies.
         for p in list(self.plugins.values()):
-            p.init_state()
+            if not p._init_state_done:
+                p.init_state()
+                p._init_state_done = True
 
     def __getstate__(self):
         # Don't pickle attributes for plugins. These will be pickled
@@ -457,8 +464,12 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
 
     def _set_plugin_state(self, plugin: SimStatePlugin, inhibit_init: bool = False):
         plugin.set_state(self)
-        if not inhibit_init:
+        # init_state runs at most once per plugin lineage: _init_state_done is set when it
+        # runs and carried over to copies, so re-attaching a copied plugin (or the second
+        # _set_plugin_state call in the lazy get_plugin path) does not re-run it.
+        if not inhibit_init and not plugin._init_state_done:
             plugin.init_state()
+            plugin._init_state_done = True
 
     #
     # Java support

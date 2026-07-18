@@ -68,7 +68,9 @@ class SimStateHistory(SimStatePlugin):
         self.successor_ip = None if clone is None else clone.successor_ip
 
         self.strongref_state = None if clone is None else clone.strongref_state
-        self.arch = None
+        # carried over on clone since init_state() only runs when the plugin first joins a
+        # state lineage, not when the state is copied
+        self.arch = None if clone is None else clone.arch
 
     def set_state(self, state):
         super().set_state(state)
