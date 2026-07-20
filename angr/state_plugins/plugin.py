@@ -1,26 +1,98 @@
 from __future__ import annotations
 
+import contextlib
 import logging
-from collections.abc import Callable
+from contextvars import ContextVar
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 import angr
 from angr.misc.ux import once
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator, Sequence
+
     from angr.sim_state import SimState
 
 
 l = logging.getLogger(name=__name__)
 
+# The memoization dictionary for the plugin copy operation currently in progress, mapping id(original) to the
+# copied instance. It is managed entirely by copy_context() and the wrapper installed around plugin copy()
+# implementations - plugin code should never need to touch it.
+_copy_memo: ContextVar[dict[int, Any] | None] = ContextVar("simstateplugin_copy_memo", default=None)
 
-class _CopyFunc[S_co](Protocol):
-    """
-    Function wrapping copy method for memo tracking.
-    """
+_MISSING = object()
 
-    def __call__(self, _self: Any, memo: dict[int, Any] | None = None) -> S_co: ...
+
+@contextlib.contextmanager
+def copy_context() -> Iterator[None]:
+    """
+    A context manager that makes all ``SimStatePlugin.copy()`` calls within it preserve shared object identity: if
+    the same plugin object is reachable through multiple paths (for example, a SimFile referenced by both the
+    filesystem and a file descriptor), it will only be copied once, and every reference in the copies will point to
+    that single new instance.
+
+    ``SimState.copy()`` wraps the copying of its plugins in this context; you only need it yourself when copying
+    multiple plugins that may share subobjects outside of a full state copy.
+
+    Nesting is a no-op: if a context is already active, it is reused.
+    """
+    if _copy_memo.get() is not None:
+        yield
+        return
+    token = _copy_memo.set({})
+    try:
+        yield
+    finally:
+        _copy_memo.reset(token)
+
+
+def _memoize_copy(f):
+    """
+    Wrap a ``copy()`` implementation with the shared-identity bookkeeping. Applied automatically to every ``copy``
+    method defined by a SimStatePlugin subclass, so plugin authors never deal with it directly.
+    """
+    if getattr(f, "__sim_copy_memoized__", False):
+        return f
+
+    @wraps(f)
+    def copy_wrapper(self):
+        memo = _copy_memo.get()
+        if memo is None:
+            with copy_context():
+                return copy_wrapper(self)
+        c = memo.get(id(self), _MISSING)
+        if c is not _MISSING:
+            return c
+        c = f(self)
+        memo[id(self)] = c
+        return c
+
+    copy_wrapper.__sim_copy_memoized__ = True  # type: ignore[attr-defined]
+    return copy_wrapper
+
+
+def _copy_element(v):
+    return v.copy() if isinstance(v, SimStatePlugin) else v
+
+
+def _copy_value(v):
+    """
+    Copy a single plugin field value for the default copy() implementation. SimStatePlugins are copied recursively,
+    plain dicts/lists/sets are shallow-copied with any SimStatePlugin elements copied recursively, and everything
+    else is shared by reference.
+    """
+    if isinstance(v, SimStatePlugin):
+        return v.copy()
+    t = type(v)
+    if t is dict:
+        return {k: _copy_element(x) for k, x in v.items()}
+    if t is list:
+        return [_copy_element(x) for x in v]
+    if t is set:
+        return {_copy_element(x) for x in v}
+    return v
 
 
 class SimStatePlugin:
@@ -28,10 +100,27 @@ class SimStatePlugin:
     This is a base class for SimState plugins. A SimState plugin will be copied along with the state when the state is
     branched. They are intended to be used for things such as tracking open files, tracking heap details, and providing
     storage and persistence for SimProcedures.
+
+    When a state is copied, each plugin's ``copy()`` method is called. The default implementation copies every field
+    of the plugin automatically - see ``copy()`` for the exact semantics and for how to control which fields are
+    copied via ``__slots__`` or ``_COPY_FIELDS``. Plugins with special requirements may override ``copy()``; the
+    override takes no arguments, and any bookkeeping needed to keep shared objects shared is handled automatically
+    by the plugin machinery.
     """
+
+    # Subclasses may set _COPY_FIELDS to explicitly declare which attributes the default copy() implementation
+    # should duplicate. Declarations are unioned across the class hierarchy, so a subclass only needs to list the
+    # fields it adds. If no class in the hierarchy declares _COPY_FIELDS, fields are discovered automatically from
+    # __slots__ declarations and the instance dict.
+    _COPY_FIELDS: ClassVar[Sequence[str] | None] = None
 
     def __init__(self) -> None:
         self.state: SimState[Any, Any] = cast("SimState[Any, Any]", None)
+
+    def __init_subclass__(cls, **kwargs) -> None:
+        super().__init_subclass__(**kwargs)
+        if "copy" in cls.__dict__:
+            cls.copy = _memoize_copy(cls.__dict__["copy"])
 
     def set_state(self, state) -> None:
         """
@@ -44,41 +133,76 @@ class SimStatePlugin:
         d["state"] = None
         return d
 
-    @staticmethod
-    def memo[S_co](f: Callable[[Any, dict[int, Any]], S_co]) -> _CopyFunc[S_co]:
+    def _blank_copy(self):
         """
-        A decorator function you should apply to ``copy``
+        Create an uninitialized instance of this plugin's class, with no state attached. Use this at the start of a
+        custom ``copy()`` implementation to construct the object to copy into - the fields of the result are entirely
+        unset, so make sure your copy method instantiates all of them!
         """
+        cls = type(self)
+        o = cls.__new__(cls)
+        o.state = None  # type: ignore[assignment]
+        # if a copy is in progress, immediately publish the blank instance as the copy of this plugin so that any
+        # recursive references back to this plugin resolve to it instead of recursing forever
+        memo = _copy_memo.get()
+        if memo is not None:
+            memo.setdefault(id(self), o)
+        return o
 
-        @wraps(f)
-        def inner(self: Any, memo: dict[int, Any] | None = None) -> S_co:
-            if memo is None:
-                memo = {}
-            if id(self) in memo:
-                return memo[id(self)]
-            c = f(self, memo)
-            memo[id(self)] = c
-            return c
-
-        return cast(_CopyFunc[S_co], inner)
-
-    @memo
-    def copy(self, _memo: dict[int, Any]) -> SimStatePlugin:
+    @classmethod
+    def _copy_class_fields(cls) -> tuple[bool, tuple[str, ...]]:
         """
-        Should return a copy of the plugin without any state attached. Should check the memo first, and add itself to
-        memo if it ends up making a new copy.
-
-        In order to simplify using the memo, you should annotate implementations of this function with
-        ``SimStatePlugin.memo``
-
-        The base implementation of this function constructs a new instance of the plugin's class without calling its
-        initializer. If you super-call down to it, make sure you instantiate all the fields in your copy method!
-
-        :param memo:    A dictionary mapping object identifiers (id(obj)) to their copied instance.  Use this to avoid
-                        infinite recursion and diverged copies.
+        Compute (and cache) the class-level field declarations for the default copy() implementation: the union of
+        all __slots__ and _COPY_FIELDS declarations across the class hierarchy. The returned flag says whether any
+        _COPY_FIELDS declaration exists, in which case the instance dict is not swept for additional fields.
         """
-        o = type(self).__new__(type(self))
-        o.state = None  # type: ignore
+        cached = cls.__dict__.get("__sim_copy_class_fields__")
+        if cached is not None:
+            return cached
+        names: list[str] = []
+        seen: set[str] = set()
+        explicit = False
+        for klass in reversed(cls.__mro__):
+            for source in (klass.__dict__.get("__slots__", ()), klass.__dict__.get("_COPY_FIELDS") or ()):
+                for name in (source,) if isinstance(source, str) else source:
+                    if name not in seen and name not in ("state", "__dict__", "__weakref__"):
+                        seen.add(name)
+                        names.append(name)
+            if klass.__dict__.get("_COPY_FIELDS") is not None:
+                explicit = True
+        result = (explicit, tuple(names))
+        cls.__sim_copy_class_fields__ = result  # type: ignore[attr-defined]
+        return result
+
+    @_memoize_copy
+    def copy(self):
+        """
+        Return a copy of the plugin without any state attached.
+
+        The default implementation copies every field of the plugin. The set of fields is the union of all
+        ``__slots__`` and ``_COPY_FIELDS`` declarations across the class hierarchy; if no class declares
+        ``_COPY_FIELDS``, everything in the instance dict is included as well, so plain plugins need no declarations
+        at all. Each field value is copied with these rules: SimStatePlugin values are copied recursively, plain dicts/lists/sets
+        are shallow-copied with SimStatePlugin elements copied recursively, and all other values are shared by
+        reference.
+
+        Override this method if your plugin needs different semantics for some fields. Overrides take no arguments
+        and should build their result on top of ``self._blank_copy()`` (or a super().copy() call, if a parent class
+        provides a suitable copy implementation). Shared-identity bookkeeping is automatic: while a state is being
+        copied, a plugin object referenced from multiple places is only ever copied once, no matter how many times
+        its ``copy()`` gets called.
+        """
+        o = self._blank_copy()
+        explicit, fields = self._copy_class_fields()
+        for name in fields:
+            v = getattr(self, name, _MISSING)
+            if v is not _MISSING:
+                setattr(o, name, _copy_value(v))
+        if not explicit:
+            for name, v in self.__dict__.items():
+                if name == "state" or name in fields:
+                    continue
+                setattr(o, name, _copy_value(v))
         return o
 
     def merge(self, others, merge_conditions, common_ancestor=None):  # pylint:disable=unused-argument

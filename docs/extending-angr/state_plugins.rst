@@ -19,11 +19,14 @@ Let's get started! All state plugins are implemented as subclasses of
 reference for this class :py:class:`angr.state_plugins.plugin.SimStatePlugin` to
 quickly review the semantics of all the interfaces you should implement.
 
-The most important method you need to implement is ``copy``: it should be
-annotated with the ``memo`` staticmethod and take a dict called the
-"memo"---these'll be important later---and returns a copy of the plugin. Short
-of that, you can do whatever you want. Just make sure to call the superclass
-initializer!
+You usually don't need to implement anything to make copying work: when a state
+is branched, the default ``copy`` implementation automatically duplicates every
+field of your plugin (see
+:py:meth:`angr.state_plugins.plugin.SimStatePlugin.copy` for the exact rules,
+and for how to control the field list with ``__slots__`` or ``_COPY_FIELDS``).
+If your plugin needs different semantics for some fields, override ``copy`` -
+it takes no arguments and returns a copy of the plugin. Short of that, you can
+do whatever you want. Just make sure to call the superclass initializer!
 
 .. code-block:: python
 
@@ -32,10 +35,6 @@ initializer!
    ...     def __init__(self, foo):
    ...         super(MyFirstPlugin, self).__init__()
    ...         self.foo = foo
-   ...
-   ...     @angr.SimStatePlugin.memo
-   ...     def copy(self, memo):
-   ...         return MyFirstPlugin(self.foo)
 
    >>> state = angr.SimState(arch='AMD64')
    >>> state.register_plugin('my_plugin', MyFirstPlugin('bar'))
@@ -176,11 +175,12 @@ is never used with ``SimState.register_plugin``. When you're doing this, there
 are a handful of rules to remember which will keep your plugins safe and happy:
 
 
-* Annotate your copy function with ``@SimStatePlugin.memo``.
-* In order to prevent *divergence* while copying multiple references to the same
-  plugin, make sure you're passing the memo (the argument to copy) to the
-  ``.copy`` of any subplugins. This with the previous point will preserve object
-  identity.
+* Copying is already safe by default: while a state is being copied, the plugin
+  machinery tracks every plugin object that gets copied, so multiple references
+  to the same plugin resolve to a single copy and object identity is preserved.
+  Just call ``.copy()`` on any subplugins from your own ``copy()`` override. If
+  you copy several plugins that share subobjects outside of a state copy, wrap
+  the calls in ``angr.state_plugins.plugin.copy_context()``.
 * In order to prevent *duplicate merging* while merging multiple references to
   the same plugin, there should be a concept of the "owner" of each instance,
   and only the owner should run the merge routine.

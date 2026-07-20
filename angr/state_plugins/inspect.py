@@ -377,8 +377,7 @@ class SimInspector(SimStatePlugin):
             # the breakpoint is not found
             l.error("remove_breakpoint(): Breakpoint %s (type %s) is not found.", bp, event_type)
 
-    @SimStatePlugin.memo
-    def copy(self, memo):  # pylint: disable=unused-argument
+    def copy(self):
         c = SimInspector()
         for i in inspect_attributes:
             setattr(c.attrs, i, getattr(self.attrs, i))

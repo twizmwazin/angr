@@ -63,8 +63,7 @@ class SimUCManager(SimStatePlugin):
         l.debug("Assigned new memory region %s", ptr)
         return ptr
 
-    @SimStatePlugin.memo
-    def copy(self, memo):  # pylint: disable=unused-argument
+    def copy(self):
         return SimUCManager(man=self)
 
     def get_alloc_depth(self, addr: int | claripy.ast.Base) -> int | None:

@@ -20,6 +20,7 @@ from .errors import SimMergeError, SimSolverModeError, SimStateError, SimValueEr
 from .misc.plugins import PluginHub, PluginPreset
 from .sim_state_options import SimStateOptions
 from .state_plugins.plugin import SimStatePlugin
+from .state_plugins.plugin import copy_context as plugin_copy_context
 
 if TYPE_CHECKING:
     from angr.project import Project
@@ -541,16 +542,10 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
 
     # Returns a dict that is a copy of all the state's plugins
     def _copy_plugins(self):
-        memo = {}
-        out = {}
-        for n, p in self._active_plugins.items():
-            if id(p) in memo:
-                out[n] = memo[id(p)]
-            else:
-                out[n] = p.copy(memo)
-                memo[id(p)] = out[n]
-
-        return out
+        # copy all plugins under a single copy context so that any objects shared between plugins (or registered
+        # under multiple names) stay shared in the copies
+        with plugin_copy_context():
+            return {n: p.copy() for n, p in self._active_plugins.items()}
 
     def copy(self):
         """

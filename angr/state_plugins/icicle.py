@@ -71,8 +71,7 @@ class SimStateIcicle(SimStatePlugin):
     def set_state(self, state):
         pass  # no weak ref needed
 
-    @SimStatePlugin.memo
-    def copy(self, _memo):
+    def copy(self):
         return SimStateIcicle(
             vm_ref=self.vm_ref,
             generation=self.generation,

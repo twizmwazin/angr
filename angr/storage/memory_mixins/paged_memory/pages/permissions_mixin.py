@@ -19,8 +19,8 @@ class PermissionsMixin(MemoryMixin):
             permissions = claripy.BVV(permissions, 3)
         self.permission_bits = permissions
 
-    def copy(self, memo):
-        o = super().copy(memo)
+    def copy(self):
+        o = super().copy()
         o.permission_bits = self.permission_bits
         return o
 

@@ -36,12 +36,10 @@ class SimStateEdgeHitmap(SimStatePlugin):
     def set_state(self, state):
         pass
 
-    @SimStatePlugin.memo
-    def copy(self, memo):  # pylint: disable=unused-argument
+    def copy(self):
         """
         Create a copy of the plugin.
 
-        :param memo: Memoization dictionary to avoid duplicate copies.
         :return: A new SimStateEdgeHitmap instance with a copy of the hitmap.
         """
         # bytes are immutable, so we can share the reference

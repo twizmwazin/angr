@@ -17,8 +17,8 @@ class RefcountMixin(MemoryMixin):
         self.refcount = 1
         self.lock = PicklableLock()
 
-    def copy(self, memo):
-        o = super().copy(memo)
+    def copy(self):
+        o = super().copy()
         o._init()
         return o
 
@@ -32,9 +32,8 @@ class RefcountMixin(MemoryMixin):
             if self.refcount == 1:
                 return self
             self.refcount -= 1
-        return self.copy(
-            {}
-        )  # TODO: evaluate if it's worth making the lock a reentrant lock (RLock) so this can go in the else arm
+        # TODO: evaluate if it's worth making the lock a reentrant lock (RLock) so this can go in the else arm
+        return self.copy()
 
     def acquire_shared(self) -> None:
         """

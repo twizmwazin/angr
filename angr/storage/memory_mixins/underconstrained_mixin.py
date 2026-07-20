@@ -16,9 +16,8 @@ class UnderconstrainedMixin(MemoryMixin):
 
         self._unconstrained_range = 1024
 
-    @MemoryMixin.memo
-    def copy(self, memo):
-        out = super().copy(memo)
+    def copy(self):
+        out = super().copy()
         out._unconstrained_range = self._unconstrained_range
         return out
 

@@ -39,9 +39,8 @@ class PagedMemoryMixin[PageType: PageBase](
         self._default_permissions = default_permissions
         self._pages: dict[int, PageType | None] = {}
 
-    @MemoryMixin.memo
-    def copy(self, memo):
-        o = super().copy(memo)
+    def copy(self):
+        o = super().copy()
 
         o.page_size = self.page_size
         o._extra_page_kwargs = self._extra_page_kwargs
@@ -723,9 +722,8 @@ class MVListPagesMixin(PagedMemoryMixin):
         super().__init__(*args, **kwargs)
         self.skip_missing_values_during_merging = skip_missing_values_during_merging
 
-    @MemoryMixin.memo
-    def copy(self, memo) -> MVListPagesMixin:
-        r = super().copy(memo)
+    def copy(self) -> MVListPagesMixin:
+        r = super().copy()
         r.skip_missing_values_during_merging = self.skip_missing_values_during_merging
         return r
 

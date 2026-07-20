@@ -78,8 +78,8 @@ class SizeConcretizationMixin(MemoryMixin):
         self._raise_memory_limit_error = raise_memory_limit_error
         self._size_limit = size_limit
 
-    def copy(self, memo):
-        o = super().copy(memo)
+    def copy(self):
+        o = super().copy()
 
         o._concretize_symbolic_write_size = self._concretize_symbolic_write_size
         o._max_concretize_count = self._max_concretize_count

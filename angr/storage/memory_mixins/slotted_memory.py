@@ -22,8 +22,8 @@ class SlottedMemoryMixin(MemoryMixin):
         if self.width is None:
             self.width = state.arch.bytes
 
-    def copy(self, memo):
-        o = super().copy(memo)
+    def copy(self):
+        o = super().copy()
         o.width = self.width
         o.contents = dict(self.contents)
         return o

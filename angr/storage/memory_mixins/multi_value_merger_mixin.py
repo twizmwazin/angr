@@ -69,8 +69,8 @@ class MultiValueMergerMixin(MemoryMixin):
             merged_val = values_set
         return merged_val
 
-    def copy(self, memo=None):
-        copied = super().copy(memo)
+    def copy(self):
+        copied = super().copy()
         copied._element_limit = self._element_limit
         copied._annotation_limit = self._annotation_limit
         copied._top_func = self._top_func

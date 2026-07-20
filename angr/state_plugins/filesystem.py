@@ -73,18 +73,6 @@ class SimFilesystem(SimStatePlugin):  # pretends links don't exist
         for fname in files:
             self.insert(fname, files[fname])
 
-    @SimStatePlugin.memo
-    def copy(self, memo):
-        o = super().copy(memo)
-
-        o.pathsep = self.pathsep
-        o.cwd = self.cwd
-        o._unlinks = list(self._unlinks)
-        o._files = {k: v.copy(memo) for k, v in self._files.items()}
-        o._mountpoints = {k: v.copy(memo) for k, v in self._mountpoints.items()}
-
-        return o
-
     @property
     def unlinks(self):
         for _, f in self._unlinks:
@@ -349,10 +337,9 @@ class SimConcreteFilesystem(SimMount):
                 return key
         return None
 
-    @SimStatePlugin.memo
-    def copy(self, memo):
+    def copy(self):
         x = type(self)(pathsep=self.pathsep)
-        x.cache = {fname: self.cache[fname].copy(memo) for fname in self.cache}
+        x.cache = {fname: self.cache[fname].copy() for fname in self.cache}
         x.deleted_list = set(self.deleted_list)
         return x
 
@@ -410,9 +397,8 @@ class SimHostFilesystem(SimConcreteFilesystem):
         super().__init__(**kwargs)
         self.host_path = host_path if host_path is not None else self.pathsep
 
-    @SimStatePlugin.memo
-    def copy(self, memo):
-        o = super().copy(memo)
+    def copy(self):
+        o = super().copy()
         o.host_path = self.host_path
         return o
 

@@ -73,9 +73,8 @@ class RegionedMemoryMixin(MemoryMixin):
         self._write_targets_limit = write_targets_limit
         self._read_targets_limit = read_targets_limit
 
-    @MemoryMixin.memo
-    def copy(self, memo):
-        o = super().copy(memo)
+    def copy(self):
+        o = super().copy()
         o._write_targets_limit = self._write_targets_limit
         o._read_targets_limit = self._read_targets_limit
         o._stack_size = self._stack_size
@@ -88,7 +87,7 @@ class RegionedMemoryMixin(MemoryMixin):
 
         o._regions = {}
         for region_id, region in self._regions.items():
-            o._regions[region_id] = region.copy(memo)  # pylint:disable=no-member
+            o._regions[region_id] = region.copy()  # pylint:disable=no-member
 
         return o
 

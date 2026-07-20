@@ -368,9 +368,8 @@ class JavaVmMemoryMixin(MemoryMixin):
         if not self.store_strategies:
             self._create_default_store_strategies()
 
-    @MemoryMixin.memo
-    def copy(self, memo):
-        o: JavaVmMemoryMixin = super().copy(memo)
+    def copy(self):
+        o: JavaVmMemoryMixin = super().copy()
         o._stack = [stack_frame.copy() for stack_frame in self._stack]
         o.heap = self.heap.copy()
         o.vm_static_table = self.vm_static_table.copy()

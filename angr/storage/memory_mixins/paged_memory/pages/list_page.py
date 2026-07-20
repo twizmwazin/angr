@@ -32,8 +32,8 @@ class ListPage(MemoryObjectMixin, PageBase):
 
         self.sinkhole: SimMemoryObject | None = sinkhole
 
-    def copy(self, memo):
-        o = super().copy(memo)
+    def copy(self):
+        o = super().copy()
         o.content = DynamicDictList(max_size=self.content.max_size, content=self.content)
         o.stored_offset = self.stored_offset.copy()
         o.sinkhole = self.sinkhole

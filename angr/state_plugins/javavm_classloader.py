@@ -118,8 +118,7 @@ class SimJavaVmClassloader(SimStatePlugin):
         """
         return self._initialized_classes
 
-    @SimStatePlugin.memo
-    def copy(self, memo):  # pylint: disable=unused-argument
+    def copy(self):
         return SimJavaVmClassloader(initialized_classes=self.initialized_classes.copy())
 
     def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument

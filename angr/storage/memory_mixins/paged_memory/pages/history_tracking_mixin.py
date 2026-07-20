@@ -26,9 +26,6 @@ class HistoryTrackingMixin(RefcountMixin, MemoryMixin):
             self._changed_offsets.occupy(addr, size, DUMMY_SORT)
         return super().store(addr, data, **kwargs)
 
-    def copy(self, memo):
-        return super().copy(memo)
-
     def acquire_unique(self):
         page = super().acquire_unique()
         if page is not self:

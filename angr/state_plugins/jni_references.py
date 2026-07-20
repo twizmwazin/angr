@@ -79,8 +79,7 @@ class SimStateJNIReferences(SimStatePlugin):
             raise NotImplementedError(f"Opaque reference {opaque_ref.to_claripy()} is symbolic.")
         return self.state.solver.eval(opaque_ref)
 
-    @SimStatePlugin.memo
-    def copy(self, memo):  # pylint: disable=unused-argument
+    def copy(self):
         return SimStateJNIReferences(local_refs=self.local_refs, global_refs=self.global_refs)
 
     def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument

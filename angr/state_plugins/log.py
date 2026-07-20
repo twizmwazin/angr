@@ -56,8 +56,7 @@ class SimStateLog(SimStatePlugin):
         # pylint: disable=no-member
         return [ev.constraint.ast for ev in self.events if isinstance(ev, SimActionConstraint)]
 
-    @SimStatePlugin.memo
-    def copy(self, memo):  # pylint: disable=unused-argument
+    def copy(self):
         return SimStateLog(log=self)
 
     def _combine(self, others):

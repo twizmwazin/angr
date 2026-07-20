@@ -454,9 +454,8 @@ class SimSolver(SimStatePlugin):
     # Branching stuff
     #
 
-    @SimStatePlugin.memo
-    def copy(self, memo):  # pylint: disable=unused-argument
-        c = super().copy(memo)
+    def copy(self):
+        c = self._blank_copy()
 
         c._stored_solver = self._solver.branch()
         c.all_variables = self.all_variables

@@ -34,8 +34,7 @@ class SimStatePreconstrainer(SimStatePlugin):
         l.warning("Merging is not implemented for preconstrainer!")
         return False
 
-    @SimStatePlugin.memo
-    def copy(self, memo):  # pylint: disable=unused-argument
+    def copy(self):
         c = SimStatePreconstrainer(constrained_addrs=self._constrained_addrs)
 
         c.variable_map = dict(self.variable_map)

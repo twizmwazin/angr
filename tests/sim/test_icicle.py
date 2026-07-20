@@ -922,7 +922,7 @@ class TestSimStateIciclePlugin(TestCase):
             translation_data=dummy_td,
             dirty_pages={3, 4},
         )
-        copied = plugin.copy({})
+        copied = plugin.copy()
         assert copied.generation == 42
         assert copied.dirty_pages == {3, 4}
         # Ensure copies are independent

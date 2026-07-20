@@ -34,9 +34,8 @@ class KeyValueMemoryMixin(MemoryMixin):
     def store(self, addr, data, type_=None, **kwargs):
         self._store[addr] = TypedVariable(type_, data)
 
-    @MemoryMixin.memo
-    def copy(self, memo) -> Self:
-        o: KeyValueMemoryMixin = super().copy(memo)
+    def copy(self) -> Self:
+        o: KeyValueMemoryMixin = super().copy()
         o._store = self._store.copy()
         return o
 

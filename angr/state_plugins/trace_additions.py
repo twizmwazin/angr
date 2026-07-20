@@ -339,8 +339,7 @@ class ChallRespInfo(angr.state_plugins.SimStatePlugin):
         self.__dict__.update(d)
         self.state = None
 
-    @angr.state_plugins.SimStatePlugin.memo
-    def copy(self, memo):  # pylint: disable=unused-argument
+    def copy(self):
         s = ChallRespInfo()
         s.stdin_min_stdout_constraints = dict(self.stdin_min_stdout_constraints)
         s.stdin_min_stdout_reads = dict(self.stdin_min_stdout_reads)
@@ -666,8 +665,7 @@ class ZenPlugin(angr.state_plugins.SimStatePlugin):
             return 0
         return max(self.depths.get(v, 0) for v in flag_arg_vars) + 1
 
-    @angr.state_plugins.SimStatePlugin.memo
-    def copy(self, memo):  # pylint: disable=unused-argument
+    def copy(self):
         z = ZenPlugin()
         # we explicitly don't copy the dict since it only is a mapping from var to replacement
         z.replacements = self.replacements

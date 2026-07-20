@@ -19,7 +19,7 @@ class TopMergerMixin(MemoryMixin):
     def _merge_values(self, values: Iterable[tuple[Any, Any]], merged_size: int, **kwargs):
         return self._top_func(merged_size * self.state.arch.byte_width)
 
-    def copy(self, memo=None):
-        copied = super().copy(memo)
+    def copy(self):
+        copied = super().copy()
         copied._top_func = self._top_func
         return copied

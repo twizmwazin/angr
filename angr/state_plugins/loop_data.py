@@ -77,8 +77,7 @@ class SimStateLoopData(SimStatePlugin):
         l.warning("Merging is not implemented for loop data!")
         return False
 
-    @SimStatePlugin.memo
-    def copy(self, memo):  # pylint: disable=unused-argument
+    def copy(self):
         return SimStateLoopData(
             back_edge_trip_counts=copy.deepcopy(self.back_edge_trip_counts),
             header_trip_counts=copy.deepcopy(self.header_trip_counts),

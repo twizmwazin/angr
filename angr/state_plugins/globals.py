@@ -55,9 +55,5 @@ class SimStateGlobals(SimStatePlugin):
     def pop(self, k, alt=None):
         return self._backer.pop(k, alt)
 
-    @SimStatePlugin.memo
-    def copy(self, memo):  # pylint: disable=unused-argument
-        return SimStateGlobals(dict(self._backer))
-
 
 SimState.register_default("globals", SimStateGlobals)

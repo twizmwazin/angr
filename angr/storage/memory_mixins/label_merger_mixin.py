@@ -27,6 +27,3 @@ class LabelMergerMixin(MemoryMixin):
                     v = None
             new_label[key] = v
         return new_label
-
-    def copy(self, memo=None):
-        return super().copy(memo)

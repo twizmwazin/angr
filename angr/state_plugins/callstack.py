@@ -50,9 +50,8 @@ class CallStack(SimStatePlugin):
     # Public methods
     #
 
-    @SimStatePlugin.memo
-    def copy(self, memo):
-        o = super().copy(memo)
+    def copy(self):
+        o = self._blank_copy()
         o.call_site_addr = self.call_site_addr
         o.func_addr = self.func_addr
         o.stack_ptr = self.stack_ptr
@@ -66,20 +65,9 @@ class CallStack(SimStatePlugin):
         o.locals = dict(self.locals)
         return o
 
-    @SimStatePlugin.memo
-    def copy_without_tail(self, memo):
-        o = super().copy(memo)
-        o.call_site_addr = self.call_site_addr
-        o.func_addr = self.func_addr
-        o.stack_ptr = self.stack_ptr
-        o.ret_addr = self.ret_addr
-        o.jumpkind = self.jumpkind
+    def copy_without_tail(self):
+        o = self.copy()
         o.next = None
-        o.invoke_return_variable = self.invoke_return_variable
-
-        o.block_counter = collections.Counter(self.block_counter)
-        o.procedure_data = self.procedure_data
-        o.locals = dict(self.locals)
         return o
 
     def set_state(self, state):
@@ -243,7 +231,7 @@ class CallStack(SimStatePlugin):
         if self.state is not None:
             self.state.register_plugin("callstack", cf)
             self.state.history.recent_stack_actions.append(
-                CallStackAction(hash(cf), len(cf), "push", callframe=cf.copy_without_tail({}))
+                CallStackAction(hash(cf), len(cf), "push", callframe=cf.copy_without_tail())
             )
 
         return cf
@@ -254,7 +242,7 @@ class CallStack(SimStatePlugin):
         """
         if self.next is None:
             raise SimEmptyCallStackError("Cannot pop a frame from an empty call stack.")
-        new_list = self.next.copy({})
+        new_list = self.next.copy()
 
         if self.state is not None:
             self.state.register_plugin("callstack", new_list)

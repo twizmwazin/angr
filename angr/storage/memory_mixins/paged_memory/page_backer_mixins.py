@@ -43,8 +43,8 @@ class ClemoryBackerMixin(PagedMemoryMixin):
             self._cle_loader = None
             self._clemory_backer = None
 
-    def copy(self, memo):
-        o = super().copy(memo)
+    def copy(self):
+        o = super().copy()
         o._clemory_backer = self._clemory_backer
         o._cle_loader = self._cle_loader
         return o
@@ -188,8 +188,8 @@ class DictBackerMixin(PagedMemoryMixin):
         super().__init__(**kwargs)
         self._dict_memory_backer = dict_memory_backer
 
-    def copy(self, memo):
-        o = super().copy(memo)
+    def copy(self):
+        o = super().copy()
         o._dict_memory_backer = self._dict_memory_backer
         return o
 

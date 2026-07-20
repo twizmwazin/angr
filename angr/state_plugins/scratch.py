@@ -173,8 +173,7 @@ class SimStateScratch(SimStatePlugin):
 
         self.state._inspect("tmp_write", BP_AFTER)
 
-    @SimStatePlugin.memo
-    def copy(self, memo):  # pylint: disable=unused-argument
+    def copy(self):
         return SimStateScratch(scratch=self)
 
     def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument

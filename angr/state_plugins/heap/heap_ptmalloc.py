@@ -5,7 +5,6 @@ import logging
 import claripy
 
 from angr.errors import SimHeapError, SimMergeError, SimSolverError
-from angr.state_plugins.plugin import SimStatePlugin
 
 from .heap_freelist import Chunk, SimHeapFreelist
 from .utils import concretize
@@ -266,9 +265,13 @@ class SimHeapPTMalloc(SimHeapFreelist):
         self.free_head_chunk = None
         self._initialized = False
 
-    @SimStatePlugin.memo
-    def copy(self, memo):  # pylint: disable=unused-argument
-        o = super().copy(memo)
+    def copy(self):
+        # Deliberately not the default field-driven copy: the chunk-related fields depend on the state and are
+        # left unset so that init_state() rebuilds them from the _free_head_chunk_* markers.
+        o = self._blank_copy()
+        o.heap_base = self.heap_base
+        o.heap_size = self.heap_size
+        o.mmap_base = self.mmap_base
         o._free_head_chunk_exists = self.free_head_chunk is not None
         o._free_head_chunk_init_base = self.free_head_chunk.base if self.free_head_chunk is not None else None
         o._initialized = self._initialized

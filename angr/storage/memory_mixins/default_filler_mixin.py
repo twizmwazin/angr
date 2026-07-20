@@ -123,8 +123,8 @@ class SpecialFillerMixin(MemoryMixin):
             return self.state._special_memory_filler(name, addr, size * self.state.arch.byte_width, self.state)
         return super()._default_value(addr, size, name=name, **kwargs)
 
-    def copy(self, memo):
-        o = super().copy(memo)
+    def copy(self):
+        o = super().copy()
         o._special_memory_filler = self._special_memory_filler
         return o
 
@@ -139,7 +139,7 @@ class ExplicitFillerMixin(MemoryMixin):
             return self._uninitialized_read_handler(addr, size, inspect=inspect, events=events)
         return super()._default_value(addr, size, inspect=inspect, events=events, **kwargs)
 
-    def copy(self, memo):
-        o = super().copy(memo)
+    def copy(self):
+        o = super().copy()
         o._uninitialized_read_handler = self._uninitialized_read_handler
         return o

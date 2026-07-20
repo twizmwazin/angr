@@ -20,8 +20,7 @@ class SimLightRegisters(SimStatePlugin):
         self.reg_map = {} if reg_map is None else reg_map
         self.registers = {} if registers is None else registers
 
-    @SimStatePlugin.memo
-    def copy(self, _memo):
+    def copy(self):
         return type(self)(reg_map=self.reg_map, registers=dict(self.registers))
 
     def set_state(self, state):

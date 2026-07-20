@@ -29,9 +29,8 @@ class RegionedAddressConcretizationMixin(MemoryMixin):
             if self.write_strategies is None:
                 self._create_default_write_strategies()
 
-    @MemoryMixin.memo
-    def copy(self, memo):
-        o = super().copy(memo)
+    def copy(self):
+        o = super().copy()
         o.read_strategies = list(self.read_strategies)
         o.write_strategies = list(self.write_strategies)
         return o

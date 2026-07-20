@@ -23,8 +23,8 @@ class StackAllocationMixin(PagedMemoryMixin):
         self._remaining_stack = stack_size
         self._stack_perms = stack_perms
 
-    def copy(self, memo):
-        o = super().copy(memo)
+    def copy(self):
+        o = super().copy()
         o._red_pageno = self._red_pageno
         o._remaining_stack = self._remaining_stack
         o._stack_perms = self._stack_perms

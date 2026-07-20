@@ -6,7 +6,6 @@ import claripy
 
 from angr.errors import SimSolverError
 from angr.sim_state import SimState
-from angr.state_plugins.plugin import SimStatePlugin
 
 from . import SimHeapBase
 
@@ -34,12 +33,6 @@ class SimHeapBrk(SimHeapBase):
     def __init__(self, heap_base=None, heap_size=None):
         super().__init__(heap_base, heap_size)
         self.heap_location = self.heap_base
-
-    @SimStatePlugin.memo
-    def copy(self, memo):
-        o = super().copy(memo)
-        o.heap_location = self.heap_location
-        return o
 
     def allocate(self, sim_size):
         """

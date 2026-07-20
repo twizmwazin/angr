@@ -10,7 +10,7 @@ from angr.sim_state import SimState
 from angr.storage.file import Flags, SimFile, SimFileDescriptor, SimFileDescriptorDuplex, SimPacketsStream
 
 from .filesystem import SimMount, Stat
-from .plugin import SimStatePlugin
+from .plugin import SimStatePlugin, copy_context
 
 l = logging.getLogger(name=__name__)
 
@@ -39,7 +39,7 @@ class PosixDevFS(SimMount):  # this'll be mounted at /dev
     def merge(self, others, conditions, common_ancestor=None):  # pylint: disable=unused-argument, arguments-differ
         return False
 
-    def copy(self, _):
+    def copy(self):
         return self  # this holds no state!
 
 
@@ -65,7 +65,7 @@ class PosixProcFS(SimMount):
     def merge(self, others, conditions, common_ancestor=None):  # pylint: disable=unused-argument, arguments-differ
         return False
 
-    def copy(self, _):
+    def copy(self):
         return self  # this holds no state!
 
 
@@ -190,18 +190,17 @@ class SimSystemPosix(SimStatePlugin):
         self.stdout = stdout
         self.stderr = stderr
 
-    @SimStatePlugin.memo
-    def copy(self, memo):
-        o = super().copy(memo)
+    def copy(self):
+        o = self._blank_copy()
 
         o.sigmask_bits = self.sigmask_bits
         o.maximum_symbolic_syscalls = self.maximum_symbolic_syscalls
         o.max_length = self.max_length
-        o.stdin = self.stdin.copy(memo)
-        o.stdout = self.stdout.copy(memo)
-        o.stderr = self.stderr.copy(memo)
-        o.fd = {k: self.fd[k].copy(memo) for k in self.fd}
-        o.sockets = {ident: tuple(x.copy(memo) for x in self.sockets[ident]) for ident in self.sockets}
+        o.stdin = self.stdin.copy()
+        o.stdout = self.stdout.copy()
+        o.stderr = self.stderr.copy()
+        o.fd = {k: self.fd[k].copy() for k in self.fd}
+        o.sockets = {ident: tuple(x.copy() for x in self.sockets[ident]) for ident in self.sockets}
         o.socket_queue = self.socket_queue  # shouldn't need to copy this - should be copied before use.
         o.argv = self.argv
         o.argc = self.argc
@@ -215,8 +214,8 @@ class SimSystemPosix(SimStatePlugin):
         o.gid = self.gid
         o.brk = self.brk
         o.autotmp_counter = self.autotmp_counter
-        o.dev_fs = self.dev_fs.copy(memo)
-        o.proc_fs = self.proc_fs.copy(memo)
+        o.dev_fs = self.dev_fs.copy()
+        o.proc_fs = self.proc_fs.copy()
         o._closed_fds = list(self._closed_fds)
 
         return o
@@ -383,12 +382,12 @@ class SimSystemPosix(SimStatePlugin):
             if self.socket_queue:
                 sockpair = self.socket_queue.pop(0)
                 if sockpair is not None:
-                    memo = {}
                     # Since we are not copying sockpairs when the FS state plugin branches, their original SimState
                     # instances might have long gone. Update their states before making copies.
                     sockpair[0].set_state(self.state)
                     sockpair[1].set_state(self.state)
-                    sockpair = sockpair[0].copy(memo), sockpair[1].copy(memo)
+                    with copy_context():
+                        sockpair = sockpair[0].copy(), sockpair[1].copy()
 
             if sockpair is None:
                 read_file = SimPacketsStream(f"socket {ident!s} read")

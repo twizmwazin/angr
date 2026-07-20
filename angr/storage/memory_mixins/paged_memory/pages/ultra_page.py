@@ -47,8 +47,8 @@ class UltraPage(MemoryObjectMixin, PageBase):
         o.refcount = 2  # pylint: disable=attribute-defined-outside-init
         return o
 
-    def copy(self, memo):
-        o = super().copy(memo)
+    def copy(self):
+        o = super().copy()
         o.concrete_data = bytearray(self.concrete_data)
         o.symbolic_bitmap = bytearray(self.symbolic_bitmap)
         o.symbolic_data = SortedDict(self.symbolic_data)

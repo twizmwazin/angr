@@ -102,8 +102,7 @@ class SimRegNameView(SimStatePlugin):
             return [*list(self.state.arch.registers.keys()), "flags"]
         return self.state.arch.registers.keys()
 
-    @SimStatePlugin.memo
-    def copy(self, memo):  # pylint: disable=unused-argument
+    def copy(self):
         return SimRegNameView()
 
     def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
@@ -251,8 +250,7 @@ class SimMemView(SimStatePlugin):
         ty = sim_type.with_arch(self.state.arch)
         return self._deeper(ty=ty)
 
-    @SimStatePlugin.memo
-    def copy(self, memo):  # pylint: disable=unused-argument
+    def copy(self):
         return SimMemView()
 
     def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument

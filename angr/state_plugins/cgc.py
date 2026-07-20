@@ -43,21 +43,6 @@ class SimStateCGC(SimStatePlugin):
 
         self.max_receive_size = 0
 
-    @SimStatePlugin.memo
-    def copy(self, memo):  # pylint: disable=unused-argument
-        c = super().copy(memo)
-
-        c.allocation_base = self.allocation_base
-        c.time = self.time
-        c.input_strings = list(self.input_strings)
-        c.output_strings = list(self.output_strings)
-        c.input_size = self.input_size
-        c.sinkholes = set(self.sinkholes)
-        c.flag_bytes = self.flag_bytes
-        c.max_receive_size = self.max_receive_size
-
-        return c
-
     def peek_input(self):
         if len(self.input_strings) == 0:
             return None

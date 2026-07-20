@@ -275,8 +275,7 @@ class SimSymbolizer(SimStatePlugin):  # pylint:disable=abstract-method
             length = self.state.memory.page_size
             self._resymbolize_region(self.state.memory, addr_start, length)
 
-    @SimStatePlugin.memo
-    def copy(self, memo):  # pylint: disable=unused-argument
+    def copy(self):
         sc = SimSymbolizer()
         sc._symbolize_all = self._symbolize_all
         sc.symbolization_target_pages = set(self.symbolization_target_pages)

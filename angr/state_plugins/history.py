@@ -175,15 +175,14 @@ class SimStateHistory(SimStatePlugin):
 
         return True
 
-    @SimStatePlugin.memo
-    def copy(self, memo):  # pylint: disable=unused-argument
+    def copy(self):
         return SimStateHistory(clone=self)
 
     def trim(self):
         """
         Discard the ancestry of this state.
         """
-        new_hist = self.copy({})
+        new_hist = self.copy()
         new_hist.parent = None
         self.state.register_plugin("history", new_hist)
 

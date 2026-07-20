@@ -151,9 +151,8 @@ class SimFileBase(SimStatePlugin):
         """
         raise NotImplementedError
 
-    @DefaultMemory.memo
-    def copy(self, memo):
-        o = super().copy(memo)
+    def copy(self):
+        o = super().copy()
         o.ident = self.ident
         o.name = self.name
         o.ident = self.ident
@@ -332,9 +331,8 @@ class SimFile(SimFileBase, DefaultMemory):  # TODO: pick a better base class omg
         self._size = claripy.If(new_end > self._size, new_end, self._size)
         return new_end
 
-    @SimStatePlugin.memo
-    def copy(self, memo):
-        o = super().copy(memo)
+    def copy(self):
+        o = super().copy()
         o.name = self.name
         o._size = self._size
         o.has_end = self.has_end
@@ -394,9 +392,8 @@ class SimFileStream(SimFile):
         self.pos = super().write(self.pos, data, size, **kwargs)
         return
 
-    @SimStatePlugin.memo
-    def copy(self, memo):
-        c = super().copy(memo)
+    def copy(self):
+        c = super().copy()
         c.pos = self.pos
         return c
 
@@ -619,8 +616,7 @@ class SimPackets(SimFileBase):
         self.content.append((_deps_unpack(data)[0], size))
         return pos + 1
 
-    @SimStatePlugin.memo
-    def copy(self, memo):  # pylint: disable=unused-argument
+    def copy(self):
         o = type(self)(
             name=self.name, write_mode=self.write_mode, content=self.content, ident=self.ident, concrete=self.concrete
         )
@@ -686,9 +682,8 @@ class SimPacketsStream(SimPackets):
         self.pos = super().write(self.pos, data, size, **kwargs)
         return
 
-    @SimStatePlugin.memo
-    def copy(self, memo):
-        c = super().copy(memo)
+    def copy(self):
+        c = super().copy()
         c.pos = self.pos
         return c
 
@@ -975,9 +970,8 @@ class SimFileDescriptor(SimFileDescriptorBase):
         self.file.set_state(state)
         super().set_state(state)
 
-    @SimStatePlugin.memo
-    def copy(self, memo):
-        c = type(self)(self.file.copy(memo), self.flags)
+    def copy(self):
+        c = type(self)(self.file.copy(), self.flags)
         c._pos = self._pos
         return c
 
@@ -1084,9 +1078,8 @@ class SimFileDescriptorDuplex(SimFileDescriptorBase):
             return self._write_file.pos
         return self._write_pos
 
-    @SimStatePlugin.memo
-    def copy(self, memo):
-        c = type(self)(self._read_file.copy(memo), self._write_file.copy(memo))
+    def copy(self):
+        c = type(self)(self._read_file.copy(), self._write_file.copy())
         c._read_pos = self._read_pos
         c._write_pos = self._write_pos
         return c
@@ -1178,8 +1171,7 @@ class SimPacketsSlots(SimFileBase):
     def size(self):
         return sum(len(x) for x in self.read_data) // self.state.arch.byte_width
 
-    @SimStatePlugin.memo
-    def copy(self, memo):  # pylint: disable=unused-argument
+    def copy(self):
         o = type(self)(self.name, self.read_sizes, ident=self.ident)
         o.read_data = list(self.read_data)
         return o

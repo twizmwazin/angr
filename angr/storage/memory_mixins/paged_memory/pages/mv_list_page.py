@@ -42,8 +42,8 @@ class MVListPage(
 
         self.sinkhole: _MOTYPE | None = sinkhole
 
-    def copy(self, memo) -> MVListPage:
-        o = super().copy(memo)
+    def copy(self) -> MVListPage:
+        o = super().copy()
         o.content = DynamicDictList(max_size=self.content.max_size, content=self.content)
         o.sinkhole = self.sinkhole
         o.stored_offset = self.stored_offset.copy()
