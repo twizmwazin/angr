@@ -21,7 +21,16 @@ from .plugin import SimStatePlugin
 from .posix import PosixDevFS, PosixProcFS, SimSystemPosix
 from .preconstrainer import SimStatePreconstrainer
 from .scratch import SimStateScratch
-from .sim_action import SimAction, SimActionConstraint, SimActionData, SimActionExit, SimActionOperation
+from .sim_action import (
+    SimAction,
+    SimActionConstraint,
+    SimActionData,
+    SimActionDataAction,
+    SimActionExit,
+    SimActionExitType,
+    SimActionOperation,
+    SimActionRegionType,
+)
 from .sim_action_object import SimActionObject
 from .sim_event import SimEvent, resource_event
 from .solver import SimSolver
@@ -47,9 +56,12 @@ __all__ = (
     "SimAction",
     "SimActionConstraint",
     "SimActionData",
+    "SimActionDataAction",
     "SimActionExit",
+    "SimActionExitType",
     "SimActionObject",
     "SimActionOperation",
+    "SimActionRegionType",
     "SimDebugVariable",
     "SimDebugVariablePlugin",
     "SimEvent",

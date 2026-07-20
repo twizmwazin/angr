@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+from enum import StrEnum
 
 from .sim_action_object import SimActionObject
 from .sim_event import SimEvent
@@ -12,6 +13,35 @@ l = logging.getLogger(name=__name__)
 _noneset = frozenset()
 
 
+class SimActionRegionType(StrEnum):
+    """
+    Types of memory regions that a SimAction can refer to.
+    """
+
+    TMP = "tmp"
+    REG = "reg"
+    MEM = "mem"
+
+
+class SimActionExitType(StrEnum):
+    """
+    Types of exits that a SimActionExit can represent.
+    """
+
+    CONDITIONAL = "conditional"
+    DEFAULT = "default"
+
+
+class SimActionDataAction(StrEnum):
+    """
+    Kinds of data accesses that a SimActionData can represent.
+    """
+
+    READ = "read"
+    WRITE = "write"
+    OPERATE = "operate"
+
+
 class SimAction(SimEvent):
     """
     A SimAction represents a semantic action that an analyzed program performs.
@@ -19,9 +49,9 @@ class SimAction(SimEvent):
 
     # __slots__ = [ 'bbl_addr', 'inst_addr', 'stmt_idx' ]
 
-    TMP = "tmp"
-    REG = "reg"
-    MEM = "mem"
+    TMP = SimActionRegionType.TMP
+    REG = SimActionRegionType.REG
+    MEM = SimActionRegionType.MEM
     _MAX_ACTION_ID = -1
 
     def __init__(self, state, region_type):
@@ -95,8 +125,8 @@ class SimActionExit(SimAction):
     An Exit action represents a (possibly conditional) jump.
     """
 
-    CONDITIONAL = "conditional"
-    DEFAULT = "default"
+    CONDITIONAL = SimActionExitType.CONDITIONAL
+    DEFAULT = SimActionExitType.DEFAULT
 
     def __init__(self, state, target, condition=None, exit_type=None):
         super().__init__(state, "exit")
@@ -194,9 +224,9 @@ class SimActionData(SimAction):
 
     # __slots__ = [ 'objects' ]
 
-    READ = "read"
-    WRITE = "write"
-    OPERATE = "operate"
+    READ = SimActionDataAction.READ
+    WRITE = SimActionDataAction.WRITE
+    OPERATE = SimActionDataAction.OPERATE
 
     def __init__(
         self,
@@ -223,7 +253,7 @@ class SimActionData(SimAction):
 
         self.tmp = tmp
         self.offset = None
-        if region_type == "reg":
+        if region_type == SimActionRegionType.REG:
             if isinstance(addr, int):
                 self.offset = addr
             else:
@@ -281,11 +311,11 @@ class SimActionData(SimAction):
                 return o
             return o.shallow_repr()
 
-        if self.type == "reg":
+        if self.type == SimActionRegionType.REG:
             _size = self.size.ast if isinstance(self.size, SimActionObject) else self.size
             assert isinstance(_size, int)
             storage = self.arch.register_size_names[(self.offset, _size // self.arch.byte_width)]
-        elif self.type == "tmp":
+        elif self.type == SimActionRegionType.TMP:
             storage = f"tmp_{self.tmp}"
         else:
             storage = self.addr
@@ -310,7 +340,7 @@ class SimActionData(SimAction):
         #     storage = f'tmp_{self.tmp}'
         # else:
         #     storage = self.addr
-        direction = "<<----" if self.action == "write" else "---->>"
+        direction = "<<----" if self.action == SimActionDataAction.WRITE else "---->>"
         return f"{self.type}/{self.action}: {self.storage}  {direction}  {_repr(self.data)}"
 
     def _copy_objects(self, c):
