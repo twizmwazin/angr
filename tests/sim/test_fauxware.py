@@ -107,9 +107,9 @@ class TestFauxware(unittest.TestCase):
         pg = p.factory.simulation_manager()
         pg.explore()
 
-        # release the unmergable data
+        # equalize the open fd sets so the states are mergeable; the filesystem itself merges fine now
+        # (files that don't exist in all states are skipped with a warning)
         for s in pg.deadended:
-            s.release_plugin("fs")
             if 3 in s.posix.fd:
                 s.posix.close(3)
 

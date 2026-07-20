@@ -442,6 +442,11 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
 
     def register_plugin(self, name, plugin, inhibit_init=False):  # pylint: disable=arguments-differ
         # l.debug("Adding plugin %s of type %s", name, plugin.__class__.__name__)
+        prev = self._active_plugins.get(name)
+        if prev is not None and prev is not plugin and hasattr(prev, "_store") and hasattr(plugin, "inherit_store"):
+            # replacing the filesystem: carry the file store over so already-issued references (open fds,
+            # posix stdin/stdout/stderr) stay valid, like POSIX open file descriptions surviving a remount
+            plugin.inherit_store(prev)
         self._set_plugin_state(plugin, inhibit_init=inhibit_init)
         return super().register_plugin(name, plugin)
 

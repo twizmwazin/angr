@@ -76,6 +76,10 @@ class SimStatePlugin:
 
         :param memo:    A dictionary mapping object identifiers (id(obj)) to their copied instance.  Use this to avoid
                         infinite recursion and diverged copies.
+
+        Note that no in-tree plugin relies on the memo being shared *across* plugins anymore: objects that used to be
+        referenced from several plugins (file storage) now have a single owner (the filesystem's file store) and are
+        referenced by key everywhere else.
         """
         o = type(self).__new__(type(self))
         o.state = None  # type: ignore

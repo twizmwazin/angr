@@ -4,7 +4,7 @@ import logging
 import os
 from collections import namedtuple
 
-from angr.errors import SimMergeError
+from angr.errors import SimFileError, SimMergeError
 from angr.storage.file import SimFile
 
 from .plugin import SimStatePlugin
@@ -39,6 +39,11 @@ class SimFilesystem(SimStatePlugin):  # pretends links don't exist
     angr's emulated filesystem. Available as state.fs.
     When constructing, all parameters are optional.
 
+    The filesystem is the sole owner of every file storage object (:class:`SimFileBase`) attached to the state: they
+    all live in its *file store*, keyed by a unique string. Everything else that refers to a file - path mappings,
+    file descriptors, ``posix.stdin`` and friends - holds a store key and resolves it through here at access time.
+    This means each file is copied exactly once when the state forks, without any cross-plugin copy coordination.
+
     :param files:       A mapping from filepath to SimFile
     :param pathsep:     The character used to separate path elements, default forward slash.
     :param cwd:         The path of the current working directory to use
@@ -46,8 +51,8 @@ class SimFilesystem(SimStatePlugin):  # pretends links don't exist
 
     :ivar pathsep:      The current pathsep
     :ivar cwd:          The current working directory
-    :ivar unlinks:      A list of unlink operations, tuples of filename and simfile. Be careful, this list is
-                        shallow-copied from successor to successor, so don't mutate anything in it without copying.
+    :ivar unlinks:      A list of unlink operations, tuples of filename and simfile. This list is constructed on the
+                        fly from the file store; mutating it will not affect the state.
     """
 
     def __init__(self, files=None, pathsep=None, cwd=None, mountpoints=None):
@@ -64,14 +69,66 @@ class SimFilesystem(SimStatePlugin):  # pretends links don't exist
 
         self.pathsep = pathsep
         self.cwd = cwd
-        self._unlinks = []
-        self._files = {}
+        self._unlinks = []  # list of (path, store key)
+        self._store = {}  # store key -> SimFileBase. THE owner of all file storage reachable from the state.
+        self._files = {}  # path -> store key
         self._mountpoints = {}
 
         for fname in mountpoints:
             self.mount(fname, mountpoints[fname])
         for fname in files:
             self.insert(fname, files[fname])
+
+    def adopt(self, simfile):
+        """
+        Take ownership of a file storage object, adding it to the file store if it's not already present, and return
+        its store key. Adopting the same object multiple times returns the same key, so references created from
+        different places (a path, several file descriptors, stdin...) all resolve to one object.
+        """
+        for key, f in self._store.items():
+            if f is simfile:
+                return key
+
+        ident = getattr(simfile, "ident", None) or type(simfile).__name__
+        key = ident
+        serial = 0
+        while key in self._store:
+            serial += 1
+            key = f"{ident}#{serial}"
+        self._store[key] = simfile
+        if self.state is not None:
+            simfile.set_state(self.state)
+        return key
+
+    def file_by_key(self, key):
+        """
+        Resolve a file store key to the file storage object it refers to.
+        """
+        try:
+            return self._store[key]
+        except KeyError:
+            raise SimFileError(
+                f"No file with key {key!r} in the filesystem's file store - "
+                "was the fs plugin replaced without inheriting the store?"
+            ) from None
+
+    def key_of(self, simfile):
+        """
+        Return the store key of a file storage object, or None if it is not in the file store.
+        """
+        for key, f in self._store.items():
+            if f is simfile:
+                return key
+        return None
+
+    def inherit_store(self, old_fs):
+        """
+        Carry over the file store of a previous filesystem plugin. This keeps already-issued references (open file
+        descriptors, stdin/stdout/stderr) valid when the fs plugin is replaced - analogous to POSIX open file
+        descriptions surviving a change of the mount namespace.
+        """
+        for key, f in old_fs._store.items():
+            self._store.setdefault(key, f)
 
     @SimStatePlugin.memo
     def copy(self, memo):
@@ -80,21 +137,21 @@ class SimFilesystem(SimStatePlugin):  # pretends links don't exist
         o.pathsep = self.pathsep
         o.cwd = self.cwd
         o._unlinks = list(self._unlinks)
-        o._files = {k: v.copy(memo) for k, v in self._files.items()}
+        # every file is stored here exactly once, so this is the only place file storage gets copied
+        o._store = {k: f.copy(memo) for k, f in self._store.items()}
+        o._files = dict(self._files)
         o._mountpoints = {k: v.copy(memo) for k, v in self._mountpoints.items()}
 
         return o
 
     @property
     def unlinks(self):
-        for _, f in self._unlinks:
-            f.set_state(self.state)
-        return self._unlinks
+        return [(path, self.file_by_key(key)) for path, key in self._unlinks]
 
     def set_state(self, state):
         super().set_state(state)
-        for fname in self._files:
-            self._files[fname].set_state(state)
+        for f in self._store.values():
+            f.set_state(state)
         for fname in self._mountpoints:
             self._mountpoints[fname].set_state(state)
 
@@ -104,7 +161,7 @@ class SimFilesystem(SimStatePlugin):  # pretends links don't exist
                 raise SimMergeError("Can't merge filesystems with disparate cwds")
             if len(o._mountpoints) != len(self._mountpoints):
                 raise SimMergeError("Can't merge filesystems with disparate mountpoints")
-            if list(map(id, o.unlinks)) != list(map(id, self.unlinks)):
+            if o._unlinks != self._unlinks:
                 raise SimMergeError("Can't merge filesystems with disparate unlinks")
 
         for fname in self._mountpoints:
@@ -120,26 +177,27 @@ class SimFilesystem(SimStatePlugin):  # pretends links don't exist
 
             self._mountpoints[fname].merge(subdeck, merge_conditions, common_ancestor=common_mp)
 
-        # this is a little messy
-        deck = [self, *others]
-        all_files = set.union(*(set(o._files.keys()) for o in deck))
-        for fname in all_files:
-            subdeck = [o._files.get(fname, None) for o in deck]
-            representative = next(x for x in subdeck if x is not None)
-            for i, v in enumerate(subdeck):
-                if v is None:
-                    subdeck[i] = representative()
-                    if i == 0:
-                        self._files[fname] = subdeck[i]
+        # As the owner of all file storage, the filesystem is responsible for merging file content, and does so
+        # exactly once per file. Keys are shared lineage: states forked from a common ancestor agree on them.
+        merging_occurred = False
+        for key in self._store:
+            if any(key not in o._store for o in others):
+                l.warning("Not merging file %s: it does not exist in all states", key)
+                continue
 
-            if common_ancestor is not None and fname in common_ancestor._files:
-                common_simfile = common_ancestor._files[fname]
-            else:
-                common_simfile = None
+            common_simfile = None
+            if common_ancestor is not None:
+                common_simfile = common_ancestor._store.get(key)
 
-            subdeck[0].merge(subdeck[1:], merge_conditions, common_ancestor=common_simfile)
+            merging_occurred |= self._store[key].merge(
+                [o._store[key] for o in others], merge_conditions, common_ancestor=common_simfile
+            )
 
-        return True
+        for fname, key in self._files.items():
+            if any(o._files.get(fname) != key for o in others):
+                l.warning("Filesystems bind %s to different files; keeping the first state's version", fname)
+
+        return merging_occurred
 
     def _normalize_path(self, path):
         """
@@ -184,19 +242,20 @@ class SimFilesystem(SimStatePlugin):  # pretends links don't exist
         mountpoint, chunks = self.get_mountpoint(path)
 
         if mountpoint is None:
-            return self._files.get(self._join_chunks(chunks))
+            key = self._files.get(self._join_chunks(chunks))
+            if key is None:
+                return None
+            return self.file_by_key(key)
         return mountpoint.get(chunks)
 
     def insert(self, path, simfile):
         """
         Insert a file into the filesystem. Returns whether the operation was successful.
         """
-        if self.state is not None:
-            simfile.set_state(self.state)
         mountpoint, chunks = self.get_mountpoint(path)
 
         if mountpoint is None:
-            self._files[self._join_chunks(chunks)] = simfile
+            self._files[self._join_chunks(chunks)] = self.adopt(simfile)
             return True
         return mountpoint.insert(chunks, simfile)
 
@@ -205,18 +264,21 @@ class SimFilesystem(SimStatePlugin):  # pretends links don't exist
         Remove a file from the filesystem. Returns whether the operation was successful.
 
         This will add a ``fs_unlink`` event with the path of the file and also the index into the `unlinks` list.
+
+        The file's storage stays in the file store, so open file descriptors (and the ``unlinks`` list) can still
+        reach it - just like a POSIX unlink of an open file.
         """
         mountpoint, chunks = self.get_mountpoint(path)
         apath = self._join_chunks(chunks)
 
         if mountpoint is None:
             try:
-                simfile = self._files.pop(apath)
+                key = self._files.pop(apath)
             except KeyError:
                 return False
             else:
-                self.state.history.add_event("fs_unlink", path=apath, unlink_idx=len(self.unlinks))
-                self.unlinks.append((apath, simfile))
+                self.state.history.add_event("fs_unlink", path=apath, unlink_idx=len(self._unlinks))
+                self._unlinks.append((apath, key))
                 return True
         else:
             return mountpoint.delete(chunks)
@@ -310,7 +372,7 @@ class SimConcreteFilesystem(SimMount):
     def __init__(self, pathsep=os.path.sep):
         super().__init__()
         self.pathsep = pathsep
-        self.cache = {}
+        self.cache = {}  # path -> file store key
         self.deleted_list = set()
 
     def get(self, path_elements):
@@ -323,7 +385,7 @@ class SimConcreteFilesystem(SimMount):
                 return None
             self.insert(path_elements, simfile)
 
-        return self.cache[path]
+        return self.state.fs.file_by_key(self.cache[path])
 
     def _load_file(self, guest_path):
         raise NotImplementedError
@@ -333,8 +395,7 @@ class SimConcreteFilesystem(SimMount):
 
     def insert(self, path_elements, simfile):
         path = self._join_chunks([x.decode() for x in path_elements])
-        simfile.set_state(self.state)
-        self.cache[path] = simfile
+        self.cache[path] = self.state.fs.adopt(simfile)
         self.deleted_list.discard(path)
         return True
 
@@ -344,52 +405,27 @@ class SimConcreteFilesystem(SimMount):
         return self.cache.pop(path, None) is not None
 
     def lookup(self, sim_file):
-        for key, val in self.cache.items():
-            if sim_file == val:
-                return key
+        for path, key in self.cache.items():
+            if self.state.fs.file_by_key(key) is sim_file:
+                return path
         return None
 
     @SimStatePlugin.memo
-    def copy(self, memo):
+    def copy(self, memo):  # pylint: disable=unused-argument
         x = type(self)(pathsep=self.pathsep)
-        x.cache = {fname: self.cache[fname].copy(memo) for fname in self.cache}
+        x.cache = dict(self.cache)  # the cache holds file store keys; the fs plugin owns (and copies) the files
         x.deleted_list = set(self.deleted_list)
         return x
 
-    def set_state(self, state):
-        super().set_state(state)
-        for fname in self.cache:
-            self.cache[fname].set_state(state)
-
     def merge(self, others, merge_conditions, common_ancestor=None):
-        merging_occurred = False
-
+        # file content is merged by the fs plugin's file store; only sanity-check the mount metadata here
         for o in others:
             if o.pathsep != self.pathsep:
                 raise SimMergeError("Can't merge concrete filesystems with disparate pathseps")
             if o.deleted_list != self.deleted_list:
                 raise SimMergeError("Can't merge concrete filesystems with disparate deleted files")
 
-        deck = [self, *others]
-        all_files = set.union(*(set(o._files.keys()) for o in deck))
-        for fname in all_files:
-            subdeck = []
-            basecase = None
-            for o in deck:
-                try:
-                    subdeck.append(o.cache[fname])
-                except KeyError:
-                    if basecase is None:
-                        basecase = self._load_file(fname)
-                    subdeck.append(basecase)
-
-            if common_ancestor is not None and fname in common_ancestor.cache:
-                common_simfile = common_ancestor.cache[fname]
-            else:
-                common_simfile = None
-
-            merging_occurred |= subdeck[0].merge(subdeck[1:], merge_conditions, common_ancestor=common_simfile)
-        return merging_occurred
+        return False
 
     def _join_chunks(self, keys):
         """

@@ -160,7 +160,8 @@ class SimSystemPosix(SimStatePlugin):
         self.autotmp_counter = 0
         self._closed_fds = []
 
-        self.sockets = sockets if sockets is not None else {}
+        # each ref is either a file object (before we're attached to a state) or its fs store key (afterwards)
+        self._sockets = {ident: tuple(pair) for ident, pair in sockets.items()} if sockets is not None else {}
         self.socket_queue = socket_queue if socket_queue is not None else []
 
         if stdin is None:
@@ -185,10 +186,59 @@ class SimSystemPosix(SimStatePlugin):
             fd[2] = SimFileDescriptor(stderr, 0)
 
         self.fd = fd
-        # these are the storage mechanisms!
-        self.stdin = stdin
-        self.stdout = stdout
-        self.stderr = stderr
+        # these are the storage mechanisms! the properties adopt them into the fs plugin's file store on attach
+        self._stdin = stdin
+        self._stdout = stdout
+        self._stderr = stderr
+
+    def _resolve_ref(self, ref):
+        if isinstance(ref, str):
+            return self.state.fs.file_by_key(ref)
+        return ref
+
+    def _adopt_ref(self, ref):
+        if isinstance(ref, str) or self.state is None:
+            return ref
+        return self.state.fs.adopt(ref)
+
+    @staticmethod
+    def _copy_ref(ref, memo):
+        return ref if isinstance(ref, str) else ref.copy(memo)
+
+    @property
+    def stdin(self):
+        return self._resolve_ref(self._stdin)
+
+    @stdin.setter
+    def stdin(self, simfile):
+        self._stdin = self._adopt_ref(simfile)
+
+    @property
+    def stdout(self):
+        return self._resolve_ref(self._stdout)
+
+    @stdout.setter
+    def stdout(self, simfile):
+        self._stdout = self._adopt_ref(simfile)
+
+    @property
+    def stderr(self):
+        return self._resolve_ref(self._stderr)
+
+    @stderr.setter
+    def stderr(self, simfile):
+        self._stderr = self._adopt_ref(simfile)
+
+    @property
+    def sockets(self):
+        """
+        A mapping from socket identifier to a tuple of the read and write storage for the socket.
+
+        This mapping is built on the fly from the filesystem's file store; mutating the returned dict has no effect.
+        """
+        return {
+            ident: (self._resolve_ref(pair[0]), self._resolve_ref(pair[1])) for ident, pair in self._sockets.items()
+        }
 
     @SimStatePlugin.memo
     def copy(self, memo):
@@ -197,11 +247,22 @@ class SimSystemPosix(SimStatePlugin):
         o.sigmask_bits = self.sigmask_bits
         o.maximum_symbolic_syscalls = self.maximum_symbolic_syscalls
         o.max_length = self.max_length
-        o.stdin = self.stdin.copy(memo)
-        o.stdout = self.stdout.copy(memo)
-        o.stderr = self.stderr.copy(memo)
-        o.fd = {k: self.fd[k].copy(memo) for k in self.fd}
-        o.sockets = {ident: tuple(x.copy(memo) for x in self.sockets[ident]) for ident in self.sockets}
+        # file storage is owned (and copied) by the fs plugin; we only carry the store keys over
+        o._stdin = self._copy_ref(self._stdin, memo)
+        o._stdout = self._copy_ref(self._stdout, memo)
+        o._stderr = self._copy_ref(self._stderr, memo)
+        # several fd numbers may share one descriptor (dup); preserve that aliasing locally
+        copied_fds = {}
+        new_fd = {}
+        for k, desc in self.fd.items():
+            if id(desc) not in copied_fds:
+                copied_fds[id(desc)] = desc.copy(memo)
+            new_fd[k] = copied_fds[id(desc)]
+        o.fd = new_fd
+        o._sockets = {
+            ident: (self._copy_ref(pair[0], memo), self._copy_ref(pair[1], memo))
+            for ident, pair in self._sockets.items()
+        }
         o.socket_queue = self.socket_queue  # shouldn't need to copy this - should be copied before use.
         o.argv = self.argv
         o.argc = self.argc
@@ -215,8 +276,8 @@ class SimSystemPosix(SimStatePlugin):
         o.gid = self.gid
         o.brk = self.brk
         o.autotmp_counter = self.autotmp_counter
-        o.dev_fs = self.dev_fs.copy(memo)
-        o.proc_fs = self.proc_fs.copy(memo)
+        o.dev_fs = self.dev_fs  # stateless singletons - their copy() returns self
+        o.proc_fs = self.proc_fs
         o._closed_fds = list(self._closed_fds)
 
         return o
@@ -278,22 +339,23 @@ class SimSystemPosix(SimStatePlugin):
     def set_state(self, state):
         super().set_state(state)
 
+        # adopt any not-yet-adopted file storage into the fs plugin's file store. after this, everything we hold
+        # is a store key and the fs plugin has sole ownership of the files themselves.
+        self._stdin = self._adopt_ref(self._stdin)
+        self._stdout = self._adopt_ref(self._stdout)
+        self._stderr = self._adopt_ref(self._stderr)
+        self._sockets = {
+            ident: (self._adopt_ref(pair[0]), self._adopt_ref(pair[1])) for ident, pair in self._sockets.items()
+        }
+
         for fd in self.fd:
             self.fd[fd].set_state(state)
 
-        self.stdin.set_state(state)
-        self.stdout.set_state(state)
-        self.stderr.set_state(state)
-
         if self.socket_queue:
+            # these are templates, not adopted state - they are copied and adopted when a socket is opened
             for sock_pair in self.socket_queue:
                 if not sock_pair:
                     continue
-                sock_pair[0].set_state(state)
-                sock_pair[1].set_state(state)
-
-        if self.sockets:
-            for sock_pair in self.sockets.values():
                 sock_pair[0].set_state(state)
                 sock_pair[1].set_state(state)
 
@@ -379,13 +441,13 @@ class SimSystemPosix(SimStatePlugin):
 
         # control flow sucks. we should be doing our analysis with nothing but mov instructions
         sockpair = None
-        if ident not in self.sockets:
+        if ident not in self._sockets:
             if self.socket_queue:
                 sockpair = self.socket_queue.pop(0)
                 if sockpair is not None:
                     memo = {}
-                    # Since we are not copying sockpairs when the FS state plugin branches, their original SimState
-                    # instances might have long gone. Update their states before making copies.
+                    # The queue holds templates that are shared between states. Update their states, then make
+                    # private copies to adopt into this state.
                     sockpair[0].set_state(self.state)
                     sockpair[1].set_state(self.state)
                     sockpair = sockpair[0].copy(memo), sockpair[1].copy(memo)
@@ -395,9 +457,8 @@ class SimSystemPosix(SimStatePlugin):
                 write_file = SimPacketsStream(f"socket {ident!s} write")
                 sockpair = (read_file, write_file)
 
-            self.sockets[ident] = sockpair
-        else:
-            sockpair = self.sockets[ident]
+            self._sockets[ident] = (self.state.fs.adopt(sockpair[0]), self.state.fs.adopt(sockpair[1]))
+        sockpair = self.sockets[ident]
 
         simfd = SimFileDescriptorDuplex(sockpair[0], sockpair[1])
         simfd.set_state(self.state)
@@ -607,16 +668,18 @@ class SimSystemPosix(SimStatePlugin):
             for fd in self.fd:
                 if fd not in o.fd:
                     raise SimMergeError("Can't merge states with disparate open file descriptors")
-            if len(self.sockets) != len(o.sockets):
+            if len(self._sockets) != len(o._sockets):
                 raise SimMergeError("Can't merge states with disparate sockets")
-            for ident in self.sockets:
-                if ident not in o.sockets:
+            for ident in self._sockets:
+                if ident not in o._sockets:
                     raise SimMergeError("Can't merge states with disparate sockets")
             if len(self.socket_queue) != len(o.socket_queue) or any(
                 x is not y for x, y in zip(self.socket_queue, o.socket_queue)
             ):
                 raise SimMergeError("Can't merge states with disparate socket queues")
 
+        # note: file content (stdin/stdout/stderr, socket storage, opened files) is merged by the fs plugin, which
+        # owns all file storage. we only merge the descriptor-level state here.
         merging_occurred = False
         for fd in self.fd:
             try:
@@ -626,36 +689,6 @@ class SimSystemPosix(SimStatePlugin):
             merging_occurred |= self.fd[fd].merge(
                 [o.fd[fd] for o in others], merge_conditions, common_ancestor=common_fd
             )
-        for ident in self.sockets:
-            try:
-                common_sock = common_ancestor.sockets[ident]
-            except (AttributeError, KeyError):
-                common_sock = None
-            merging_occurred |= self.sockets[ident][0].merge(
-                [o.sockets[ident][0] for o in others], merge_conditions, common_ancestor=common_sock[0]
-            )
-            merging_occurred |= self.sockets[ident][1].merge(
-                [o.sockets[ident][1] for o in others], merge_conditions, common_ancestor=common_sock[1]
-            )
-
-        # pylint: disable=no-member
-        # pylint seems to be seriously flipping out here for reasons I'm unsure of
-        # it thinks others is a list of bools somehow
-        merging_occurred |= self.stdin.merge(
-            [o.stdin for o in others],
-            merge_conditions,
-            common_ancestor=common_ancestor.stdin if common_ancestor is not None else None,
-        )
-        merging_occurred |= self.stdout.merge(
-            [o.stdout for o in others],
-            merge_conditions,
-            common_ancestor=common_ancestor.stdout if common_ancestor is not None else None,
-        )
-        merging_occurred |= self.stderr.merge(
-            [o.stderr for o in others],
-            merge_conditions,
-            common_ancestor=common_ancestor.stderr if common_ancestor is not None else None,
-        )
 
         return merging_occurred
 

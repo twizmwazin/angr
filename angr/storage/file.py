@@ -881,15 +881,33 @@ class SimFileDescriptor(SimFileDescriptorBase):
     A simple file descriptor forwarding reads and writes to a SimFile. Contains information about
     the current opened state of the file, such as the flags or (if relevant) the current position.
 
+    The descriptor does not own the file's storage - the filesystem plugin (``state.fs``) does. Once the descriptor
+    is attached to a state, it only remembers the file's store key and resolves it through ``state.fs`` on access,
+    so descriptors can be copied freely without duplicating the file.
+
     :ivar file:     The SimFile described to by this descriptor
     :ivar flags:    The mode that the file descriptor was opened with, a bitfield of flags
     """
 
     def __init__(self, simfile, flags=0):
         super().__init__()
-        self.file = simfile
+        # either the file object itself (before we are attached to a state) or its file store key (afterwards)
+        self._file_ref = simfile
         self._pos = 0
         self.flags = flags
+
+    @property
+    def file(self):
+        if isinstance(self._file_ref, str):
+            return self.state.fs.file_by_key(self._file_ref)
+        return self._file_ref
+
+    @file.setter
+    def file(self, simfile):
+        if self.state is not None:
+            self._file_ref = self.state.fs.adopt(simfile)
+        else:
+            self._file_ref = simfile
 
     def read_data(self, size, **kwargs):
         size = self._prep_read(size)
@@ -972,12 +990,16 @@ class SimFileDescriptor(SimFileDescriptorBase):
         return self._pos
 
     def set_state(self, state):
-        self.file.set_state(state)
         super().set_state(state)
+        if not isinstance(self._file_ref, str):
+            # hand the file over to the filesystem's file store, keeping only the key
+            self._file_ref = state.fs.adopt(self._file_ref)
 
     @SimStatePlugin.memo
     def copy(self, memo):
-        c = type(self)(self.file.copy(memo), self.flags)
+        # if attached to a state, _file_ref is a store key: the fs plugin owns and copies the file itself
+        file_ref = self._file_ref if isinstance(self._file_ref, str) else self._file_ref.copy(memo)
+        c = type(self)(file_ref, self.flags)
         c._pos = self._pos
         return c
 
@@ -1016,11 +1038,24 @@ class SimFileDescriptorDuplex(SimFileDescriptorBase):
 
     def __init__(self, read_file, write_file):
         super().__init__()
-        self._read_file = read_file
-        self._write_file = write_file
+        # either the file objects themselves (before we are attached to a state) or their file store keys (afterwards)
+        self._read_ref = read_file
+        self._write_ref = write_file
 
         self._read_pos = 0
         self._write_pos = 0
+
+    @property
+    def _read_file(self):
+        if isinstance(self._read_ref, str):
+            return self.state.fs.file_by_key(self._read_ref)
+        return self._read_ref
+
+    @property
+    def _write_file(self):
+        if isinstance(self._write_ref, str):
+            return self.state.fs.file_by_key(self._write_ref)
+        return self._write_ref
 
     def read_data(self, size, **kwargs):
         size = self._prep_read(size)
@@ -1037,9 +1072,11 @@ class SimFileDescriptorDuplex(SimFileDescriptorBase):
         return size
 
     def set_state(self, state):
-        self._read_file.set_state(state)
-        self._write_file.set_state(state)
         super().set_state(state)
+        if not isinstance(self._read_ref, str):
+            self._read_ref = state.fs.adopt(self._read_ref)
+        if not isinstance(self._write_ref, str):
+            self._write_ref = state.fs.adopt(self._write_ref)
 
     def eof(self):
         # the thing that makes the most sense is for this to refer to the read eof status...
@@ -1086,7 +1123,10 @@ class SimFileDescriptorDuplex(SimFileDescriptorBase):
 
     @SimStatePlugin.memo
     def copy(self, memo):
-        c = type(self)(self._read_file.copy(memo), self._write_file.copy(memo))
+        # if attached to a state, the refs are store keys: the fs plugin owns and copies the files themselves
+        read_ref = self._read_ref if isinstance(self._read_ref, str) else self._read_ref.copy(memo)
+        write_ref = self._write_ref if isinstance(self._write_ref, str) else self._write_ref.copy(memo)
+        c = type(self)(read_ref, write_ref)
         c._read_pos = self._read_pos
         c._write_pos = self._write_pos
         return c
