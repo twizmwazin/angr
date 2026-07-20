@@ -22,8 +22,6 @@ def tracer_cgc(
     write_strategies=None,
     add_options=None,
     remove_options=None,
-    syscall_data=None,
-    symbolic_stdin=True,
 ):
     p = angr.Project(filename)
     p.simos.syscall_library.update(angr.SIM_LIBRARIES["cgcabi_tracer"][0])
@@ -49,13 +47,7 @@ def tracer_cgc(
         keep_predecessors=1,
         copy_states=copy_states,
         follow_unsat=follow_unsat,
-        syscall_data=syscall_data,
     )
-    if add_options is not None and angr.options.UNICORN_HANDLE_CGC_RECEIVE_SYSCALL in add_options:
-        fd_data = {0: (stdin, b"\x01" * len(stdin))} if symbolic_stdin else {0: (stdin, b"\x00" * len(stdin))}
-
-        t.set_fd_data(fd_data)
-
     simgr.use_technique(t)
     simgr.use_technique(angr.exploration_techniques.Oppologist())
 
@@ -72,8 +64,6 @@ def trace_cgc_with_pov_file(
     write_strategies=None,
     add_options=None,
     remove_options=None,
-    syscall_data=None,
-    symbolic_stdin=True,
 ):
     assert os.path.isfile(pov_file)
     pov = load_cgc_pov(pov_file)
@@ -86,8 +76,6 @@ def trace_cgc_with_pov_file(
         write_strategies=write_strategies,
         add_options=add_options,
         remove_options=remove_options,
-        syscall_data=syscall_data,
-        symbolic_stdin=symbolic_stdin,
     )
     simgr = trace_result[0]
     simgr.run()
@@ -180,148 +168,6 @@ class TestTracer(unittest.TestCase):
         assert crash_path is not None
         assert crash_state is not None
 
-    def test_cgc_receive_unicorn_native_interface(self):
-        """
-        Test if unicorn native interface handles CGC receive syscall correctly. Receives with symbolic arguments also
-        tested.
-        """
-
-        binary = os.path.join(bin_location, "tests", "cgc", "KPRCA_00038")
-        pov_file = os.path.join(bin_location, "tests_data", "cgc_povs", "KPRCA_00038_POV_00000.xml")
-        output_initial_bytes = b""
-        add_options = {
-            angr.options.UNICORN_HANDLE_CGC_RECEIVE_SYSCALL,
-            angr.options.UNICORN_HANDLE_SYMBOLIC_ADDRESSES,
-            angr.options.UNICORN_HANDLE_SYMBOLIC_CONDITIONS,
-            angr.options.UNICORN_HANDLE_SYMBOLIC_SYSCALLS,
-        }
-        trace_cgc_with_pov_file(
-            binary,
-            "tracer_cgc_receive_unicorn_native_interface",
-            pov_file,
-            output_initial_bytes,
-            add_options=add_options,
-        )
-
-    def test_cgc_receive_unicorn_native_interface_rx_bytes(self):
-        """
-        Test rx_bytes is correctly handled by unicorn native interface's CGC receive: update only if non-null
-        """
-
-        binary = os.path.join(bin_location, "tests", "cgc", "CROMU_00012")
-        pov_file = os.path.join(bin_location, "tests_data", "cgc_povs", "CROMU_00012_POV_00000.xml")
-        output_initial_bytes = b""
-        add_options = {
-            angr.options.UNICORN_HANDLE_CGC_RECEIVE_SYSCALL,
-            angr.options.UNICORN_HANDLE_SYMBOLIC_ADDRESSES,
-            angr.options.UNICORN_HANDLE_SYMBOLIC_CONDITIONS,
-        }
-        trace_cgc_with_pov_file(
-            binary,
-            "tracer_cgc_receive_unicorn_native_interface_rx_bytes",
-            pov_file,
-            output_initial_bytes,
-            add_options=add_options,
-        )
-
-    def test_cgc_random_syscall_handling_native_interface(self):
-        """
-        Test if random syscall is correctly handled in native interface. Random with symbolic arguments also tested.
-        """
-
-        binary = os.path.join(bin_location, "tests", "cgc", "KPRCA_00011")
-        pov_file = os.path.join(bin_location, "tests_data", "cgc_povs", "KPRCA_00011_POV_00000.xml")
-        output_file = os.path.join(bin_location, "tests_data", "cgc_povs", "KPRCA_00011_stdout.txt")
-        add_options = {
-            angr.options.UNICORN_HANDLE_CGC_RECEIVE_SYSCALL,
-            angr.options.UNICORN_HANDLE_CGC_RANDOM_SYSCALL,
-            angr.options.UNICORN_HANDLE_SYMBOLIC_ADDRESSES,
-            angr.options.UNICORN_HANDLE_SYMBOLIC_CONDITIONS,
-            angr.options.UNICORN_HANDLE_SYMBOLIC_SYSCALLS,
-        }
-
-        rand_syscall_data = {
-            "random": [
-                (65, 1),
-                (16705, 2),
-                (16705, 2),
-                (65, 1),
-                (16705, 2),
-                (16705, 2),
-                (65, 1),
-                (16705, 2),
-                (16705, 2),
-                (65, 1),
-                (16705, 2),
-                (16705, 2),
-                (65, 1),
-                (16705, 2),
-                (16705, 2),
-                (65, 1),
-                (16705, 2),
-                (16705, 2),
-                (65, 1),
-                (16705, 2),
-                (16705, 2),
-                (65, 1),
-                (16705, 2),
-                (16705, 2),
-                (65, 1),
-                (16705, 2),
-                (16705, 2),
-                (65, 1),
-                (16705, 2),
-                (16705, 2),
-                (65, 1),
-                (16705, 2),
-                (16705, 2),
-                (65, 1),
-                (16705, 2),
-                (16705, 2),
-                (65, 1),
-                (16705, 2),
-                (16705, 2),
-                (65, 1),
-                (16705, 2),
-                (16705, 2),
-                (65, 1),
-                (16705, 2),
-                (16705, 2),
-                (65, 1),
-                (16705, 2),
-                (16705, 2),
-                (65, 1),
-                (16705, 2),
-                (16705, 2),
-                (65, 1),
-                (16705, 2),
-                (16705, 2),
-                (65, 1),
-                (16705, 2),
-                (16705, 2),
-                (65, 1),
-                (16705, 2),
-                (16705, 2),
-                (65, 1),
-                (16705, 2),
-                (16705, 2),
-                (65, 1),
-                (16705, 2),
-                (16705, 2),
-            ]
-        }
-        with open(output_file, "rb") as fh:
-            output_bytes = fh.read()
-
-        trace_cgc_with_pov_file(
-            binary,
-            "tracer_cgc_receive_unicorn_native_interface_rx_bytes",
-            pov_file,
-            output_bytes,
-            add_options=add_options,
-            syscall_data=rand_syscall_data,
-        )
-
     def test_cgc_se1_palindrome_raw(self):
         b = os.path.join(bin_location, "tests", "cgc", "sc1_0b32aa01_01")
         # test a valid palindrome
@@ -353,49 +199,6 @@ class TestTracer(unittest.TestCase):
 
         assert simgr.crashed
 
-    def test_concrete_execution_in_native_interface(self):
-        """
-        Test if concrete execution without any symbolic bytes is done correctly when receive syscall is handled in
-        native interface
-        """
-
-        binary = os.path.join(bin_location, "tests", "cgc", "KPRCA_00052")
-        pov_file = os.path.join(bin_location, "tests_data", "cgc_povs", "KPRCA_00052_POV_00000.xml")
-        output_initial_bytes = (
-            b"Enter system password: \nWelcome to the CGC Pizzeria order management system.\n1. Input Order\n"
-            b"2. Update Order\n3. View One Orders\n4. View All Orders\n5. Delete Order\n6. Clear All Orders\n"
-            b"7. Logout\n"
-            b"Choice: Enter Pickup Name: Choose what the kind of pizza\n1. Pizza Pie - The classic!\n"
-            b"2. Pizza Sub - All the fun, on a bun\n3. Pizza Bowl - Our own twist\nChoice: Select Size\n1. Small\n"
-            b"2. Medium\n3. Large\nChoice: Successfully added a new Pizza Pie!\nSelect an option:\n1. Add Toppings\n"
-            b"2. Remove Toppings\n3. Add Sauce\n4. Remove Sauce\n5. Finished With Pizza\nChoice: Successfully added "
-            b"pizza!"
-            b"\n1. Add another Pizza\n2. Quit\nChoice: 0. Cancel\n==================================================\n"
-            b"  "
-            b"Item #1. Classic Pizza Pie, Size: SMALL\n    Selected Toppings\n\tNone\n    Sauce on the side\n\tNone\n"
-            b"--------------------------------------\n\t\tCalories: 1000\n\t\tCarbs   : 222\n\nPizza length... = 1\n"
-            b"\t\t"
-            b"Estimated wait time: 36 minute(s)\n==================================================\nChoice: "
-            b"Removed Item #1\n1. Add another Pizza\n2. Quit\nChoice: Order successfully added!\n1. Input Order\n"
-            b"2. Update Order\n3. View One Orders\n4. View All Orders\n5. Delete Order\n6. Clear All Orders\n7. "
-            b"Logout\n"
-            b"Choice: 1 - pov: Ordered 0 pizza(s)\n==================================================\n"
-            b"--------------------------------------\n\t\tCalories: 0\n\t\tCarbs   : 0\n\n"
-        )
-        add_options = {
-            angr.options.UNICORN_HANDLE_CGC_RECEIVE_SYSCALL,
-            angr.options.UNICORN_HANDLE_SYMBOLIC_ADDRESSES,
-            angr.options.UNICORN_HANDLE_SYMBOLIC_CONDITIONS,
-        }
-        trace_cgc_with_pov_file(
-            binary,
-            "concrete_execution_in_native_interface",
-            pov_file,
-            output_initial_bytes,
-            add_options=add_options,
-            symbolic_stdin=False,
-        )
-
     def test_d_flag_and_write_write_conflict_in_unicorn(self):
         """
         Check if d flag is handled correctly in unicorn native interface and write-write conflicts do not occur when
@@ -411,7 +214,6 @@ class TestTracer(unittest.TestCase):
             b" operators ==, !=, >, <, AND and OR):\n"
         )
         add_options = {
-            angr.options.UNICORN_HANDLE_CGC_RECEIVE_SYSCALL,
             angr.options.UNICORN_HANDLE_SYMBOLIC_ADDRESSES,
             angr.options.UNICORN_HANDLE_SYMBOLIC_CONDITIONS,
         }
@@ -454,7 +256,6 @@ class TestTracer(unittest.TestCase):
             b"--------------------------------------\n\t\tCalories: 0\n\t\tCarbs   : 0\n\n"
         )
         add_options = {
-            angr.options.UNICORN_HANDLE_CGC_RECEIVE_SYSCALL,
             angr.options.UNICORN_HANDLE_SYMBOLIC_ADDRESSES,
             angr.options.UNICORN_HANDLE_SYMBOLIC_CONDITIONS,
         }
@@ -591,7 +392,6 @@ class TestTracer(unittest.TestCase):
         pov_file = os.path.join(bin_location, "tests_data", "cgc_povs", "KPRCA_00028_POV_00000.xml")
         output_initial_bytes = b"Welcome to the SLUR REPL. Type an expression to evaluate it.\n> "
         add_options = {
-            angr.options.UNICORN_HANDLE_CGC_RECEIVE_SYSCALL,
             angr.options.UNICORN_HANDLE_SYMBOLIC_ADDRESSES,
             angr.options.UNICORN_HANDLE_SYMBOLIC_CONDITIONS,
         }
@@ -618,7 +418,6 @@ class TestTracer(unittest.TestCase):
             b"LV type will be handled in v4.\n190\n0\n===trolololo===\n"
         )
         add_options = {
-            angr.options.UNICORN_HANDLE_CGC_RECEIVE_SYSCALL,
             angr.options.UNICORN_HANDLE_SYMBOLIC_ADDRESSES,
             angr.options.UNICORN_HANDLE_SYMBOLIC_CONDITIONS,
         }
@@ -640,7 +439,6 @@ class TestTracer(unittest.TestCase):
         pov_file = os.path.join(bin_location, "tests_data", "cgc_povs", "NRFIN_00021_POV_00000.xml")
         output_initial_bytes = b""
         add_options = {
-            angr.options.UNICORN_HANDLE_CGC_RECEIVE_SYSCALL,
             angr.options.UNICORN_HANDLE_SYMBOLIC_ADDRESSES,
             angr.options.UNICORN_HANDLE_SYMBOLIC_CONDITIONS,
         }
@@ -665,7 +463,6 @@ class TestTracer(unittest.TestCase):
         )
         add_options = {
             angr.options.UNSUPPORTED_FORCE_CONCRETIZE,
-            angr.options.UNICORN_HANDLE_CGC_RECEIVE_SYSCALL,
             angr.options.UNICORN_HANDLE_SYMBOLIC_ADDRESSES,
             angr.options.UNICORN_HANDLE_SYMBOLIC_CONDITIONS,
         }
@@ -793,33 +590,6 @@ class TestTracer(unittest.TestCase):
             "tracer_symbolic_memory_dependencies_liveness",
             pov_file,
             output_initial_bytes,
-        )
-
-    def test_symbolic_cgc_transmit_handling_in_native_interface(self):
-        """
-        Check if CGC transmit syscall with symbolic arguments is handled in native interface when tracing.
-        """
-
-        binary = os.path.join(bin_location, "tests", "cgc", "CROMU_00008")
-        pov_file = os.path.join(bin_location, "tests_data", "cgc_povs", "CROMU_00008_POV_00000.xml")
-        output_initial_bytes = (
-            b"> You logged in.\n> First name: Last name: User name: Birthdate (mm/dd/yy hh:mm:ss): "
-            b"Date is: 12/21/1983 5:43:21\nData added, record 0\n"
-            b"> Enter search express (firstname or fn, lastname or ln, username or un, birthdate or bd,"
-            b" operators ==, !=, >, <, AND and OR):\n"
-        )
-        add_options = {
-            angr.options.UNICORN_HANDLE_CGC_RECEIVE_SYSCALL,
-            angr.options.UNICORN_HANDLE_SYMBOLIC_ADDRESSES,
-            angr.options.UNICORN_HANDLE_SYMBOLIC_CONDITIONS,
-            angr.options.UNICORN_HANDLE_SYMBOLIC_SYSCALLS,
-        }
-        trace_cgc_with_pov_file(
-            binary,
-            "tracer_symbolic_cgc_transmit_handling_in_native_interface",
-            pov_file,
-            output_initial_bytes,
-            add_options=add_options,
         )
 
     def test_user_controlled_code_execution(self):

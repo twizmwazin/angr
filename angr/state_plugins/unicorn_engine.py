@@ -46,14 +46,6 @@ class MEM_PATCH(ctypes.Structure):
 MEM_PATCH._fields_ = [("address", ctypes.c_uint64), ("length", ctypes.c_uint64), ("next", ctypes.POINTER(MEM_PATCH))]
 
 
-class TRANSMIT_RECORD(ctypes.Structure):
-    """
-    struct transmit_record_t
-    """
-
-    _fields_ = [("fd", ctypes.c_uint32), ("data", ctypes.c_void_p), ("count", ctypes.c_uint32)]
-
-
 class TaintEntityEnum:
     """
     taint_entity_enum_t
@@ -244,16 +236,6 @@ class StopDetails(ctypes.Structure):
     ]
 
 
-class SimOSEnum:
-    """
-    enum simos_t
-    """
-
-    SIMOS_CGC = 0
-    SIMOS_LINUX = 1
-    SIMOS_OTHER = 2
-
-
 #
 # Memory mapping errors - only used internally
 #
@@ -433,8 +415,6 @@ def _load_native():
             state_t,
             uc_engine_t,
             ctypes.c_uint64,
-            ctypes.c_uint64,
-            ctypes.c_bool,
             ctypes.c_bool,
             ctypes.c_bool,
         )
@@ -461,21 +441,6 @@ def _load_native():
         _setup_prototype(h, "disable_symbolic_reg_tracking", None, state_t)
         _setup_prototype(h, "symbolic_register_data", None, state_t, ctypes.c_uint64, ctypes.POINTER(ctypes.c_uint64))
         _setup_prototype(h, "get_symbolic_registers", ctypes.c_uint64, state_t, ctypes.POINTER(ctypes.c_uint64))
-        _setup_prototype(h, "is_interrupt_handled", ctypes.c_bool, state_t)
-        _setup_prototype(
-            h,
-            "set_cgc_syscall_details",
-            None,
-            state_t,
-            ctypes.c_uint32,
-            ctypes.c_uint64,
-            ctypes.c_uint32,
-            ctypes.c_uint64,
-            ctypes.c_uint64,
-            ctypes.c_uint32,
-            ctypes.c_uint64,
-        )
-        _setup_prototype(h, "process_transmit", ctypes.POINTER(TRANSMIT_RECORD), state_t, ctypes.c_uint32)
         _setup_prototype(h, "set_tracking", None, state_t, ctypes.c_bool, ctypes.c_bool)
         _setup_prototype(h, "executed_pages", ctypes.c_uint64, state_t)
         _setup_prototype(h, "in_cache", ctypes.c_bool, state_t, ctypes.c_uint64)
@@ -504,25 +469,6 @@ def _load_native():
             None,
             state_t,
             ctypes.POINTER(ctypes.c_uint64),
-            ctypes.POINTER(ctypes.c_uint64),
-            ctypes.POINTER(ctypes.c_uint64),
-            ctypes.c_uint64,
-        )
-        _setup_prototype(
-            h,
-            "set_fd_bytes",
-            state_t,
-            ctypes.c_uint64,
-            ctypes.c_void_p,
-            ctypes.c_void_p,
-            ctypes.c_uint64,
-            ctypes.c_uint64,
-        )
-        _setup_prototype(
-            h,
-            "set_random_syscall_data",
-            None,
-            state_t,
             ctypes.POINTER(ctypes.c_uint64),
             ctypes.POINTER(ctypes.c_uint64),
             ctypes.c_uint64,
@@ -698,15 +644,6 @@ class Unicorn(SimStatePlugin):
         # this is a record of the ASTs for which we've added concretization constraints
         self._concretized_asts = set() if concretized_asts is None else concretized_asts
 
-        # the address to use for concrete transmits
-        self.cgc_transmit_addr = None
-
-        # the address for CGC receive
-        self.cgc_receive_addr = None
-
-        # the address for CGC random
-        self.cgc_random_addr = None
-
         self.time = None
 
         self._bullshit_cb = (
@@ -739,9 +676,6 @@ class Unicorn(SimStatePlugin):
         u.countdown_symbolic_stop = self.countdown_symbolic_stop
         u.countdown_unsupported_stop = self.countdown_unsupported_stop
         u.countdown_stop_point = self.countdown_stop_point
-        u.cgc_receive_addr = self.cgc_receive_addr
-        u.cgc_random_addr = self.cgc_random_addr
-        u.cgc_transmit_addr = self.cgc_transmit_addr
         u._uncache_regions = list(self._uncache_regions)
         u.gdt = self.gdt
         return u
@@ -926,9 +860,6 @@ class Unicorn(SimStatePlugin):
             _UC_NATIVE.stop(self._uc_state, STOP.STOP_ERROR)
 
     def _hook_intr_x86(self, uc, intno, user_data):
-        if _UC_NATIVE.is_interrupt_handled(self._uc_state):
-            return
-
         if self.state.arch.bits == 32:
             self.trap_ip = self.uc.reg_read(unicorn.x86_const.UC_X86_REG_EIP)
         else:
@@ -1203,7 +1134,7 @@ class Unicorn(SimStatePlugin):
         """
         return self.state.arch.name == "MIPS32"
 
-    def setup(self, syscall_data=None, fd_bytes=None):
+    def setup(self):
         if self._is_mips32 and options.COPY_STATES not in self.state.options:
             # we always re-create the thread-local UC object for MIPS32 even if COPY_STATES is disabled in state
             # options. this is to avoid some weird bugs in unicorn (e.g., it reports stepping 1 step while in reality it
@@ -1217,20 +1148,10 @@ class Unicorn(SimStatePlugin):
             self.uc.reset()
             raise
 
-        if self.state.os_name == "CGC":
-            simos_val = SimOSEnum.SIMOS_CGC
-        elif self.state.os_name == "Linux":
-            simos_val = SimOSEnum.SIMOS_LINUX
-        else:
-            simos_val = SimOSEnum.SIMOS_OTHER
-
         # tricky: using unicorn handle from unicorn.Uc object
         handle_symb_addrs = options.UNICORN_HANDLE_SYMBOLIC_ADDRESSES in self.state.options
         handle_symb_conds = options.UNICORN_HANDLE_SYMBOLIC_CONDITIONS in self.state.options
-        handle_symbolic_syscalls = options.UNICORN_HANDLE_SYMBOLIC_SYSCALLS in self.state.options
-        self._uc_state = _UC_NATIVE.alloc(
-            self.uc._uch, self.cache_key, simos_val, handle_symb_addrs, handle_symb_conds, handle_symbolic_syscalls
-        )
+        self._uc_state = _UC_NATIVE.alloc(self.uc._uch, self.cache_key, handle_symb_addrs, handle_symb_conds)
 
         if (
             options.UNICORN_SYM_REGS_SUPPORT in self.state.options
@@ -1253,49 +1174,6 @@ class Unicorn(SimStatePlugin):
             else:
                 _UC_NATIVE.symbolic_register_data(self._uc_state, 0, None)
 
-        # set (cgc, for now) transmit and receive syscall handler
-        if self.state.has_plugin("cgc"):
-            cgc_transmit_addr = 0
-            cgc_receive_addr = 0
-            cgc_random_addr = 0
-            if options.UNICORN_HANDLE_CGC_TRANSMIT_SYSCALL in self.state.options:
-                if self.cgc_transmit_addr is None:
-                    l.error("You haven't set the address for concrete transmits!!!!!!!!!!!")
-                else:
-                    cgc_transmit_addr = self.cgc_transmit_addr
-
-            if options.UNICORN_HANDLE_CGC_RECEIVE_SYSCALL in self.state.options:
-                if self.cgc_receive_addr is None:
-                    l.error("You haven't set the address for receive syscall!!!!!!!!!!!!!!")
-                else:
-                    cgc_receive_addr = self.cgc_receive_addr
-
-            if options.UNICORN_HANDLE_CGC_RANDOM_SYSCALL in self.state.options and syscall_data is not None:
-                if self.cgc_random_addr is None:
-                    l.error("You haven't set the address for random syscall!!!!!!!!!!!!!!")
-                elif "random" not in syscall_data or not syscall_data["random"]:
-                    l.error("No syscall data specified for replaying random syscall!!!!!!!!!!!!!!")
-                else:
-                    cgc_random_addr = self.cgc_random_addr
-                    values = (ctypes.c_uint64(item[0]) for item in syscall_data["random"])
-                    sizes = (ctypes.c_uint64(item[1]) for item in syscall_data["random"])
-                    values_array = (ctypes.c_uint64 * len(syscall_data["random"]))(*values)
-                    sizes_array = (ctypes.c_uint64 * len(syscall_data["random"]))(*sizes)
-                    _UC_NATIVE.set_random_syscall_data(
-                        self._uc_state, values_array, sizes_array, len(syscall_data["random"])
-                    )
-
-            _UC_NATIVE.set_cgc_syscall_details(
-                self._uc_state,
-                2,
-                cgc_transmit_addr,
-                3,
-                cgc_receive_addr,
-                self.state.cgc.max_receive_size,
-                7,
-                cgc_random_addr,
-            )
-
         _UC_NATIVE.set_heap_base(self._uc_state, self.state.heap.heap_base)
 
         implemented_procedures = {
@@ -1312,17 +1190,6 @@ class Unicorn(SimStatePlugin):
         # activate gdt page, which was written/mapped during set_regs
         if self.gdt is not None:
             _UC_NATIVE.activate_page(self._uc_state, self.gdt.addr, bytes(0x1000), None)
-
-        # Pass all concrete fd bytes to native interface so that it can handle relevant syscalls
-        if fd_bytes is not None:
-            for fd_num, fd_data in fd_bytes.items():
-                # fd_data is a tuple whose first element is fd data and second is taints for each fd byte
-                fd_bytes_p = int(ffi.cast("uint64_t", ffi.from_buffer(memoryview(fd_data[0]))))
-                fd_taint_p = int(ffi.cast("uint64_t", ffi.from_buffer(memoryview(fd_data[1]))))
-                read_pos = self.state.solver.eval(self.state.posix.fd.get(fd_num).read_pos)
-                _UC_NATIVE.set_fd_bytes(self._uc_state, fd_num, fd_bytes_p, fd_taint_p, len(fd_data[0]), read_pos)
-        else:
-            l.info("Input fds concrete data not specified. Handling some syscalls in native interface could fail.")
 
         # Initialize list of artificial VEX registers
         artificial_regs_list = (ctypes.c_uint64(offset) for offset in self.state.arch.artificial_registers_offsets)
@@ -1482,23 +1349,6 @@ class Unicorn(SimStatePlugin):
                 state.memory.store(address, s)
 
             p_update = update.next
-
-        # process the concrete transmits
-        i = 0
-        stdout = state.posix.get_fd(1)
-        stderr = state.posix.get_fd(2)
-
-        while True:
-            record = _UC_NATIVE.process_transmit(self._uc_state, i)
-            if not bool(record):
-                break
-
-            string = ctypes.string_at(record.contents.data, record.contents.count)
-            if record.contents.fd == 1:
-                stdout.write_data(string)
-            elif record.contents.fd == 2:
-                stderr.write_data(string)
-            i += 1
 
         # Re-execute concrete writes
         count_of_writes_to_reexecute = _UC_NATIVE.get_count_of_writes_to_reexecute(self._uc_state)

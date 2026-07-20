@@ -74,7 +74,7 @@ void ucproc_memset(State *state) {
     uint64_t size = arg(state, 2);
     char *bigbuf = (char*)malloc(0x1000);
     memset(bigbuf, src, 0x1000);
-    state->handle_write(dst, size, true, false);
+    state->handle_write(dst, size, true);
     if (state->stopped) {
     	free(bigbuf);
     	return;

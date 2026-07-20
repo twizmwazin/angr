@@ -33,12 +33,6 @@ typedef uint64_t unicorn_reg_id_t;
 typedef int64_t vex_reg_offset_t;
 typedef int64_t vex_tmp_id_t;
 
-enum simos_t: uint8_t {
-	SIMOS_CGC = 0,
-	SIMOS_LINUX = 1,
-	SIMOS_OTHER = 2,
-};
-
 enum taint_t: uint8_t {
 	TAINT_NONE = 0,
 	TAINT_SYMBOLIC = 1, // this should be 1 to match the UltraPage impl
@@ -497,20 +491,6 @@ extern std::map<uint64_t, caches_t> global_cache;
 typedef std::unordered_set<vex_reg_offset_t> RegisterSet;
 typedef std::unordered_set<vex_tmp_id_t> TempSet;
 
-struct fd_data {
-	char *bytes;
-	taint_t *taints;
-	uint64_t curr_pos;
-	uint64_t len;
-
-	fd_data(char *fd_bytes, taint_t *fd_taints, uint64_t fd_len, uint64_t fd_read_pos) {
-		bytes = fd_bytes;
-		taints = fd_taints;
-		curr_pos = fd_read_pos;
-		len = fd_len;
-	}
-};
-
 struct mem_write_t {
 	address_t address;
 	std::vector<uint8_t> value;
@@ -536,19 +516,12 @@ struct mem_update_t {
 	struct mem_update_t *next;
 };
 
-struct transmit_record_t {
-	uint32_t fd;
-	void *data;
-	uint32_t count;
-};
-
 // These prototypes may be found in <unicorn/unicorn.h> by searching for "Callback"
 static void hook_mem_read(uc_engine *uc, uc_mem_type type, uint64_t address, int size, int64_t value, void *user_data);
 static void hook_mem_write(uc_engine *uc, uc_mem_type type, uint64_t address, int size, int64_t value, void *user_data);
 static bool hook_mem_unmapped(uc_engine *uc, uc_mem_type type, uint64_t address, int size, int64_t value, void *user_data);
 static bool hook_mem_prot(uc_engine *uc, uc_mem_type type, uint64_t address, int size, int64_t value, void *user_data);
 static void hook_block(uc_engine *uc, uint64_t address, int32_t size, void *user_data);
-static void hook_intr(uc_engine *uc, uint32_t intno, void *user_data);
 
 class State {
 	PageCache *page_cache;
@@ -605,15 +578,6 @@ class State {
 
 	// Pointer to memory writes' data passed to Python land
 	mem_update_t *mem_updates_head;
-
-	// Input fd bytes for tracing in unicorn
-	std::unordered_map<uint64_t, fd_data> fd_details;
-
-	// Random syscall data
-	std::vector<std::pair<int, int>> random_bytes;
-
-	// OS being simulated
-	simos_t simos;
 
 	// Determine if symbolic memory addresses should be handled or not
 	bool handle_symbolic_addrs;
@@ -760,9 +724,8 @@ class State {
 		std::unordered_set<address_t> executed_pages;
 		std::unordered_set<address_t>::iterator *executed_pages_iterator;
 		uint64_t syscall_count;
-		std::vector<transmit_record_t> transmit_records;
 		uint64_t cur_steps, max_steps;
-		uc_hook h_read, h_write, h_block, h_prot, h_unmap, h_intr;
+		uc_hook h_read, h_write, h_block, h_prot, h_unmap;
 		bool stopped;
 
 		bool ignore_next_block;
@@ -772,15 +735,6 @@ class State {
 
 		uc_arch arch;
 		uc_mode unicorn_mode;
-		bool interrupt_handled;
-		int32_t cgc_random_sysno;
-		uint64_t cgc_random_bbl;
-		int32_t cgc_receive_sysno;
-		uint64_t cgc_receive_bbl;
-		uint64_t cgc_receive_max_size;
-		int32_t cgc_transmit_sysno;
-		uint64_t cgc_transmit_bbl;
-		bool handle_symbolic_syscalls;
 
 		VexArch vex_guest;
 		VexArchInfo vex_archinfo;
@@ -808,10 +762,6 @@ class State {
 		// Concrete writes to re-execute to avoid write-write conflicts
 		std::unordered_map<uint64_t, uint8_t> concrete_writes_to_reexecute;
 
-		// Concrete writes performed by syscalls. Used to determine if any write-write conflicts occur when syscall is
-		// re-executed.
-		std::unordered_set<address_t> syscall_concrete_writes;
-
 		// List of instructions that should be executed symbolically; used to store data to return
 		std::vector<sym_block_details_t> block_details_to_return;
 
@@ -829,7 +779,7 @@ class State {
 		std::unordered_map<uint64_t, void (*)(State *)> uc_procedures;
 		uint64_t heap_base;
 
-		State(uc_engine *_uc, uint64_t cache_key, simos_t curr_os, bool symb_addrs, bool symb_cond, bool symb_syscalls);
+		State(uc_engine *_uc, uint64_t cache_key, bool symb_addrs, bool symb_cond);
 
 		~State() {
 			for (auto it = active_pages.begin(); it != active_pages.end(); it++) {
@@ -905,7 +855,7 @@ class State {
 		// Returns -1 if no tainted data is present.
 		int64_t find_tainted(address_t address, int size);
 
-		void handle_write(address_t address, int size, bool is_interrupt, bool interrupt_value_symbolic);
+		void handle_write(address_t address, int size, bool is_procedure_write);
 
 		void propagate_taint_of_mem_read_instr_and_continue(address_t read_address, int read_size);
 
@@ -918,26 +868,6 @@ class State {
 		address_t get_instruction_pointer() const;
 
 		address_t get_stack_pointer() const;
-
-		void fd_init_bytes(uint64_t fd, char *bytes, taint_t *taints, uint64_t len, uint64_t read_pos);
-
-		uint64_t fd_read(uint64_t fd, char *buf, taint_t *&taints, uint64_t count);
-
-		// Set random syscall data for replaying
-		void init_random_bytes(uint64_t *values, uint64_t *sizes, uint64_t count);
-
-		// CGC syscall handlers
-		void perform_cgc_random();
-
-		void perform_cgc_receive();
-
-		void perform_cgc_transmit();
-
-		// Inline functions
-
-		inline simos_t get_simos() const {
-			return simos;
-		}
 
 		/*
 		* Feasibility checks for unicorn

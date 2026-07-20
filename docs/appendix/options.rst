@@ -556,11 +556,6 @@ These are individual option objects, found as ``angr.options.XXX``.
      -
      -
      - Oppologist
-   * - ``UNICORN_HANDLE_TRANSMIT_SYSCALL``
-     - CGC: handle the transmit syscall without leaving unicorn
-     - ``unicorn``
-     - ``tracing``
-     -
    * - ``UNICORN_SYM_REGS_SUPPORT``
      - Attempt to stay in unicorn even in the presence of symbolic registers by
        checking that the tainted registers are unused at every step

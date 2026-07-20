@@ -31,9 +31,8 @@ extern "C" {
 
 std::map<uint64_t, caches_t> global_cache;
 
-State::State(uc_engine *_uc, uint64_t cache_key, simos_t curr_os, bool symb_addrs, bool symb_cond, bool symb_syscalls):
-  uc(_uc), simos(curr_os), handle_symbolic_addrs(symb_addrs), handle_symbolic_conditions(symb_cond),
-  handle_symbolic_syscalls(symb_syscalls) {
+State::State(uc_engine *_uc, uint64_t cache_key, bool symb_addrs, bool symb_cond):
+  uc(_uc), handle_symbolic_addrs(symb_addrs), handle_symbolic_conditions(symb_cond) {
 	hooked = false;
 	h_read = h_write = h_block = h_prot = 0;
 	max_steps = cur_steps = 0;
@@ -41,10 +40,6 @@ State::State(uc_engine *_uc, uint64_t cache_key, simos_t curr_os, bool symb_addr
 	stop_details.stop_reason = STOP_NOSTART;
 	ignore_next_block = false;
 	ignore_next_selfmod = false;
-	interrupt_handled = false;
-	cgc_random_sysno = -1;
-	cgc_receive_sysno = -1;
-	cgc_transmit_sysno = -1;
 	vex_guest = VexArch_INVALID;
 	syscall_count = 0;
 	uc_context_alloc(uc, &saved_regs);
@@ -89,8 +84,6 @@ void State::hook() {
 
 	err = uc_hook_add(uc, &h_unmap, UC_HOOK_MEM_UNMAPPED, (void *)hook_mem_unmapped, this, 1, 0);
 
-	err = uc_hook_add(uc, &h_intr, UC_HOOK_INTR, (void *)hook_intr, this, 1, 0);
-
 	hooked = true;
 }
 
@@ -104,7 +97,6 @@ void State::unhook() {
 	err = uc_hook_del(uc, h_block);
 	err = uc_hook_del(uc, h_prot);
 	err = uc_hook_del(uc, h_unmap);
-	err = uc_hook_del(uc, h_intr);
 
 	hooked = false;
 	h_read = h_write = h_block = h_prot = h_unmap = 0;
@@ -668,15 +660,15 @@ int64_t State::find_tainted(address_t address, int size) {
 	return -1;
 }
 
-void State::handle_write(address_t address, int size, bool is_interrupt = false, bool interrupt_value_symbolic = false) {
+void State::handle_write(address_t address, int size, bool is_procedure_write = false) {
 	// If the write spans a page, chop it up
 	if ((address & 0xfff) + size > 0x1000) {
 		int chopsize = 0x1000 - (address & 0xfff);
-		handle_write(address, chopsize, is_interrupt, interrupt_value_symbolic);
+		handle_write(address, chopsize, is_procedure_write);
 		if (stopped) {
 			return;
 		}
-		handle_write(address + chopsize, size - chopsize, is_interrupt, interrupt_value_symbolic);
+		handle_write(address + chopsize, size - chopsize, is_procedure_write);
 		return;
 	}
 
@@ -713,12 +705,9 @@ void State::handle_write(address_t address, int size, bool is_interrupt = false,
 	}
 
 	clean = 0;
-	if (is_interrupt) {
-		is_dst_symbolic = interrupt_value_symbolic;
-	}
-	else if (is_symbolic_tracking_disabled() || curr_block_details.vex_lift_failed) {
+	if (is_procedure_write || is_symbolic_tracking_disabled() || curr_block_details.vex_lift_failed) {
+		// Writes performed by native procedure hooks (ucproc) are always concrete
 		// If symbolic tracking is disabled, all writes are concrete
-		// is_interrupt flag is a workaround for CGC transmit syscall, which never passes symbolic data
 		// If VEX lift failed, then write is definitely concrete since execution continues only
 		// if no symbolic data is present
 		is_dst_symbolic = false;
@@ -779,14 +768,12 @@ void State::handle_write(address_t address, int size, bool is_interrupt = false,
 				block_concrete_writes_to_reexecute.erase(curr_block_write_reexec_entry);
 			}
 		}
-		if (!is_interrupt) {
-			// Save the details of memory location written to in the statement details
-			for (auto &symbolic_stmt: curr_block_details.symbolic_stmts) {
-				if ((symbolic_stmt.instr_addr == curr_instr_addr) && symbolic_stmt.has_memory_write) {
-					symbolic_stmt.mem_write_addr = address;
-					symbolic_stmt.mem_write_size = size;
-					break;
-				}
+		// Save the details of memory location written to in the statement details
+		for (auto &symbolic_stmt: curr_block_details.symbolic_stmts) {
+			if ((symbolic_stmt.instr_addr == curr_instr_addr) && symbolic_stmt.has_memory_write) {
+				symbolic_stmt.mem_write_addr = address;
+				symbolic_stmt.mem_write_size = size;
+				break;
 			}
 		}
 	}
@@ -849,11 +836,6 @@ void State::handle_write(address_t address, int size, bool is_interrupt = false,
 			if (concrete_writes_to_reexecute.find(byte_addr) != concrete_writes_to_reexecute.end()) {
 				// We are writing a concrete value to the same address as some concrete write to be reexecuted. Record
 				// address to later update concrete value to write.
-				block_concrete_writes_to_reexecute.emplace(byte_addr);
-			}
-			else if (syscall_concrete_writes.find(byte_addr) != syscall_concrete_writes.end()) {
-				// Mark write for re-execution since value will be overwritten by a previously executed syscall that
-				// will be re-executed.
 				block_concrete_writes_to_reexecute.emplace(byte_addr);
 			}
 			else if ((symbolic_mem_writes.count(byte_addr) > 0) || (block_symbolic_mem_writes.count(byte_addr) > 0)) {
@@ -2458,340 +2440,6 @@ address_t State::get_stack_pointer() const {
 	return out;
 }
 
-void State::fd_init_bytes(uint64_t fd, char *bytes, taint_t *taints, uint64_t len, uint64_t read_pos) {
-	fd_details.emplace(fd, fd_data(bytes, taints, len, read_pos));
-	return;
-}
-
-uint64_t State::fd_read(uint64_t fd, char *buf, taint_t *&taints, uint64_t count) {
-	auto &fd_det = fd_details.at(fd);
-	if (fd_det.curr_pos >= fd_det.len) {
-		// No more bytes to read
-		return 0;
-	}
-	// Truncate count of bytes to read if request exceeds number left in the "stream"
-	auto actual_count = std::min(count, fd_det.len - fd_det.curr_pos);
-	memcpy(buf, fd_det.bytes + fd_det.curr_pos, actual_count);
-	taints = fd_det.taints + fd_det.curr_pos;
-	fd_det.curr_pos += actual_count;
-	return actual_count;
-}
-
-void State::init_random_bytes(uint64_t *values, uint64_t *sizes, uint64_t count) {
-	for (auto i = 0; i < count; i++) {
-		random_bytes.emplace_back(values[i], sizes[i]);
-	}
-	return;
-}
-
-// CGC syscall handlers
-
-void State::perform_cgc_random() {
-	uint32_t buf, count, rnd_bytes;
-	uint64_t number_of_items_to_process, actual_count, next_write_offset;
-	char *rand_bytes;
-
-	uc_reg_read(uc, UC_X86_REG_EBX, &buf);
-	uc_reg_read(uc, UC_X86_REG_ECX, &count);
-	uc_reg_read(uc, UC_X86_REG_EDX, &rnd_bytes);
-
-	if (count == 0) {
-		if (rnd_bytes != 0) {
-			handle_write(rnd_bytes, 4, true);
-			if (stopped) {
-				return;
-			}
-			uc_mem_write(uc, rnd_bytes, &count, 4);
-		}
-		uc_reg_write(uc, UC_X86_REG_EAX, &count);
-		interrupt_handled = true;
-		syscall_count++;
-		return;
-	}
-
-	number_of_items_to_process = 0;
-	actual_count = 0;
-	for (auto &val: random_bytes) {
-		if (actual_count == count) {
-			break;
-		}
-		actual_count += val.second;
-		number_of_items_to_process++;
-	}
-	assert((actual_count == count));
-	rand_bytes = (char *)malloc(actual_count);
-	next_write_offset = 0;
-	for (auto i = 0; i < number_of_items_to_process; i++) {
-		std::reverse_copy((char *)&(random_bytes[i].first), (char *)&(random_bytes[i].first) + random_bytes[i].second, rand_bytes + next_write_offset);
-		next_write_offset += random_bytes[i].second;
-	}
-	for (auto i = 0; i < number_of_items_to_process; i++) {
-		random_bytes.erase(random_bytes.begin());
-	}
-	handle_write(buf, actual_count, true, true);
-	if (stopped) {
-		free(rand_bytes);
-		return;
-	}
-	uc_mem_write(uc, buf, rand_bytes, actual_count);
-	free(rand_bytes);
-	if (rnd_bytes != 0) {
-		handle_write(rnd_bytes, 4, true);
-		if (stopped) {
-			return;
-		}
-		uc_mem_write(uc, rnd_bytes, &actual_count, 4);
-	}
-	next_write_offset = 0;
-	uc_reg_write(uc, UC_X86_REG_EAX, &next_write_offset);
-	step(cgc_random_bbl, 0, false);
-	commit();
-	if (actual_count > 0) {
-		// Save a block with an instruction to track that the random syscall needs to be re-executed. The instruction
-		// data is used only to work with existing mechanism to return data to python.
-		// Save all non-symbolic register arguments needed for syscall.
-		block_details_t block_for_random;
-		block_for_random.block_addr = cgc_random_bbl;
-		block_for_random.block_size = 0;
-		block_for_random.block_trace_ind = executed_blocks_count;
-		block_for_random.has_symbolic_exit = false;
-		vex_stmt_details_t stmt_for_random;
-		// First argument: ebx
-		register_value_t reg_val;
-		if (!is_symbolic_register(20, 4)) {
-			reg_val.offset = 20;
-			reg_val.size = 4;
-			get_register_value(reg_val.offset, reg_val.value);
-			stmt_for_random.reg_deps.emplace(reg_val);
-		}
-		// Second argument: ecx
-		if (!is_symbolic_register(12, 4)) {
-			reg_val.offset = 12;
-			reg_val.size = 4;
-			get_register_value(reg_val.offset, reg_val.value);
-			stmt_for_random.reg_deps.emplace(reg_val);
-		}
-		block_for_random.symbolic_stmts.emplace_back(stmt_for_random);
-		blocks_with_symbolic_stmts.emplace_back(block_for_random);
-	}
-	interrupt_handled = true;
-	syscall_count++;
-	return;
-}
-
-void State::perform_cgc_receive() {
-	uint32_t fd, buf, count, rx_bytes;
-
-	uc_reg_read(uc, UC_X86_REG_EBX, &fd);
-	if (fd > 2) {
-		// Ignore any fds > 2
-		interrupt_handled = true;
-		return;
-	}
-
-	if (fd == 1) {
-		// Python land maps 1 to 0 so do the same here for receives run on stdout.
-		fd = 0;
-	}
-
-	if (fd_details.count(fd) == 0) {
-		// fd stream has not been initialized in native interface. Can't perform receive.
-		return;
-	}
-
-	uc_reg_read(uc, UC_X86_REG_ECX, &buf);
-	uc_reg_read(uc, UC_X86_REG_EDX, &count);
-	uc_reg_read(uc, UC_X86_REG_ESI, &rx_bytes);
-	if (count == 0) {
-		// Requested to read 0 bytes. Set *rx_bytes and syscall return value to 0
-		if (rx_bytes != 0) {
-			handle_write(rx_bytes, 4, true);
-			if (stopped) {
-				return;
-			}
-			uc_mem_write(uc, rx_bytes, &count, 4);
-		}
-		uc_reg_write(uc, UC_X86_REG_EAX, &count);
-		interrupt_handled = true;
-		syscall_count++;
-		return;
-	}
-
-	if ((cgc_receive_max_size != 0) && (count > cgc_receive_max_size)) {
-		count = cgc_receive_max_size;
-	}
-
-	// Perform read
-	char *tmp_buf = (char *)malloc(count);
-	taint_t *tmp_taint_buf;
-	auto actual_count = fd_read(fd, tmp_buf, tmp_taint_buf, count);
-	if (stopped) {
-		// Possibly stopped when writing bytes read to memory. Treat as syscall failure.
-		free(tmp_buf);
-		return;
-	}
-	if (actual_count > 0) {
-		// Update taint status. The taint status update tries to minimize updates by updating status of contiguous chunk
-		// of bytes with same taint
-		taint_t curr_taint_status = tmp_taint_buf[0];
-		uint64_t start_offset = 0, curr_offset = 1, slice_size = 1;
-		for (int i = 0; i < actual_count; i++) {
-			if (tmp_taint_buf[i] == TAINT_STATUS_CONCRETE) {
-				// Track address of concrete write by syscall for finding write-write conflicts with other concrete
-				// writes
-				syscall_concrete_writes.emplace(buf + i);
-			}
-		}
-		for (; curr_offset < actual_count; curr_offset++) {
-			if (tmp_taint_buf[curr_offset] != curr_taint_status) {
-				// Taint status of next byte differs. Update all previous ones
-				handle_write(buf + start_offset, slice_size, true, (curr_taint_status == TAINT_SYMBOLIC));
-				if (stopped) {
-					free(tmp_buf);
-					return;
-				}
-				start_offset = curr_offset;
-				curr_taint_status = tmp_taint_buf[curr_offset];
-				slice_size = 0;
-			}
-			else {
-				slice_size++;
-			}
-		}
-		if (start_offset != curr_offset) {
-			// Taint status of some more bytes need to be updated
-			handle_write(buf + start_offset, slice_size, true, (curr_taint_status == TAINT_SYMBOLIC));
-			if (stopped) {
-				free(tmp_buf);
-				return;
-			}
-		}
-		uc_mem_write(uc, buf, tmp_buf, actual_count);
-	}
-	free(tmp_buf);
-	if (rx_bytes != 0) {
-		handle_write(rx_bytes, 4, true);
-		if (stopped) {
-			return;
-		}
-		uc_mem_write(uc, rx_bytes, &actual_count, 4);
-	}
-	count = 0;
-	uc_reg_write(uc, UC_X86_REG_EAX, &count);
-	step(cgc_receive_bbl, 0, false);
-	commit();
-	if (actual_count > 0) {
-		// Save a block with an instruction to track that the receive syscall needs to be re-executed. The instruction
-		// data is used only to work with existing mechanism to return data to python.
-		// Save all non-symbolic register arguments needed for syscall.
-		block_details_t block_for_receive;
-		block_for_receive.block_addr = cgc_receive_bbl;
-		block_for_receive.block_size = 0;
-		block_for_receive.block_trace_ind = executed_blocks_count;
-		block_for_receive.has_symbolic_exit = false;
-		vex_stmt_details_t stmt_for_receive;
-		// First argument: ebx
-		register_value_t reg_val;
-		if (!is_symbolic_register(20, 4)) {
-			reg_val.offset = 20;
-			reg_val.size = 4;
-			get_register_value(reg_val.offset, reg_val.value);
-			stmt_for_receive.reg_deps.emplace(reg_val);
-		}
-		// Second argument: ecx
-		if (!is_symbolic_register(12, 4)) {
-			reg_val.offset = 12;
-			reg_val.size = 4;
-			get_register_value(reg_val.offset, reg_val.value);
-			stmt_for_receive.reg_deps.emplace(reg_val);
-		}
-		// Third argument: edx
-		if (!is_symbolic_register(16, 4)) {
-			reg_val.offset = 16;
-			reg_val.size = 4;
-			get_register_value(reg_val.offset, reg_val.value);
-			stmt_for_receive.reg_deps.emplace(reg_val);
-		}
-		block_for_receive.symbolic_stmts.emplace_back(stmt_for_receive);
-		blocks_with_symbolic_stmts.emplace_back(block_for_receive);
-	}
-	interrupt_handled = true;
-	syscall_count++;
-	return;
-}
-
-void State::perform_cgc_transmit() {
-	// basically an implementation of the cgc transmit syscall
-	//printf(".. TRANSMIT!\n");
-	uint32_t fd, buf, count, tx_bytes;
-	uc_err err;
-
-	uc_reg_read(uc, UC_X86_REG_EBX, &fd);
-	if (fd < 3) {
-		// Process transmits to fd 0, 1 or 2 only.
-		uc_reg_read(uc, UC_X86_REG_ECX, &buf);
-		uc_reg_read(uc, UC_X86_REG_EDX, &count);
-		uc_reg_read(uc, UC_X86_REG_ESI, &tx_bytes);
-
-		// ensure that the memory we're sending is not tainted
-		// TODO: Can transmit also work with symbolic bytes?
-		void *dup_buf = malloc(count);
-		uint32_t tmp_tx;
-
-		err = uc_mem_read(uc, buf, dup_buf, count);
-		if (err == UC_ERR_READ_UNMAPPED) {
-			py_mem_callback(uc, UC_MEM_READ_UNMAPPED, buf, count, 0, (void*)0);
-			if (uc_mem_read(uc, buf, dup_buf, count) != UC_ERR_OK) {
-				//printf("... fault on buf\n");
-				free(dup_buf);
-				return;
-			}
-		}
-		else if (err != UC_ERR_OK) {
-			// Read failed due to some other error. Abort.
-			free(dup_buf);
-			return;
-		}
-
-		if (!handle_symbolic_syscalls && (find_tainted(buf, count) != -1)) {
-			//printf("... symbolic data\n");
-			free(dup_buf);
-			return;
-		}
-
-		step(cgc_transmit_bbl, 0, false);
-		commit();
-		if (stopped) {
-			//printf("... stopped after step()\n");
-			free(dup_buf);
-			return;
-		}
-
-		if (tx_bytes != 0) {
-			handle_write(tx_bytes, 4, true);
-			if (stopped) {
-				return;
-			}
-			uc_mem_write(uc, tx_bytes, &count, 4);
-		}
-
-		if (stopped) {
-			return;
-		}
-
-		transmit_records.push_back({fd, dup_buf, count});
-		int result = 0;
-		uc_reg_write(uc, UC_X86_REG_EAX, &result);
-		symbolic_registers.erase(8);
-		symbolic_registers.erase(9);
-		symbolic_registers.erase(10);
-		symbolic_registers.erase(11);
-		syscall_count++;
-	}
-	interrupt_handled = true;
-	return;
-}
-
 static void hook_mem_read(uc_engine *uc, uc_mem_type type, uint64_t address, int size, int64_t value, void *user_data) {
 	// uc_mem_read(uc, address, &value, size);
 	// //LOG_D("mem_read [%#lx, %#lx] = %#lx", address, address + size);
@@ -2846,39 +2494,6 @@ static void hook_block(uc_engine *uc, uint64_t address, int32_t size, void *user
 	return;
 }
 
-static void hook_intr(uc_engine *uc, uint32_t intno, void *user_data) {
-	State *state = (State *)user_data;
-	state->interrupt_handled = false;
-	auto curr_simos = state->get_simos();
-
-	if (curr_simos == SIMOS_CGC) {
-		assert (state->arch == UC_ARCH_X86);
-		assert (state->unicorn_mode == UC_MODE_32);
-
-		if (intno == 0x80) {
-			if (!state->handle_symbolic_syscalls) {
-				for (auto sr : state->symbolic_registers) {
-					// eax,ecx,edx,ebx,esi
-					if ((sr >= 8 && sr <= 23) || (sr >= 32 && sr <= 35)) return;
-				}
-			}
-
-			uint32_t sysno;
-			uc_reg_read(uc, UC_X86_REG_EAX, &sysno);
-			//printf("SYSCALL: %d\n", sysno);
-			if ((sysno == state->cgc_transmit_sysno) && (state->cgc_transmit_bbl != 0)) {
-				state->perform_cgc_transmit();
-			}
-			else if ((sysno == state->cgc_receive_sysno) && (state->cgc_receive_bbl != 0)) {
-				state->perform_cgc_receive();
-			}
-			else if ((sysno == state->cgc_random_sysno) && (state->cgc_random_bbl != 0)) {
-				state->perform_cgc_random();
-			}
-		}
-	}
-}
-
 static bool hook_mem_unmapped(uc_engine *uc, uc_mem_type type, uint64_t address, int size, int64_t value, void *user_data) {
 	State *state = (State *)user_data;
 	uint64_t start = address & ~0xFFFULL;
@@ -2905,9 +2520,8 @@ static bool hook_mem_prot(uc_engine *uc, uc_mem_type type, uint64_t address, int
  */
 
 extern "C"
-State *simunicorn_alloc(uc_engine *uc, uint64_t cache_key, simos_t simos, bool handle_symbolic_addrs,
-  bool handle_symb_cond, bool handle_symb_syscalls) {
-	State *state = new State(uc, cache_key, simos, handle_symbolic_addrs, handle_symb_cond, handle_symb_syscalls);
+State *simunicorn_alloc(uc_engine *uc, uint64_t cache_key, bool handle_symbolic_addrs, bool handle_symb_cond) {
+	State *state = new State(uc, cache_key, handle_symbolic_addrs, handle_symb_cond);
 	return state;
 }
 
@@ -2969,11 +2583,6 @@ uint64_t simunicorn_step(State *state) {
 extern "C"
 void simunicorn_set_last_block_details(State *state, address_t block_addr, uint64_t curr_count, uint64_t total_count) {
 	state->set_last_block_details(block_addr, curr_count, total_count);
-}
-
-extern "C"
-void simunicorn_set_random_syscall_data(State *state, uint64_t *values, uint64_t *sizes, uint64_t count) {
-	state->init_random_bytes(values, sizes, count);
 }
 
 extern "C"
@@ -3049,27 +2658,6 @@ void simunicorn_disable_symbolic_reg_tracking(State *state) {
 	state->vex_guest = VexArch_INVALID;
 }
 
-//
-// Concrete transmits
-//
-
-extern "C"
-bool simunicorn_is_interrupt_handled(State *state) {
-	return state->interrupt_handled;
-}
-
-extern "C"
-void simunicorn_set_cgc_syscall_details(State *state, uint32_t transmit_num, uint64_t transmit_bbl,
-  uint32_t receive_num, uint64_t receive_bbl, uint64_t receive_size, uint32_t random_num, uint64_t random_bbl) {
-	state->cgc_random_sysno = random_num;
-	state->cgc_random_bbl = random_bbl;
-	state->cgc_receive_sysno = receive_num;
-	state->cgc_receive_bbl = receive_bbl;
-	state->cgc_receive_max_size = receive_size;
-	state->cgc_transmit_sysno = transmit_num;
-	state->cgc_transmit_bbl = transmit_bbl;
-}
-
 extern "C"
 bool simunicorn_set_ucproc(State *state, uint64_t hook_addr, char *proc_name) {
   void (*func)(State *) = nullptr;
@@ -3094,32 +2682,6 @@ uint64_t simunicorn_get_heap_base(State *state) {
 extern "C"
 void simunicorn_set_heap_base(State *state, uint64_t base) {
   state->heap_base = base;
-}
-
-extern "C"
-transmit_record_t *simunicorn_process_transmit(State *state, uint32_t num) {
-	if (num >= state->transmit_records.size()) {
-		for (auto record_iter = state->transmit_records.begin();
-				record_iter != state->transmit_records.end();
-				record_iter++) {
-			free(record_iter->data);
-		}
-		state->transmit_records.clear();
-		return NULL;
-	} else {
-		transmit_record_t *out = &state->transmit_records[num];
-		return out;
-	}
-}
-
-/*
- * Set concrete bytes of an open file for use in tracing
- */
-
-extern "C"
-void simunicorn_set_fd_bytes(State *state, uint64_t fd, char *input, taint_t *taints, uint64_t len, uint64_t read_pos) {
-	state->fd_init_bytes(fd, input, taints, len, read_pos);
-	return;
 }
 
 /*

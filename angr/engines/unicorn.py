@@ -182,7 +182,7 @@ class SimEngineUnicorn(SuccessorsEngine):
 
         del self.stmt_idx
 
-    def _execute_symbolic_instrs(self, syscall_data):
+    def _execute_symbolic_instrs(self):
         recent_bbl_addrs = None
         stop_details = None
 
@@ -190,92 +190,43 @@ class SimEngineUnicorn(SuccessorsEngine):
         for block_details in self.state.unicorn._get_details_of_blocks_with_symbolic_vex_stmts():
             self.state.scratch.guard = claripy.true()
             try:
-                if self.state.os_name == "CGC" and block_details["block_addr"] in {
-                    self.state.unicorn.cgc_random_addr,
-                    self.state.unicorn.cgc_receive_addr,
-                }:
-                    # Re-execute CGC syscall
-                    reg_vals = dict(block_details["registers"])
-                    curr_regs = self.state.regs
-                    # If any regs are not present in the block details for re-execute, they are probably symbolic and so
-                    # were not saved in native interface. Use current register values in those cases: they should have
-                    # correct values right now.
-                    if block_details["block_addr"] == self.state.unicorn.cgc_receive_addr:
-                        # rx_bytes argument is set to 0 since we care about updating symbolic values only
-                        syscall_args = [
-                            reg_vals.get("ebx", curr_regs.ebx),
-                            reg_vals.get("ecx", curr_regs.ecx),
-                            reg_vals.get("edx", curr_regs.edx),
-                            0,
-                        ]
-                        syscall_simproc = self.state.project.simos.syscall_from_number(3, abi=None)
-                        syscall_simproc.arch = self.state.arch
-                        syscall_simproc.project = self.state.project
-                        syscall_simproc.state = self.state
-                        syscall_simproc.cc = self.state.project.simos.syscall_cc(self.state)
-                        ret_val = getattr(syscall_simproc, syscall_simproc.run_func)(*syscall_args)
-                        self.state.registers.store("eax", ret_val, inspect=False, disable_actions=True)
-                    elif block_details["block_addr"] == self.state.unicorn.cgc_random_addr:
-                        syscall_simproc = self.state.project.simos.syscall_from_number(7, abi=None)
-                        # rnd_bytes argument is set to 0 since we care about updating symbolic values only
-                        syscall_args = [reg_vals.get("ebx", curr_regs.ebx), reg_vals.get("ecx", curr_regs.ecx), 0]
-                        if o.UNICORN_HANDLE_CGC_RANDOM_SYSCALL in self.state.options:
-                            # Update concrete value before invoking syscall
-                            concrete_data = b""
-                            curr_size = 0
-                            max_size = self.state.solver.eval(syscall_args[1])
-                            while curr_size != max_size:
-                                next_entry = syscall_data["random"].pop(0)
-                                curr_size = curr_size + next_entry[1]
-                                endianness = "little" if self.state.arch.memory_endness == "Iend_LE" else "big"
-                                concrete_data = concrete_data + next_entry[0].to_bytes(next_entry[1], endianness)
+                if block_details["has_symbolic_exit"]:
+                    curr_succs_count = len(self.successors.successors)
+                    if not recent_bbl_addrs:
+                        recent_bbl_addrs = self.state.unicorn.get_recent_bbl_addrs()
+
+                    if not stop_details:
+                        stop_details = self.state.unicorn.get_stop_details()
+
+                self._execute_block_instrs_in_vex(block_details)
+                if block_details["has_symbolic_exit"]:
+                    curr_succs = self.successors.successors
+                    if len(curr_succs) == curr_succs_count + 1:
+                        # There is only one newly added satisfiable successor state and so that is the state that
+                        # follows path being traced
+                        self.state = curr_succs[curr_succs_count]
+                        self.successors.flat_successors.remove(self.state)
+                        self.successors.all_successors.remove(self.state)
+                        self.successors.successors.remove(self.state)
+                    else:
+                        # There are multiple satisfiable states. Use the state's record of basic blocks executed
+                        # and block where native interface stopped to determine which state followed the path traced
+                        # till now
+
+                        next_block_on_path = None
+                        if block_details["block_hist_ind"] + 1 < len(recent_bbl_addrs):
+                            next_block_on_path = recent_bbl_addrs[block_details["block_hist_ind"] + 1]
                         else:
-                            concrete_data = None
+                            next_block_on_path = stop_details.block_addr
 
-                        syscall_simproc.arch = self.state.arch
-                        syscall_simproc.project = self.state.project
-                        syscall_simproc.state = self.state
-                        syscall_simproc.cc = self.state.project.simos.syscall_cc(self.state)
-                        ret_val = getattr(syscall_simproc, syscall_simproc.run_func)(*syscall_args, concrete_data)
-                        self.state.registers.store("eax", ret_val, inspect=False, disable_actions=True)
-                else:
-                    if block_details["has_symbolic_exit"]:
-                        curr_succs_count = len(self.successors.successors)
-                        if not recent_bbl_addrs:
-                            recent_bbl_addrs = self.state.unicorn.get_recent_bbl_addrs()
-
-                        if not stop_details:
-                            stop_details = self.state.unicorn.get_stop_details()
-
-                    self._execute_block_instrs_in_vex(block_details)
-                    if block_details["has_symbolic_exit"]:
-                        curr_succs = self.successors.successors
-                        if len(curr_succs) == curr_succs_count + 1:
-                            # There is only one newly added satisfiable successor state and so that is the state that
-                            # follows path being traced
-                            self.state = curr_succs[curr_succs_count]
-                            self.successors.flat_successors.remove(self.state)
-                            self.successors.all_successors.remove(self.state)
-                            self.successors.successors.remove(self.state)
+                        for succ in curr_succs[curr_succs_count:]:
+                            if succ.addr == next_block_on_path:
+                                self.state = succ
+                                self.successors.flat_successors.remove(succ)
+                                self.successors.successors.remove(succ)
+                                break
                         else:
-                            # There are multiple satisfiable states. Use the state's record of basic blocks executed
-                            # and block where native interface stopped to determine which state followed the path traced
-                            # till now
-
-                            next_block_on_path = None
-                            if block_details["block_hist_ind"] + 1 < len(recent_bbl_addrs):
-                                next_block_on_path = recent_bbl_addrs[block_details["block_hist_ind"] + 1]
-                            else:
-                                next_block_on_path = stop_details.block_addr
-
-                            for succ in curr_succs[curr_succs_count:]:
-                                if succ.addr == next_block_on_path:
-                                    self.state = succ
-                                    self.successors.flat_successors.remove(succ)
-                                    self.successors.successors.remove(succ)
-                                    break
-                            else:
-                                raise Exception("Multiple valid successor states found but none followed the trace!")
+                            raise Exception("Multiple valid successor states found but none followed the trace!")
             except SimValueError as e:
                 l.error(e)
 
@@ -431,9 +382,7 @@ class SimEngineUnicorn(SuccessorsEngine):
 
         # initialize unicorn plugin
         try:
-            syscall_data = kwargs.get("syscall_data")
-            fd_bytes = kwargs.get("fd_bytes")
-            state.unicorn.setup(syscall_data=syscall_data, fd_bytes=fd_bytes)
+            state.unicorn.setup()
         except SimValueError:
             # it's trying to set a symbolic register somehow
             # fail out, force fallback to next engine
@@ -449,7 +398,7 @@ class SimEngineUnicorn(SuccessorsEngine):
             )
             state.unicorn.hook()
             state.unicorn.start(step=step)
-            self._execute_symbolic_instrs(syscall_data=syscall_data)
+            self._execute_symbolic_instrs()
             state.unicorn.finish(self.state)
         finally:
             state.unicorn.destroy(self.state)

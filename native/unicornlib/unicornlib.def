@@ -25,8 +25,6 @@ EXPORTS
   simunicorn_disable_symbolic_reg_tracking
   simunicorn_symbolic_register_data
   simunicorn_get_symbolic_registers
-  simunicorn_is_interrupt_handled
-  simunicorn_process_transmit
   simunicorn_set_tracking
   simunicorn_executed_pages
   simunicorn_in_cache
@@ -37,11 +35,6 @@ EXPORTS
   simunicorn_set_cpu_flags_details
   simunicorn_set_register_blacklist
   simunicorn_set_vex_to_unicorn_reg_mappings
-  simunicorn_is_interrupt_handled
-  simunicorn_set_cgc_syscall_details
-  simunicorn_process_transmit
-  simunicorn_set_fd_bytes
-  simunicorn_set_random_syscall_data
   simunicorn_set_vex_cc_reg_data
   simunicorn_get_count_of_writes_to_reexecute
   simunicorn_get_concrete_writes_to_reexecute
