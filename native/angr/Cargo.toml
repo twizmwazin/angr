@@ -13,12 +13,19 @@ repository.workspace = true
 name = "rustylib"
 crate-type = ["cdylib"]
 
+# Exactly one z3 backend must be enabled; both at once makes z3-sys's build
+# script panic, so never build with --all-features.
+[features]
+default = ["z3-vendored"]
+z3-vendored = ["clarirs-z3/vendored"]
+z3-gh-release = ["clarirs-z3/gh-release"]
+
 [dependencies]
 backtrace = "0.3.76"
 clarirs-core = { path = "../clarirs-core", features = ["runtime-checks"] }
 clarirs-num = { path = "../clarirs-num" }
 clarirs-vsa = { path = "../clarirs-vsa" }
-clarirs-z3 = { path = "../clarirs-z3" }
+clarirs-z3 = { path = "../clarirs-z3", default-features = false }
 dashmap = "6.2.1"
 log = "0.4.32"
 thiserror = { workspace = true }

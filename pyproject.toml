@@ -106,10 +106,9 @@ angr = ["py.typed", "unicornlib.*", "rustylib.*", "**/*.pyi"]
 [tool.setuptools.dynamic]
 version = { attr = "angr.__version__" }
 
-[[tool.setuptools-rust.ext-modules]]
-target = "angr.rustylib"
-path = "native/angr/Cargo.toml"
-debug = false
+# The Rust extension module is declared in setup.py rather than here so the
+# z3 backend can be selected from the build environment (see rust_extensions
+# in setup.py).
 
 [tool.distutils.bdist_wheel]
 py_limited_api = "cp312"

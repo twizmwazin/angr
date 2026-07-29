@@ -14,11 +14,28 @@ from setuptools import Command, setup
 from setuptools.command.develop import develop as st_develop
 from setuptools.errors import LibError
 
-# Import setuptools_rust to ensure an error is raised if not installed
 try:
-    _ = importlib.import_module("setuptools_rust")
+    from setuptools_rust import RustExtension
 except ImportError as err:
     raise Exception("angr requires setuptools-rust to build") from err
+
+
+def z3_feature() -> str:
+    """Pick the z3 backend for the Rust extension.
+
+    z3-sys can either compile z3 from source ("vendored") or download a
+    prebuilt static library from z3's GitHub releases ("gh-release"). Building
+    from source takes long enough to blow through Read the Docs' build
+    timeout, so gh-release is used there. ANGR_Z3_BUILD overrides the choice
+    everywhere; the gh-release download can be authenticated by setting
+    READ_ONLY_GITHUB_TOKEN to avoid anonymous GitHub API rate limits.
+    """
+    choice = os.environ.get("ANGR_Z3_BUILD")
+    if choice is None:
+        choice = "gh-release" if os.environ.get("READTHEDOCS") else "vendored"
+    if choice not in ("vendored", "gh-release"):
+        raise ValueError(f"Invalid ANGR_Z3_BUILD value: {choice!r} (expected 'vendored' or 'gh-release')")
+    return f"z3-{choice}"
 
 if sys.platform == "darwin":
     library_file = "unicornlib.dylib"
@@ -129,4 +146,15 @@ except ModuleNotFoundError:
     pass
 
 
-setup(cmdclass=cmdclass)
+setup(
+    cmdclass=cmdclass,
+    rust_extensions=[
+        RustExtension(
+            target="angr.rustylib",
+            path="native/angr/Cargo.toml",
+            debug=False,
+            args=["--no-default-features"],
+            features=[z3_feature()],
+        )
+    ],
+)

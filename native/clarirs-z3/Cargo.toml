@@ -11,8 +11,15 @@ repository = { workspace = true }
 
 [dependencies]
 clarirs-core = { path = "../clarirs-core" }
-z3-sys = { version = "0.11", features = ["vendored"] }
+z3-sys = { version = "0.11", default-features = false }
 regex = "1.12"
+
+# z3-sys requires exactly one of these to be enabled; enabling both makes its
+# build script panic, so never build with --all-features.
+[features]
+default = ["vendored"]
+vendored = ["z3-sys/vendored"]
+gh-release = ["z3-sys/gh-release"]
 
 [lints]
 workspace = true
