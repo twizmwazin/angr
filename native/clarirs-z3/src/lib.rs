@@ -4,10 +4,15 @@ mod solver;
 
 pub use solver::Z3Solver;
 
-use clarirs_core::cache::GenericCache;
+use clarirs_core::cache::LruCache;
 use clarirs_core::error::ClarirsError;
 use rc::RcAst;
 use z3_sys::*;
+
+/// Bound on each thread's Z3 AST conversion cache. Entries hold strong Z3
+/// references, so an unbounded cache pins every converted AST for the life of
+/// the thread; beyond this many entries the least recently used are dropped.
+const Z3_AST_CACHE_CAPACITY: usize = 4096;
 
 thread_local! {
     static Z3_CONTEXT: Z3_context = unsafe {
@@ -18,7 +23,7 @@ thread_local! {
         ctx
     };
 
-    static Z3_AST_CACHE: GenericCache<u64, RcAst> = GenericCache::default();
+    static Z3_AST_CACHE: LruCache<u64, RcAst> = LruCache::new(Z3_AST_CACHE_CAPACITY);
 }
 
 /// Convert a nullable `z3-sys` result into a [`ClarirsError`].
@@ -44,4 +49,30 @@ pub(crate) fn check_z3_error() -> Result<(), clarirs_core::error::ClarirsError> 
             Ok(())
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::astext::AstExtZ3;
+    use clarirs_core::prelude::*;
+
+    /// Converting an AST with more unique nodes than the cache capacity must
+    /// still succeed, and the per-thread conversion cache must stay bounded.
+    #[test]
+    fn test_z3_ast_cache_stays_bounded() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let mut ast = ctx.bvs("x", 64)?;
+        // Each iteration adds two unique nodes (the constant and the sum), so
+        // the walk inserts well over Z3_AST_CACHE_CAPACITY entries.
+        for i in 0..(Z3_AST_CACHE_CAPACITY as u64 / 2 + 512) {
+            ast = ctx.add(&ast, &ctx.bvv(BitVec::from((i, 64)))?)?;
+        }
+        ast.to_z3()?;
+        Z3_AST_CACHE.with(|cache| {
+            assert!(cache.len() <= Z3_AST_CACHE_CAPACITY);
+            assert!(!cache.is_empty());
+        });
+        Ok(())
+    }
 }

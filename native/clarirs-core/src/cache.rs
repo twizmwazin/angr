@@ -1,7 +1,8 @@
 use ahash::HashMap;
 use std::{
+    collections::BTreeMap,
     hash::Hash,
-    sync::{Arc, RwLock, Weak},
+    sync::{Arc, Mutex, RwLock, Weak},
 };
 
 use crate::prelude::*;
@@ -54,6 +55,102 @@ impl<K: Hash + Eq, V: Clone> Cache<K, V> for GenericCache<K, V> {
 
     fn insert(&self, key: K, value: &V) {
         self.0.write().unwrap().insert(key, value.clone());
+    }
+}
+
+/// A bounded cache that evicts the least-recently-used entry once `capacity`
+/// is reached. Both `get` and `insert` count as a use of the entry.
+///
+/// Recency is tracked with a monotonically increasing stamp per access and a
+/// `BTreeMap` from stamp to key whose first entry is the eviction candidate,
+/// so every operation is O(log n) without an intrusive list.
+#[derive(Debug)]
+pub struct LruCache<K, V> {
+    capacity: usize,
+    inner: Mutex<LruInner<K, V>>,
+}
+
+#[derive(Debug)]
+struct LruInner<K, V> {
+    /// Key -> (value, stamp of the entry's most recent access). The stamp is
+    /// also the entry's slot in `order`.
+    map: HashMap<K, (V, u64)>,
+    /// Access order: stamp -> key. Stamps are unique, so the first entry is
+    /// always the least recently used.
+    order: BTreeMap<u64, K>,
+    next_stamp: u64,
+}
+
+impl<K, V> LruCache<K, V> {
+    /// A capacity of 0 disables caching entirely: every `get` misses.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            capacity,
+            inner: Mutex::new(LruInner {
+                map: HashMap::default(),
+                order: BTreeMap::new(),
+                next_stamp: 0,
+            }),
+        }
+    }
+
+    /// Number of entries currently in the cache. For tests and diagnostics.
+    pub fn len(&self) -> usize {
+        self.inner.lock().unwrap().map.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl<K: Hash + Eq + Clone, V: Clone> Cache<K, V> for LruCache<K, V> {
+    fn get(&self, key: &K) -> Option<V> {
+        let mut inner = self.inner.lock().unwrap();
+        let stamp = inner.next_stamp;
+        let (value, old_stamp) = match inner.map.get_mut(key) {
+            Some((value, entry_stamp)) => {
+                let old = *entry_stamp;
+                *entry_stamp = stamp;
+                (value.clone(), old)
+            }
+            None => return None,
+        };
+        inner.next_stamp += 1;
+        let key = inner
+            .order
+            .remove(&old_stamp)
+            .expect("LRU order entry missing for live key");
+        inner.order.insert(stamp, key);
+        Some(value)
+    }
+
+    fn insert(&self, key: K, value: &V) {
+        if self.capacity == 0 {
+            return;
+        }
+        let mut inner = self.inner.lock().unwrap();
+        let stamp = inner.next_stamp;
+        inner.next_stamp += 1;
+
+        if let Some((entry_value, entry_stamp)) = inner.map.get_mut(&key) {
+            *entry_value = value.clone();
+            let old_stamp = *entry_stamp;
+            *entry_stamp = stamp;
+            inner.order.remove(&old_stamp);
+            inner.order.insert(stamp, key);
+            return;
+        }
+
+        while inner.map.len() >= self.capacity {
+            let (_, lru_key) = inner
+                .order
+                .pop_first()
+                .expect("LRU order empty while map is at capacity");
+            inner.map.remove(&lru_key);
+        }
+        inner.order.insert(stamp, key.clone());
+        inner.map.insert(key, (value.clone(), stamp));
     }
 }
 
@@ -341,6 +438,83 @@ mod tests {
         });
         // Every node is dead by now, so every entry must have been evicted.
         assert_eq!(ctx.ast_cache.len(), 0);
+    }
+
+    #[test]
+    fn test_lru_cache_basic() {
+        let cache = LruCache::<u64, String>::new(4);
+
+        let result1 = cache
+            .get_or_insert::<ClarirsError>(1, || Ok("hello".to_string()))
+            .unwrap();
+        let result2 = cache
+            .get_or_insert::<ClarirsError>(1, || panic!("Should not compute when cached"))
+            .unwrap();
+
+        assert_eq!(result1, result2);
+        assert_eq!(cache.len(), 1);
+    }
+
+    #[test]
+    fn test_lru_cache_evicts_least_recently_used() {
+        let cache = LruCache::<u64, u64>::new(2);
+        cache.insert(1, &10);
+        cache.insert(2, &20);
+        cache.insert(3, &30);
+
+        assert_eq!(cache.len(), 2);
+        assert_eq!(cache.get(&1), None);
+        assert_eq!(cache.get(&2), Some(20));
+        assert_eq!(cache.get(&3), Some(30));
+    }
+
+    #[test]
+    fn test_lru_cache_get_refreshes_recency() {
+        let cache = LruCache::<u64, u64>::new(2);
+        cache.insert(1, &10);
+        cache.insert(2, &20);
+
+        // Touching key 1 makes key 2 the eviction candidate.
+        assert_eq!(cache.get(&1), Some(10));
+        cache.insert(3, &30);
+
+        assert_eq!(cache.get(&1), Some(10));
+        assert_eq!(cache.get(&2), None);
+        assert_eq!(cache.get(&3), Some(30));
+    }
+
+    #[test]
+    fn test_lru_cache_reinsert_updates_without_evicting() {
+        let cache = LruCache::<u64, u64>::new(2);
+        cache.insert(1, &10);
+        cache.insert(2, &20);
+        // Same key: replaces the value and refreshes recency, no eviction.
+        cache.insert(1, &11);
+
+        assert_eq!(cache.len(), 2);
+        assert_eq!(cache.get(&2), Some(20));
+        assert_eq!(cache.get(&1), Some(11));
+    }
+
+    #[test]
+    fn test_lru_cache_never_exceeds_capacity() {
+        let cache = LruCache::<u64, u64>::new(8);
+        for i in 0..1000 {
+            cache.insert(i, &i);
+            assert!(cache.len() <= 8);
+        }
+        // The 8 most recently inserted keys survive.
+        for i in 992..1000 {
+            assert_eq!(cache.get(&i), Some(i));
+        }
+    }
+
+    #[test]
+    fn test_lru_cache_zero_capacity_stores_nothing() {
+        let cache = LruCache::<u64, u64>::new(0);
+        cache.insert(1, &10);
+        assert_eq!(cache.get(&1), None);
+        assert!(cache.is_empty());
     }
 
     #[test]
