@@ -1,12 +1,13 @@
 mod astext;
+mod cache;
 mod rc;
 mod solver;
 
 pub use solver::Z3Solver;
 
-use clarirs_core::cache::GenericCache;
+use cache::Z3AstCache;
 use clarirs_core::error::ClarirsError;
-use rc::RcAst;
+use std::sync::Arc;
 use z3_sys::*;
 
 thread_local! {
@@ -15,10 +16,16 @@ thread_local! {
         let ctx = Z3_mk_context(cfg).expect("Z3_mk_context returned null");
         Z3_set_error_handler(ctx, None);
         Z3_del_config(cfg);
+        // Cache entries are released from whichever thread drops the last
+        // reference to a clarirs node; concurrent dec-ref mode makes those
+        // cross-thread Z3_dec_ref calls safe (they are queued and reclaimed
+        // by this thread during later API calls).
+        Z3_enable_concurrent_dec_ref(ctx);
         ctx
     };
 
-    static Z3_AST_CACHE: GenericCache<u64, RcAst> = GenericCache::default();
+    static Z3_AST_CACHE: Arc<Z3AstCache> =
+        Z3_CONTEXT.with(|&ctx| Z3AstCache::register_for_thread(ctx));
 }
 
 /// Convert a nullable `z3-sys` result into a [`ClarirsError`].

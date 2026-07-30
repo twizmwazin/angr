@@ -9,6 +9,16 @@ use z3_sys::*;
 pub struct RcAst(Z3_ast);
 
 impl RcAst {
+    /// Wraps an AST without taking a new Z3 reference.
+    ///
+    /// # Safety
+    /// The caller must transfer ownership of one Z3 reference on `ast`, and
+    /// `ast` must belong to the current thread's context (the handle's `Clone`
+    /// and `Drop` count against that context).
+    pub(crate) unsafe fn from_raw(ast: Z3_ast) -> Self {
+        RcAst(ast)
+    }
+
     /// Returns the `DeclKind` of this AST node (assumes it is an application).
     pub fn decl_kind(&self) -> DeclKind {
         Z3_CONTEXT.with(|&ctx| unsafe {

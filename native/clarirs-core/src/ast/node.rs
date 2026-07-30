@@ -258,7 +258,12 @@ impl Drop for AstNode<'_> {
         // drops on a cache hit leaves the live entry untouched. This body runs
         // before `op`'s child references drop, so the cache lock is never held
         // across the recursive child drops.
-        self.ctx.ast_cache.remove_if_expired(self.hash);
+        //
+        // A real eviction is broadcast to the registered hooks so backends can
+        // release state derived from this node (e.g. its converted Z3 AST).
+        if self.ctx.ast_cache.remove_if_expired(self.hash) {
+            crate::cache::notify_evicted(self.hash);
+        }
     }
 }
 

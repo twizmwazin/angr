@@ -531,7 +531,7 @@ impl<'c> AstExtZ3<'c> for AstRef<'c> {
                         })
                     })
                 },
-                cache,
+                cache.as_ref(),
             )
         })
     }

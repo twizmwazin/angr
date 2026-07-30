@@ -6,6 +6,28 @@ use std::{
 
 use crate::prelude::*;
 
+/// Hooks invoked with a node's structural hash after its interning entry has
+/// been evicted from an [`AstCache`], i.e. once the last strong reference to
+/// the node is gone. Backends register a hook to release derived per-hash
+/// state (e.g. converted Z3 ASTs) in lockstep with the source AST.
+///
+/// Hooks run on whichever thread dropped the node, while no cache lock is
+/// held. A hook must therefore be safe to call from any thread and must not
+/// create or drop ASTs itself.
+static EVICTION_HOOKS: RwLock<Vec<fn(u64)>> = RwLock::new(Vec::new());
+
+/// Registers a process-wide hook called with the structural hash of every AST
+/// node evicted from an [`AstCache`]. Hooks cannot be unregistered.
+pub fn register_eviction_hook(hook: fn(u64)) {
+    EVICTION_HOOKS.write().unwrap().push(hook);
+}
+
+pub(crate) fn notify_evicted(hash: u64) {
+    for hook in EVICTION_HOOKS.read().unwrap().iter() {
+        hook(hash);
+    }
+}
+
 /// A trait for caching values based on a key. In the context of clarirs, this
 /// is used to cache ASTs, as well as the results of various algorithms.
 ///
@@ -77,12 +99,15 @@ impl AstCache<'_> {
     /// The hot path (entry still live, e.g. the throwaway-duplicate drop) is
     /// served with only the read lock; the write lock is taken just when the
     /// entry actually looks dead, and the check is repeated under it.
-    pub(crate) fn remove_if_expired(&self, key: u64) {
+    ///
+    /// Returns whether an entry was actually removed, so the caller can fire
+    /// the eviction hooks only for real evictions.
+    pub(crate) fn remove_if_expired(&self, key: u64) -> bool {
         {
             let inner = self.0.read().unwrap();
             match inner.get(&key) {
                 Some(weak) if weak.strong_count() == 0 => {}
-                _ => return,
+                _ => return false,
             }
         }
         let mut inner = self.0.write().unwrap();
@@ -90,7 +115,9 @@ impl AstCache<'_> {
             && weak.strong_count() == 0
         {
             inner.remove(&key);
+            return true;
         }
+        false
     }
 
     /// Number of entries currently in the cache (live or expired). For tests
@@ -341,6 +368,33 @@ mod tests {
         });
         // Every node is dead by now, so every entry must have been evicted.
         assert_eq!(ctx.ast_cache.len(), 0);
+    }
+
+    #[test]
+    fn test_eviction_hook_fires_once_per_real_eviction() {
+        use std::sync::Mutex;
+        // Global registry, so the hook also sees hashes from other tests in
+        // this process; assertions filter on this test's hash.
+        static SEEN: Mutex<Vec<u64>> = Mutex::new(Vec::new());
+        fn record(hash: u64) {
+            SEEN.lock().unwrap().push(hash);
+        }
+        register_eviction_hook(record);
+
+        let ctx = crate::context::Context::new();
+        let a = ctx.bvv(BitVec::from((0x1234abcd, 64))).unwrap();
+        // Deref: `Hash` is in scope here, so `a.hash()` would resolve to
+        // `Hash::hash` on the `Arc` instead of the inherent `AstNode::hash`.
+        let hash = (*a).hash();
+        // Cache hit: the throwaway duplicate node dropped inside interning
+        // must not fire the hook while the entry is live.
+        let b = ctx.bvv(BitVec::from((0x1234abcd, 64))).unwrap();
+        assert!(!SEEN.lock().unwrap().contains(&hash));
+        drop(a);
+        assert!(!SEEN.lock().unwrap().contains(&hash));
+        drop(b);
+        let count = SEEN.lock().unwrap().iter().filter(|&&h| h == hash).count();
+        assert_eq!(count, 1);
     }
 
     #[test]
