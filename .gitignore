@@ -40,4 +40,3 @@ target/
 *_angr_rtdb_*
 .claude
 angr/protos/*_pb2.py
-.z3-trace
