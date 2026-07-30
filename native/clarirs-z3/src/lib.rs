@@ -17,8 +17,6 @@ thread_local! {
         ctx
     };
 
-    // Values are weak: the cache never keeps a Z3 AST alive on its own, and
-    // entries whose ASTs have been released are dropped rather than returned.
     static Z3_AST_CACHE: WeakAstCache = WeakAstCache::default();
 }
 

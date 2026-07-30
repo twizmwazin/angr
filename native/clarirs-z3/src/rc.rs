@@ -6,23 +6,16 @@ use crate::{Z3_CONTEXT, check_z3_error, require};
 use clarirs_core::error::ClarirsError;
 use z3_sys::*;
 
-/// Owns exactly one Z3 reference count on the wrapped AST (`Z3_inc_ref` is
-/// called before construction, `Z3_dec_ref` on drop), plus strong references
-/// to the handles of the node's children.
-///
-/// The children mirror Z3's internal retention: a Z3 parent keeps its children
-/// alive, so as long as any Rust-held [`RcAst`] can reach a node, that node's
-/// handle — and therefore its [`WeakAst`] cache entry — stays alive too.
-/// Without this, a cache entry would expire as soon as its own last `RcAst`
-/// dropped, even though the Z3 node lives on inside a still-held parent.
+/// Owns one Z3 reference count on the wrapped AST, plus strong references to
+/// the node's children so a subterm's handle (and cache entry) stays alive
+/// while any Rust-held ancestor is, mirroring Z3's internal retention.
 struct AstHandle {
     ast: Z3_ast,
     children: Vec<RcAst>,
 }
 
 impl AstHandle {
-    /// Wraps `ast`, taking ownership of one Z3 reference count that the caller
-    /// has already acquired via `Z3_inc_ref`.
+    /// Takes ownership of one Z3 reference count already acquired by the caller.
     fn new(ast: Z3_ast) -> Self {
         AstHandle {
             ast,
@@ -34,25 +27,19 @@ impl AstHandle {
 impl Drop for AstHandle {
     fn drop(&mut self) {
         Z3_CONTEXT.with(|&ctx| unsafe { Z3_dec_ref(ctx, self.ast) });
-        // Drop the child handles iteratively: the recursive default would
-        // overflow the stack on the deep expression chains symbolic execution
-        // produces.
+        // Iterative so deep expression chains can't overflow the stack.
         let mut stack = std::mem::take(&mut self.children);
         while let Some(child) = stack.pop() {
             if let Some(mut handle) = Rc::into_inner(child.0) {
                 stack.append(&mut handle.children);
-                // `handle` drops here with no children left, so its own drop
-                // cannot recurse.
             }
         }
     }
 }
 
-/// A shared handle to a Z3 AST. All clones share a single Z3 reference count
-/// (held by the inner [`AstHandle`]), which is released when the last clone is
-/// dropped. [`RcAst::downgrade`] produces a [`WeakAst`] that observes — but
-/// does not delay — that release, which is what lets caches hold Z3 ASTs
-/// without keeping them alive.
+/// A shared handle to a Z3 AST. All clones share a single Z3 reference count,
+/// released when the last clone drops; [`RcAst::downgrade`] gives a [`WeakAst`]
+/// that observes that release without delaying it.
 pub struct RcAst(Rc<AstHandle>);
 
 impl RcAst {
@@ -62,15 +49,12 @@ impl RcAst {
         self.0.ast
     }
 
-    /// Creates a [`WeakAst`] that does not keep the Z3 AST alive.
     pub fn downgrade(&self) -> WeakAst {
         WeakAst(Rc::downgrade(&self.0))
     }
 
-    /// Attaches `children` to this handle so their handles (and cache entries)
-    /// stay alive for as long as this node is reachable from a live `RcAst`,
-    /// mirroring the retention Z3 applies internally. Used when building a
-    /// node from converted children.
+    /// Attaches converted children so their cache entries live as long as this
+    /// node is reachable from a live `RcAst`.
     pub(crate) fn with_children(mut self, children: &[RcAst]) -> RcAst {
         if children.is_empty() {
             return self;
@@ -80,9 +64,8 @@ impl RcAst {
                 handle.children = children.to_vec();
                 self
             }
-            // The handle is shared (e.g. the node collapsed to one of its
-            // children), so make a fresh handle for this node with its own Z3
-            // reference.
+            // Shared handle (the node collapsed to one of its children):
+            // make a fresh one with its own Z3 reference.
             None => {
                 Z3_CONTEXT.with(|&ctx| unsafe { Z3_inc_ref(ctx, self.raw()) });
                 RcAst(Rc::new(AstHandle {
@@ -295,19 +278,14 @@ impl Deref for RcAst {
     }
 }
 
-/// A non-owning handle to a Z3 AST, obtained via [`RcAst::downgrade`]. It does
-/// not hold a Z3 reference count, so it never prevents Z3 from garbage
-/// collecting the node. [`WeakAst::upgrade`] recovers a strong [`RcAst`] while
-/// at least one strong handle is still alive, and returns `None` once the last
-/// strong handle has dropped (at which point the underlying Z3 pointer may be
-/// dangling). This makes it safe to keep in caches: an entry that fails to
-/// upgrade is known-invalid and must be discarded.
+/// A non-owning handle to a Z3 AST that never prevents Z3 from reclaiming the
+/// node. `upgrade` returns `None` once the last strong handle has dropped
+/// (the Z3 pointer may then be dangling), so a failed upgrade marks a cache
+/// entry as invalid.
 #[derive(Clone)]
 pub struct WeakAst(Weak<AstHandle>);
 
 impl WeakAst {
-    /// Attempts to recover a strong [`RcAst`]. Returns `None` if every strong
-    /// handle has been dropped and the Z3 reference has been released.
     pub fn upgrade(&self) -> Option<RcAst> {
         self.0.upgrade().map(RcAst)
     }
@@ -319,21 +297,14 @@ impl From<&RcAst> for WeakAst {
     }
 }
 
-/// A cache from clarirs AST hashes to Z3 ASTs that stores [`WeakAst`] values,
-/// so cached entries do not keep Z3 ASTs alive. Because each handle retains
-/// its children (see [`AstHandle`]), an entry stays live as long as its node
-/// is reachable from any Rust-held [`RcAst`] — mirroring how long Z3 itself
-/// keeps the node. Once nothing reachable references it (so our Z3 reference
-/// is released and Z3 may reclaim the node), the entry fails to upgrade and is
-/// dropped from the cache instead of being returned.
-///
-/// Dead entries are removed eagerly on lookup, and the whole map is swept once
-/// it grows past a high-water mark so entries that are never probed again
-/// cannot accumulate. Like the Z3 context itself, this type is single-threaded
-/// (kept in thread-local storage).
+/// A cache from clarirs AST hashes to Z3 ASTs with [`WeakAst`] values, so it
+/// never keeps a Z3 AST alive on its own. An entry stays live while its node
+/// is reachable from any Rust-held [`RcAst`] (handles retain their children);
+/// after that it fails to upgrade and is dropped instead of returned. Dead
+/// entries are removed on lookup, plus a bulk sweep once the map grows past a
+/// high-water mark. Single-threaded, like the Z3 context.
 pub struct WeakAstCache {
     map: std::cell::RefCell<std::collections::HashMap<u64, WeakAst>>,
-    /// Sweep the map of dead entries when it grows to this many entries.
     sweep_at: std::cell::Cell<usize>,
 }
 
@@ -367,7 +338,6 @@ impl clarirs_core::cache::Cache<u64, RcAst> for WeakAstCache {
         match map.get(key)?.upgrade() {
             Some(ast) => Some(ast),
             None => {
-                // The last strong handle is gone; the pointer may dangle.
                 map.remove(key);
                 None
             }
@@ -378,8 +348,6 @@ impl clarirs_core::cache::Cache<u64, RcAst> for WeakAstCache {
         let mut map = self.map.borrow_mut();
         if map.len() >= self.sweep_at.get() {
             map.retain(|_, weak| weak.upgrade().is_some());
-            // Keep the next sweep proportional to the live population so sweep
-            // cost stays amortized-constant per insert.
             self.sweep_at.set((map.len() * 2).max(WEAK_CACHE_MIN_SWEEP));
         }
         map.insert(key, value.downgrade());
@@ -815,7 +783,6 @@ mod weak_tests {
         let weak = ast.downgrade();
         let clone = ast.clone();
         drop(ast);
-        // A clone still holds the shared handle.
         assert!(weak.upgrade().is_some());
         drop(clone);
         assert!(weak.upgrade().is_none());
@@ -828,8 +795,6 @@ mod weak_tests {
         cache.insert(1, &child);
         let parent = RcAst::mk_bool("dep_parent").with_children(std::slice::from_ref(&child));
         drop(child);
-        // Only the parent still references the child's handle, but that is
-        // enough to keep the cache entry alive.
         assert!(cache.get(&1).is_some());
         drop(parent);
         assert!(cache.get(&1).is_none());
@@ -837,7 +802,6 @@ mod weak_tests {
 
     #[test]
     fn deep_chain_drops_without_stack_overflow() {
-        // A recursive AstHandle drop would blow the stack at this depth.
         let mut node = RcAst::mk_bv("chain_leaf", 64);
         for _ in 0..200_000 {
             node = RcAst::mk_bool("chain_link").with_children(std::slice::from_ref(&node));
@@ -861,9 +825,7 @@ mod weak_tests {
             let ast = RcAst::mk_bv("cache_dead", 64);
             cache.insert(2, &ast);
         }
-        // The AST is gone; the entry must not be returned...
         assert!(cache.get(&2).is_none());
-        // ...and the dead entry is removed by the failed lookup.
         assert!(cache.is_empty());
     }
 
@@ -882,22 +844,18 @@ mod weak_tests {
             })
             .unwrap();
         assert!(computed, "dead entry must be recomputed, not returned");
-        // The recomputed value is cached and live again.
         assert_eq!(*cache.get(&3).expect("re-inserted entry is live"), *ast);
     }
 
     #[test]
     fn cache_sweep_evicts_dead_entries() {
         let cache = WeakAstCache::default();
-        // Fill past the sweep threshold with dead entries that are never
-        // probed again.
         for i in 0..WEAK_CACHE_MIN_SWEEP as u64 {
             let ast = RcAst::mk_bv_val(&i.to_string(), 64);
             cache.insert(i, &ast);
         }
         let live = RcAst::mk_bv("cache_survivor", 64);
         cache.insert(u64::MAX, &live);
-        // The insert that crossed the threshold swept all dead entries.
         assert_eq!(cache.len(), 1);
         assert!(cache.get(&u64::MAX).is_some());
     }

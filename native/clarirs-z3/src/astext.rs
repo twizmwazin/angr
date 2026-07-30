@@ -527,9 +527,6 @@ impl<'c> AstExtZ3<'c> for AstRef<'c> {
                         })
                         .and_then(|converted| {
                             check_z3_error()?;
-                            // Tie the children's handles to this node so their
-                            // cache entries stay alive while any ancestor is
-                            // still held, matching Z3's internal retention.
                             Ok(converted.with_children(children))
                         })
                     })
@@ -1057,9 +1054,6 @@ mod cache_tests {
     use super::AstExtZ3;
     use crate::Z3_AST_CACHE;
 
-    /// A converted subterm's cache entry must stay alive while the converted
-    /// root is held (the Z3 node is alive inside the root), and expire once
-    /// the root is dropped.
     #[test]
     fn subterm_entries_live_while_root_is_held() -> Result<(), ClarirsError> {
         let ctx = Context::new();
