@@ -4,9 +4,8 @@ mod solver;
 
 pub use solver::Z3Solver;
 
-use clarirs_core::cache::GenericCache;
 use clarirs_core::error::ClarirsError;
-use rc::RcAst;
+use rc::WeakAstCache;
 use z3_sys::*;
 
 thread_local! {
@@ -18,7 +17,9 @@ thread_local! {
         ctx
     };
 
-    static Z3_AST_CACHE: GenericCache<u64, RcAst> = GenericCache::default();
+    // Values are weak: the cache never keeps a Z3 AST alive on its own, and
+    // entries whose ASTs have been released are dropped rather than returned.
+    static Z3_AST_CACHE: WeakAstCache = WeakAstCache::default();
 }
 
 /// Convert a nullable `z3-sys` result into a [`ClarirsError`].
