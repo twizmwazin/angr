@@ -6,13 +6,45 @@ use crate::{Z3_CONTEXT, check_z3_error, require};
 use clarirs_core::error::ClarirsError;
 use z3_sys::*;
 
-/// Owns exactly one Z3 reference count on the wrapped AST: `Z3_inc_ref` is
-/// called before construction, `Z3_dec_ref` on drop.
-struct AstHandle(Z3_ast);
+/// Owns exactly one Z3 reference count on the wrapped AST (`Z3_inc_ref` is
+/// called before construction, `Z3_dec_ref` on drop), plus strong references
+/// to the handles of the node's children.
+///
+/// The children mirror Z3's internal retention: a Z3 parent keeps its children
+/// alive, so as long as any Rust-held [`RcAst`] can reach a node, that node's
+/// handle — and therefore its [`WeakAst`] cache entry — stays alive too.
+/// Without this, a cache entry would expire as soon as its own last `RcAst`
+/// dropped, even though the Z3 node lives on inside a still-held parent.
+struct AstHandle {
+    ast: Z3_ast,
+    children: Vec<RcAst>,
+}
+
+impl AstHandle {
+    /// Wraps `ast`, taking ownership of one Z3 reference count that the caller
+    /// has already acquired via `Z3_inc_ref`.
+    fn new(ast: Z3_ast) -> Self {
+        AstHandle {
+            ast,
+            children: Vec::new(),
+        }
+    }
+}
 
 impl Drop for AstHandle {
     fn drop(&mut self) {
-        Z3_CONTEXT.with(|&ctx| unsafe { Z3_dec_ref(ctx, self.0) });
+        Z3_CONTEXT.with(|&ctx| unsafe { Z3_dec_ref(ctx, self.ast) });
+        // Drop the child handles iteratively: the recursive default would
+        // overflow the stack on the deep expression chains symbolic execution
+        // produces.
+        let mut stack = std::mem::take(&mut self.children);
+        while let Some(child) = stack.pop() {
+            if let Some(mut handle) = Rc::into_inner(child.0) {
+                stack.append(&mut handle.children);
+                // `handle` drops here with no children left, so its own drop
+                // cannot recurse.
+            }
+        }
     }
 }
 
@@ -27,12 +59,38 @@ impl RcAst {
     /// The raw Z3 pointer. Only valid while `self` (or another strong clone)
     /// is alive.
     fn raw(&self) -> Z3_ast {
-        self.0.0
+        self.0.ast
     }
 
     /// Creates a [`WeakAst`] that does not keep the Z3 AST alive.
     pub fn downgrade(&self) -> WeakAst {
         WeakAst(Rc::downgrade(&self.0))
+    }
+
+    /// Attaches `children` to this handle so their handles (and cache entries)
+    /// stay alive for as long as this node is reachable from a live `RcAst`,
+    /// mirroring the retention Z3 applies internally. Used when building a
+    /// node from converted children.
+    pub(crate) fn with_children(mut self, children: &[RcAst]) -> RcAst {
+        if children.is_empty() {
+            return self;
+        }
+        match Rc::get_mut(&mut self.0) {
+            Some(handle) => {
+                handle.children = children.to_vec();
+                self
+            }
+            // The handle is shared (e.g. the node collapsed to one of its
+            // children), so make a fresh handle for this node with its own Z3
+            // reference.
+            None => {
+                Z3_CONTEXT.with(|&ctx| unsafe { Z3_inc_ref(ctx, self.raw()) });
+                RcAst(Rc::new(AstHandle {
+                    ast: self.raw(),
+                    children: children.to_vec(),
+                }))
+            }
+        }
     }
 
     /// Returns the `DeclKind` of this AST node (assumes it is an application).
@@ -205,7 +263,7 @@ impl TryFrom<Z3_ast> for RcAst {
     fn try_from(ast: Z3_ast) -> Result<Self, Self::Error> {
         check_z3_error()?;
         Z3_CONTEXT.with(|&ctx| unsafe { Z3_inc_ref(ctx, ast) });
-        Ok(RcAst(Rc::new(AstHandle(ast))))
+        Ok(RcAst(Rc::new(AstHandle::new(ast))))
     }
 }
 
@@ -219,7 +277,7 @@ impl TryFrom<Option<Z3_ast>> for RcAst {
         check_z3_error()?;
         let ast = require(ast)?;
         Z3_CONTEXT.with(|&ctx| unsafe { Z3_inc_ref(ctx, ast) });
-        Ok(RcAst(Rc::new(AstHandle(ast))))
+        Ok(RcAst(Rc::new(AstHandle::new(ast))))
     }
 }
 
@@ -233,7 +291,7 @@ impl Deref for RcAst {
     type Target = Z3_ast;
 
     fn deref(&self) -> &Self::Target {
-        &self.0.0
+        &self.0.ast
     }
 }
 
@@ -262,10 +320,12 @@ impl From<&RcAst> for WeakAst {
 }
 
 /// A cache from clarirs AST hashes to Z3 ASTs that stores [`WeakAst`] values,
-/// so cached entries do not keep Z3 ASTs alive. Once every strong [`RcAst`]
-/// for an entry is dropped (releasing our Z3 reference and allowing Z3 to
-/// reclaim the node), the entry fails to upgrade and is dropped from the cache
-/// instead of being returned.
+/// so cached entries do not keep Z3 ASTs alive. Because each handle retains
+/// its children (see [`AstHandle`]), an entry stays live as long as its node
+/// is reachable from any Rust-held [`RcAst`] — mirroring how long Z3 itself
+/// keeps the node. Once nothing reachable references it (so our Z3 reference
+/// is released and Z3 may reclaim the node), the entry fails to upgrade and is
+/// dropped from the cache instead of being returned.
 ///
 /// Dead entries are removed eagerly on lookup, and the whole map is swept once
 /// it grows past a high-water mark so entries that are never probed again
@@ -759,6 +819,30 @@ mod weak_tests {
         assert!(weak.upgrade().is_some());
         drop(clone);
         assert!(weak.upgrade().is_none());
+    }
+
+    #[test]
+    fn parent_keeps_child_cache_entry_alive() {
+        let cache = WeakAstCache::default();
+        let child = RcAst::mk_bv("dep_child", 64);
+        cache.insert(1, &child);
+        let parent = RcAst::mk_bool("dep_parent").with_children(std::slice::from_ref(&child));
+        drop(child);
+        // Only the parent still references the child's handle, but that is
+        // enough to keep the cache entry alive.
+        assert!(cache.get(&1).is_some());
+        drop(parent);
+        assert!(cache.get(&1).is_none());
+    }
+
+    #[test]
+    fn deep_chain_drops_without_stack_overflow() {
+        // A recursive AstHandle drop would blow the stack at this depth.
+        let mut node = RcAst::mk_bv("chain_leaf", 64);
+        for _ in 0..200_000 {
+            node = RcAst::mk_bool("chain_link").with_children(std::slice::from_ref(&node));
+        }
+        drop(node);
     }
 
     #[test]
