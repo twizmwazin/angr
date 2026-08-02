@@ -20,13 +20,40 @@ Good luck!
 """)
 
 # isort: off
+import ctypes
+import importlib.util
+import os
+import sys
+
+from pathlib import Path
+
+# angr.rustylib is linked against the libz3 in the z3-solver wheel, which is on no dynamic loader
+# search path. Load it first: once libz3 is in the process, the loader reuses it to satisfy the
+# extension no matter where either of them was installed.
+_z3_spec = importlib.util.find_spec("z3")
+_z3_lib_dir = None
+if _z3_spec is not None and _z3_spec.submodule_search_locations:
+    _z3_lib_dir = Path(next(iter(_z3_spec.submodule_search_locations)), "lib")
+
+# Held for the lifetime of the process: closing the handle undoes the search path addition.
+_z3_dll_directory = None
+if _z3_lib_dir is not None and _z3_lib_dir.is_dir():
+    if sys.platform == "win32":
+        # Windows resolves imports by DLL name, not by path, so the directory goes on the search path
+        _z3_dll_directory = os.add_dll_directory(str(_z3_lib_dir))
+    else:
+        _z3_library = _z3_lib_dir / ("libz3.dylib" if sys.platform == "darwin" else "libz3.so")
+        if _z3_library.is_file():
+            ctypes.CDLL(str(_z3_library), mode=ctypes.RTLD_GLOBAL)
+        del _z3_library
+
+del _z3_spec, _z3_lib_dir, ctypes, importlib, os, Path
+
 # claripy is built from the vendored clarirs sources as part of angr.rustylib;
 # its canonical module paths are angr.rustylib.claripy.*. Alias it (and every
 # submodule) as angr.claripy in sys.modules before anything imports it. There
 # is deliberately no top-level `claripy` module: import it as
 # `from angr import claripy` (or `angr.claripy`).
-import sys
-
 from .rustylib import claripy
 
 sys.modules["angr.claripy"] = claripy
