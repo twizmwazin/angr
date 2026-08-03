@@ -523,6 +523,7 @@ impl<'c> Solver<'c> for Z3Solver<'c> {
     }
 
     fn simplify(&mut self) -> Result<(), ClarirsError> {
+        let pre_rewrite_len = self.assertions.len();
         self.assertions = self
             .assertions
             .iter()
@@ -535,8 +536,29 @@ impl<'c> Solver<'c> for Z3Solver<'c> {
                 }
             })
             .collect::<Result<Vec<_>, ClarirsError>>()?;
-        // The assertion set changed in place; the cached solver is now stale.
-        self.invalidate_cache();
+        // Each rewritten constraint is equivalent to the one it replaced (and
+        // dropped ones were tautologies), so a live z3 solver asserting the
+        // old forms remains sound for the new set: checks, future pushes, and
+        // the stored model all carry over. Re-key the entry to the rewritten
+        // assertions instead of discarding the warm solver — angr simplifies
+        // constraints on every state merge, exactly when the solver is
+        // hottest. Only an entry that had asserted the whole pre-rewrite set
+        // can be re-keyed; a partially-pushed one would leave the un-pushed
+        // old constraints untracked (index correspondence is lost once
+        // tautologies are dropped), so it is discarded as before.
+        SOLVER_CACHE.with(|cell| {
+            let mut map = cell.borrow_mut();
+            match map.get_mut(&self.cache_id) {
+                Some(cached) if cached.asserted == pre_rewrite_len => {
+                    cached.asserted = self.assertions.len();
+                    cached.hashes = self.assertions.iter().map(|a| a.hash()).collect();
+                }
+                Some(_) => {
+                    map.remove(&self.cache_id);
+                }
+                None => {}
+            }
+        });
         Ok(())
     }
 
@@ -1728,6 +1750,73 @@ mod tests {
         // Getting unsat core on a SAT result should fail
         assert!(solver.unsat_core().is_err());
 
+        Ok(())
+    }
+
+    /// A clone whose ancestor's z3 solver is live must answer satisfiability
+    /// by borrowing it (scoped assumptions) instead of building its own.
+    #[test]
+    fn test_clone_borrows_ancestor_solver() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let mut parent = Z3Solver::new(&ctx);
+        let x = ctx.bvs("x", 32)?;
+        let y = ctx.bvs("y", 32)?;
+        parent.add(&ctx.ult(&x, &y)?)?;
+        parent.add(&ctx.ult(&y, &ctx.bvv(BitVec::from((1000u64, 32)))?)?)?;
+        assert!(parent.satisfiable()?);
+        assert!(SOLVER_CACHE.with(|c| c.borrow().contains_key(&parent.cache_id)));
+
+        let mut child = parent.clone();
+        assert_eq!(child.parent_id, Some(parent.cache_id));
+        child.add(&ctx.ult(&ctx.bvv(BitVec::from((500u64, 32)))?, &x)?)?;
+        assert!(child.satisfiable()?);
+        // The check must have been answered on the ancestor's solver: the
+        // child has no entry of its own, and the borrowed witness was stashed.
+        assert!(
+            !SOLVER_CACHE.with(|c| c.borrow().contains_key(&child.cache_id)),
+            "clone built its own solver instead of borrowing the ancestor's"
+        );
+        assert!(
+            MODEL_STASH.with(|c| c.borrow().contains_key(&child.cache_id)),
+            "borrowed check did not stash its witness model"
+        );
+
+        // An unsatisfiable suffix must be answered (false) the same way.
+        let mut child2 = parent.clone();
+        child2.add(&ctx.ult(&y, &x)?)?;
+        assert!(!child2.satisfiable()?);
+        assert!(!SOLVER_CACHE.with(|c| c.borrow().contains_key(&child2.cache_id)));
+        Ok(())
+    }
+
+    #[test]
+    fn test_borrow_timing() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let mut parent = Z3Solver::new(&ctx);
+        let xs: Vec<_> = (0..30)
+            .map(|i| ctx.bvs(&format!("x{i}"), 32).unwrap())
+            .collect();
+        for i in 0..29 {
+            let a = ctx.add(&xs[i], &ctx.bvv(BitVec::from((i as u64, 32)))?)?;
+            let b = ctx.mul(&xs[i + 1], &ctx.bvv(BitVec::from((3u64, 32)))?)?;
+            parent.add(&ctx.ult(&a, &b)?)?;
+            let m = ctx.and2(&xs[i], &ctx.bvv(BitVec::from((0xffu64, 32)))?)?;
+            parent.add(&ctx.neq(&m, &ctx.bvv(BitVec::from((i as u64, 32)))?)?)?;
+        }
+        let t0 = std::time::Instant::now();
+        assert!(parent.satisfiable()?);
+        let t1 = std::time::Instant::now();
+        let mut child = parent.clone();
+        child.add(&ctx.ule(&xs[29], &ctx.bvv(BitVec::from((5u64, 32)))?)?)?;
+        let t2 = std::time::Instant::now();
+        assert!(child.satisfiable()?);
+        let t3 = std::time::Instant::now();
+        eprintln!(
+            "parent first check: {:?}  child borrowed check: {:?}  child-has-own-entry: {}",
+            t1 - t0,
+            t3 - t2,
+            SOLVER_CACHE.with(|c| c.borrow().contains_key(&child.cache_id))
+        );
         Ok(())
     }
 }
