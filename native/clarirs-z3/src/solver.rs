@@ -20,6 +20,10 @@ struct CachedSolver {
     roots: Vec<RcAst>,
     /// Number of `Z3Solver::assertions` already pushed into `solver`.
     asserted: usize,
+    /// Hashes of the asserted constraints, in assertion order. Lets a cloned
+    /// solver verify that this entry's assertions are a prefix of its own
+    /// before borrowing the solver for a scoped check.
+    hashes: Vec<u64>,
     /// Model from the most recent successful check, valid for exactly the
     /// `asserted` constraints (cleared whenever more are pushed). Kept so
     /// model queries after a satisfiability check don't re-run the solver.
@@ -30,6 +34,12 @@ struct CachedSolver {
 
 thread_local! {
     static SOLVER_CACHE: RefCell<HashMap<u64, CachedSolver>> = RefCell::new(HashMap::new());
+    /// Witness models for solvers that have no [`SOLVER_CACHE`] entry of their
+    /// own: a check answered by borrowing an ancestor's solver stores its model
+    /// here, keyed by the borrowing solver's `cache_id`. The `usize` is the
+    /// number of assertions the model covers; it is only trusted when it still
+    /// equals the solver's current assertion count.
+    static MODEL_STASH: RefCell<HashMap<u64, (usize, RcModel)>> = RefCell::new(HashMap::new());
 }
 
 static NEXT_SOLVER_ID: AtomicU64 = AtomicU64::new(1);
@@ -37,6 +47,12 @@ static NEXT_SOLVER_ID: AtomicU64 = AtomicU64::new(1);
 fn next_solver_id() -> u64 {
     NEXT_SOLVER_ID.fetch_add(1, Ordering::Relaxed)
 }
+
+/// Maximum number of un-asserted trailing constraints a clone may pass as
+/// per-check assumptions when borrowing an ancestor's live z3 solver. Past
+/// this, building an own solver amortizes better than re-sending a long
+/// assumption list on every check.
+const MAX_BORROW_SUFFIX: usize = 32;
 
 #[derive(Debug)]
 pub struct Z3Solver<'c> {
@@ -48,10 +64,28 @@ pub struct Z3Solver<'c> {
     tracking_vars: HashMap<usize, AstRef<'c>>,
     /// Identifies this solver's incremental z3 solver in [`SOLVER_CACHE`].
     cache_id: u64,
+    /// Nearest ancestor (via `clone`) that had a live entry in [`SOLVER_CACHE`]
+    /// when this solver was cloned. A clone starts with no z3 solver of its
+    /// own; until it builds one, satisfiability checks can borrow the
+    /// ancestor's warm incremental solver, passing this solver's extra
+    /// constraints as scoped assumptions (see `try_borrowed_check`).
+    parent_id: Option<u64>,
 }
 
 impl<'c> Clone for Z3Solver<'c> {
     fn clone(&self) -> Self {
+        // Record the nearest ancestor whose z3 solver is live on this thread,
+        // so checks on the clone can reuse it instead of solving from scratch.
+        // A miss here (entry on another thread, or none yet) only costs the
+        // clone a cold build on its first hard query, exactly as before.
+        let parent_id = SOLVER_CACHE.with(|cell| {
+            let map = cell.borrow();
+            if map.contains_key(&self.cache_id) {
+                Some(self.cache_id)
+            } else {
+                self.parent_id.filter(|id| map.contains_key(id))
+            }
+        });
         Z3Solver {
             ctx: self.ctx,
             assertions: self.assertions.clone(),
@@ -59,6 +93,7 @@ impl<'c> Clone for Z3Solver<'c> {
             unsat_core: self.unsat_core,
             tracking_vars: self.tracking_vars.clone(),
             cache_id: next_solver_id(),
+            parent_id,
         }
     }
 }
@@ -66,6 +101,11 @@ impl<'c> Clone for Z3Solver<'c> {
 impl Drop for Z3Solver<'_> {
     fn drop(&mut self) {
         let _ = SOLVER_CACHE.try_with(|cell| {
+            if let Ok(mut map) = cell.try_borrow_mut() {
+                map.remove(&self.cache_id);
+            }
+        });
+        let _ = MODEL_STASH.try_with(|cell| {
             if let Ok(mut map) = cell.try_borrow_mut() {
                 map.remove(&self.cache_id);
             }
@@ -82,6 +122,7 @@ impl<'c> Z3Solver<'c> {
             unsat_core: false,
             tracking_vars: HashMap::new(),
             cache_id: next_solver_id(),
+            parent_id: None,
         }
     }
 
@@ -93,6 +134,7 @@ impl<'c> Z3Solver<'c> {
             unsat_core: false,
             tracking_vars: HashMap::new(),
             cache_id: next_solver_id(),
+            parent_id: None,
         }
     }
 
@@ -104,6 +146,7 @@ impl<'c> Z3Solver<'c> {
             unsat_core,
             tracking_vars: HashMap::new(),
             cache_id: next_solver_id(),
+            parent_id: None,
         }
     }
 
@@ -244,6 +287,7 @@ impl<'c> Z3Solver<'c> {
                         solver,
                         roots,
                         asserted: self.assertions.len(),
+                        hashes: self.assertions.iter().map(|a| a.hash()).collect(),
                         model: None,
                         timeout: self.timeout,
                         unsat_core: self.unsat_core,
@@ -261,9 +305,92 @@ impl<'c> Z3Solver<'c> {
                 let idx = cached.asserted;
                 self.assert_at(&mut cached.solver, &mut cached.roots, idx)?;
                 cached.asserted = idx + 1;
+                cached.hashes.push(self.assertions[idx].hash());
                 cached.model = None;
             }
             f(cached)
+        })
+    }
+
+    /// Whether this solver already has a usable [`SOLVER_CACHE`] entry on this
+    /// thread (same params, asserted set still a prefix of the current one).
+    fn has_own_entry(&self) -> bool {
+        SOLVER_CACHE.with(|cell| {
+            matches!(
+                cell.borrow().get(&self.cache_id),
+                Some(c) if c.timeout == self.timeout
+                    && c.unsat_core == self.unsat_core
+                    && c.asserted <= self.assertions.len()
+            )
+        })
+    }
+
+    /// Answer a satisfiability check by borrowing the nearest ancestor's live
+    /// z3 solver, if possible.
+    ///
+    /// A clone shares its ancestor's asserted constraints as a prefix; the
+    /// constraints it added since (plus `extra`) go to `check_assumptions` as
+    /// scoped assumptions, which never modify the ancestor's solver but reuse
+    /// everything it has already learned. This turns the very common
+    /// "clone the state, add a branch guard, check feasibility" pattern from a
+    /// from-scratch solve into an incremental one.
+    ///
+    /// Returns `None` when there is nothing suitable to borrow (no ancestor
+    /// entry, params differ, prefix mismatch, or too many trailing
+    /// constraints); the caller then falls back to its own solver. On a
+    /// successful satisfiable outcome the witness model is stashed under this
+    /// solver's id so model queries and the model-cache mixin can use it.
+    fn try_borrowed_check(&self, extra: &[RcAst]) -> Option<Result<bool, ClarirsError>> {
+        if self.unsat_core {
+            return None;
+        }
+        let parent_id = self.parent_id?;
+        SOLVER_CACHE.with(|cell| {
+            let mut map = cell.borrow_mut();
+            let cached = map.get_mut(&parent_id)?;
+            if cached.timeout != self.timeout
+                || cached.unsat_core
+                || cached.asserted > self.assertions.len()
+                || self.assertions.len() - cached.asserted + extra.len() > MAX_BORROW_SUFFIX
+            {
+                return None;
+            }
+            // The ancestor's asserted constraints must be exactly our prefix;
+            // the ancestor may have diverged since the clone.
+            if !cached
+                .hashes
+                .iter()
+                .zip(&self.assertions)
+                .all(|(h, a)| *h == a.hash())
+            {
+                return None;
+            }
+
+            let mut assumptions =
+                Vec::with_capacity(self.assertions.len() - cached.asserted + extra.len());
+            for a in &self.assertions[cached.asserted..] {
+                match a.to_z3() {
+                    Ok(converted) => assumptions.push(converted),
+                    Err(e) => return Some(Err(e)),
+                }
+            }
+            assumptions.extend_from_slice(extra);
+
+            Some(match cached.solver.check_assumptions(&assumptions) {
+                Ok(Z3_L_TRUE) => {
+                    if let Ok(model) = cached.solver.model() {
+                        MODEL_STASH.with(|stash| {
+                            stash
+                                .borrow_mut()
+                                .insert(self.cache_id, (self.assertions.len(), model));
+                        });
+                    }
+                    Ok(true)
+                }
+                Ok(Z3_L_FALSE) => Ok(false),
+                Ok(_) => Err(ClarirsError::SolverUnknown(cached.solver.reason_unknown())),
+                Err(e) => Err(e),
+            })
         })
     }
 
@@ -271,6 +398,12 @@ impl<'c> Z3Solver<'c> {
     /// Required whenever the assertion set changes other than by appending.
     fn invalidate_cache(&self) {
         SOLVER_CACHE.with(|cell| {
+            cell.borrow_mut().remove(&self.cache_id);
+        });
+        // A stashed model is validated by assertion count alone, which a
+        // non-append rewrite (clear/simplify) could leave coincidentally
+        // matching, so drop it explicitly.
+        MODEL_STASH.with(|cell| {
             cell.borrow_mut().remove(&self.cache_id);
         });
     }
@@ -287,6 +420,34 @@ impl<'c> Z3Solver<'c> {
     }
 
     fn make_model(&self) -> Result<RcModel, ClarirsError> {
+        // A model stashed by a borrowed check is still valid if no assertions
+        // were added since.
+        let stashed = MODEL_STASH.with(|cell| {
+            cell.borrow()
+                .get(&self.cache_id)
+                .filter(|(n, _)| *n == self.assertions.len())
+                .map(|(_, m)| m.clone())
+        });
+        if let Some(model) = stashed {
+            return Ok(model);
+        }
+        // No own z3 solver yet: answer from an ancestor's warm solver if one
+        // is available, which stashes the model on success.
+        if !self.has_own_entry()
+            && let Some(result) = self.try_borrowed_check(&[])
+        {
+            match result? {
+                true => {
+                    let stashed = MODEL_STASH
+                        .with(|cell| cell.borrow().get(&self.cache_id).map(|(_, m)| m.clone()));
+                    if let Some(model) = stashed {
+                        return Ok(model);
+                    }
+                    // Model extraction failed; fall through to an own solve.
+                }
+                false => return Err(ClarirsError::Unsat),
+            }
+        }
         self.with_cached_solver(|cached| {
             // A model from an earlier check of the same assertions is still
             // valid; reuse it instead of re-running the solver.
@@ -380,6 +541,11 @@ impl<'c> Solver<'c> for Z3Solver<'c> {
     }
 
     fn satisfiable(&mut self) -> Result<bool, ClarirsError> {
+        if !self.has_own_entry()
+            && let Some(result) = self.try_borrowed_check(&[])
+        {
+            return result;
+        }
         self.with_cached_solver(|cached| {
             if cached.model.is_some() {
                 // A model for the current assertions is already known.
@@ -406,6 +572,11 @@ impl<'c> Solver<'c> for Z3Solver<'c> {
         for c in extra {
             assumptions.push(c.simplify_z3()?.to_z3()?);
         }
+        if !self.has_own_entry()
+            && let Some(result) = self.try_borrowed_check(&assumptions)
+        {
+            return result;
+        }
         self.with_cached_solver(|cached| {
             if assumptions.is_empty() && cached.model.is_some() {
                 return Ok(true);
@@ -430,25 +601,32 @@ impl<'c> Solver<'c> for Z3Solver<'c> {
         &mut self,
         exprs: &[AstRef<'c>],
     ) -> Result<Option<Vec<AstRef<'c>>>, ClarirsError> {
-        // Look only; never build a solver or run a check here. The stored
-        // model is usable only when it covers every current assertion.
-        SOLVER_CACHE.with(|cell| {
-            let map = cell.borrow();
-            let Some(cached) = map.get(&self.cache_id) else {
-                return Ok(None);
-            };
-            if cached.asserted != self.assertions.len() {
-                return Ok(None);
-            }
-            let Some(model) = &cached.model else {
-                return Ok(None);
-            };
-            exprs
-                .iter()
-                .map(|expr| AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?))
-                .collect::<Result<Vec<_>, _>>()
-                .map(Some)
-        })
+        // Look only; never build a solver or run a check here. A model is
+        // usable only when it covers every current assertion. Borrowed checks
+        // stash their model separately from own-solver checks.
+        let model = MODEL_STASH.with(|cell| {
+            cell.borrow()
+                .get(&self.cache_id)
+                .filter(|(n, _)| *n == self.assertions.len())
+                .map(|(_, m)| m.clone())
+        });
+        let model = match model {
+            Some(model) => Some(model),
+            None => SOLVER_CACHE.with(|cell| {
+                cell.borrow()
+                    .get(&self.cache_id)
+                    .filter(|c| c.asserted == self.assertions.len())
+                    .and_then(|c| c.model.clone())
+            }),
+        };
+        let Some(model) = model else {
+            return Ok(None);
+        };
+        exprs
+            .iter()
+            .map(|expr| AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?))
+            .collect::<Result<Vec<_>, _>>()
+            .map(Some)
     }
 
     fn eval(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
