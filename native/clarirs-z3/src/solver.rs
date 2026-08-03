@@ -1788,35 +1788,4 @@ mod tests {
         assert!(!SOLVER_CACHE.with(|c| c.borrow().contains_key(&child2.cache_id)));
         Ok(())
     }
-
-    #[test]
-    fn test_borrow_timing() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
-        let mut parent = Z3Solver::new(&ctx);
-        let xs: Vec<_> = (0..30)
-            .map(|i| ctx.bvs(&format!("x{i}"), 32).unwrap())
-            .collect();
-        for i in 0..29 {
-            let a = ctx.add(&xs[i], &ctx.bvv(BitVec::from((i as u64, 32)))?)?;
-            let b = ctx.mul(&xs[i + 1], &ctx.bvv(BitVec::from((3u64, 32)))?)?;
-            parent.add(&ctx.ult(&a, &b)?)?;
-            let m = ctx.and2(&xs[i], &ctx.bvv(BitVec::from((0xffu64, 32)))?)?;
-            parent.add(&ctx.neq(&m, &ctx.bvv(BitVec::from((i as u64, 32)))?)?)?;
-        }
-        let t0 = std::time::Instant::now();
-        assert!(parent.satisfiable()?);
-        let t1 = std::time::Instant::now();
-        let mut child = parent.clone();
-        child.add(&ctx.ule(&xs[29], &ctx.bvv(BitVec::from((5u64, 32)))?)?)?;
-        let t2 = std::time::Instant::now();
-        assert!(child.satisfiable()?);
-        let t3 = std::time::Instant::now();
-        eprintln!(
-            "parent first check: {:?}  child borrowed check: {:?}  child-has-own-entry: {}",
-            t1 - t0,
-            t3 - t2,
-            SOLVER_CACHE.with(|c| c.borrow().contains_key(&child.cache_id))
-        );
-        Ok(())
-    }
 }
