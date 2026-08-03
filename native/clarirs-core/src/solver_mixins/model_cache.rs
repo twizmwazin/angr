@@ -136,43 +136,79 @@ impl<'c, S: Solver<'c>> ModelCacheMixin<'c, S> {
 
     fn try_cache_model(&mut self) -> Result<(), ClarirsError> {
         let constraints = self.inner.constraints()?;
+        let leaves = Self::constraint_leaves(&constraints)?;
 
-        // Collect every distinct variable leaf across all constraints.
+        // Harvest the witness of a check the backend already ran when one is
+        // available; otherwise a single batch_eval yields a consistent
+        // assignment for all leaves (at the price of a solve).
+        let values = match self.inner.last_model_eval(&leaves) {
+            Ok(Some(values)) => values,
+            _ => match self.inner.batch_eval(&leaves) {
+                Ok(values) => values,
+                Err(ClarirsError::Unsat) => {
+                    self.sat = Some(false);
+                    return Ok(());
+                }
+                // Don't let caching surface backend errors; treat as a miss.
+                Err(_) => return Ok(()),
+            },
+        };
+
+        self.store_model(&leaves, values, &constraints);
+        Ok(())
+    }
+
+    /// Collect every distinct variable leaf across all constraints.
+    fn constraint_leaves(constraints: &[AstRef<'c>]) -> Result<Vec<AstRef<'c>>, ClarirsError> {
         let mut leaves: Vec<AstRef<'c>> = Vec::new();
         let mut seen: HashSet<u64> = HashSet::new();
-        for c in &constraints {
+        for c in constraints {
             for v in collect_vars(c)? {
                 if seen.insert(v.hash()) {
                     leaves.push(v);
                 }
             }
         }
+        Ok(leaves)
+    }
 
-        // A single batch_eval yields a consistent assignment for all leaves.
-        let values = match self.inner.batch_eval(&leaves) {
-            Ok(values) => values,
-            Err(ClarirsError::Unsat) => {
-                self.sat = Some(false);
-                return Ok(());
-            }
-            // Don't let caching surface backend errors; treat as a miss.
-            Err(_) => return Ok(()),
-        };
-
+    /// Build a model from `leaves`/`values`, verify it against `constraints`,
+    /// and store it unless it duplicates a cached one.
+    fn store_model(
+        &mut self,
+        leaves: &[AstRef<'c>],
+        values: Vec<AstRef<'c>>,
+        constraints: &[AstRef<'c>],
+    ) {
         let assignments: HashMap<u64, AstRef<'c>> =
             leaves.iter().map(|l| l.hash()).zip(values).collect();
         let mut model = Model::new(assignments);
 
         // Only trust the model if it actually satisfies the constraints. This
         // guards against backends that don't return a consistent model.
-        if !model.satisfies(&constraints).unwrap_or(false) {
-            return Ok(());
+        if !model.satisfies(constraints).unwrap_or(false) {
+            return;
         }
         if self.models.iter().any(|m| m.signature == model.signature) {
-            return Ok(());
+            return;
         }
         self.models.push(model);
-        Ok(())
+    }
+
+    /// Cache the witness of a satisfiability check the inner solver just ran,
+    /// if the backend kept it. Never triggers a solve; on any failure the
+    /// cache is simply not warmed.
+    fn cache_model_from_last(&mut self, constraints: &[AstRef<'c>]) {
+        if self.models.len() >= MAX_CACHED_MODELS {
+            return;
+        }
+        let Ok(leaves) = Self::constraint_leaves(constraints) else {
+            return;
+        };
+        let Ok(Some(values)) = self.inner.last_model_eval(&leaves) else {
+            return;
+        };
+        self.store_model(&leaves, values, constraints);
     }
 
     /// Return true if a cached model satisfies all `constraints`. Models found
@@ -241,10 +277,10 @@ impl<'c, S: Solver<'c>> Solver<'c> for ModelCacheMixin<'c, S> {
     }
 
     fn simplify(&mut self) -> Result<(), ClarirsError> {
-        // Simplification rewrites the constraints; drop cached models rather
-        // than reason about whether each still applies. Equivalence-preserving
-        // simplification cannot change satisfiability, so keep `sat`.
-        self.models.clear();
+        // Simplification preserves equivalence, so cached models remain valid
+        // witnesses of the rewritten constraints and satisfiability is
+        // unchanged. Models are re-verified against the new constraint set
+        // before use anyway (see `Model::satisfies`), so both caches survive.
         self.inner.simplify()
     }
 
@@ -256,7 +292,13 @@ impl<'c, S: Solver<'c>> Solver<'c> for ModelCacheMixin<'c, S> {
         let sat = if self.has_witness(&constraints) {
             true
         } else {
-            self.inner.satisfiable()?
+            let sat = self.inner.satisfiable()?;
+            if sat {
+                // The backend just computed a witness; pull it into the cache
+                // so descendants of this solver answer from it without z3.
+                self.cache_model_from_last(&constraints);
+            }
+            sat
         };
         self.sat = Some(sat);
         Ok(sat)
@@ -276,7 +318,14 @@ impl<'c, S: Solver<'c>> Solver<'c> for ModelCacheMixin<'c, S> {
         }
         // Cache miss: defer to the inner solver, which can check the extra
         // constraints incrementally (e.g. via Z3 assumptions).
-        self.inner.satisfiable_with_extra(extra)
+        let sat = self.inner.satisfiable_with_extra(extra)?;
+        if sat {
+            // A model of constraints+extra is in particular a model of the
+            // persistent set: record satisfiability and harvest the witness.
+            self.sat = Some(true);
+            self.cache_model_from_last(&constraints);
+        }
+        Ok(sat)
     }
 
     fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {

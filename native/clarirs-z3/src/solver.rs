@@ -20,6 +20,10 @@ struct CachedSolver {
     roots: Vec<RcAst>,
     /// Number of `Z3Solver::assertions` already pushed into `solver`.
     asserted: usize,
+    /// Model from the most recent successful check, valid for exactly the
+    /// `asserted` constraints (cleared whenever more are pushed). Kept so
+    /// model queries after a satisfiability check don't re-run the solver.
+    model: Option<RcModel>,
     timeout: Option<u32>,
     unsat_core: bool,
 }
@@ -116,7 +120,8 @@ impl<'c> Z3Solver<'c> {
             ));
         }
 
-        self.with_cached_solver(|z3_solver| {
+        self.with_cached_solver(|cached| {
+            let z3_solver = &mut cached.solver;
             // Check if UNSAT
             if z3_solver.check()? != Z3_L_FALSE {
                 return Err(ClarirsError::UnsupportedOperation(
@@ -212,7 +217,7 @@ impl<'c> Z3Solver<'c> {
     /// re-asserting the whole set each time.
     fn with_cached_solver<T>(
         &self,
-        f: impl FnOnce(&mut RcSolver) -> Result<T, ClarirsError>,
+        f: impl FnOnce(&mut CachedSolver) -> Result<T, ClarirsError>,
     ) -> Result<T, ClarirsError> {
         SOLVER_CACHE.with(|cell| {
             // Reusable only if built with the same params and its asserted
@@ -239,6 +244,7 @@ impl<'c> Z3Solver<'c> {
                         solver,
                         roots,
                         asserted: self.assertions.len(),
+                        model: None,
                         timeout: self.timeout,
                         unsat_core: self.unsat_core,
                     },
@@ -249,13 +255,15 @@ impl<'c> Z3Solver<'c> {
             let cached = map
                 .get_mut(&self.cache_id)
                 .expect("cache entry just ensured");
-            // Push any assertions added since the last call.
+            // Push any assertions added since the last call. The stored model
+            // reflects only the assertions checked so far, so it goes stale.
             while cached.asserted < self.assertions.len() {
                 let idx = cached.asserted;
                 self.assert_at(&mut cached.solver, &mut cached.roots, idx)?;
                 cached.asserted = idx + 1;
+                cached.model = None;
             }
-            f(&mut cached.solver)
+            f(cached)
         })
     }
 
@@ -279,13 +287,22 @@ impl<'c> Z3Solver<'c> {
     }
 
     fn make_model(&self) -> Result<RcModel, ClarirsError> {
-        self.with_cached_solver(|z3_solver| {
-            match z3_solver.check()? {
+        self.with_cached_solver(|cached| {
+            // A model from an earlier check of the same assertions is still
+            // valid; reuse it instead of re-running the solver.
+            if let Some(model) = &cached.model {
+                return Ok(model.clone());
+            }
+            match cached.solver.check()? {
                 Z3_L_TRUE => {}
                 Z3_L_FALSE => return Err(ClarirsError::Unsat),
-                _ => return Err(ClarirsError::SolverUnknown(z3_solver.reason_unknown())),
+                _ => {
+                    return Err(ClarirsError::SolverUnknown(cached.solver.reason_unknown()));
+                }
             }
-            z3_solver.model()
+            let model = cached.solver.model()?;
+            cached.model = Some(model.clone());
+            Ok(model)
         })
     }
 
@@ -363,10 +380,21 @@ impl<'c> Solver<'c> for Z3Solver<'c> {
     }
 
     fn satisfiable(&mut self) -> Result<bool, ClarirsError> {
-        self.with_cached_solver(|z3_solver| match z3_solver.check()? {
-            Z3_L_TRUE => Ok(true),
-            Z3_L_FALSE => Ok(false),
-            _ => Err(ClarirsError::SolverUnknown(z3_solver.reason_unknown())),
+        self.with_cached_solver(|cached| {
+            if cached.model.is_some() {
+                // A model for the current assertions is already known.
+                return Ok(true);
+            }
+            match cached.solver.check()? {
+                Z3_L_TRUE => {
+                    // The check produced a model; keep it so later model
+                    // queries (and the model-cache mixin) get it for free.
+                    cached.model = cached.solver.model().ok();
+                    Ok(true)
+                }
+                Z3_L_FALSE => Ok(false),
+                _ => Err(ClarirsError::SolverUnknown(cached.solver.reason_unknown())),
+            }
         })
     }
 
@@ -378,13 +406,49 @@ impl<'c> Solver<'c> for Z3Solver<'c> {
         for c in extra {
             assumptions.push(c.simplify_z3()?.to_z3()?);
         }
-        self.with_cached_solver(
-            |z3_solver| match z3_solver.check_assumptions(&assumptions)? {
-                Z3_L_TRUE => Ok(true),
+        self.with_cached_solver(|cached| {
+            if assumptions.is_empty() && cached.model.is_some() {
+                return Ok(true);
+            }
+            match cached.solver.check_assumptions(&assumptions)? {
+                Z3_L_TRUE => {
+                    // The model satisfies the assumptions on top of every
+                    // asserted constraint, so it is also a valid model of the
+                    // persistent set alone.
+                    cached.model = cached.solver.model().ok();
+                    Ok(true)
+                }
+                // UNSAT under assumptions says nothing about the persistent
+                // set, so any stored model stays valid.
                 Z3_L_FALSE => Ok(false),
-                _ => Err(ClarirsError::SolverUnknown(z3_solver.reason_unknown())),
-            },
-        )
+                _ => Err(ClarirsError::SolverUnknown(cached.solver.reason_unknown())),
+            }
+        })
+    }
+
+    fn last_model_eval(
+        &mut self,
+        exprs: &[AstRef<'c>],
+    ) -> Result<Option<Vec<AstRef<'c>>>, ClarirsError> {
+        // Look only; never build a solver or run a check here. The stored
+        // model is usable only when it covers every current assertion.
+        SOLVER_CACHE.with(|cell| {
+            let map = cell.borrow();
+            let Some(cached) = map.get(&self.cache_id) else {
+                return Ok(None);
+            };
+            if cached.asserted != self.assertions.len() {
+                return Ok(None);
+            }
+            let Some(model) = &cached.model else {
+                return Ok(None);
+            };
+            exprs
+                .iter()
+                .map(|expr| AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?))
+                .collect::<Result<Vec<_>, _>>()
+                .map(Some)
+        })
     }
 
     fn eval(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {

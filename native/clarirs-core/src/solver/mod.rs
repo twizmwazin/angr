@@ -50,6 +50,27 @@ pub trait Solver<'c>: Clone + HasContext<'c> {
         solver.satisfiable()
     }
 
+    /// Evaluate `exprs` under the model produced by the most recent successful
+    /// satisfiability check, without invoking the solver again.
+    ///
+    /// Returns `Ok(None)` when no such model is available — the default for
+    /// backends that keep none, and for backends whose constraints changed
+    /// since the model was produced. Values are drawn from one satisfying
+    /// assignment, so they are mutually consistent; callers must still verify
+    /// the assignment against any constraints they care about, exactly as with
+    /// [`Solver::batch_eval`].
+    ///
+    /// This exists so caching layers (the model-cache mixin in particular) can
+    /// harvest the witness a `satisfiable()` call already computed instead of
+    /// paying for a second solve.
+    fn last_model_eval(
+        &mut self,
+        exprs: &[AstRef<'c>],
+    ) -> Result<Option<Vec<AstRef<'c>>>, ClarirsError> {
+        let _ = exprs;
+        Ok(None)
+    }
+
     /// Evaluate an expression in the current model. The result has the same
     /// sort as the input expression.
     ///
