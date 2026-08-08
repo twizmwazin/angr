@@ -120,9 +120,9 @@ default-groups = ["dev", "extras"]
 
 [tool.uv.sources]
 angr-data = { git = "https://github.com/angr/angr-data.git", branch = "master" }
-archinfo = { git = "https://github.com/angr/archinfo.git", branch = "master" }
-pyvex = { git = "https://github.com/angr/pyvex.git", branch = "master" }
-cle = { git = "https://github.com/angr/cle.git", branch = "master" }
+archinfo = { git = "https://github.com/angr/archinfo.git", rev = "da171ca0dd8eec1e16dd9c4f04576b2c958e2aea" }
+pyvex = { git = "https://github.com/angr/pyvex.git", rev = "90e9094c6217e4e530bf653c06c386d8a6746f82" }
+cle = { git = "https://github.com/angr/cle.git", rev = "b58ea02a446106647cdaae32bdf91b7062404cc1" }
 pysoot = { git = "https://github.com/angr/pysoot.git", branch = "master" }
 
 [tool.ruff]
