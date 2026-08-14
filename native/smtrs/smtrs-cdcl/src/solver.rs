@@ -1221,6 +1221,19 @@ impl Solver {
         // LBD = number of distinct levels. Counted with a generation-stamped
         // array rather than collect/sort/dedup, which allocated and sorted once
         // per conflict for a number that is a linear scan.
+        //
+        // `lbd_stamp` grows with `new_var` on the theory that levels are
+        // bounded by the variable count — but that is false under assumptions:
+        // `solve` opens one level per assumption *index*, including an empty
+        // pseudo-level when the assumption is already satisfied, so a caller
+        // stacking many (possibly repeated or forced) assumption literals can
+        // push the decision level past the variable count. The bit-fixing
+        // minimize/eval_n loops in smtrs-solver do exactly that. Learnt-clause
+        // levels are bounded by the current decision level, so covering it is
+        // always enough.
+        if self.lbd_stamp.len() <= self.decision_level() as usize {
+            self.lbd_stamp.resize(self.decision_level() as usize + 1, 0);
+        }
         self.lbd_gen += 1;
         let gen = self.lbd_gen;
         let mut lbd = 0u32;

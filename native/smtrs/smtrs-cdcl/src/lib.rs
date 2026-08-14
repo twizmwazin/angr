@@ -30,6 +30,28 @@ mod tests {
         (0..n).map(|_| s.new_var()).collect()
     }
 
+    /// A conflict at a decision level above the variable count. `solve` opens
+    /// one level per assumption *index* — an already-satisfied assumption
+    /// opens an empty pseudo-level — so stacking repeated assumptions drives
+    /// the level past `num_vars`, and conflict analysis then indexes its
+    /// level-stamped LBD array out of bounds unless it grows with the level.
+    /// This is the shape smtrs-solver's bit-fixing minimize/eval_n loops
+    /// produce.
+    #[test]
+    fn conflict_above_variable_count_levels() {
+        let mut s = Solver::new();
+        let vs = nvars(&mut s, 3);
+        // y -> z and y -> !z: assuming y is a conflict found by propagation.
+        s.add_clause(&[lit(&vs, -2), lit(&vs, 3)]);
+        s.add_clause(&[lit(&vs, -2), lit(&vs, -3)]);
+        // x padded out far past the variable count, then the conflicting y.
+        let mut assums = vec![lit(&vs, 1); 64];
+        assums.push(lit(&vs, 2));
+        assert_eq!(s.solve(&assums), lbool::FALSE);
+        // And the solver is still usable afterwards.
+        assert_eq!(s.solve(&[lit(&vs, 1)]), lbool::TRUE);
+    }
+
     #[test]
     fn trivial() {
         let mut s = Solver::new();
