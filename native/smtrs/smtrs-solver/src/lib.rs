@@ -336,6 +336,13 @@ pub struct Solver {
     /// and several `unknown` paths are reached only after `assertions` has
     /// already been replaced by its lowering.
     orig_roots: Vec<TermId>,
+    /// The last check's assumptions in the form the engine actually solved:
+    /// identical to what the caller passed when no theory lowering ran, the
+    /// lowered forms otherwise. The bit-level operations that follow a check
+    /// (`minimize`/`maximize`/`eval_n`) re-literalize the assumptions against
+    /// the engine, and the engine speaks post-lowering Bool/BV — handing it a
+    /// raw `fp.*` or `str.*` term is a blaster panic.
+    lowered_assumptions: Vec<TermId>,
     /// When the current check started, so that the last-resort
     /// over-approximations can be given a budget proportional to what the
     /// attempt they are backstopping has already spent.
@@ -482,6 +489,7 @@ impl Solver {
             terminate: None,
             unsat_trustworthy: true,
             orig_roots: Vec::new(),
+            lowered_assumptions: Vec::new(),
             check_start: std::time::Instant::now(),
             dual_encode_max_secs: dual_encode_max_secs(),
         }
@@ -531,6 +539,7 @@ impl Solver {
             terminate: None,
             unsat_trustworthy: self.unsat_trustworthy,
             orig_roots: self.orig_roots.clone(),
+            lowered_assumptions: self.lowered_assumptions.clone(),
             check_start: std::time::Instant::now(),
             dual_encode_max_secs: dual_encode_max_secs(),
         }
@@ -896,6 +905,7 @@ impl Solver {
         self.check_start = std::time::Instant::now();
         self.model = None;
         self.core = CoreState::Absent;
+        self.lowered_assumptions = assumptions.to_vec();
         let mut roots: Vec<TermId> = self.assertions.clone();
         roots.extend_from_slice(assumptions);
         // The over-approximation fallbacks want the problem as the *user*
@@ -951,6 +961,7 @@ impl Solver {
                         self.tracked.resize(self.assertions.len(), None);
                     }
                     self.engine = None;
+                    self.lowered_assumptions = lowered_assumptions.clone();
                     let mut roots2 = self.assertions.clone();
                     roots2.extend_from_slice(&lowered_assumptions);
                     if let Some(reason) = self.unsupported_reason(pool, &roots2) {
@@ -996,6 +1007,7 @@ impl Solver {
             }
             self.fp_lowered = true;
             self.engine = None; // assertion terms changed identity
+            self.lowered_assumptions = lowered_assumptions.clone();
             let mut roots2 = self.assertions.clone();
             roots2.extend_from_slice(&lowered_assumptions);
             roots = roots2;
@@ -1697,8 +1709,11 @@ impl Solver {
         if self.check_sat(pool, assumptions) != Answer::Sat {
             return None;
         }
+        // The check may have theory-lowered the assumptions; literalize what
+        // the engine actually solved, not what the caller wrote.
+        let assumptions = self.lowered_assumptions.clone();
         let bit_lits = self.term_bit_lits(pool, term)?;
-        let base = self.literalize(pool, assumptions).ok()?;
+        let base = self.literalize(pool, &assumptions).ok()?;
         let e = self.engine.as_mut()?;
         let w = bit_lits.len();
         // MSB-first: greedily fix each bit to the preferred value if a model
@@ -1737,10 +1752,13 @@ impl Solver {
         if n == 0 || self.check_sat(pool, assumptions) != Answer::Sat {
             return out;
         }
+        // As in `extremum`: the engine speaks post-lowering Bool/BV, so
+        // re-literalize the lowered assumptions, never the raw ones.
+        let assumptions = self.lowered_assumptions.clone();
         let Some(bit_lits) = self.term_bit_lits(pool, term) else {
             return out;
         };
-        let Ok(base) = self.literalize(pool, assumptions) else {
+        let Ok(base) = self.literalize(pool, &assumptions) else {
             return out;
         };
         let e = self.engine.as_mut().expect("engine exists");
@@ -1871,6 +1889,35 @@ mod tests {
         assert_eq!(solver.check_sat(&mut pool, &[t]), Answer::Unsat);
         // And the assertions alone are still satisfiable afterwards.
         assert_eq!(solver.check_sat(&mut pool, &[]), Answer::Sat);
+    }
+
+    /// `minimize`/`eval_n` under assumptions that need theory lowering: the
+    /// engine speaks post-lowering Bool/BV, so literalizing the caller's raw
+    /// `fp.*` terms was a blaster panic. The auxiliary-variable shape below is
+    /// exactly how a client evaluates a float: bind its IEEE bits to a BV
+    /// variable by an assumed equality, then enumerate that variable.
+    #[test]
+    fn native_ops_under_fp_assumptions() {
+        let mut pool = TermPool::new();
+        let x_sym = pool.fresh_symbol("x", Sort::Float(8, 24));
+        let x = pool.var(x_sym);
+        let aux_sym = pool.fresh_symbol("aux", Sort::BitVec(32));
+        let aux = pool.var(aux_sym);
+        let bits = pool.mk(Op::FpToIeeeBv, &[x]).unwrap();
+        let link = pool.mk(Op::Eq, &[aux, bits]).unwrap();
+        // x == 2.0f32 (bit pattern 0x40000000).
+        let two_bits = pool.bv_u64(32, 0x4000_0000);
+        let two = pool.mk(Op::FpFromIeeeBv { eb: 8, sb: 24 }, &[two_bits]).unwrap();
+        let x_is_two = pool.mk(Op::FpEq, &[x, two]).unwrap();
+
+        let mut solver = Solver::new();
+        solver.declared = vec![x_sym, aux_sym];
+        solver.assert(x_is_two);
+        let values = solver.eval_n(&mut pool, aux, 4, &[link]);
+        assert_eq!(values.len(), 1, "fp.eq pins the bit pattern");
+        assert_eq!(values[0].as_u64(), Some(0x4000_0000));
+        let min = solver.minimize(&mut pool, aux, &[link]).expect("sat");
+        assert_eq!(min.as_u64(), Some(0x4000_0000));
     }
 
     /// The bit-vector bridge (`bv2nat` / `(_ int2bv w)` in `smtrs-str`), as a
