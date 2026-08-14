@@ -9,7 +9,6 @@ requires = [
     "pyvex==9.3.3.dev0",
     "grpcio-tools~=1.80.0",
     "protobuf>=6.31.1,<7",
-    "z3-solver==5.0.0.0",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -50,7 +49,6 @@ dependencies = [
     "sortedcontainers",
     "sympy",
     "typing-extensions",
-    "z3-solver==5.0.0.0",
     "colorama;platform_system=='Windows'",
 ]
 dynamic = ["version"]

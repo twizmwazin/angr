@@ -3,7 +3,7 @@ use clarirs_core::solver_mixins::{
     ConcreteEarlyResolutionMixin, ModelCacheMixin, SimplificationMixin,
 };
 use clarirs_vsa::VSASolver;
-use clarirs_z3::Z3Solver;
+use clarirs_smtrs::SmtrsSolver;
 
 // Type aliases for the wrapped solvers with mixins.
 //
@@ -14,9 +14,9 @@ use clarirs_z3::Z3Solver;
 // `SolverCacheless`.
 type WrappedConcreteSolver<'c> = ConcreteSolver<'c>;
 type WrappedZ3Solver<'c> =
-    SimplificationMixin<'c, ConcreteEarlyResolutionMixin<'c, ModelCacheMixin<'c, Z3Solver<'c>>>>;
+    SimplificationMixin<'c, ConcreteEarlyResolutionMixin<'c, ModelCacheMixin<'c, SmtrsSolver<'c>>>>;
 type WrappedZ3CachelessSolver<'c> =
-    SimplificationMixin<'c, ConcreteEarlyResolutionMixin<'c, Z3Solver<'c>>>;
+    SimplificationMixin<'c, ConcreteEarlyResolutionMixin<'c, SmtrsSolver<'c>>>;
 type WrappedVSASolver<'c> =
     SimplificationMixin<'c, ConcreteEarlyResolutionMixin<'c, VSASolver<'c>>>;
 type WrappedHybridSolver<'c> = SimplificationMixin<
@@ -57,12 +57,12 @@ impl DynSolver {
         match self {
             DynSolver::Z3(wrapped_solver) => {
                 // Access through the mixin layers
-                // SimplificationMixin -> ConcreteEarlyResolutionMixin -> ModelCacheMixin -> Z3Solver
+                // SimplificationMixin -> ConcreteEarlyResolutionMixin -> ModelCacheMixin -> SmtrsSolver
                 let z3_solver = wrapped_solver.inner_mut().inner_mut().inner_mut();
                 z3_solver.unsat_core()
             }
             DynSolver::Z3Cacheless(wrapped_solver) => {
-                // SimplificationMixin -> ConcreteEarlyResolutionMixin -> Z3Solver
+                // SimplificationMixin -> ConcreteEarlyResolutionMixin -> SmtrsSolver
                 let z3_solver = wrapped_solver.inner_mut().inner_mut();
                 z3_solver.unsat_core()
             }
@@ -77,7 +77,7 @@ impl DynSolver {
                 // child is unsat (claripy's CompositeFrontend does the same).
                 for child in composite.children_mut() {
                     if !child.satisfiable()? {
-                        // SimplificationMixin -> ConcreteEarlyResolutionMixin -> ModelCacheMixin -> Z3Solver
+                        // SimplificationMixin -> ConcreteEarlyResolutionMixin -> ModelCacheMixin -> SmtrsSolver
                         let z3_solver = child.inner_mut().inner_mut().inner_mut();
                         return z3_solver.unsat_core();
                     }

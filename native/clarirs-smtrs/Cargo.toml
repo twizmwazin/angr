@@ -1,8 +1,8 @@
 [package]
-name = "clarirs-z3"
+name = "clarirs-smtrs"
 version = "0.1.0"
 edition = "2024"
-description = "Z3 solver for clarirs"
+description = "smtrs solver backend for clarirs"
 license = { workspace = true }
 readme = { workspace = true }
 keywords = { workspace = true }
@@ -11,8 +11,10 @@ repository = { workspace = true }
 
 [dependencies]
 clarirs-core = { path = "../clarirs-core" }
-z3-sys = "0.12"
-regex = "1.12"
+clarirs-num = { path = "../clarirs-num" }
+smtrs-core = { workspace = true }
+smtrs-solver = { workspace = true }
+smallvec = "1"
 
 [lints]
 workspace = true

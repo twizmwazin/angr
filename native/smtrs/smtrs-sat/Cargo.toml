@@ -1,0 +1,12 @@
+[package]
+name = "smtrs-sat"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+batsat.workspace = true
+smtrs-cdcl.workspace = true
+
+[lints]
+workspace = true

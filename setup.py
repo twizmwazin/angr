@@ -60,22 +60,6 @@ def build_unicornlib():
     shutil.copy(os.path.join("native/unicornlib", library_file), "angr")
 
 
-def configure_z3():
-    """Point the Rust build at the libz3 that ships in the z3-solver wheel.
-
-    z3-sys probes pkg-config before honoring the override, and its search path would win, so a
-    machine with a system-wide Z3 of another version would link that instead -- the bindings are
-    tied to one Z3 release. Windows takes its import library from Z3's own release (see
-    native/angr/Cargo.toml) and ignores both of these.
-    """
-    spec = importlib.util.find_spec("z3")
-    if spec is None or not spec.submodule_search_locations:
-        raise LibError("You must install z3-solver before building angr")
-
-    os.environ.setdefault("Z3_NO_PKG_CONFIG", "1")
-    os.environ.setdefault("Z3_LIBRARY_PATH_OVERRIDE", os.path.join(next(iter(spec.submodule_search_locations)), "lib"))
-
-
 def build_protos():
     proto_files = sorted(glob.glob("angr/protos/*.proto"))
     cmd = [sys.executable, "-m", "grpc_tools.protoc", "-I.", "--python_out=.", *proto_files]
@@ -93,12 +77,6 @@ def clean_unicornlib():
     oglob += glob.glob("native/*.dylib")
     for fname in oglob:
         os.unlink(fname)
-
-
-class build_rust(setuptools_rust.build_rust):
-    def run(self):
-        configure_z3()
-        super().run()
 
 
 class build(st_build):
@@ -129,7 +107,6 @@ class develop(st_develop):
 
 cmdclass = {
     "build": build,
-    "build_rust": build_rust,
     "clean_unicornlib": clean,
     "develop": develop,
 }

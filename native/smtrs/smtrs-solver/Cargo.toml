@@ -1,0 +1,21 @@
+[package]
+name = "smtrs-solver"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+smtrs-core.workspace = true
+smtrs-rewrite.workspace = true
+smtrs-sat.workspace = true
+smtrs-bitblast.workspace = true
+smtrs-aig.workspace = true
+smtrs-fp.workspace = true
+smtrs-str.workspace = true
+rustc-hash.workspace = true
+
+[dev-dependencies]
+smtrs-parser.workspace = true
+
+[lints]
+workspace = true

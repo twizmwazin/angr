@@ -18,7 +18,7 @@ backtrace = "0.3.76"
 clarirs-core = { path = "../clarirs-core", features = ["runtime-checks"] }
 clarirs-num = { path = "../clarirs-num" }
 clarirs-vsa = { path = "../clarirs-vsa" }
-clarirs-z3 = { path = "../clarirs-z3" }
+clarirs-smtrs = { path = "../clarirs-smtrs" }
 dashmap = "6.2.1"
 log = "0.4.32"
 thiserror = { workspace = true }
@@ -44,9 +44,3 @@ target-lexicon = "0.13.5"
 [dev-dependencies]
 tempfile = "3.27.0"
 
-# Not used from Rust: this is how the extension configures the Z3 that clarirs-z3 links against.
-# Windows links against an import library — only a name-to-DLL mapping — and the z3-solver wheel
-# ships none, so take the one from Z3's own release of the same version. setup.py points the other
-# platforms at the wheel, and angr/__init__.py loads the wheel's libz3 at runtime everywhere.
-[target.'cfg(windows)'.dependencies]
-z3-sys = { version = "0.12", features = ["gh-release"] }

@@ -1,0 +1,12 @@
+[package]
+name = "smtrs-parser"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+smtrs-core.workspace = true
+rustc-hash.workspace = true
+
+[lints]
+workspace = true

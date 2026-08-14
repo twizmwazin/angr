@@ -4,13 +4,41 @@ members = [
     "native/angr",
     "native/clarirs-core",
     "native/clarirs-num",
+    "native/clarirs-smtrs",
     "native/clarirs-vsa",
-    "native/clarirs-z3",
+    "native/smtrs/smtrs-aig",
+    "native/smtrs/smtrs-bitblast",
+    "native/smtrs/smtrs-cdcl",
+    "native/smtrs/smtrs-core",
+    "native/smtrs/smtrs-fp",
+    "native/smtrs/smtrs-parser",
+    "native/smtrs/smtrs-rewrite",
+    "native/smtrs/smtrs-sat",
+    "native/smtrs/smtrs-solver",
+    "native/smtrs/smtrs-str",
 ]
 
 [workspace.dependencies]
 anyhow = "1"
 thiserror = "2"
+
+# Vendored smtrs solver stack (https://github.com/twizmwazin/smtrs), the
+# pure-Rust SMT solver that replaces Z3. The crates under native/smtrs are
+# copied verbatim from that repository and reference each other through these
+# workspace entries, exactly as they do in their home workspace.
+smtrs-core = { path = "native/smtrs/smtrs-core" }
+smtrs-parser = { path = "native/smtrs/smtrs-parser" }
+smtrs-rewrite = { path = "native/smtrs/smtrs-rewrite" }
+smtrs-sat = { path = "native/smtrs/smtrs-sat" }
+smtrs-aig = { path = "native/smtrs/smtrs-aig" }
+smtrs-cdcl = { path = "native/smtrs/smtrs-cdcl" }
+smtrs-fp = { path = "native/smtrs/smtrs-fp" }
+smtrs-str = { path = "native/smtrs/smtrs-str" }
+smtrs-bitblast = { path = "native/smtrs/smtrs-bitblast" }
+smtrs-solver = { path = "native/smtrs/smtrs-solver" }
+rustc-hash = "2"
+indexmap = "2"
+batsat = "0.6"
 
 [workspace.package]
 license = "BSD-2-Clause"
