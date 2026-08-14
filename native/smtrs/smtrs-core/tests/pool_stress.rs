@@ -261,6 +261,54 @@ fn post_order_matches_a_reference_across_reuse_growth_and_nesting() {
     assert_eq!(after, want, "parked scratch was left inconsistent");
 }
 
+/// `find_post_order` must report exactly the node a full `post_order` that
+/// latched its first hit would have reported — that is the whole basis for
+/// rewriting `contains_strings`, `contains_fp` and `unsupported_reason` as
+/// early-exiting walks — and it must visit no node past that hit.
+#[test]
+fn find_post_order_agrees_with_a_latching_full_walk() {
+    let mut rng = Rng(0xF1AD_0001);
+    let mut pool = TermPool::new();
+    let terms = build_and_check(&mut pool, &mut rng, 1500);
+
+    for round in 0..300 {
+        let n = 1 + rng.below(4);
+        let roots: Vec<TermId> = (0..n).map(|_| terms[rng.below(terms.len())]).collect();
+        // A predicate that accepts a pseudo-random subset of the pool, so the
+        // hit lands at every position from "first node" to "never".
+        let key = rng.next() | 1;
+        let accepts = |t: TermId| (t.0 as u64).wrapping_mul(key).is_multiple_of(7);
+
+        // Reference: the shape this replaces — walk everything, keep the first.
+        let order = ref_post_order(&pool, &roots);
+        let want = order.iter().copied().find(|&t| accepts(t));
+        let want_visits = match want {
+            Some(hit) => order.iter().position(|&t| t == hit).unwrap() + 1,
+            None => order.len(),
+        };
+
+        let before = pool.walk_counters();
+        let got = pool.find_post_order(&roots, |_, t| accepts(t));
+        let after = pool.walk_counters();
+        assert_eq!(got, want, "round {round}");
+        assert_eq!(
+            after.visits - before.visits,
+            want_visits as u64,
+            "round {round}: stopped at the wrong point"
+        );
+        assert_eq!(after.walks - before.walks, 1, "round {round}");
+
+        // An early exit must leave the parked scratch usable: the very next
+        // full walk has to see every node again.
+        let mut again = Vec::new();
+        pool.post_order(&roots, |_, t| again.push(t));
+        assert_eq!(
+            again, order,
+            "round {round}: scratch left stale after a stop"
+        );
+    }
+}
+
 #[test]
 fn substitute_many_matches_a_reference() {
     let mut rng = Rng(0x0BAD_F00D);

@@ -60,6 +60,11 @@ pub struct SatCounters {
     pub prepro_clauses_after: u32,
     pub prepro_secs: f64,
     pub restored_vars: u64,
+    /// Incremental trail reuse (cdcl backend): solves answered outright from
+    /// the model the previous `solve` left on the trail, and decision levels
+    /// carried into a solve instead of being re-decided and re-propagated.
+    pub reused_models: u64,
+    pub reused_levels: u64,
 }
 
 /// Minimal incremental SAT interface the bit-blaster needs.
@@ -423,6 +428,8 @@ impl SatBackend for CdclBackend {
             prepro_clauses_after: s.prepro_clauses_after,
             prepro_secs: s.prepro_secs,
             restored_vars: s.restored_vars,
+            reused_models: s.reused_models,
+            reused_levels: s.reused_levels,
         })
     }
 }

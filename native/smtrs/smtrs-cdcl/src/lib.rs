@@ -1135,4 +1135,244 @@ mod tests {
             "only {lucky_answers} rounds exercised the accepting path"
         );
     }
+
+    // ---------- carrying the trail from one `solve` to the next ----------
+
+    /// The differential that governs [`Solver::disable_solve_reuse`]: a solver
+    /// that carries its trail across `solve` calls must answer a *sequence* of
+    /// incremental queries exactly as one that tears the trail down every
+    /// time, and every model it reports must really satisfy the clauses.
+    ///
+    /// The sequence is what matters. A single query cannot exercise reuse at
+    /// all (there is no previous trail), so the generator interleaves the
+    /// three things that decide whether the retained state is still valid:
+    /// repeating an assumption set, extending it by one literal the way
+    /// `minimize` does, and adding a clause — which must invalidate the
+    /// retained model whether or not it also backtracks.
+    #[test]
+    fn carrying_the_trail_never_changes_an_answer() {
+        let mut seed = 0x7a11_c0deu64;
+        let mut rng = move || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        let (mut sats, mut unsats, mut model_hits, mut level_hits) = (0u64, 0u64, 0u64, 0u64);
+        for round in 0..400 {
+            let nv = 6 + (rng() % 24) as usize;
+            // Under-constrained on purpose: reuse only ever fires on a SAT
+            // answer, so the interesting formulas are the satisfiable ones.
+            let density = 1.0 + (rng() % 25) as f64 / 10.0;
+            let nc = (nv as f64 * density) as usize;
+            let mut clauses: Vec<Vec<usize>> = Vec::new();
+            for _ in 0..nc {
+                let len = 1 + (rng() % 4) as usize;
+                let mut cl: Vec<usize> = Vec::new();
+                for _ in 0..len {
+                    let x = (rng() % nv as u64) as usize * 2 + (rng() % 2) as usize;
+                    if !cl.contains(&x) {
+                        cl.push(x);
+                    }
+                }
+                clauses.push(cl);
+            }
+            let lits = |cl: &[usize], vs: &[Var]| -> Vec<Lit> {
+                cl.iter()
+                    .map(|&x| Lit::new(vs[x / 2], x % 2 == 0))
+                    .collect()
+            };
+            // Two solvers over the same input, differing only in reuse. Both
+            // see the same preprocessing entry point so that BVE and
+            // equivalent-literal substitution run underneath reuse too: an
+            // assumption over an eliminated variable is answered off the
+            // reconstructed model by the fast path and by `restore_lits`
+            // otherwise, and those two had better agree.
+            let mut reuse = Solver::new();
+            let mut plain = Solver::new();
+            plain.disable_solve_reuse();
+            // Rotate the two halves independently: with both on, the fast path
+            // intercepts most of the repeats and the carried-level code would
+            // barely run.
+            let (m, l) = [(true, true), (true, false), (false, true)][round % 3];
+            reuse.set_solve_reuse(m, l);
+            for s in [&mut reuse, &mut plain] {
+                s.set_prepro_at([0, 1, 9][round % 3]);
+            }
+            let vr = nvars(&mut reuse, nv);
+            let vp = nvars(&mut plain, nv);
+            for cl in &clauses {
+                reuse.add_clause(&lits(cl, &vr));
+                plain.add_clause(&lits(cl, &vp));
+            }
+
+            let mut assumps: Vec<usize> = Vec::new();
+            for step in 0..12 {
+                match rng() % 5 {
+                    // Repeat the current set verbatim — the shape a repeated
+                    // `check-sat-assuming` produces.
+                    0 => {}
+                    // Extend by one literal: the `minimize` bit-fixing shape.
+                    1 | 2 => assumps.push((rng() % nv as u64) as usize * 2 + (rng() % 2) as usize),
+                    // Drop back down.
+                    3 => {
+                        assumps.pop();
+                    }
+                    // Add a clause. `eval_n`'s blocking clauses are this, and
+                    // a retained model that survived one would be a wrong
+                    // `sat` — or, in `eval_n`, an infinite loop.
+                    _ => {
+                        let len = 1 + (rng() % 3) as usize;
+                        let mut cl: Vec<usize> = Vec::new();
+                        for _ in 0..len {
+                            let x = (rng() % nv as u64) as usize * 2 + (rng() % 2) as usize;
+                            if !cl.contains(&x) {
+                                cl.push(x);
+                            }
+                        }
+                        reuse.add_clause(&lits(&cl, &vr));
+                        plain.add_clause(&lits(&cl, &vp));
+                        clauses.push(cl);
+                    }
+                }
+                let ar = lits(&assumps, &vr);
+                let ap = lits(&assumps, &vp);
+                let got = reuse.solve(&ar);
+                let want = plain.solve(&ap);
+                assert_eq!(
+                    got, want,
+                    "round {round} step {step}: reuse changed the answer under {assumps:?}"
+                );
+                match got {
+                    lbool::TRUE => {
+                        sats += 1;
+                        // TRUE claims a *complete* assignment, and the fast
+                        // path claims the retained one still is. Nothing else
+                        // here is sensitive to a variable quietly going
+                        // unassigned — a clause check only notices when the
+                        // missing literal was the clause's only true one.
+                        for &v in &vr {
+                            assert_ne!(
+                                reuse.value_lit(Lit::new(v, true)),
+                                lbool::UNDEF,
+                                "round {round} step {step}: sat with {v:?} unassigned"
+                            );
+                        }
+                        for cl in &clauses {
+                            assert!(
+                                lits(cl, &vr)
+                                    .iter()
+                                    .any(|&l| reuse.value_lit(l) == lbool::TRUE),
+                                "round {round} step {step}: reported model violates {cl:?}"
+                            );
+                        }
+                        for &a in &ar {
+                            assert_eq!(
+                                reuse.value_lit(a),
+                                lbool::TRUE,
+                                "round {round} step {step}: reported model violates an assumption"
+                            );
+                        }
+                    }
+                    lbool::FALSE => {
+                        unsats += 1;
+                        // `analyze_final` reads the failed set off the
+                        // decisions on the trail, and carried levels are
+                        // decisions this call did not make. If one of them
+                        // were not an assumption it would land here.
+                        for f in reuse.failed_assumptions() {
+                            assert!(
+                                ar.contains(f),
+                                "round {round} step {step}: {f:?} was never assumed"
+                            );
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            let (m, l) = reuse.reuse_counts();
+            model_hits += m;
+            level_hits += l;
+            let (m0, l0) = plain.reuse_counts();
+            assert_eq!((m0, l0), (0, 0), "the disabled side reused something");
+        }
+        // Guard against the test passing because nothing was ever reused.
+        assert!(sats > 500, "only {sats} sat answers");
+        assert!(unsats > 100, "only {unsats} unsat answers");
+        assert!(
+            model_hits > 200,
+            "only {model_hits} solves came off the model"
+        );
+        assert!(level_hits > 200, "only {level_hits} levels were carried");
+    }
+
+    /// A model must not survive a clause it does not satisfy — the exact
+    /// failure that would turn `eval_n`'s enumeration into an infinite loop
+    /// handing back the same value forever.
+    #[test]
+    fn a_blocking_clause_retires_the_retained_model() {
+        let mut s = Solver::new();
+        s.disable_lucky();
+        let vs = nvars(&mut s, 3);
+        let l = |i: i32| lit(&vs, i);
+        s.add_clause(&[l(1), l(2), l(3)]);
+        let mut seen: Vec<(bool, bool, bool)> = Vec::new();
+        for _ in 0..8 {
+            if s.solve(&[]) != lbool::TRUE {
+                break;
+            }
+            let v = (
+                s.value_lit(l(1)) == lbool::TRUE,
+                s.value_lit(l(2)) == lbool::TRUE,
+                s.value_lit(l(3)) == lbool::TRUE,
+            );
+            assert!(!seen.contains(&v), "the same model came back twice: {v:?}");
+            seen.push(v);
+            s.add_clause(&[
+                l(if v.0 { -1 } else { 1 }),
+                l(if v.1 { -2 } else { 2 }),
+                l(if v.2 { -3 } else { 3 }),
+            ]);
+        }
+        // Seven assignments satisfy the clause; the eighth call must refute.
+        assert_eq!(seen.len(), 7, "enumerated {seen:?}");
+        assert_eq!(s.solve(&[]), lbool::FALSE);
+    }
+
+    /// A fresh variable is unassigned, so the retained assignment stops being
+    /// a *complete* model and must not be handed back as one.
+    #[test]
+    fn a_fresh_variable_retires_the_retained_model() {
+        let mut s = Solver::new();
+        s.disable_lucky();
+        let vs = nvars(&mut s, 1);
+        assert_eq!(s.solve(&[lit(&vs, 1)]), lbool::TRUE);
+        let (before, _) = s.reuse_counts();
+        let w = s.new_var();
+        assert_eq!(s.solve(&[lit(&vs, 1)]), lbool::TRUE);
+        assert_eq!(s.reuse_counts().0, before, "answered off a stale model");
+        assert_ne!(s.value_lit(Lit::new(w, true)), lbool::UNDEF);
+    }
+
+    /// The whole point of the fast path: a repeat of a satisfied query costs
+    /// no propagation at all.
+    #[test]
+    fn a_repeated_query_costs_nothing() {
+        let mut s = Solver::new();
+        s.disable_lucky();
+        let vs = nvars(&mut s, 4);
+        s.add_clause(&[lit(&vs, -1), lit(&vs, 2)]);
+        s.add_clause(&[lit(&vs, -2), lit(&vs, 3)]);
+        s.add_clause(&[lit(&vs, -3), lit(&vs, 4)]);
+        assert_eq!(s.solve(&[lit(&vs, 1)]), lbool::TRUE);
+        let props = s.propagations;
+        let decs = s.decisions;
+        // Same query, and a strictly weaker one: both hold in the model.
+        assert_eq!(s.solve(&[lit(&vs, 1)]), lbool::TRUE);
+        assert_eq!(s.solve(&[]), lbool::TRUE);
+        assert_eq!(s.solve(&[lit(&vs, 4)]), lbool::TRUE);
+        assert_eq!((s.propagations, s.decisions), (props, decs));
+        assert_eq!(s.reuse_counts().0, 3);
+        assert_eq!(s.value_lit(lit(&vs, 4)), lbool::TRUE);
+    }
 }

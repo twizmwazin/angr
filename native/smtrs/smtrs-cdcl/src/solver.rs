@@ -90,6 +90,23 @@ fn trail_reuse_disabled() -> bool {
     std::env::var_os("SMTRS_CDCL_NO_TRAIL_REUSE").is_some()
 }
 
+/// Carrying the previous `solve`'s trail into the next one has two halves and
+/// a switch each, so a bisection can tell them apart:
+/// `SMTRS_CDCL_NO_MODEL_REUSE` turns off answering a call outright from the
+/// model already on the trail, `SMTRS_CDCL_NO_LEVEL_REUSE` turns off keeping
+/// the decision levels that already decide the assumption prefix, and
+/// `SMTRS_CDCL_NO_SOLVE_REUSE` turns off both — which restores the exact
+/// pre-change behaviour. See [`Solver::reusable_assumption_levels`].
+fn model_reuse_disabled() -> bool {
+    std::env::var_os("SMTRS_CDCL_NO_MODEL_REUSE").is_some()
+        || std::env::var_os("SMTRS_CDCL_NO_SOLVE_REUSE").is_some()
+}
+
+fn level_reuse_disabled() -> bool {
+    std::env::var_os("SMTRS_CDCL_NO_LEVEL_REUSE").is_some()
+        || std::env::var_os("SMTRS_CDCL_NO_SOLVE_REUSE").is_some()
+}
+
 /// Which branching heuristic picks the next decision variable.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum DecisionMode {
@@ -277,6 +294,28 @@ pub struct Solver {
     /// itself, which is a real and different answer — see
     /// [`Solver::failed_assumptions`].
     failed: Vec<Lit>,
+
+    // ---------- carrying the trail from one `solve` to the next ----------
+    /// The two halves of cross-call trail reuse (see `model_reuse_disabled`).
+    model_reuse: bool,
+    level_reuse: bool,
+    /// The trail is a **complete, propagation-closed model** of the clause
+    /// database exactly as it stands: the previous `solve` returned TRUE and
+    /// nothing has touched the database, the variable set or the trail since.
+    ///
+    /// Every operation that can falsify any clause of that sentence clears it:
+    /// [`Solver::backtrack`] (the assignment stops being complete),
+    /// [`Solver::add_clause_inner`] (the model may not satisfy the new clause,
+    /// and it runs even when `backtrack(0)` is a no-op) and
+    /// [`Solver::new_var`] (the assignment stops covering every variable).
+    /// `solve` clears it on entry and only sets it again on a fresh model.
+    trail_is_model: bool,
+    /// Solves answered straight from `trail_is_model`, and decision levels
+    /// carried into a solve instead of being re-decided. Both are pure
+    /// removed work and neither depends on machine load, which is what makes
+    /// them the numbers to compare this change on.
+    pub reused_models: u64,
+    pub reused_levels: u64,
 }
 
 impl Clone for Solver {
@@ -353,6 +392,13 @@ impl Clone for Solver {
             prepro_vars_merged: self.prepro_vars_merged,
             terminate: None,
             failed: self.failed.clone(),
+            model_reuse: self.model_reuse,
+            level_reuse: self.level_reuse,
+            // The clone's trail, assignment and database are the original's,
+            // so the sentence `trail_is_model` states is inherited verbatim.
+            trail_is_model: self.trail_is_model,
+            reused_models: self.reused_models,
+            reused_levels: self.reused_levels,
         }
     }
 }
@@ -442,6 +488,11 @@ impl Solver {
             prepro_vars_merged: 0,
             terminate: None,
             failed: Vec::new(),
+            model_reuse: !model_reuse_disabled(),
+            level_reuse: !level_reuse_disabled(),
+            trail_is_model: false,
+            reused_models: 0,
+            reused_levels: 0,
         }
     }
 
@@ -475,6 +526,8 @@ impl Solver {
     }
 
     pub fn new_var(&mut self) -> Var {
+        // A retained model no longer covers every variable.
+        self.trail_is_model = false;
         let v = Var(self.assign.len() as u32);
         self.assign.push(lbool::UNDEF);
         self.level.push(0);
@@ -640,6 +693,10 @@ impl Solver {
         // Normalization below reads level-0 values; a reconstructed model must
         // never be mistaken for one (see prepro::clear_extended_model).
         debug_assert!(!self.model_extended);
+        // Set here and not only through `backtrack`: at level 0 the backtrack
+        // below is a no-op, and a level-0 trail is exactly the state in which
+        // a stale `trail_is_model` would be believed.
+        self.trail_is_model = false;
         self.backtrack(0);
         if !self.ok {
             return;
@@ -942,6 +999,21 @@ impl Solver {
 
     /// Highest-stamped unassigned variable, advancing the search cursor.
     fn vmtf_next_decision(&mut self) -> Option<Var> {
+        // A full assignment is decided from counts alone, without the walk.
+        // `trail` holds exactly the assigned variables: every assignment goes
+        // through `enqueue` and every unassignment through `backtrack`, and
+        // `extend_model`'s out-of-trail writes are cleared before any search
+        // resumes. An eliminated variable is never assigned (BVE takes only
+        // unassigned variables and nothing can enqueue one before
+        // `restore_var`), so equality below means no live variable is left to
+        // decide. This matters on an incremental stream, where the queue
+        // holds every variable ever created and each model otherwise pays
+        // one full sweep to conclude what the counts already say.
+        if self.trail.len() + self.elim_stack.len() == self.num_vars() {
+            debug_assert!((0..self.num_vars())
+                .all(|i| self.assign[i] != lbool::UNDEF || self.elim_index[i] >= 0));
+            return None;
+        }
         let mut v = self.vmtf_search;
         while v != VMTF_NIL {
             if self.assign[v as usize] == lbool::UNDEF {
@@ -955,9 +1027,10 @@ impl Solver {
         // cursor had drifted below an unassigned variable this scan would miss
         // it and we would report `sat` on a partial assignment — silently, and
         // only on the instances where the drift happened. So the cursor
-        // invariant is checked here rather than trusted. It costs one sweep
-        // per model (and per restart with nothing left to decide), which is
-        // why it can afford to be exhaustive.
+        // invariant is checked here rather than trusted. The counting fast
+        // path above answers the all-assigned case, so falling out of the
+        // walk means an unassigned variable exists and sits below the cursor
+        // — exactly the drift the assertion below is for.
         //
         // The invariant is not maintained by this module alone: `backtrack` is
         // what restores the cursor after the trail shrinks, and it does so
@@ -1010,6 +1083,9 @@ impl Solver {
         if self.decision_level() <= target {
             return;
         }
+        // Unassigning anything ends the "complete assignment" half of
+        // `trail_is_model`.
+        self.trail_is_model = false;
         let cut = self.trail_lim[target as usize] as usize;
         let mut kept: Vec<Lit> = Vec::new();
         for i in cut..self.trail.len() {
@@ -1593,9 +1669,118 @@ impl Solver {
         1u64 << seq
     }
 
+    /// How many leading decision levels of the current trail already decide
+    /// `assumptions` verbatim, and so can be carried into this `solve` instead
+    /// of being torn down and re-decided.
+    ///
+    /// `solve` opened with `backtrack(0)` for this solver's whole life, which
+    /// means the one piece of state that did *not* survive an incremental
+    /// check was the trail: every call re-decided the whole assumption prefix
+    /// and re-ran its propagation. `minimize`/`maximize` are the extreme case
+    /// — width-many solves whose assumption vectors differ by one trailing
+    /// literal — but any repeated `check-sat-assuming` pays it.
+    ///
+    /// The condition is deliberately literal rather than semantic: level `i+1`
+    /// counts only if it was **opened by the decision** `assumptions[i]`. Two
+    /// things depend on that and not merely on the assumption being true:
+    ///
+    /// * the search loop indexes `assumptions` by `decision_level()`, so the
+    ///   levels it inherits have to line up one-for-one with the prefix; and
+    /// * [`Solver::analyze_final`] reads the failed set off the decisions on
+    ///   the trail, and its argument — "every decision here is an assumption"
+    ///   — is exactly this invariant. A level kept on the weaker grounds that
+    ///   its assumption happens to be true elsewhere would let a non-assumption
+    ///   decision into a reported core.
+    ///
+    /// An assumption that was already true when its turn came opened an
+    /// *empty* level carrying no decision at all. That level is still exactly
+    /// what the decide loop would rebuild, and it contributes nothing to
+    /// `analyze_final`, so it counts — provided its literal is still true
+    /// *below* the level, which is what makes it survive the backtrack.
+    fn reusable_assumption_levels(&self, assumptions: &[Lit]) -> u32 {
+        if !self.level_reuse {
+            return 0;
+        }
+        let ndl = self.trail_lim.len();
+        let mut keep = 0usize;
+        while keep < assumptions.len() && keep < ndl {
+            let lvl = keep as u32 + 1;
+            let a = assumptions[keep];
+            let av = (a.0 >> 1) as usize;
+            let lo = self.trail_lim[keep] as usize;
+            let hi = if keep + 1 < ndl {
+                self.trail_lim[keep + 1] as usize
+            } else {
+                self.trail.len()
+            };
+            // `trail[trail_lim[i]]` is the decision that opened level i+1 when
+            // the level has one — `backtrack` re-appends the entries it keeps
+            // starting at the cut, and the decision, being the lowest-
+            // positioned of them, lands back at the cut. The reason/level pair
+            // is checked anyway rather than rested on: a level that was opened
+            // empty *can* acquire chronologically-kept literals at that exact
+            // position, and none of those is a decision.
+            let decided_here = lo < hi
+                && self.trail[lo] == a
+                && self.reason[av] == CREF_NONE
+                && self.level[av] == lvl;
+            let empty_here = lo == hi && self.value_lit(a) == lbool::TRUE && self.level[av] < lvl;
+            if !decided_here && !empty_here {
+                break;
+            }
+            keep += 1;
+        }
+        keep as u32
+    }
+
     /// Solve under assumptions. Returns TRUE/FALSE/UNDEF (budget exhausted).
     pub fn solve(&mut self, assumptions: &[Lit]) -> lbool {
-        self.backtrack(0);
+        // The previous call may have left a complete model of an unchanged
+        // clause database on the trail. If it satisfies this call's
+        // assumptions too it is a model for this call, and the whole search is
+        // skipped. Checked before `clear_extended_model` on purpose: an
+        // eliminated variable's reconstructed value is part of that model, so
+        // an assumption over one is answered here without restoring it.
+        //
+        // `still_total` re-derives completeness rather than trusting
+        // `trail_is_model` to have been cleared, and it is the guard that
+        // makes this path safe rather than merely careful. Every assigned
+        // variable is on the trail exactly once and no eliminated variable
+        // is, so the sum is the assigned count; anything that could have
+        // invalidated the model since — a backtrack, a restore, a fresh
+        // variable — leaves a variable unassigned and shows up here. What is
+        // left over is a clause added while the assignment stayed total, and
+        // at level 0 a total assignment leaves `add_clause_inner` no room: the
+        // clause is either satisfied (still a model) or falsified, and a
+        // falsified one clears `ok`.
+        let still_total = self.trail.len() + self.elim_stack.len() == self.num_vars();
+        // The sum counts each variable at most once because elimination
+        // removes a variable from the heap and the VMTF queue and takes its
+        // clauses with it (`prepro`), so an eliminated variable can be neither
+        // decided nor propagated and never reaches the trail. Asserted rather
+        // than assumed: if that stopped holding, `still_total` would go from a
+        // guarantee to a coincidence, and this is the state the answer below
+        // is read from.
+        debug_assert!(
+            !(self.trail_is_model && still_total) || self.assign.iter().all(|&v| v != lbool::UNDEF),
+            "a model was about to be reused with a variable unassigned"
+        );
+        if self.model_reuse
+            && self.trail_is_model
+            && still_total
+            && self.ok
+            && assumptions
+                .iter()
+                .all(|&a| self.value_lit(a) == lbool::TRUE)
+        {
+            self.failed.clear();
+            self.reused_models += 1;
+            return lbool::TRUE;
+        }
+        let keep = self.reusable_assumption_levels(assumptions);
+        self.reused_levels += keep as u64;
+        self.backtrack(keep);
+        self.trail_is_model = false;
         self.clear_extended_model();
         // Every FALSE below other than the assumption-failure path is a
         // refutation of the clause database itself, for which the empty set is
@@ -1605,14 +1790,29 @@ impl Solver {
         if !self.ok {
             return lbool::FALSE;
         }
-        // An eliminated variable cannot be assumed: restore it first.
+        // An eliminated variable cannot be assumed: restore it first. This can
+        // add clauses, which backtracks to level 0 and gives up the carried
+        // prefix — correct, just not free.
         self.restore_lits(assumptions);
         if !self.ok {
             return lbool::FALSE;
         }
         if self.propagate().is_some() {
-            self.ok = false;
-            return lbool::FALSE;
+            // At level 0 this refutes the database. Above it, the conflict can
+            // only come from the carried prefix (the trail was propagation-
+            // closed when the previous call left it, and `backtrack` only
+            // re-queues literals it kept); that is a conflict *under
+            // assumptions*, not a refutation, so drop the prefix and start the
+            // call over from scratch exactly as it would have without reuse.
+            if self.decision_level() == 0 {
+                self.ok = false;
+                return lbool::FALSE;
+            }
+            self.backtrack(0);
+            if self.propagate().is_some() {
+                self.ok = false;
+                return lbool::FALSE;
+            }
         }
         // Lucky phases come first: they are four propagation sweeps and they
         // answer before any other machinery has run. Assumptions are not
@@ -1621,7 +1821,11 @@ impl Solver {
         if self.lucky_pending && assumptions.is_empty() {
             match self.lucky_phases() {
                 Some(true) => {
+                    // A finished lucky pass assigned every live variable with
+                    // propagation complete, which is the same complete model
+                    // the search below returns.
                     self.extend_model();
+                    self.trail_is_model = true;
                     return lbool::TRUE;
                 }
                 Some(false) => return lbool::FALSE,
@@ -1832,6 +2036,7 @@ impl Solver {
                         // Full model over the live variables; give the
                         // eliminated ones consistent values.
                         self.extend_model();
+                        self.trail_is_model = true;
                         return lbool::TRUE;
                     }
                     Some(v) => {
@@ -2008,6 +2213,26 @@ impl Solver {
     /// Skip the pre-search lucky phases (tests, bisection).
     pub fn disable_lucky(&mut self) {
         self.lucky_pending = false;
+    }
+
+    /// Per-solver equivalents of `SMTRS_CDCL_NO_MODEL_REUSE` and
+    /// `SMTRS_CDCL_NO_LEVEL_REUSE` (tests, bisection). Per-solver because the
+    /// environment is process-wide and a differential test runs both sides in
+    /// one process.
+    pub fn set_solve_reuse(&mut self, model: bool, levels: bool) {
+        self.model_reuse = model;
+        self.level_reuse = levels;
+    }
+
+    /// Never carry the previous `solve`'s trail into the next one.
+    pub fn disable_solve_reuse(&mut self) {
+        self.set_solve_reuse(false, false);
+    }
+
+    /// Solves answered from the model the previous `solve` left on the trail,
+    /// and decision levels carried in rather than re-decided.
+    pub fn reuse_counts(&self) -> (u64, u64) {
+        (self.reused_models, self.reused_levels)
     }
 
     /// Conflict count at which CNF preprocessing runs; 0 runs it before the

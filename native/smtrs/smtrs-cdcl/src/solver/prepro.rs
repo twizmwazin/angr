@@ -750,10 +750,9 @@ impl Prepro {
         let mut cands: Vec<Var> = (0..nvars as u32)
             .map(Var)
             .filter(|&v| {
-                !self.frozen[v.0 as usize]
-                    && !self.fixed[v.0 as usize]
-                    && !(self.occ[Lit::new(v, true).0 as usize].is_empty()
-                        && self.occ[Lit::new(v, false).0 as usize].is_empty())
+                let absent = self.occ[Lit::new(v, true).0 as usize].is_empty()
+                    && self.occ[Lit::new(v, false).0 as usize].is_empty();
+                !(self.frozen[v.0 as usize] || self.fixed[v.0 as usize] || absent)
             })
             .collect();
         cands.sort_by_key(|&v| {

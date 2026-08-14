@@ -139,9 +139,31 @@ pub struct TermPool {
     /// The epoch travels with the buffer, so whichever traversal parks last
     /// leaves a self-consistent pair behind.
     traversal: Cell<Option<Box<Traversal>>>,
+    /// DAG-walk instrumentation; see [`TermPool::walk_counters`]. Kept
+    /// because a traversal count is the one measure of this pipeline's work
+    /// that a loaded machine cannot move: wall time on a shared box says
+    /// nothing, but "this change visits 40% fewer term nodes" is the same
+    /// number on an idle machine and a busy one. Cost is one local increment
+    /// per emitted node and one `Cell` write per walk.
+    counters: Cell<WalkCounters>,
     /// Interned `true`/`false` for cheap access.
     pub true_term: TermId,
     pub false_term: TermId,
+}
+
+/// How much DAG walking this pool has been asked to do.
+///
+/// Wall-clock timing on a shared machine is not evidence; the number of term
+/// nodes a query visits is, because it cannot move under load. Every traversal
+/// that walks the term graph — `post_order`, `find_post_order`, and the
+/// solver's own incremental prefix scan via [`TermPool::record_walk`] —
+/// accumulates here, so "visits per query" is one subtraction.
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+pub struct WalkCounters {
+    /// Term nodes handed to a traversal's callback.
+    pub visits: u64,
+    /// Traversals started.
+    pub walks: u64,
 }
 
 impl Default for TermPool {
@@ -163,6 +185,7 @@ impl TermPool {
             bv_intern: FxHashMap::default(),
             symbols: Vec::new(),
             traversal: Cell::new(None),
+            counters: Cell::new(WalkCounters::default()),
             true_term: TermId(0),
             false_term: TermId(0),
         };
@@ -731,11 +754,60 @@ impl TermPool {
         })
     }
 
+    /// DAG-walk instrumentation accumulated so far; see [`WalkCounters`].
+    pub fn walk_counters(&self) -> WalkCounters {
+        self.counters.get()
+    }
+
+    /// Fold an externally-run DAG walk into [`TermPool::walk_counters`], so
+    /// that a traversal which keeps its own visited set (the solver's
+    /// incremental prefix scan) is counted on the same scale as the pool's.
+    pub fn record_walk(&self, visits: u64) {
+        let mut c = self.counters.get();
+        c.visits += visits;
+        c.walks += 1;
+        self.counters.set(c);
+    }
+
     /// Iterative post-order traversal from `roots`, calling `f` on each
     /// reachable term exactly once (children before parents). Iterative so
     /// that pathological term depth (deep concat/ite chains) cannot overflow
     /// the stack.
     pub fn post_order(&self, roots: &[TermId], mut f: impl FnMut(&Self, TermId)) {
+        self.walk(roots, |pool, t| {
+            f(pool, t);
+            false
+        });
+    }
+
+    /// Post-order traversal that stops at the first term `f` accepts, and
+    /// returns it.
+    ///
+    /// Same order as [`TermPool::post_order`], so "the first node satisfying
+    /// `f`" is the same node either way — a predicate written as a full walk
+    /// that latches the first hit can be rewritten as this without changing
+    /// which hit it reports. What changes is that the nodes *after* the hit
+    /// are never visited.
+    pub fn find_post_order(
+        &self,
+        roots: &[TermId],
+        mut f: impl FnMut(&Self, TermId) -> bool,
+    ) -> Option<TermId> {
+        let mut hit = None;
+        self.walk(roots, |pool, t| {
+            if f(pool, t) {
+                hit = Some(t);
+                true
+            } else {
+                false
+            }
+        });
+        hit
+    }
+
+    /// The traversal both public forms are built from: `f` returns `true` to
+    /// stop the walk.
+    fn walk(&self, roots: &[TermId], mut f: impl FnMut(&Self, TermId) -> bool) {
         // Move the scratch out for the duration: `f` receives `&self` and is
         // allowed to start its own traversal, which then gets its own buffer.
         let mut tr = self.traversal.take().unwrap_or_default();
@@ -758,13 +830,17 @@ impl TermPool {
         let stamp = &mut tr.stamp;
         stack.clear();
         stack.extend(roots.iter().rev().map(|&r| (r, false)));
+        let mut visits = 0u64;
         while let Some((t, children_done)) = stack.pop() {
             if stamp[t.0 as usize] == epoch {
                 continue;
             }
             if children_done {
                 stamp[t.0 as usize] = epoch;
-                f(self, t);
+                visits += 1;
+                if f(self, t) {
+                    break;
+                }
             } else {
                 stack.push((t, true));
                 for &c in self.args(t).iter().rev() {
@@ -775,6 +851,65 @@ impl TermPool {
             }
         }
         self.traversal.set(Some(tr));
+        self.record_walk(visits);
+    }
+
+    /// `post_order` over a **caller-owned** visit map that is never reset: a
+    /// node already marked in `seen` is neither descended into nor handed to
+    /// `f`, and every node that *is* handed to `f` is marked before the call
+    /// returns.
+    ///
+    /// This is for a *sequence* of traversals over one pool whose results
+    /// compose — model reconstruction evaluating one defining term per
+    /// eliminated variable is the case it exists for. Each defining term's
+    /// cone overlaps its neighbours' heavily, so a plain `post_order` per
+    /// definition re-walks the same nodes once per definition and the total is
+    /// quadratic in the pool; threading one map makes it linear.
+    ///
+    /// The contract runs both ways: because a marked node is silently skipped,
+    /// the caller must keep whatever it derived from that node. A caller that
+    /// abandons a traversal part-way (an error) has marked nodes it never
+    /// processed and must clear the map.
+    pub fn post_order_memo(
+        &self,
+        seen: &mut Vec<bool>,
+        roots: &[TermId],
+        mut f: impl FnMut(&Self, TermId),
+    ) {
+        if seen.len() < self.nodes.len() {
+            seen.resize(self.nodes.len(), false);
+        }
+        // Same reason as `post_order`: `f` gets `&self` and may nest.
+        let mut tr = self.traversal.take().unwrap_or_default();
+        let stack = &mut tr.stack;
+        stack.clear();
+        stack.extend(
+            roots
+                .iter()
+                .rev()
+                .filter(|r| !seen[r.0 as usize])
+                .map(|&r| (r, false)),
+        );
+        let mut emitted = 0u64;
+        while let Some((t, children_done)) = stack.pop() {
+            if seen[t.0 as usize] {
+                continue;
+            }
+            if children_done {
+                seen[t.0 as usize] = true;
+                emitted += 1;
+                f(self, t);
+            } else {
+                stack.push((t, true));
+                for &c in self.args(t).iter().rev() {
+                    if !seen[c.0 as usize] {
+                        stack.push((c, false));
+                    }
+                }
+            }
+        }
+        self.traversal.set(Some(tr));
+        self.record_walk(emitted);
     }
 
     /// Rebuild `root` with every occurrence of a key in `map` replaced by its
@@ -1199,6 +1334,72 @@ mod tests {
 
         // And the outer traversal is still repeatable afterwards.
         assert_eq!(collect(&p, sub), after);
+    }
+
+    /// `post_order_memo` is the traversal a *sequence* of related evaluations
+    /// shares. Its whole contract is what it leaves out, so the properties to
+    /// pin are: the union over a sequence emits every reachable node exactly
+    /// once; the emission order is still children-before-parents *within what
+    /// is emitted*; and a fresh map reproduces `post_order` exactly.
+    #[test]
+    fn post_order_memo_emits_each_node_once_across_a_sequence() {
+        let mut p = TermPool::new();
+        let x = p.fresh_symbol("x", Sort::BitVec(8));
+        let xt = p.var(x);
+        let y = p.fresh_symbol("y", Sort::BitVec(8));
+        let yt = p.var(y);
+        let c = p.bv_u64(8, 7);
+        // A chain whose cones nest, which is the model-reconstruction shape.
+        let a1 = p.mk(Op::BvAdd, &[xt, c]).unwrap();
+        let a2 = p.mk(Op::BvMul, &[a1, yt]).unwrap();
+        let a3 = p.mk(Op::BvSub, &[a2, a1]).unwrap();
+
+        // A fresh map must reproduce `post_order` exactly.
+        let mut plain = Vec::new();
+        p.post_order(&[a3], |_, t| plain.push(t));
+        let mut seen = Vec::new();
+        let mut memo = Vec::new();
+        p.post_order_memo(&mut seen, &[a3], |_, t| memo.push(t));
+        assert_eq!(plain, memo, "a fresh memo is not a plain post_order");
+
+        // Threading one map over the chain: the union is the same set, with no
+        // node emitted twice even though the cones overlap almost entirely.
+        let mut seen = Vec::new();
+        let mut all = Vec::new();
+        for root in [a1, a2, a3] {
+            let mut here = Vec::new();
+            p.post_order_memo(&mut seen, &[root], |_, t| here.push(t));
+            // Children before parents among the newly emitted nodes.
+            for (i, &t) in here.iter().enumerate() {
+                for &arg in p.args(t) {
+                    if let Some(j) = here.iter().position(|&u| u == arg) {
+                        assert!(j < i, "operand emitted after its parent");
+                    }
+                }
+            }
+            all.extend(here);
+        }
+        let mut sorted = all.clone();
+        sorted.sort_unstable();
+        sorted.dedup();
+        assert_eq!(sorted.len(), all.len(), "a node was emitted twice");
+        assert_eq!(sorted, {
+            let mut want = plain.clone();
+            want.sort_unstable();
+            want
+        });
+
+        // Re-running a root whose cone is fully marked emits nothing at all —
+        // that is the saving, stated as a property rather than as a timing.
+        let mut again = 0usize;
+        p.post_order_memo(&mut seen, &[a3], |_, _| again += 1);
+        assert_eq!(again, 0);
+
+        // Nodes created after the map was sized are still reachable.
+        let a4 = p.mk(Op::BvXor, &[a3, c]).unwrap();
+        let mut fresh = Vec::new();
+        p.post_order_memo(&mut seen, &[a4], |_, t| fresh.push(t));
+        assert_eq!(fresh, vec![a4]);
     }
 
     /// `substitute_many` decides whether to rebuild a node from an

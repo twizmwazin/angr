@@ -16,7 +16,7 @@
 use rustc_hash::FxHashMap;
 use smtrs_aig::{Aig, AigLit, FALSE, TRUE};
 use smtrs_core::{Op, PollTick, TermId, TermPool};
-use smtrs_sat::SatBackend;
+use smtrs_sat::{Lit, SatBackend};
 
 #[derive(Clone)]
 pub struct BitBlaster {
@@ -99,11 +99,23 @@ impl BitBlaster {
 
     /// Blast and assert a Bool term, emitting new CNF into `sat`.
     pub fn assert_true<B: SatBackend>(&mut self, pool: &TermPool, t: TermId, sat: &mut B) {
+        self.assert_true_guarded(pool, t, sat, None);
+    }
+
+    /// Blast and assert a Bool term under an optional activation literal; see
+    /// [`Aig::assert_true_guarded`]. `None` is a plain top-level assertion.
+    pub fn assert_true_guarded<B: SatBackend>(
+        &mut self,
+        pool: &TermPool,
+        t: TermId,
+        sat: &mut B,
+        guard: Option<Lit>,
+    ) {
         let out = self.blast_bool(pool, t);
         if self.interrupted {
             return;
         }
-        self.aig.assert_true(sat, out);
+        self.aig.assert_true_guarded(sat, out, guard);
     }
 
     pub fn bv_bits(&self, t: TermId) -> Option<&Vec<AigLit>> {

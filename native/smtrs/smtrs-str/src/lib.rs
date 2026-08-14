@@ -929,14 +929,15 @@ impl B<'_> {
 /// whose only non-BV content is Int arithmetic is not routed through the
 /// string lowering, even though `lower_node` does handle Int operators once
 /// it is running (they arrive as length and index arithmetic).
+///
+/// Stops at the first string-sorted term rather than finishing the walk: the
+/// answer is a disjunction over node-local tests, so no later node can change
+/// it.
 pub fn contains_strings(pool: &TermPool, roots: &[TermId]) -> bool {
-    let mut found = false;
-    pool.post_order(roots, |pool, t| {
-        if matches!(pool.sort(t), Sort::Str | Sort::RegLan) {
-            found = true;
-        }
-    });
-    found
+    pool.find_post_order(roots, |pool, t| {
+        matches!(pool.sort(t), Sort::Str | Sort::RegLan)
+    })
+    .is_some()
 }
 
 enum Val {
@@ -1605,6 +1606,58 @@ mod tests {
         let long = "1".repeat(40);
         let (_, ok) = to_int_of(&long, 64);
         assert!(!ok, "a 40-digit number was not excluded");
+    }
+}
+
+#[cfg(test)]
+mod contains_tests {
+    use smtrs_core::{Op, Sort, TermId, TermPool};
+
+    /// A long BV chain, so "walked the whole DAG" and "stopped early" are
+    /// hundreds of node visits apart rather than a rounding error.
+    fn ballast(pool: &mut TermPool, n: usize) -> TermId {
+        let s = pool.fresh_symbol("bv", Sort::BitVec(8));
+        let mut t = pool.var(s);
+        for i in 0..n {
+            let k = pool.bv_u64(8, i as u64 + 1);
+            t = pool.mk(Op::BvAdd, &[t, k]).expect("well-sorted");
+        }
+        let zero = pool.bv_u64(8, 0);
+        pool.mk(Op::Eq, &[t, zero]).expect("well-sorted")
+    }
+
+    /// The answer is a disjunction of node-local tests, so the walk has no
+    /// reason to continue past the first hit — and the saving is the rest of
+    /// the DAG, which on a real string problem is the whole problem.
+    #[test]
+    fn contains_strings_stops_at_the_first_string_node() {
+        let mut pool = TermPool::new();
+        let a = pool.fresh_symbol("a", Sort::Str);
+        let b = pool.fresh_symbol("b", Sort::Str);
+        let (av, bv) = (pool.var(a), pool.var(b));
+        let streq = pool.mk(Op::Eq, &[av, bv]).expect("well-sorted");
+        let big = ballast(&mut pool, 400);
+        let roots = [streq, big];
+
+        let mut total = 0u64;
+        pool.post_order(&roots, |_, _| total += 1);
+        assert!(total > 400, "ballast did not build ({total} nodes)");
+
+        let before = pool.walk_counters();
+        assert!(super::contains_strings(&pool, &roots));
+        let visited = pool.walk_counters().visits - before.visits;
+        assert!(
+            visited < 4,
+            "walked {visited} of {total} nodes to find a string in the first one"
+        );
+
+        // And a problem with no strings at all still has to be walked fully —
+        // that is what "no early exit possible" means, and it must not be
+        // mistaken for a hit.
+        let before = pool.walk_counters();
+        assert!(!super::contains_strings(&pool, &[big]));
+        let visited = pool.walk_counters().visits - before.visits;
+        assert_eq!(visited, total - 3, "a negative answer must see every node");
     }
 }
 

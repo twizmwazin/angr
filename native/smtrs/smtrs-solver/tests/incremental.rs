@@ -409,6 +409,170 @@ fn declarations_made_before_a_push_remain_usable_after_the_pop() {
     );
 }
 
+#[test]
+fn a_level_that_asserts_false_dies_with_the_level() {
+    // `false` inside a scope takes the short path that adds the unit `¬act`
+    // rather than blasting anything, and nesting must retire the inner level
+    // together with the outer one. The failure mode this catches is the
+    // contradiction outliving its scope, which would make everything after
+    // the pop unsat.
+    let a = replay(
+        "(declare-const x (_ BitVec 4))
+         (assert (bvult x #x8))
+         (push 1)
+         (assert false)
+         (check-sat)
+         (push 1)
+         (assert (= x #x1))
+         (check-sat)
+         (pop 2)
+         (check-sat)
+         (push 1) (assert (= x #x1)) (check-sat) (pop 1)
+         (check-sat)",
+    );
+    assert_eq!(a, vec![A::Unsat, A::Unsat, A::Sat, A::Sat, A::Sat]);
+}
+
+// ---------------------------------------------------------------------------
+// The engine actually survives the pop
+// ---------------------------------------------------------------------------
+
+/// Run a script, returning the answers, the rebuild count, and the largest SAT
+/// variable count any check ran against.
+fn run_counting(src: &str) -> (Vec<A>, u64, u32) {
+    let mut pool = TermPool::new();
+    let script = parse_script(src, &mut pool).expect("parse");
+    let mut solver = Solver::new();
+    solver.declared = script.declared.clone();
+    let mut answers = Vec::new();
+    let mut peak_vars = 0u32;
+    for cmd in &script.commands {
+        match cmd {
+            Command::Assert(t, _) => solver.assert(*t),
+            Command::Push(n) => solver.push(*n),
+            Command::Pop(n) => solver.pop(*n),
+            Command::CheckSat => {
+                answers.push(norm(&solver.check_sat(&mut pool, &[])));
+                peak_vars = peak_vars.max(solver.stats.sat_vars);
+            }
+            _ => {}
+        }
+    }
+    (answers, solver.stats.rebuilds, peak_vars)
+}
+
+/// A base big enough that re-encoding it per query is the cost that matters.
+/// Written as text so the scripts below stay readable.
+fn wide_base() -> String {
+    let mut s = String::new();
+    for i in 0..8 {
+        s.push_str(&format!("(declare-const v{i} (_ BitVec 32))\n"));
+    }
+    for i in 0..8 {
+        let j = (i + 1) % 8;
+        s.push_str(&format!(
+            "(assert (bvult (bvadd (bvmul v{i} v{j}) (bvxor v{i} v{j})) #x7fffffff))\n"
+        ));
+    }
+    s
+}
+
+/// The point of all of the above: a `pop` must not rebuild the engine.
+///
+/// `stats.rebuilds` counts checks that could not reuse the persistent engine
+/// and re-ran the whole preprocess-and-blast pipeline. It is a pure count, so
+/// unlike wall time it says the same thing on a loaded machine as on an idle
+/// one — which is what makes it the number to assert on.
+///
+/// The BMC shape below (`push; assert; check-sat; pop`, repeated over a base
+/// that dwarfs what each round adds) used to rebuild on *every* check, because
+/// `pop` shortens the assertion list and the engine's reuse test is a prefix
+/// test. Three is the whole budget now: the first check, and the two pops it
+/// takes to earn guarded mode.
+#[test]
+fn the_bmc_shape_rebuilds_a_fixed_number_of_times_not_once_per_check() {
+    let mut src = wide_base();
+    for i in 0..20 {
+        src.push_str(&format!(
+            "(push 1)\n(assert (bvugt v0 #x{:08x}))\n(check-sat)\n(pop 1)\n",
+            i * 0x100
+        ));
+    }
+    let (answers, rebuilds, _) = run_counting(&src);
+    assert_eq!(answers.len(), 20);
+    assert!(answers.iter().all(|&a| a == A::Sat));
+    assert_eq!(
+        rebuilds, 3,
+        "20 checks bracketed by push/pop cost {rebuilds} engine rebuilds; only \
+         the first check and the two pops that earn guarded mode may"
+    );
+}
+
+/// Retiring a level satisfies its clauses but does not delete them, so a long
+/// script would otherwise carry every round it has ever run. The engine is
+/// collected once the retired part outweighs the live one, which bounds the
+/// formula each query faces at twice the live encoding however many rounds the
+/// script does.
+///
+/// Without the collection this same script ends its 60th round against a
+/// database several times the size of its first, and the growth has no limit.
+#[test]
+fn a_long_pop_loop_does_not_grow_the_formula_without_bound() {
+    let mut src = String::from("(declare-const x (_ BitVec 16))\n(assert (bvult x #x8000))\n");
+    for i in 0..60 {
+        src.push_str(&format!(
+            "(push 1)\n(assert (bvugt x #x{:04x}))\n(check-sat)\n(pop 1)\n",
+            i * 0x10
+        ));
+    }
+    let (answers, _, peak_vars) = run_counting(&src);
+    assert_eq!(answers.len(), 60);
+    assert!(answers.iter().all(|&a| a == A::Sat));
+
+    // What one round costs, measured the same way.
+    let mut one = String::from("(declare-const x (_ BitVec 16))\n(assert (bvult x #x8000))\n");
+    one.push_str("(push 1)\n(assert (bvugt x #x0000))\n(check-sat)\n(pop 1)\n");
+    let (_, _, one_round_vars) = run_counting(&one);
+
+    assert!(
+        peak_vars <= 2 * one_round_vars,
+        "60 rounds peaked at {peak_vars} SAT variables against {one_round_vars} \
+         for a single round; the retired levels are not being collected"
+    );
+}
+
+/// A script that only ever grows still rebuilds exactly once — the guarded-level
+/// machinery must not cost a rebuild to scripts that never pop, which is the
+/// shape (`push` without `pop`) that made unconditional guarding a 6x loss.
+#[test]
+fn a_script_that_never_pops_rebuilds_once() {
+    let mut pool = TermPool::new();
+    let script = parse_script(
+        "(declare-const x (_ BitVec 16))
+         (assert (bvult x #x8000))
+         (check-sat)
+         (push 1) (assert (bvugt x #x0010)) (check-sat)
+         (push 1) (assert (bvugt x #x0020)) (check-sat)
+         (assert (bvugt x #x0030)) (check-sat)",
+        &mut pool,
+    )
+    .expect("parse");
+    let mut solver = Solver::new();
+    solver.declared = script.declared.clone();
+    for cmd in &script.commands {
+        match cmd {
+            Command::Assert(t, _) => solver.assert(*t),
+            Command::Push(n) => solver.push(*n),
+            Command::Pop(n) => solver.pop(*n),
+            Command::CheckSat => {
+                assert_eq!(norm(&solver.check_sat(&mut pool, &[])), A::Sat);
+            }
+            _ => {}
+        }
+    }
+    assert_eq!(solver.stats.rebuilds, 1);
+}
+
 // ---------------------------------------------------------------------------
 // Theory lowering across a pop
 // ---------------------------------------------------------------------------
@@ -476,6 +640,63 @@ fn repeated_string_push_pop_cycles_stay_consistent() {
     assert_eq!(a, vec![A::Unsat, A::Sat, A::Unsat, A::Sat]);
 }
 
+/// Theory content asserted *after* a lowering, with no `push`/`pop` at all.
+///
+/// This is a third distinct wrong `sat`, found by the agent auditing the
+/// `check_sat` prologue and originally recorded on its branch as an
+/// `#[ignore]`d reproducer. Both lowerings replace `Solver::assertions` with
+/// their lowered forms in place; assert more theory content afterwards and the
+/// two never meet, because the earlier assertions now hold bit-vectors where
+/// `s` (or `f`) used to be, while the new formula is lowered afresh into its
+/// own encoding of the same variable.
+///
+/// Asserting both before the first check answers correctly, so this is
+/// specific to incremental use — which is exactly why a one-shot oracle is the
+/// right test and why nothing before this suite caught it.
+#[test]
+fn string_content_asserted_after_a_lowering_is_not_lost() {
+    let a = replay(
+        "(declare-const s String)
+         (assert (= (str.len s) 3))
+         (check-sat)
+         (assert (= s \"abcd\"))
+         (check-sat)",
+    );
+    assert_eq!(a, vec![A::Sat, A::Unsat]);
+}
+
+/// The floating-point half of the same defect. It survived the first fix: the
+/// FP lowering preserves the assertion *count*, so `levels` stays valid and
+/// `push`/`pop` were never wrong — but the terms still change identity, and
+/// there was no `fp_lowered` flag for `undo_lowering` to act on.
+#[test]
+fn fp_content_asserted_after_a_lowering_is_not_lost() {
+    let a = replay(
+        "(declare-const f Float32)
+         (declare-const g Float32)
+         (assert (fp.lt f g))
+         (check-sat)
+         (assert (fp.lt g f))
+         (check-sat)",
+    );
+    assert_eq!(a, vec![A::Sat, A::Unsat]);
+}
+
+/// Mixed theories across a lowering: BV first, then strings, then more BV.
+#[test]
+fn a_clean_prefix_does_not_hide_theory_content_asserted_later() {
+    assert_matches_oneshot(
+        "(declare-const x (_ BitVec 8))
+         (declare-const s String)
+         (assert (bvult x #x40))
+         (check-sat)
+         (assert (= (str.len s) 3))
+         (check-sat)
+         (assert (bvugt x #x30))
+         (check-sat)",
+    );
+}
+
 #[test]
 fn fp_lowering_survives_a_pop() {
     // The FP lowering preserves the assertion count, so it was never affected
@@ -535,7 +756,14 @@ fn corpus_incremental_files_agree_with_one_shot() {
     }
 
     // Stride rather than take a prefix, so the sample spans subdirectories.
-    let want = 12usize;
+    // The default is what a routine `cargo test` can afford; a change to the
+    // push/pop encoding wants a deeper sweep than that, and re-running this
+    // same replay over hundreds of files is the cheapest way to get one —
+    // hence the override rather than a second, near-identical test.
+    let want: usize = std::env::var("SMTRS_INCREMENTAL_REPLAY_FILES")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(12);
     let step = std::cmp::max(1, files.len() / want);
     let sample: Vec<_> = files.iter().step_by(step).take(want).collect();
 

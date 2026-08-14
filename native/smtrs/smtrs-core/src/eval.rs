@@ -178,9 +178,38 @@ pub fn apply_op(op: Op, vals: &[Value]) -> Option<Value> {
     })
 }
 
+/// Value of one node, given values for all of its operands. Shared by the
+/// one-shot [`eval`] and by [`Evaluator`] so that the two cannot drift apart.
+fn node_value(
+    pool: &TermPool,
+    t: TermId,
+    assignment: &FxHashMap<SymbolId, Value>,
+    cache: &FxHashMap<TermId, Value>,
+) -> Result<Value, EvalError> {
+    Ok(match pool.op(t) {
+        Op::True => Value::Bool(true),
+        Op::False => Value::Bool(false),
+        Op::BvConst(id) => Value::Bv(pool.bv_const(id).clone()),
+        Op::Var(sym) => match assignment.get(&sym) {
+            Some(v) => v.clone(),
+            None => return Err(EvalError::UnassignedVar(pool.symbol(sym).name.clone())),
+        },
+        Op::Other { name, .. } => {
+            return Err(EvalError::Unsupported(pool.symbol(name).name.clone()))
+        }
+        op => {
+            let vals: Vec<Value> = pool.args(t).iter().map(|a| cache[a].clone()).collect();
+            apply_op(op, &vals).expect("non-leaf op")
+        }
+    })
+}
+
 /// Evaluate `roots` under `assignment`, returning the value of each root.
 /// Unassigned variables produce an error (callers wanting model completion
 /// should complete the assignment first).
+///
+/// One-shot. A caller evaluating a *sequence* of terms over one pool under a
+/// growing assignment wants [`Evaluator`] instead.
 pub fn eval(
     pool: &TermPool,
     roots: &[TermId],
@@ -192,32 +221,74 @@ pub fn eval(
         if error.is_some() {
             return;
         }
-        let v = match pool.op(t) {
-            Op::True => Value::Bool(true),
-            Op::False => Value::Bool(false),
-            Op::BvConst(id) => Value::Bv(pool.bv_const(id).clone()),
-            Op::Var(sym) => match assignment.get(&sym) {
-                Some(v) => v.clone(),
-                None => {
-                    error = Some(EvalError::UnassignedVar(pool.symbol(sym).name.clone()));
-                    return;
-                }
-            },
-            Op::Other { name, .. } => {
-                error = Some(EvalError::Unsupported(pool.symbol(name).name.clone()));
-                return;
+        match node_value(pool, t, assignment, &cache) {
+            Ok(v) => {
+                cache.insert(t, v);
             }
-            op => {
-                let vals: Vec<Value> = pool.args(t).iter().map(|a| cache[a].clone()).collect();
-                apply_op(op, &vals).expect("non-leaf op")
-            }
-        };
-        cache.insert(t, v);
+            Err(e) => error = Some(e),
+        }
     });
     if let Some(e) = error {
         return Err(e);
     }
     Ok(roots.iter().map(|r| cache[r].clone()).collect())
+}
+
+/// An evaluation that outlives a single call, so that a *sequence* of
+/// evaluations over one term pool shares one traversal and one value cache.
+///
+/// This is what model reconstruction needs. Eliminating `n` variables leaves
+/// `n` defining terms to evaluate, their cones overlap heavily, and a
+/// standalone [`eval`] per term re-walks the shared part once per definition
+/// and allocates a fresh cache each time — work quadratic in the pool. One
+/// `Evaluator` threaded through the sequence makes the total proportional to
+/// the reachable set, visited once.
+///
+/// **Contract.** The caller may *extend* `assignment` between calls but must
+/// never change a value already in it, and must not mutate the pool's existing
+/// nodes: cached term values are never invalidated. Growing the pool is fine.
+/// (Both hold for model reconstruction: each definition's value is inserted
+/// once and never revised.) An `Err` leaves the evaluator empty rather than
+/// half-populated, so it stays usable — see the abandoned-traversal note in
+/// [`TermPool::post_order_memo`].
+#[derive(Default)]
+pub struct Evaluator {
+    seen: Vec<bool>,
+    cache: FxHashMap<TermId, Value>,
+}
+
+impl Evaluator {
+    /// Value of each of `roots`, reusing everything already computed.
+    pub fn eval(
+        &mut self,
+        pool: &TermPool,
+        roots: &[TermId],
+        assignment: &FxHashMap<SymbolId, Value>,
+    ) -> Result<Vec<Value>, EvalError> {
+        // Disjoint field borrows: the visit map is threaded through the
+        // traversal while the closure holds the cache.
+        let Evaluator { seen, cache } = self;
+        let mut error: Option<EvalError> = None;
+        pool.post_order_memo(seen, roots, |pool, t| {
+            if error.is_some() {
+                return;
+            }
+            match node_value(pool, t, assignment, cache) {
+                Ok(v) => {
+                    cache.insert(t, v);
+                }
+                Err(e) => error = Some(e),
+            }
+        });
+        if let Some(e) = error {
+            // The abandoned traversal marked nodes visited that never got a
+            // value, so the shared state is no longer a consistent memo.
+            self.seen.clear();
+            self.cache.clear();
+            return Err(e);
+        }
+        Ok(roots.iter().map(|r| self.cache[r].clone()).collect())
+    }
 }
 
 #[cfg(test)]
@@ -256,5 +327,90 @@ mod tests {
             eval(&p, &[x], &FxHashMap::default()),
             Err(EvalError::UnassignedVar(_))
         ));
+    }
+
+    /// The property the solver relies on: over a sequence of evaluations under
+    /// a *growing* assignment, a shared `Evaluator` returns exactly what a
+    /// fresh one-shot `eval` returns at each step. This is model
+    /// reconstruction's shape — a chain of definitions, each evaluated after
+    /// the previous one's value has been added to the assignment — so if
+    /// sharing the memo across the sequence could ever be wrong, it is wrong
+    /// here.
+    #[test]
+    fn evaluator_sequence_matches_a_fresh_eval_at_every_step() {
+        let mut p = TermPool::new();
+        let bs: Vec<SymbolId> = (0..4)
+            .map(|i| p.fresh_symbol(format!("b{i}"), Sort::BitVec(16)))
+            .collect();
+        let bvars: Vec<TermId> = bs.iter().map(|&s| p.var(s)).collect();
+
+        // t0 = b0 + b1; t[i] = (t[i-1] ^ b[i%4]) * (t[i-1] + 3) ... a chain
+        // whose cones nest, plus reuse of the earlier links.
+        let mut defs: Vec<(SymbolId, TermId)> = Vec::new();
+        let three = p.bv_u64(16, 3);
+        let mut rhs = p.mk(Op::BvAdd, &[bvars[0], bvars[1]]).unwrap();
+        for i in 0..8usize {
+            let sym = p.fresh_symbol(format!("t{i}"), Sort::BitVec(16));
+            defs.push((sym, rhs));
+            let v = p.var(sym);
+            let a = p.mk(Op::BvXor, &[v, bvars[i % 4]]).unwrap();
+            let b = p.mk(Op::BvAdd, &[v, three]).unwrap();
+            rhs = p.mk(Op::BvMul, &[a, b]).unwrap();
+        }
+
+        let mut assignment: FxHashMap<SymbolId, Value> = FxHashMap::default();
+        for (i, &s) in bs.iter().enumerate() {
+            assignment.insert(s, Value::Bv(BvConst::from_u64(16, 1000 + i as u64 * 37)));
+        }
+
+        let mut ev = Evaluator::default();
+        for (sym, rhs) in &defs {
+            let want = eval(&p, &[*rhs], &assignment).expect("one-shot");
+            let got = ev.eval(&p, &[*rhs], &assignment).expect("shared");
+            assert_eq!(
+                got,
+                want,
+                "shared evaluator diverged on {}",
+                p.symbol(*sym).name
+            );
+            assignment.insert(*sym, got[0].clone());
+        }
+        // And a final multi-root evaluation over the whole chain, the way
+        // model validation re-checks every assertion.
+        let roots: Vec<TermId> = defs.iter().map(|&(_, r)| r).collect();
+        assert_eq!(
+            ev.eval(&p, &roots, &assignment).expect("shared"),
+            eval(&p, &roots, &assignment).expect("one-shot")
+        );
+    }
+
+    /// An `Err` must leave the evaluator empty rather than half-populated: the
+    /// abandoned traversal marked nodes it never gave a value to, and a
+    /// surviving mark would silently skip that node — and read a stale or
+    /// missing value — on the next call.
+    #[test]
+    fn evaluator_recovers_from_an_error() {
+        let mut p = TermPool::new();
+        let xs = p.fresh_symbol("x", Sort::BitVec(8));
+        let x = p.var(xs);
+        let ys = p.fresh_symbol("y", Sort::BitVec(8));
+        let y = p.var(ys);
+        let sum = p.mk(Op::BvAdd, &[x, y]).unwrap();
+
+        let mut asg: FxHashMap<SymbolId, Value> = FxHashMap::default();
+        asg.insert(xs, Value::Bv(BvConst::from_u64(8, 5)));
+
+        let mut ev = Evaluator::default();
+        assert!(matches!(
+            ev.eval(&p, &[sum], &asg),
+            Err(EvalError::UnassignedVar(_))
+        ));
+        // Now supply `y` and re-run: nothing from the abandoned walk may
+        // survive, so the answer must be the one a fresh evaluator gives.
+        asg.insert(ys, Value::Bv(BvConst::from_u64(8, 9)));
+        assert_eq!(
+            ev.eval(&p, &[sum], &asg).expect("now complete"),
+            eval(&p, &[sum], &asg).expect("one-shot")
+        );
     }
 }

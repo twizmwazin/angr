@@ -440,19 +440,42 @@ impl Aig {
 
     /// Assert `out` at top level.
     pub fn assert_true<B: SatBackend>(&mut self, sat: &mut B, out: AigLit) {
+        self.assert_true_guarded(sat, out, None);
+    }
+
+    /// Assert `out` under an activation literal: the asserting clause becomes
+    /// `(¬guard ∨ out)`, so a later unit `¬guard` retires it. Only the root
+    /// clause is guarded — the Tseitin definitions `emit` produces are
+    /// conservative extensions of a fresh variable and stay unconditional,
+    /// which is what lets the gates be shared with (and by) other levels
+    /// without the sharing leaking any constraint across a retraction.
+    pub fn assert_true_guarded<B: SatBackend>(
+        &mut self,
+        sat: &mut B,
+        out: AigLit,
+        guard: Option<Lit>,
+    ) {
         if out == TRUE {
             return;
         }
         if out == FALSE {
-            // Empty clause: unsatisfiable.
-            sat.add_clause(&[]);
+            match guard {
+                // The guarded context is unsatisfiable on its own, which is
+                // not the same as the formula being unsatisfiable.
+                Some(g) => sat.add_clause(&[!g]),
+                // Empty clause: unsatisfiable.
+                None => sat.add_clause(&[]),
+            }
             return;
         }
         let l = self.emit(sat, out);
         if self.interrupted {
             return;
         }
-        sat.add_clause(&[l]);
+        match guard {
+            Some(g) => sat.add_clause(&[!g, l]),
+            None => sat.add_clause(&[l]),
+        }
     }
 
     /// SAT model value of a literal, if its node was emitted.

@@ -1163,6 +1163,9 @@ fn step(pool: &mut TermPool, op: Op, args: &[TermId], stats: &mut Stats) -> Step
                 }
                 // Low bits of arithmetic depend only on low operand bits.
                 // Narrowing a *shared* multiplier duplicates it; leave those.
+                // The guard spells "not (a shared multiply)" directly; the
+                // De-Morganed form clippy 1.94 asks for buries that reading.
+                #[allow(clippy::nonminimal_bool)]
                 Op::BvAdd | Op::BvMul | Op::BvSub | Op::BvNeg
                     if lo == 0
                         && !group_disabled("extract-push")

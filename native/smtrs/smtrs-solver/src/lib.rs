@@ -21,6 +21,9 @@ use rustc_hash::FxHashMap;
 use smtrs_bitblast::BitBlaster;
 use smtrs_core::{eval, BvConst, Op, Sort, SymbolId, TermId, TermPool, Value};
 use smtrs_rewrite::Rewriter;
+/// Re-exported so a caller can read [`Solver::sat_counters`] without taking a
+/// direct dependency on the SAT layer.
+pub use smtrs_sat::SatCounters;
 use smtrs_sat::{Backend, SatBackend, SatResult};
 
 /// How far the term pool may grow during preprocessing before the run is
@@ -94,6 +97,14 @@ impl PhaseTimes {
 #[derive(Default)]
 pub struct SolverStats {
     pub checks: u64,
+    /// Checks that could not reuse the persistent engine and rebuilt it from
+    /// scratch. On a monotone incremental script this should be 1; anything
+    /// higher means the whole preprocess-and-blast pipeline is being paid
+    /// again per query, which is what the incremental tier is meant to avoid.
+    ///
+    /// Load-independent, so it is the number an A/B on incremental work should
+    /// be read off first.
+    pub rebuilds: u64,
     pub rewrites_applied: FxHashMap<&'static str, u64>,
     pub sat_vars: u32,
     pub aig_gates: u64,
@@ -101,7 +112,18 @@ pub struct SolverStats {
     pub aig_folds: u64,
     pub terms: usize,
     pub assertions_blasted: usize,
+    /// `post_order` calls and term nodes visited *inside model
+    /// reconstruction*, summed over every check. Deterministic where the
+    /// `model` phase time is not, so this is the number an A/B of anything
+    /// touching model building should move.
+    pub model_traversals: u64,
+    pub model_visits: u64,
     pub phases: PhaseTimes,
+    /// Term-node visits and traversals made against the shared pool, over its
+    /// whole life rather than this solver's. Deterministic — a walk visits the
+    /// same nodes however loaded the machine is — which is what makes it
+    /// usable as A/B evidence where wall time is not.
+    pub walk: smtrs_core::WalkCounters,
     /// SAT search counters after the last check (deterministic, unlike wall
     /// time — these are what A/B comparisons should be based on). `None` when
     /// the selected backend does not keep them, which is not the same as a
@@ -140,7 +162,7 @@ impl SolverStats {
             Some(c) => format!(
                 "\"conflicts\":{},\"decisions\":{},\"propagations\":{},\"restarts\":{},\
 \"prepro_vars_elim\":{},\"prepro_clauses_before\":{},\"prepro_clauses_after\":{},\
-\"t_prepro\":{:.6},\"restored_vars\":{}",
+\"t_prepro\":{:.6},\"restored_vars\":{},\"reused_models\":{},\"reused_levels\":{}",
                 c.conflicts,
                 c.decisions,
                 c.propagations,
@@ -150,25 +172,33 @@ impl SolverStats {
                 c.prepro_clauses_after,
                 c.prepro_secs,
                 c.restored_vars,
+                c.reused_models,
+                c.reused_levels,
             ),
             None => "\"conflicts\":null,\"decisions\":null,\"propagations\":null,\
 \"restarts\":null,\"prepro_vars_elim\":null,\"prepro_clauses_before\":null,\
-\"prepro_clauses_after\":null,\"t_prepro\":null,\"restored_vars\":null"
+\"prepro_clauses_after\":null,\"t_prepro\":null,\"restored_vars\":null,\
+\"reused_models\":null,\"reused_levels\":null"
                 .to_string(),
         };
         format!(
-            "{{\"wall\":{wall:.6},\"checks\":{},\"terms\":{},\"assertions_blasted\":{},\"sat_vars\":{},\
+            "{{\"wall\":{wall:.6},\"checks\":{},\"rebuilds\":{},\"terms\":{},\"assertions_blasted\":{},\"sat_vars\":{},\
 \"aig_gates\":{},\"aig_strash_hits\":{},\"aig_folds\":{},\
+\"model_traversals\":{},\"model_visits\":{},\
 \"t_lower_fp\":{:.6},\"t_lower_str\":{:.6},\"t_rewrite\":{:.6},\"t_blast\":{:.6},\
 \"t_sat\":{:.6},\"t_prop_abs\":{:.6},\"t_model\":{:.6},\"t_total\":{:.6},\
+\"walk_visits\":{},\"walks\":{},\
 {counters_json},\"rules\":{{{}}}}}",
             self.checks,
+            self.rebuilds,
             self.terms,
             self.assertions_blasted,
             self.sat_vars,
             self.aig_gates,
             self.aig_strash_hits,
             self.aig_folds,
+            self.model_traversals,
+            self.model_visits,
             p.lower_fp,
             p.lower_str,
             p.rewrite_preprocess,
@@ -177,6 +207,8 @@ impl SolverStats {
             p.prop_abs,
             p.model,
             p.total(),
+            self.walk.visits,
+            self.walk.walks,
             rules_json.join(",")
         )
     }
@@ -305,15 +337,19 @@ pub struct Solver {
     /// Sticky, because the lowering replaces `assertions` once and every later
     /// check runs against the lowered form. See [`Solver::set_core`].
     string_lowered: bool,
-    /// This solver's assertions have been through the floating-point word
-    /// blasting. The FP lowering mints a fresh bit-variable for each
-    /// FP-sorted symbol *per run*, so a second run over a mix of
-    /// already-lowered and raw FP terms would give one source variable two
-    /// unrelated encodings — `(not (fp.eq x x))` checked, then
-    /// `(not (fp.isNaN x))` asserted, answered a wrong `sat` because the two
-    /// constraints stopped talking about the same `x`. Tracked so that any
-    /// later check that needs FP lowering first restores the pristine
-    /// assertions and lowers everything in a single run.
+    /// Set once the FP lowering has replaced `assertions` with their
+    /// word-blasted bit-vector forms.
+    ///
+    /// Unlike the string lowering this preserves the assertion *count*, so
+    /// `levels` stays valid and `push`/`pop` were never affected. What it does
+    /// change is the terms: after it, `f` in an existing assertion is a
+    /// bit-vector, so asserting more FP content and lowering only the new
+    /// formula gives the two occurrences of `f` different variables and they
+    /// never meet. `(fp.lt f g)` then `(fp.lt g f)` answered `sat` — and the
+    /// same severing reaches a check through raw theory content in its
+    /// *assumptions*, which never pass through `assert`; the lowering
+    /// branches below consult this flag and restore the pristine assertions
+    /// first so everything is lowered in one consistent run.
     fp_lowered: bool,
     /// Model from the last sat answer (complete over `declared`).
     model: Option<FxHashMap<SymbolId, Value>>,
@@ -321,9 +357,10 @@ pub struct Solver {
     pub declared: Vec<SymbolId>,
     pub validate_models: bool,
     pub stats: SolverStats,
-    /// Persistent solving state, reused while the assertion set grows
-    /// monotonically. Invalidated by pop (rebuild-on-pop keeps the logic
-    /// simple; angr-style workloads never pop — they use assumptions).
+    /// Persistent solving state. Survives a growing assertion set, and — once
+    /// it is built guarded (see [`Engine::acts`] and [`GUARD_AFTER_POPS`]) — a
+    /// `pop` as well. A change of assertion *identity*, i.e. string or
+    /// floating-point lowering rewriting the whole set, still discards it.
     engine: Option<Engine>,
     /// Cooperative termination flag, installed into every engine.
     terminate: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
@@ -353,7 +390,65 @@ pub struct Solver {
     /// `SMTRS_DUAL_ENCODE`; a field rather than an env read per check so tests
     /// can drive both sides without a process-global switch.
     dual_encode_max_secs: f64,
+    /// Cached DAG analysis of the assertion prefix; see [`PrefixScan`].
+    scan: PrefixScan,
+    /// Push levels retired so far. Guarded mode is engaged once this reaches
+    /// [`GUARD_AFTER_POPS`]; see [`Solver::guard_levels`].
+    pops: u32,
+    /// Consecutive guarded engines collected before they had amortised their
+    /// construction. See [`Solver::guard_futile`].
+    futile_collections: u8,
+    /// Guarding has been switched back off for this solver, permanently.
+    ///
+    /// [`Engine::retired_dominates`] collects a guarded engine once its
+    /// retired levels outweigh its live ones. If that keeps happening before
+    /// the engine has answered [`MIN_CHECKS_PER_ENGINE`] queries, each round
+    /// is about as big as the base: there is no large shared encoding for the
+    /// guard to protect, and guarding buys a rebuild per round or two while
+    /// charging every query the enlarged formula. That is the shape of the
+    /// highest-`pop` scripts in the corpus (`sum_10x0_true` runs 4 069 rounds
+    /// over a 274-variable formula) and of the search-bound BMC unrollings
+    /// (`VexRiscv-regch0-20`), and for both the honest answer is the old path,
+    /// exactly.
+    guard_futile: bool,
 }
+
+/// Premature collections in a row before guarding is abandoned for good (see
+/// [`Solver::guard_futile`]). More than one, so a single unrepresentative round
+/// does not decide it; small, so a script that is never going to benefit stops
+/// paying almost immediately.
+const GUARD_FUTILE_STREAK: u8 = 3;
+
+/// How many `pop`s a script must do before its push levels are encoded under
+/// activation literals (see [`Engine::acts`]) instead of being retired by
+/// rebuilding the engine.
+///
+/// Guarding is not free: substitution rewrites the terms of every assertion
+/// around a definition, so a retractable level cannot supply one, and the
+/// preprocessor's reach shrinks to the base level. Making that trade needs
+/// evidence that the script is going to keep popping, and the threshold is
+/// what that evidence costs.
+///
+/// **One pop is not evidence.** The engine a first pop finds was built by a
+/// preprocessor that could draw definitions from the level being retracted, so
+/// that engine has to go whatever we do — guarding cannot save that rebuild,
+/// it can only make the *next* pop cheap. Engaging at one pop therefore pays
+/// the encoding penalty immediately and collects nothing until a second pop
+/// arrives — and of the 738 files in the incremental tier that pop at all,
+/// **352 stop at exactly two**, so for nearly half of them the penalty is the
+/// whole story. Measured on the two-round `push/check-sat/pop` script
+/// `20190307-CPAchecker_kInduction/32_1_cilled_…marvell.ko`: engaging at the
+/// first pop encodes 1 310 SAT variables where rebuilding encodes 312 — 4.2x,
+/// for zero rebuilds saved.
+///
+/// **Two is.** A script that has popped twice is running a loop, and the loop
+/// is what the machinery is for. The price is one extra rebuild, and the
+/// repeating shapes run 4 to 7 267 rounds, so it is amortised immediately.
+///
+/// (Counts from the 2 503 files of `corpus/incremental/incremental/QF_BV`
+/// under 4 MB: 1 765 never pop, 45 pop once, 352 pop twice, 316 pop 4-10
+/// times, 25 pop more.)
+const GUARD_AFTER_POPS: u32 = 2;
 
 /// Floor and ceiling on the time the length abstraction may spend. See
 /// [`Solver::unknown_or_prop_unsat`].
@@ -373,14 +468,107 @@ struct Engine {
     /// most `subst_rounds`, so `apply_subst` iterates to a fixpoint.
     subst: FxHashMap<TermId, TermId>,
     subst_rounds: u32,
-    /// An asserted formula rewrote to false: unsat until a pop rebuilds.
+    /// An asserted formula that can never be retracted rewrote to false: unsat
+    /// for good. A formula inside a guarded push level that does the same
+    /// retires *its level* instead (a unit `¬act`), which is a fact about the
+    /// level and dies with it.
     hard_unsat: bool,
+    /// One entry per open push level, outermost first.
+    ///
+    /// Popping a level adds the permanent unit `¬act`, which retires its
+    /// clauses in place. Without it a pop had to discard the whole engine, and
+    /// a BMC script that brackets each query with `push`/`pop` — which is most
+    /// of the incremental tier — paid a full preprocess-and-blast per query
+    /// and threw away every learned clause with it.
+    ///
+    /// Learned clauses stay valid across the retirement: adding `¬act` only
+    /// strengthens the clause database, and everything learned from it was
+    /// already implied by the weaker one.
+    ///
+    /// Empty unless this engine was *built* guarded, which is what makes the
+    /// unguarded mode byte-for-byte the old encoding rather than a special
+    /// case of this one.
+    acts: Vec<Level>,
+    /// SAT variables belonging to levels already retired. Retiring a level
+    /// leaves its clauses in the database — satisfied, but still there — so
+    /// this is how much of the engine is dead weight, and it is what
+    /// [`Engine::retired_dominates`] weighs against the live part.
+    retired_vars: u32,
+    /// This engine was built with push levels held back from preprocessing, so
+    /// its levels can be retired in place. Recorded on the engine rather than
+    /// read off the solver at pop time, because it is a property of *how this
+    /// circuit was encoded*: an engine built before guarding was engaged has
+    /// definitions drawn from levels that are still open, and retiring one of
+    /// those in place would leave the definitions behind.
+    guarded: bool,
+    /// `SolverStats::checks` when this engine was built, so that collecting it
+    /// can say how many queries it answered. See [`Solver::guard_futile`].
+    checks_at_build: u64,
     /// Activation literal per tracked assertion, in this engine's variable
     /// numbering. Cached because the mapping is a property of the engine, not
     /// of the check: it must not change between the solve that produced a core
     /// and the one that verifies it, and freezing a variable twice would grow
     /// the SAT solver's pinned list on every incremental query.
     act_lits: FxHashMap<SymbolId, ActLit>,
+}
+
+/// An open push level inside a guarded [`Engine`].
+#[derive(Clone, Copy)]
+struct Level {
+    /// Length `blasted` had when the level was opened.
+    start: usize,
+    /// The literal everything asserted inside the level is blasted under.
+    /// Allocated on first use, so a level that asserts nothing — or asserts
+    /// only formulas that rewrite to `true` — costs no variable and no
+    /// assumption.
+    act: Option<smtrs_sat::Lit>,
+    /// SAT variable count when the level was opened. The difference against
+    /// the count at pop time is what the level cost, and therefore what
+    /// retiring it strands in the clause database.
+    vars_at_open: u32,
+}
+
+/// Checks a guarded engine must answer before its construction counts as
+/// amortised. Below this, [`Solver::guard_futile`] starts counting against it.
+///
+/// The trade guarding makes is fewer rebuilds in exchange for a slightly
+/// larger query formula (retired levels are satisfied, not deleted — see
+/// [`Engine::retired_dominates`]). An engine collected without having answered
+/// more than one query saved no rebuild at all and charged the enlargement to
+/// the one query it did answer, which is a pure loss.
+const MIN_CHECKS_PER_ENGINE: u64 = 2;
+
+/// How much dead weight a guarded engine may carry, as a percentage of its
+/// live encoding, before [`Engine::retired_dominates`] collects it.
+///
+/// This is the whole risk budget of the change, so it is set by what may be
+/// risked rather than by what could be gained. Retired levels are satisfied
+/// clauses, not deleted ones, and their Tseitin cones are unguarded — every
+/// query still assigns those variables. So this number *is* the ceiling on
+/// how much bigger a query gets than it was under the old rebuild-per-pop
+/// path, and 25 % is chosen to keep that ceiling small on a change whose
+/// benefit could not be timed.
+///
+/// It was 100 % first, and the instance that argued it down is
+/// `2018-Wolf-fmbench/VexRiscv-regch0-20-unrolled`: 21 propagation-only checks
+/// followed by one five-million-conflict proof. At 100 % its formula reached
+/// 1.34x and that final proof went from `unsat` to `unknown` under a 300 s
+/// per-check budget — the old path closes it within 5 026 783 conflicts, the
+/// enlarged one had not closed it after 8 620 128. A rebuild it does not need
+/// costs that instance a fraction of a second; a formula it does not need
+/// costs it the answer.
+const COLLECT_MAX_DEAD_PERCENT: u32 = 25;
+
+/// Whether a guarded engine reached [`Engine::retired_dominates`] without ever
+/// having amortised its construction — the signal [`Solver::guard_futile`]
+/// counts.
+///
+/// Measured in *checks answered*, not in pops. A persistent engine earns its
+/// construction by answering queries; scripts that pop several times between
+/// two `check-sat`s are common (`gcd_1` pops 1 097 times across 785 checks),
+/// and counting pops would read those engines as long and productive.
+fn collected_too_soon(checks_now: u64, e: &Engine) -> bool {
+    e.guarded && checks_now.saturating_sub(e.checks_at_build) < MIN_CHECKS_PER_ENGINE
 }
 
 impl Engine {
@@ -403,7 +591,65 @@ impl Engine {
             subst_rounds: self.subst_rounds,
             hard_unsat: self.hard_unsat,
             act_lits: self.act_lits.clone(),
+            acts: self.acts.clone(),
+            retired_vars: self.retired_vars,
+            guarded: self.guarded,
+            checks_at_build: self.checks_at_build,
         })
+    }
+
+    /// Activation literals of the open push levels. Every solve has to assume
+    /// these, or the clauses they guard carry no force at all.
+    fn live_acts(&self) -> Vec<smtrs_sat::Lit> {
+        self.acts.iter().filter_map(|l| l.act).collect()
+    }
+
+    /// The activation literal covering the assertion at index `idx`, creating
+    /// it if this is the level's first blasted assertion. `None` for the base
+    /// level, whose assertions are never retracted.
+    fn guard_for(&mut self, idx: usize) -> Option<smtrs_sat::Lit> {
+        let k = self.acts.iter().rposition(|l| l.start <= idx)?;
+        if self.acts[k].act.is_none() {
+            let v = self.sat.new_var();
+            // The level literal is assumed on every solve for as long as the
+            // level is open, and a unit `¬v` retires it. Both work on an
+            // eliminated variable — `add_clause` restores it — but pinning it
+            // keeps CNF preprocessing from doing that work and then undoing it.
+            self.sat.freeze_var(v);
+            self.acts[k].act = Some(v);
+        }
+        self.acts[k].act
+    }
+
+    /// Has this engine accumulated more dead weight than
+    /// [`COLLECT_MAX_DEAD_PERCENT`] of its live encoding?
+    ///
+    /// Retiring a level does not remove its clauses, it satisfies them, so a
+    /// script that runs thousands of `push`/`check-sat`/`pop` rounds against
+    /// one engine accumulates every round it has ever run. Left alone that
+    /// turns a fixed-size query into one whose clause database grows without
+    /// bound: measured on `20170501-Heizmann/sum_10x0_true`, 4 069 rounds over
+    /// a 274-variable formula end at 142 264 variables, and the search pays for
+    /// all of them on every query.
+    ///
+    /// So the engine is dropped and rebuilt once the dead part passes its
+    /// share. That is the standard amortised-collection bound, and it replaces
+    /// a hope with two guarantees: the database never exceeds the live formula
+    /// by more than that share, and total encoding work becomes proportional
+    /// to what the script asserts rather than to (rounds x whole formula). On
+    /// the shape this machinery exists for — a large base with a sliver added
+    /// per round — the trigger is reached rarely and rebuilds still collapse.
+    ///
+    /// The estimate is deliberately loose in one direction only. A
+    /// `vars_at_open` delta counts structure that later levels share and
+    /// therefore keep alive, and nested levels retired by separate `pop` calls
+    /// are charged twice. Both make the dead part look bigger than it is, so
+    /// the engine is collected slightly early — which is a step back towards
+    /// the old rebuild-per-pop behaviour, the safe direction to be wrong in.
+    fn retired_dominates(&self) -> bool {
+        let total = u64::from(self.sat.num_vars());
+        let dead = u64::from(self.retired_vars);
+        dead * 100 > total.saturating_sub(dead) * u64::from(COLLECT_MAX_DEAD_PERCENT)
     }
 }
 
@@ -464,6 +710,229 @@ fn apply_subst(
     cur
 }
 
+/// Everything the `check_sat` prologue needs to know about a term DAG.
+///
+/// Four questions — is there a string in here, is there a float, is there
+/// anything outside the Bool/BV fragment, and which variables need a value in
+/// the model — used to be four independent full post-orders over
+/// `assertions + assumptions`, on every single check. Each is *node-local*: it
+/// reads `pool.op(t)` and `pool.sort(t)` and nothing else. So one traversal
+/// answers all four, and a node already accounted for cannot change any answer
+/// by being visited again.
+#[derive(Default)]
+struct WalkFacts {
+    has_strings: bool,
+    has_fp: bool,
+    /// The first term found outside the Bool/BV fragment, in post-order — the
+    /// same one the full walk latched. Kept as a term rather than as a message
+    /// so the supported case never formats one.
+    unsupported: Option<TermId>,
+    /// `Op::Var` symbols met on this walk, in traversal order. A symbol appears
+    /// at most once: `pool.var` interns `Op::Var(sym)` with the symbol's own
+    /// sort, so one symbol is one term, and each term is visited at most once.
+    vars: Vec<SymbolId>,
+}
+
+/// Stamp meaning "reachable from the cached assertion prefix". Query walks use
+/// marks from 2 upwards, so a prefix node is skipped by every query.
+const PREFIX_MARK: u32 = 1;
+
+/// Cached whole-DAG analysis of a prefix of the assertion stack.
+///
+/// In the workload this solver exists for — angr replaying a stream of
+/// feasibility queries against one long-lived solver — the assertions are fixed
+/// and only the assumptions change, so all four answers above are the same on
+/// every call. Keeping them, together with the set of terms they were derived
+/// from, turns a per-query walk of the whole path condition into a walk of the
+/// one new constraint.
+///
+/// **Why it is allowed to be a cache.** The four facts are monotone unions over
+/// the node set: adding a term can turn `has_strings` on but never off, and can
+/// add a model symbol but never retract one. So extending the prefix is folding
+/// one more walk's facts in. Retracting the prefix is *not* expressible that
+/// way, and no attempt is made: [`PrefixScan::refresh`] throws the whole cache
+/// away the moment the live assertion vector stops extending the cached one,
+/// which is exactly what `pop` does to it.
+///
+/// **Why the stamps stay valid.** Terms are interned and never mutated or
+/// removed, so `stamp[t] == PREFIX_MARK` — "t and everything under it is
+/// already folded in" — cannot go stale while the prefix stands. It is dropped
+/// wholesale with the rest of the cache when the prefix does not.
+#[derive(Clone, Default)]
+struct PrefixScan {
+    /// Copy of the assertion prefix these facts cover. The live `assertions`
+    /// must still start with it for the cache to be reusable — a check that
+    /// catches `pop`'s truncation without `pop` having to know this exists.
+    asserts: Vec<TermId>,
+    /// Likewise for `declared`, which is public and may be assigned to.
+    declared: Vec<SymbolId>,
+    /// `stamp[t] == PREFIX_MARK` when `t` is reachable from `asserts`, and
+    /// equals the current query's mark when it was reached from this query's
+    /// assumptions.
+    stamp: Vec<u32>,
+    /// Mark used by the last query walk; the next one gets `mark + 1`.
+    mark: u32,
+    /// Parked DFS stack, so a query costs no allocation.
+    stack: Vec<(TermId, bool)>,
+    has_strings: bool,
+    has_fp: bool,
+    unsupported: Option<TermId>,
+    /// Symbols needing a model value: `declared` first (as before), then the
+    /// variables reachable from `asserts`, deduplicated.
+    model_syms: Vec<SymbolId>,
+    seen_syms: rustc_hash::FxHashSet<SymbolId>,
+}
+
+impl PrefixScan {
+    fn clear(&mut self) {
+        self.asserts.clear();
+        self.declared.clear();
+        // Emptying the stamp array is load-bearing, not tidying: `walk` only
+        // ever *grows* it, so anything left behind would read as already
+        // folded in and the rebuild would skip it — losing whatever fact that
+        // term carried. See `prefix_scan_rebuild_rewalks_already_stamped_terms`.
+        self.stamp.clear();
+        self.mark = PREFIX_MARK;
+        self.has_strings = false;
+        self.has_fp = false;
+        self.unsupported = None;
+        self.model_syms.clear();
+        self.seen_syms.clear();
+    }
+
+    /// One post-order sweep over `roots`, stamping each term with `mark` and
+    /// collecting the node-local facts of every term not already covered.
+    ///
+    /// Post-order, in `TermPool::post_order`'s exact order, even though nothing
+    /// here needs children before parents: it is what makes "the first
+    /// unsupported term" the same term the four separate walks reported.
+    fn walk(&mut self, pool: &TermPool, roots: &[TermId], mark: u32) -> WalkFacts {
+        if self.stamp.len() < pool.num_terms() {
+            self.stamp.resize(pool.num_terms(), 0);
+        }
+        let stamp = &mut self.stamp;
+        let stack = &mut self.stack;
+        let mut facts = WalkFacts::default();
+        let mut visits = 0u64;
+        stack.clear();
+        stack.extend(roots.iter().rev().map(|&r| (r, false)));
+        while let Some((t, children_done)) = stack.pop() {
+            let s = stamp[t.0 as usize];
+            // A prefix-stamped term has every descendant stamped too
+            // (reachability), so not descending into it is safe.
+            if s == PREFIX_MARK || s == mark {
+                continue;
+            }
+            if children_done {
+                stamp[t.0 as usize] = mark;
+                visits += 1;
+                let sort = pool.sort(t);
+                let op = pool.op(t);
+                if matches!(sort, Sort::Str | Sort::RegLan) {
+                    facts.has_strings = true;
+                }
+                if op.is_fp() || matches!(sort, Sort::Float(..) | Sort::RoundingMode) {
+                    facts.has_fp = true;
+                }
+                if let Op::Var(sym) = op {
+                    facts.vars.push(sym);
+                }
+                if facts.unsupported.is_none() && Solver::unsupported_node(pool, t) {
+                    facts.unsupported = Some(t);
+                }
+            } else {
+                stack.push((t, true));
+                for &c in pool.args(t).iter().rev() {
+                    let cs = stamp[c.0 as usize];
+                    if cs != PREFIX_MARK && cs != mark {
+                        stack.push((c, false));
+                    }
+                }
+            }
+        }
+        pool.record_walk(visits);
+        facts
+    }
+
+    /// Fold `roots` into the persistent prefix.
+    fn extend_prefix(&mut self, pool: &TermPool, roots: &[TermId]) {
+        let f = self.walk(pool, roots, PREFIX_MARK);
+        self.has_strings |= f.has_strings;
+        self.has_fp |= f.has_fp;
+        // `or`, not `unwrap_or`: an earlier assertion's offending term comes
+        // first in the walk of the whole set, so it is the one to report.
+        self.unsupported = self.unsupported.or(f.unsupported);
+        for s in f.vars {
+            if self.seen_syms.insert(s) {
+                self.model_syms.push(s);
+            }
+        }
+    }
+
+    /// Bring the cache up to date with `assertions` and `declared`, rebuilding
+    /// from scratch if the live vectors no longer extend the cached ones.
+    fn refresh(&mut self, pool: &TermPool, assertions: &[TermId], declared: &[SymbolId]) {
+        let extends = assertions.len() >= self.asserts.len()
+            && assertions[..self.asserts.len()] == self.asserts[..]
+            && declared.len() >= self.declared.len()
+            && declared[..self.declared.len()] == self.declared[..]
+            // Query marks are never reused, so a term stamped by an earlier
+            // query reads as unvisited now. On the (unreachable in practice)
+            // wrap, throw the cache away rather than believe a stale stamp.
+            && self.mark < u32::MAX;
+        if !extends {
+            self.clear();
+        }
+        // `declared` is folded in before the assertion walk so that a solver
+        // configured the usual way — declarations, then assertions, then checks
+        // — produces exactly the model-symbol order the from-scratch walk did.
+        let n_declared = self.declared.len();
+        if declared.len() > n_declared {
+            for &s in &declared[n_declared..] {
+                if self.seen_syms.insert(s) {
+                    self.model_syms.push(s);
+                }
+            }
+            self.declared.extend_from_slice(&declared[n_declared..]);
+        }
+        if assertions.len() > self.asserts.len() {
+            // `assertions` is the caller's slice, not borrowed from `self`, so
+            // the new tail can be walked in place rather than copied first.
+            let n = self.asserts.len();
+            self.extend_prefix(pool, &assertions[n..]);
+            self.asserts.extend_from_slice(&assertions[n..]);
+        }
+    }
+
+    /// Answer the four questions for `assertions + assumptions`, walking only
+    /// what the prefix does not already cover.
+    fn query(&mut self, pool: &TermPool, assumptions: &[TermId]) -> QueryFacts {
+        self.mark = self.mark.max(PREFIX_MARK) + 1;
+        let mark = self.mark;
+        let f = self.walk(pool, assumptions, mark);
+        let mut model_syms = Vec::with_capacity(self.model_syms.len() + f.vars.len());
+        model_syms.extend_from_slice(&self.model_syms);
+        model_syms.extend(f.vars.iter().filter(|s| !self.seen_syms.contains(s)));
+        QueryFacts {
+            has_strings: self.has_strings || f.has_strings,
+            has_fp: self.has_fp || f.has_fp,
+            unsupported: self.unsupported.or(f.unsupported),
+            model_syms,
+        }
+    }
+}
+
+/// Facts about one check's roots: the cached prefix answers, widened by
+/// whatever the assumptions on top of them contribute.
+struct QueryFacts {
+    has_strings: bool,
+    has_fp: bool,
+    unsupported: Option<TermId>,
+    /// `declared`, then the variables reachable from the assertions, then those
+    /// only the assumptions reach — the order the from-scratch walk produced.
+    model_syms: Vec<SymbolId>,
+}
+
 impl Default for Solver {
     fn default() -> Self {
         Self::new()
@@ -492,6 +961,10 @@ impl Solver {
             lowered_assumptions: Vec::new(),
             check_start: std::time::Instant::now(),
             dual_encode_max_secs: dual_encode_max_secs(),
+            scan: PrefixScan::default(),
+            pops: 0,
+            futile_collections: 0,
+            guard_futile: false,
         }
     }
 
@@ -542,6 +1015,14 @@ impl Solver {
             lowered_assumptions: self.lowered_assumptions.clone(),
             check_start: std::time::Instant::now(),
             dual_encode_max_secs: dual_encode_max_secs(),
+            // The fork's assertions and declarations are the parent's, so the
+            // parent's analysis of them is the fork's too. The two copies then
+            // diverge over a shared pool, which is fine: each is validated
+            // against its own solver's assertion vector.
+            scan: self.scan.clone(),
+            pops: self.pops,
+            futile_collections: self.futile_collections,
+            guard_futile: self.guard_futile,
         }
     }
 
@@ -702,15 +1183,78 @@ impl Solver {
         }
     }
 
+    /// Should an engine built *now* hold push levels back from preprocessing
+    /// and encode them under activation literals?
+    ///
+    /// Two conditions. [`GUARD_AFTER_POPS`] is the evidence that the script
+    /// pops repeatedly and the trade is worth making. The second is bounded
+    /// string lowering: it replaces the assertion set with
+    /// `lowered ++ side_constraints`, and the side constraints land at the
+    /// *end*, i.e. inside whatever push level happens to be open. Guarding
+    /// those would let a `pop` retire an encoding constraint that belongs to a
+    /// base-level assertion, so a lowered problem keeps the rebuild-on-pop
+    /// path.
+    fn guard_levels(&self) -> bool {
+        self.pops >= GUARD_AFTER_POPS && !self.string_lowered && !self.guard_futile
+    }
+
+    /// Retract the innermost `n` push levels.
+    ///
+    /// Against a guarded engine the circuit survives *and stays usable*:
+    /// everything asserted inside a level was blasted under that level's
+    /// activation literal, so falsifying it permanently retires the level's
+    /// clauses while the base encoding, the AIG, and every learned clause stay
+    /// where they are.
+    ///
+    /// An unguarded engine is left exactly as it is. It cannot be trusted for
+    /// the smaller assertion set — its preprocessor was free to draw
+    /// definitions from the level just retracted — but it does not have to be
+    /// discarded here to say so: `check_sat_lowered` reuses an engine only
+    /// while the assertion set still extends `Engine::blasted`, and a pop is
+    /// what breaks that. Throwing it away here would also throw away the one
+    /// case where it survives honestly — a script that re-asserts the same
+    /// terms after popping them restores the prefix, and the engine it built
+    /// still describes them exactly.
     pub fn pop(&mut self, n: u32) {
         // A core names activation symbols; `pop` can retire the assertions
         // they belong to, so the previous check's core stops being a statement
         // about the current assertion set. Drop it rather than let it be read.
         self.core = CoreState::Absent;
         for _ in 0..n {
-            if let Some(len) = self.levels.pop() {
-                self.pristine.truncate(len);
-                self.tracked.truncate(len);
+            let Some(len) = self.levels.pop() else { break };
+            // Truncate `pristine`, not `assertions`: `levels` indexes the
+            // originals (see `push`), and the working set is rebuilt from them
+            // below. In guarded mode no lowering has run (`guard_levels`
+            // refuses to guard a lowered set), so `pristine`, `assertions` and
+            // `Engine::blasted` share this indexing.
+            self.pristine.truncate(len);
+            self.tracked.truncate(len);
+            self.pops += 1;
+            match &mut self.engine {
+                Some(e) if e.guarded => {
+                    // Everything allocated since the outermost retired level
+                    // was opened is now dead weight; see `retired_dominates`.
+                    // Taken once over the whole retirement so that nested
+                    // levels are not counted twice.
+                    let mut oldest = e.sat.num_vars();
+                    while e.acts.len() > self.levels.len() {
+                        let level = e.acts.pop().expect("acts outnumber levels");
+                        oldest = oldest.min(level.vars_at_open);
+                        if let Some(a) = level.act {
+                            // Not needed to retire the level — dropping the
+                            // literal from the assumption set already lets the
+                            // guarded clauses be satisfied by a false `act`.
+                            // It is added because it is *permanent*: at level
+                            // zero the solver can propagate through the
+                            // retirement instead of re-deciding `act` on every
+                            // later query.
+                            e.sat.add_clause(&[!a]);
+                        }
+                    }
+                    e.retired_vars = e.retired_vars.saturating_add(e.sat.num_vars() - oldest);
+                    e.blasted.truncate(len);
+                }
+                _ => {}
             }
         }
         // Rebuild the working set from the originals. When no lowering has run
@@ -729,6 +1273,17 @@ impl Solver {
 
     pub fn model(&self) -> Option<&FxHashMap<SymbolId, Value>> {
         self.model.as_ref()
+    }
+
+    /// Live SAT search counters of the current engine, or `None` when there is
+    /// no engine or the backend keeps none.
+    ///
+    /// `stats.sat_counters` is a snapshot taken at the end of `check_sat`, so
+    /// it misses the solves `minimize`/`maximize`/`eval_n` run on top of one.
+    /// This reads the engine directly, which is what an A/B on those streams
+    /// has to compare — they are the queries angr floods the solver with.
+    pub fn sat_counters(&self) -> Option<smtrs_sat::SatCounters> {
+        self.engine.as_ref().and_then(|e| e.sat.counters())
     }
 
     /// Report unsatisfiability, downgrading to `unknown` when the encoding
@@ -877,30 +1432,63 @@ impl Solver {
         }
     }
 
+    /// Is this one node outside the supported Bool/BV fragment?
+    ///
+    /// Node-local by construction — it reads `op(t)` and `sort(t)` and nothing
+    /// else — which is what lets the answer for a whole DAG be cached and
+    /// extended one subtree at a time (see [`PrefixScan`]).
+    fn unsupported_node(pool: &TermPool, t: TermId) -> bool {
+        match pool.op(t) {
+            Op::Other { .. } => true,
+            // `pool.var` interns with the symbol's own sort, so the node sort
+            // and `pool.symbol(sym).sort` are the same thing.
+            Op::Var(sym) => !matches!(pool.symbol(sym).sort, Sort::Bool | Sort::BitVec(_)),
+            _ => false,
+        }
+    }
+
+    /// Why `t` is outside the fragment. Formatted on demand, so the supported
+    /// case never builds a string.
+    fn unsupported_message(pool: &TermPool, t: TermId) -> String {
+        match pool.op(t) {
+            Op::Other { name, .. } => format!("operator {}", pool.symbol(name).name),
+            Op::Var(sym) => format!("sort {}", pool.symbol(sym).sort),
+            // Only the two arms above can be reported by `unsupported_node`.
+            _ => format!("term {}", pool.display(t)),
+        }
+    }
+
+    /// Everything the prologue needs to know about `assertions + assumptions`,
+    /// answered against the cached analysis of the assertion prefix.
+    ///
+    /// The assertions are *not* passed in: they are the prefix, so `refresh`
+    /// has just folded every one of them in and a query only ever walks what
+    /// the assumptions add on top.
+    fn scan_roots(&mut self, pool: &TermPool, assumptions: &[TermId]) -> QueryFacts {
+        self.scan.refresh(pool, &self.assertions, &self.declared);
+        self.scan.query(pool, assumptions)
+    }
+
     /// Detect content outside the supported Bool/BV fragment.
+    ///
+    /// Uncached, and used only off the common path (`term_bit_lits`); the
+    /// prologue reads the same answer out of [`PrefixScan`]. Stopping at the
+    /// first offending node reports the same node the old full walk latched,
+    /// because `find_post_order` visits in the same order.
     fn unsupported_reason(&self, pool: &TermPool, roots: &[TermId]) -> Option<String> {
-        let mut reason = None;
-        pool.post_order(roots, |pool, t| {
-            if reason.is_some() {
-                return;
-            }
-            match pool.op(t) {
-                Op::Other { name, .. } => {
-                    reason = Some(format!("operator {}", pool.symbol(name).name));
-                }
-                Op::Var(sym) => {
-                    let s = pool.symbol(sym).sort;
-                    if !matches!(s, Sort::Bool | Sort::BitVec(_)) {
-                        reason = Some(format!("sort {s}"));
-                    }
-                }
-                _ => {}
-            }
-        });
-        reason
+        pool.find_post_order(roots, Self::unsupported_node)
+            .map(|t| Self::unsupported_message(pool, t))
     }
 
     pub fn check_sat(&mut self, pool: &mut TermPool, assumptions: &[TermId]) -> Answer {
+        let answer = self.check_sat_inner(pool, assumptions);
+        // Every `unknown` path returns early out of `check_sat_inner`, so the
+        // walk counters are read here rather than at any one of them.
+        self.stats.walk = pool.walk_counters();
+        answer
+    }
+
+    fn check_sat_inner(&mut self, pool: &mut TermPool, assumptions: &[TermId]) -> Answer {
         self.stats.checks += 1;
         self.check_start = std::time::Instant::now();
         self.model = None;
@@ -928,15 +1516,23 @@ impl Solver {
             roots.clone()
         };
 
+        // One walk for all four questions, and only over what the cached
+        // analysis of the assertion prefix does not already cover. The order of
+        // the tests below is the order it always was, and it matters:
+        // `unsupported` is only consulted once strings and floats have been
+        // lowered away, because before that a `Float` sort *is* an unsupported
+        // sort.
+        let facts = self.scan_roots(pool, assumptions);
+
         // Strings are reduced to bounded bit-vectors up front.
-        if smtrs_str::contains_strings(pool, &roots) {
+        if facts.has_strings {
             // A previous check's lowering replaced the assertion set, and its
             // encoding variables are minted per run: lowering this check's
-            // raw string content (assumptions, typically) against the
-            // already-lowered assertions would give the same source variable
-            // two unrelated encodings. Restore the originals and lower
-            // everything in one consistent run. See `fp_lowered`, whose bug
-            // this is the string twin of.
+            // raw string content (assumptions, typically — `assert` already
+            // undoes on its own) against the already-lowered assertions would
+            // give the same source variable two unrelated encodings. Restore
+            // the originals and lower everything in one consistent run. The
+            // scan cache self-heals on the prefix change (see `refresh`).
             if self.string_lowered || self.fp_lowered {
                 self.undo_lowering();
                 (roots, self.orig_roots) = self.rebuilt_roots(assumptions);
@@ -964,11 +1560,28 @@ impl Solver {
                     self.lowered_assumptions = lowered_assumptions.clone();
                     let mut roots2 = self.assertions.clone();
                     roots2.extend_from_slice(&lowered_assumptions);
-                    if let Some(reason) = self.unsupported_reason(pool, &roots2) {
-                        let r = format!("unsupported: {reason}");
+                    // Lowering replaced the assertions, so the cached analysis
+                    // is of formulas that no longer exist.
+                    //
+                    // Belt and braces, and known to be: mutation testing says
+                    // deleting this line fails nothing, because `refresh`
+                    // notices anyway — the live vector no longer extends the
+                    // cached one. It is kept because that argument runs through
+                    // a property of `smtrs_str::lower` in another crate (an
+                    // assertion carrying string content cannot come back
+                    // unchanged), and this line does not.
+                    self.scan.clear();
+                    let f2 = self.scan_roots(pool, &lowered_assumptions);
+                    if let Some(t) = f2.unsupported {
+                        let r = format!("unsupported: {}", Self::unsupported_message(pool, t));
                         return self.unknown_or_prop_unsat(pool, &r);
                     }
-                    return self.check_sat_lowered(pool, &lowered_assumptions, roots2);
+                    return self.check_sat_lowered(
+                        pool,
+                        &lowered_assumptions,
+                        roots2,
+                        f2.model_syms,
+                    );
                 }
                 Err(e) => {
                     if std::env::var_os("SMTRS_DEBUG").is_some() {
@@ -981,14 +1594,10 @@ impl Solver {
 
         // Floating point is word-blasted to bit-vectors up front, so the rest
         // of the pipeline only ever sees Bool/BV.
-        let fp_present = smtrs_fp::contains_fp(pool, &roots);
-        if fp_present {
-            // The lowering names each FP variable's bit-vector afresh per
-            // run. If a previous check already lowered the assertion set,
-            // this check's raw FP terms (new assertions or assumptions)
-            // would be encoded against *different* bit-variables than the
-            // lowered set uses — so restore the originals and lower
-            // everything in one consistent run. See `fp_lowered`.
+        if facts.has_fp {
+            // As for strings above: raw FP content in the assumptions after a
+            // lowered check must not be encoded against a different vintage of
+            // bit-variables than the lowered assertions use. See `fp_lowered`.
             if self.fp_lowered || self.string_lowered {
                 self.undo_lowering();
                 (roots, self.orig_roots) = self.rebuilt_roots(assumptions);
@@ -1001,28 +1610,33 @@ impl Solver {
             };
             let n = self.assertions.len();
             self.assertions = lowered[..n].to_vec();
+            self.fp_lowered = true;
             let lowered_assumptions: Vec<TermId> = lowered[n..].to_vec();
             if self.produce_cores {
                 self.tracked.resize(self.assertions.len(), None);
             }
-            self.fp_lowered = true;
             self.engine = None; // assertion terms changed identity
             self.lowered_assumptions = lowered_assumptions.clone();
             let mut roots2 = self.assertions.clone();
             roots2.extend_from_slice(&lowered_assumptions);
             roots = roots2;
-            if let Some(reason) = self.unsupported_reason(pool, &roots) {
-                let r = format!("unsupported: {reason}");
+            // Same rescan-from-scratch as the string path, and the same
+            // belt-and-braces note: FP lowering gives the assertions new term
+            // identities, which `refresh` would notice on its own.
+            self.scan.clear();
+            let f2 = self.scan_roots(pool, &lowered_assumptions);
+            if let Some(t) = f2.unsupported {
+                let r = format!("unsupported: {}", Self::unsupported_message(pool, t));
                 return self.unknown_or_prop_unsat(pool, &r);
             }
-            return self.check_sat_lowered(pool, &lowered_assumptions, roots);
+            return self.check_sat_lowered(pool, &lowered_assumptions, roots, f2.model_syms);
         }
 
-        if let Some(reason) = self.unsupported_reason(pool, &roots) {
-            let r = format!("unsupported: {reason}");
+        if let Some(t) = facts.unsupported {
+            let r = format!("unsupported: {}", Self::unsupported_message(pool, t));
             return self.unknown_or_prop_unsat(pool, &r);
         }
-        self.check_sat_lowered(pool, assumptions, roots)
+        self.check_sat_lowered(pool, assumptions, roots, facts.model_syms)
     }
 
     fn check_sat_lowered(
@@ -1030,15 +1644,49 @@ impl Solver {
         pool: &mut TermPool,
         assumptions: &[TermId],
         roots: Vec<TermId>,
+        model_syms: Vec<SymbolId>,
     ) -> Answer {
+        // Collect an engine whose retired levels have come to outweigh its
+        // live ones, before asking whether it can be reused. An engine that
+        // never survived more than one round says guarding is not paying here;
+        // a streak of those switches it off (see `Solver::guard_futile`).
+        if self.engine.as_ref().is_some_and(Engine::retired_dominates) {
+            let futile = self
+                .engine
+                .as_ref()
+                .is_some_and(|e| collected_too_soon(self.stats.checks, e));
+            self.futile_collections = if futile {
+                self.futile_collections.saturating_add(1)
+            } else {
+                0
+            };
+            if self.futile_collections >= GUARD_FUTILE_STREAK {
+                self.guard_futile = true;
+            }
+            self.engine = None;
+        }
         // (Re)build the engine, or extend it with newly asserted formulas.
         let reusable = self
             .engine
             .as_ref()
             .is_some_and(|e| self.assertions.starts_with(&e.blasted));
+        // In guarded mode, substitution-based preprocessing may only draw
+        // definitions from assertions that can never be retracted, since it
+        // rewrites the terms of every assertion around them. That is exactly
+        // the base level; anything above the first open push is left to the
+        // extension pass below, which blasts it under the level's activation
+        // literal. Until guarding is engaged there is nothing to protect, and
+        // preprocessing sees the whole assertion set as it always did.
+        let guard_levels = self.guard_levels();
+        let base_len = match self.levels.first() {
+            Some(&n) if guard_levels => n.min(self.assertions.len()),
+            _ => self.assertions.len(),
+        };
         let mut blast_secs = 0.0f64;
         if !reusable {
+            self.stats.rebuilds += 1;
             self.engine = None;
+            let base = &self.assertions[..base_len];
             // The flattening rules consult a *refcount* to decide whether
             // re-associating a sum would destroy blaster reuse, and that proxy
             // is wrong in both directions: honouring it cost `Sage2/bench_16251`
@@ -1067,14 +1715,14 @@ impl Solver {
                 // flattening decisions in the rewriter. This is the "assertion set
                 // was rebuilt" case `count_parents` exists for; the per-round
                 // recounts inside `preprocess` are the other caller.
-                preprocess::count_parents(pool, &self.assertions, &mut rewriter);
+                preprocess::count_parents(pool, base, &mut rewriter);
                 if let Some(f) = &self.terminate {
                     rewriter.set_terminate(f.clone());
                 }
                 rewriter.set_size_budget(rewrite_size_budget(pool.num_terms()));
                 let allow_subst = std::env::var_os("SMTRS_NO_SUBST").is_none();
                 let t_rw = std::time::Instant::now();
-                let mut pre = preprocess(pool, &mut rewriter, &self.assertions, allow_subst);
+                let mut pre = preprocess(pool, &mut rewriter, base, allow_subst);
                 if rewriter.over_budget() && !rewriter.interrupted() {
                     // Rewriting grew the DAG out of all proportion to the input
                     // — extract pushdown across a term whose slice boundaries
@@ -1086,12 +1734,12 @@ impl Solver {
                     // independently.
                     rewriter = Rewriter::new();
                     rewriter.share_guard = share_guard;
-                    preprocess::count_parents(pool, &self.assertions, &mut rewriter);
+                    preprocess::count_parents(pool, base, &mut rewriter);
                     if let Some(f) = &self.terminate {
                         rewriter.set_terminate(f.clone());
                     }
                     rewriter.set_conservative(true);
-                    pre = preprocess(pool, &mut rewriter, &self.assertions, allow_subst);
+                    pre = preprocess(pool, &mut rewriter, base, allow_subst);
                     rewriter.stats.insert("size-budget-retry", 1);
                 }
                 self.stats.phases.rewrite_preprocess += t_rw.elapsed().as_secs_f64();
@@ -1140,12 +1788,16 @@ impl Solver {
                         b
                     },
                     rewriter,
-                    blasted: self.assertions.clone(),
+                    blasted: base.to_vec(),
                     defs: Vec::new(),
                     subst: FxHashMap::default(),
                     subst_rounds: 0,
                     hard_unsat: false,
                     act_lits: FxHashMap::default(),
+                    acts: Vec::new(),
+                    retired_vars: 0,
+                    guarded: guard_levels,
+                    checks_at_build: self.stats.checks,
                 };
                 match pre {
                     None => engine.hard_unsat = true,
@@ -1247,31 +1899,68 @@ impl Solver {
                 eprintln!("; dual_encode: chose {best_size} sat vars");
             }
             self.engine = best;
-        } else {
+        }
+        // Extend the engine with everything not blasted yet: the assertions
+        // added since the last check, plus — after a rebuild in guarded mode —
+        // everything above the base level, which preprocessing deliberately
+        // skipped. On the unguarded path `base_len` is the whole assertion set,
+        // so after a rebuild this loop runs zero times.
+        {
             let e = self.engine.as_mut().expect("engine exists");
-            let new: Vec<TermId> = self.assertions[e.blasted.len()..].to_vec();
+            // Mirror the open push levels into activation-literal slots. Keyed
+            // off the engine's own flag, so an engine built before guarding was
+            // engaged keeps blasting plain units — with no slots every
+            // assertion blasts exactly as it did before push levels were made
+            // retractable.
+            let levels: &[usize] = if e.guarded { &self.levels } else { &[] };
+            while e.acts.len() < levels.len() {
+                let start = levels[e.acts.len()];
+                let vars_at_open = e.sat.num_vars();
+                e.acts.push(Level {
+                    start,
+                    act: None,
+                    vars_at_open,
+                });
+            }
+            let start = e.blasted.len();
+            let new: Vec<TermId> = self.assertions[start..].to_vec();
             let t_inc = std::time::Instant::now();
             let mut interrupted = false;
-            for a in new {
+            for (off, &a) in new.iter().enumerate() {
+                if e.hard_unsat {
+                    break; // nothing left to learn; skip the encoding work
+                }
                 let s = apply_subst(pool, &e.subst, e.subst_rounds, a);
                 let rw = e.rewriter.rewrite(pool, s);
                 if e.rewriter.interrupted() {
                     interrupted = true;
                     break;
                 }
-                if rw == pool.false_term {
-                    e.hard_unsat = true;
-                    break;
+                if rw == pool.true_term {
+                    // Nothing to assert, so the level gets no activation
+                    // literal on account of this one.
+                    continue;
                 }
-                if rw != pool.true_term {
-                    e.blaster.assert_true(pool, rw, &mut e.sat);
+                let guard = e.guard_for(start + off);
+                if rw == pool.false_term {
+                    match guard {
+                        // The level contradicts itself, which is a fact about
+                        // the level and must not outlive it.
+                        Some(g) => e.sat.add_clause(&[!g]),
+                        None => {
+                            e.hard_unsat = true;
+                            break;
+                        }
+                    }
+                } else {
+                    e.blaster.assert_true_guarded(pool, rw, &mut e.sat, guard);
                 }
                 if e.blaster.interrupted() {
                     interrupted = true;
                     break;
                 }
             }
-            e.blasted = self.assertions.clone();
+            e.blasted.extend_from_slice(&new);
             blast_secs += t_inc.elapsed().as_secs_f64();
             if interrupted {
                 self.stats.phases.blast += blast_secs;
@@ -1281,7 +1970,10 @@ impl Solver {
         self.stats.phases.blast += blast_secs;
 
         let e = self.engine.as_mut().expect("engine exists");
-        self.stats.rewrites_applied = e.rewriter.stats.clone();
+        // `clone_from` reuses the destination's table across checks; a fresh
+        // clone per check is a per-query allocation with no reader that needs
+        // it (hygiene, not a measured win — see docs/REJECTED.md).
+        self.stats.rewrites_applied.clone_from(&e.rewriter.stats);
         if std::env::var_os("SMTRS_DEBUG").is_some() {
             eprintln!(
                 "; debug: terms={} blasted_assertions={} aig_gates={} sat_vars={}",
@@ -1302,7 +1994,12 @@ impl Solver {
 
         // Assumptions become SAT-level assumption literals: nothing about the
         // engine changes across assumption-only checks (angr's usage pattern).
-        let mut assumption_lits = Vec::with_capacity(assumptions.len());
+        // The open push levels' activation literals ride along at the front —
+        // they are what makes the clauses of the current context active at all,
+        // and they belong in `user_lits` below because they are in force for
+        // the answer while naming no tracked assertion.
+        let mut assumption_lits = e.live_acts();
+        assumption_lits.reserve(assumptions.len());
         for &a in assumptions {
             let s = apply_subst(pool, &e.subst, e.subst_rounds, a);
             let rw = e.rewriter.rewrite(pool, s);
@@ -1391,38 +2088,6 @@ impl Solver {
             }
         }
 
-        // Variables to give values to: everything appearing in the roots
-        // (FP lowering introduces fresh IEEE-bit variables that models and
-        // validation both need) plus the user-declared constants.
-        let mut model_syms: Vec<SymbolId> = Vec::new();
-        {
-            let mut seen: rustc_hash::FxHashSet<SymbolId> = rustc_hash::FxHashSet::default();
-            for &s in &self.declared {
-                if seen.insert(s) {
-                    model_syms.push(s);
-                }
-            }
-            pool.post_order(&roots, |pool, t| {
-                if let Op::Var(sym) = pool.op(t) {
-                    if seen.insert(sym) {
-                        model_syms.push(sym);
-                    }
-                }
-            });
-        }
-        let var_bits: Vec<(SymbolId, Option<VarBits>)> = model_syms
-            .iter()
-            .map(|&sym| {
-                let var = pool.var(sym);
-                let bits = match pool.symbol(sym).sort {
-                    Sort::Bool => e.blaster.bool_lit(var).map(VarBits::Bool),
-                    Sort::BitVec(_) => e.blaster.bv_bits(var).cloned().map(VarBits::Bv),
-                    _ => None,
-                };
-                (sym, bits)
-            })
-            .collect();
-
         if let Ok(path) = std::env::var("SMTRS_DUMP_CNF") {
             e.sat.dump_dimacs(&path);
             eprintln!("; dumped CNF to {path}");
@@ -1467,6 +2132,32 @@ impl Solver {
             SatResult::Sat => {}
         }
         let t_model = std::time::Instant::now();
+        let t_visits = pool.walk_counters();
+
+        // Variables to give values to: everything appearing in the roots
+        // (FP lowering introduces fresh IEEE-bit variables that models and
+        // validation both need) plus the user-declared constants. The list
+        // comes pre-collected from the caller's [`PrefixScan`], in the order
+        // the walk that used to live here produced.
+        //
+        // The literal lookups stay *after* the verdict: they are work done for
+        // the model — an `unsat` or `unknown` check has no model, so doing
+        // them before the solve made every refutation pay for one. Nothing
+        // here can affect the search: it only reads the blaster's
+        // term-to-literal map, which the solve does not touch.
+        let var_bits: Vec<(SymbolId, Option<VarBits>)> = model_syms
+            .iter()
+            .map(|&sym| {
+                let var = pool.var(sym);
+                let bits = match pool.symbol(sym).sort {
+                    Sort::Bool => e.blaster.bool_lit(var).map(VarBits::Bool),
+                    Sort::BitVec(_) => e.blaster.bv_bits(var).cloned().map(VarBits::Bv),
+                    _ => None,
+                };
+                (sym, bits)
+            })
+            .collect();
+
         // Model reconstruction with completion: unconstrained -> 0/false.
         let mut model: FxHashMap<SymbolId, Value> = FxHashMap::default();
         let defined: rustc_hash::FxHashSet<SymbolId> = e.defs.iter().map(|(s, _)| *s).collect();
@@ -1496,8 +2187,18 @@ impl Solver {
         // Eliminated variables: evaluate defining terms in reverse
         // recording order (each RHS references only surviving vars or
         // later-recorded defs).
+        //
+        // One evaluator for the whole sequence, and for the validation pass
+        // below. Preprocessing can eliminate thousands of variables whose
+        // defining terms are chained (`t[i]` built from `t[i-1]`), so their
+        // cones almost entirely coincide; a standalone `eval` per definition
+        // re-walks that shared cone once per definition and allocates a fresh
+        // value cache each time. Sound because the sequence only ever *extends*
+        // `model` — a value once computed is never revised — which is exactly
+        // the contract `Evaluator` states.
+        let mut ev = smtrs_core::Evaluator::default();
         for (sym, rhs) in e.defs.iter().rev() {
-            match eval(pool, &[*rhs], &model) {
+            match ev.eval(pool, &[*rhs], &model) {
                 Ok(vals) => {
                     model.insert(*sym, vals[0].clone());
                 }
@@ -1529,7 +2230,7 @@ impl Solver {
                     );
                 }
             }
-            match eval(pool, &roots, &model) {
+            match ev.eval(pool, &roots, &model) {
                 Ok(vals) => {
                     if let Some(i) = vals.iter().position(|v| v != &Value::Bool(true)) {
                         panic!(
@@ -1544,6 +2245,13 @@ impl Solver {
         }
 
         self.model = Some(model);
+        // Re-read: giving a value to a declared symbol that occurs in no
+        // assertion mints its `Var` node, and that now happens here rather
+        // than before the solve.
+        self.stats.terms = pool.num_terms();
+        let now = pool.walk_counters();
+        self.stats.model_traversals += now.walks - t_visits.walks;
+        self.stats.model_visits += now.visits - t_visits.visits;
         self.stats.phases.model += t_model.elapsed().as_secs_f64();
         Answer::Sat
     }
@@ -1641,6 +2349,10 @@ impl Solver {
         };
         let e = self.engine.as_mut().expect("engine exists");
         let mut lits = acts;
+        // The open push levels, for the same reason: their clauses are inert
+        // without them, so a direct `sat.solve` would run on a formula missing
+        // everything asserted inside the current scope.
+        lits.extend(e.live_acts());
         lits.reserve(terms.len());
         for &a in terms {
             let s = apply_subst(pool, &e.subst, e.subst_rounds, a);
@@ -2047,6 +2759,127 @@ mod tests {
         assert_eq!(a, vec![Answer::Unsat]);
     }
 
+    /// Model reconstruction shares one `Evaluator` across every eliminated
+    /// variable's defining term. This is the shape that exercises it: a long
+    /// chain of top-level equalities, which preprocessing substitutes out, so
+    /// the model is rebuilt definition by definition in reverse over cones
+    /// that almost entirely coincide. A memo that leaked a stale value between
+    /// links would put one link out of step with its own equation, so the test
+    /// re-derives the whole chain in Rust from the model's value for `b` and
+    /// requires agreement at every link.
+    #[test]
+    fn long_definition_chain_reconstructs_every_eliminated_variable() {
+        const N: usize = 40;
+        let mut s = String::from("(declare-const b (_ BitVec 32))\n");
+        for i in 0..N {
+            s.push_str(&format!("(declare-const t{i} (_ BitVec 32))\n"));
+        }
+        s.push_str("(assert (= t0 (bvadd b #x00000007)))\n");
+        for i in 1..N {
+            s.push_str(&format!(
+                "(assert (= t{i} (bvadd (bvxor t{p} #x{k:08x}) (bvmul t{p} #x00000003))))\n",
+                p = i - 1,
+                k = (i as u32).wrapping_mul(2_654_435_761)
+            ));
+        }
+        s.push_str(&format!("(assert (bvult t{} #x80000000))\n", N - 1));
+        s.push_str("(check-sat)");
+
+        let (a, pool, solver) = run(&s);
+        assert_eq!(a, vec![Answer::Sat]);
+        let m = solver.model().unwrap();
+
+        let by_name: FxHashMap<&str, u32> = solver
+            .declared
+            .iter()
+            .map(|sym| {
+                let v = m
+                    .get(sym)
+                    .unwrap_or_else(|| panic!("{} has no value", pool.symbol(*sym).name));
+                let n = v.as_bv().expect("bv value").as_u64().expect("32 bits fit") as u32;
+                (pool.symbol(*sym).name.as_str(), n)
+            })
+            .collect();
+        assert_eq!(by_name.len(), N + 1, "every declared symbol has a value");
+
+        let mut want = by_name["b"].wrapping_add(7);
+        assert_eq!(by_name["t0"], want, "t0 disagrees with its definition");
+        for i in 1..N {
+            want =
+                (want ^ (i as u32).wrapping_mul(2_654_435_761)).wrapping_add(want.wrapping_mul(3));
+            assert_eq!(
+                by_name[format!("t{i}").as_str()],
+                want,
+                "t{i} disagrees with its definition"
+            );
+        }
+        assert!(want < 0x8000_0000, "the model must satisfy the bound");
+    }
+
+    /// The symbols a model covers are collected *after* the verdict, so this
+    /// pins what that collection must still produce: a value for every
+    /// declared symbol, including one that appears in no assertion at all and
+    /// therefore has no bit-blasted representation to read a value off.
+    #[test]
+    fn model_covers_declared_symbols_that_appear_in_no_assertion() {
+        let (a, pool, solver) = run("(declare-const x (_ BitVec 8))
+             (declare-const untouched (_ BitVec 12))
+             (declare-const flag Bool)
+             (assert (= x #x2a))
+             (check-sat)");
+        assert_eq!(a, vec![Answer::Sat]);
+        let m = solver.model().unwrap();
+        for &sym in &solver.declared {
+            assert!(
+                m.contains_key(&sym),
+                "{} missing from the model",
+                pool.symbol(sym).name
+            );
+        }
+        let untouched = solver.declared[1];
+        assert_eq!(m[&untouched].as_bv().unwrap().as_u64(), Some(0));
+        assert_eq!(m[&solver.declared[2]], Value::Bool(false));
+    }
+
+    /// An `unsat` answer leaves no model behind, and asking again on the same
+    /// solver must not be disturbed by the fact that the refuted check never
+    /// collected any model symbols.
+    #[test]
+    fn an_unsat_check_leaves_no_model_and_does_not_disturb_the_next_one() {
+        let mut pool = TermPool::new();
+        let script = parse_script(
+            "(declare-const x (_ BitVec 8))
+             (declare-const y (_ BitVec 8))
+             (assert (bvult x #x10))
+             (check-sat-assuming ((bvugt x #x20)))
+             (check-sat)",
+            &mut pool,
+        )
+        .expect("parse");
+        let mut solver = Solver::new();
+        solver.declared = script.declared.clone();
+        let mut answers = Vec::new();
+        for cmd in &script.commands {
+            match cmd {
+                Command::Assert(t, _) => solver.assert(*t),
+                Command::CheckSat => {
+                    answers.push(solver.check_sat(&mut pool, &[]));
+                    assert!(solver.model().is_some(), "a sat check leaves a model");
+                }
+                Command::CheckSatAssuming(ts) => {
+                    answers.push(solver.check_sat(&mut pool, ts));
+                    assert!(solver.model().is_none(), "an unsat check leaves no model");
+                }
+                _ => {}
+            }
+        }
+        assert_eq!(answers, vec![Answer::Unsat, Answer::Sat]);
+        let m = solver.model().unwrap();
+        for &sym in &solver.declared {
+            assert!(m.contains_key(&sym));
+        }
+    }
+
     #[test]
     fn arithmetic_sat() {
         let (a, pool, solver) = run(
@@ -2180,6 +3013,33 @@ mod tests {
         assert_eq!(got, (3..=15).collect::<Vec<u64>>());
         // Engine still healthy after enumeration (activation retired).
         assert_eq!(solver.check_sat(&mut pool, &[]), Answer::Sat);
+        assert_eq!(
+            solver.maximize(&mut pool, x, &[]).unwrap().as_u64(),
+            Some(15)
+        );
+        // Bit fixing and enumeration solve the SAT instance directly, so an
+        // open push level has to reach them through its activation literal or
+        // its assertions are simply not there. `GUARD_AFTER_POPS` empty
+        // push/pop pairs first, to get into guarded mode.
+        for _ in 0..GUARD_AFTER_POPS {
+            solver.push(1);
+            solver.pop(1);
+        }
+        solver.push(1);
+        let twelve = pool.bv_u64(8, 12);
+        let below12 = pool.mk(smtrs_core::Op::BvUlt, &[x, twelve]).unwrap();
+        solver.assert(below12);
+        assert_eq!(solver.check_sat(&mut pool, &[]), Answer::Sat);
+        assert_eq!(
+            solver.maximize(&mut pool, x, &[]).unwrap().as_u64(),
+            Some(11)
+        );
+        let vals = solver.eval_n(&mut pool, x, 20, &[]);
+        let mut got: Vec<u64> = vals.iter().map(|v| v.as_u64().unwrap()).collect();
+        got.sort_unstable();
+        assert_eq!(got, (3..=11).collect::<Vec<u64>>());
+        // And the level's constraint is gone again once it is retired.
+        solver.pop(1);
         assert_eq!(
             solver.maximize(&mut pool, x, &[]).unwrap().as_u64(),
             Some(15)
@@ -2865,5 +3725,172 @@ mod tests {
             let (a, _, _) = run(src);
             assert!(!matches!(a[0], Answer::Unsat), "{src} -> {:?}", a[0]);
         }
+    }
+
+    /// A rebuild has to re-walk terms an *earlier* prefix already stamped.
+    ///
+    /// This is the one way [`PrefixScan`] can be wrong that a shrinking prefix
+    /// does not already exercise. `clear` empties the stamp array, and `walk`
+    /// refills it because the vector is then shorter than the pool. Keep the
+    /// array instead — `resize` only ever grows it — and every term the old
+    /// prefix touched still reads as folded in, so the rebuild skips it and
+    /// loses the fact it carried. Below, the offending term is asserted,
+    /// popped, and asserted again: on the way back in it is reached by a prefix
+    /// walk that has already seen it once, and skipping it hands an `Int` or a
+    /// float straight to the bit-blaster.
+    #[test]
+    fn prefix_scan_rebuild_rewalks_already_stamped_terms() {
+        let (a, _, _) = run("(declare-const b (_ BitVec 8))(declare-const i Int)
+             (assert (bvult b #x40))(push 1)(assert (= i 0))(check-sat)
+             (pop 1)(check-sat)(assert (= i 0))(check-sat)");
+        assert!(matches!(a[0], Answer::Unknown(_)), "{a:?}");
+        assert_eq!(a[1], Answer::Sat, "{a:?}");
+        assert!(matches!(a[2], Answer::Unknown(_)), "{a:?}");
+
+        let (a, _, _) = run("(declare-const b (_ BitVec 8))(declare-const f Float32)
+             (assert (bvult b #x40))(push 1)(assert (fp.isNaN f))(check-sat)
+             (pop 1)(check-sat)
+             (assert (fp.isNaN f))(assert (not (fp.isNaN f)))(check-sat)");
+        assert_eq!(a, vec![Answer::Sat, Answer::Sat, Answer::Unsat], "{a:?}");
+    }
+
+    /// The cache must not let a *popped* assertion keep answering.
+    ///
+    /// Each fact is retracted by the pop that retires the term carrying it, so
+    /// each is checked on its own: an `Int` (unsupported), a string (routes to
+    /// the bounded lowering), a float (routes to word-blasting), and a variable
+    /// that must stop appearing in models.
+    #[test]
+    fn prefix_scan_facts_do_not_survive_the_pop_that_retires_them() {
+        // Unsupported sort: unknown inside the scope, decidable outside it.
+        let (a, _, _) = run("(declare-const b (_ BitVec 8))(declare-const i Int)
+             (assert (bvult b #x40))(push 1)(assert (> i 3))(check-sat)(pop 1)(check-sat)");
+        assert!(matches!(a[0], Answer::Unknown(_)), "{a:?}");
+        assert_eq!(a[1], Answer::Sat, "{a:?}");
+
+        // A string assertion pushes the whole problem through the bounded
+        // lowering, which replaces `assertions` wholesale. After the pop the
+        // remaining BV problem must still be answered as a BV problem.
+        let (a, _, _) = run("(declare-const b (_ BitVec 8))(declare-const s String)
+             (assert (bvult b #x40))(push 1)(assert (= s \"ab\"))(check-sat)
+             (pop 1)(check-sat)(assert (bvugt b #x40))(check-sat)");
+        assert_eq!(a, vec![Answer::Sat, Answer::Sat, Answer::Unsat], "{a:?}");
+
+        // Same for a float.
+        let (a, _, _) = run("(declare-const b (_ BitVec 8))(declare-const f Float32)
+             (assert (bvult b #x40))(push 1)(assert (fp.isNaN f))(check-sat)
+             (pop 1)(check-sat)(assert (bvugt b #x40))(check-sat)");
+        assert_eq!(a, vec![Answer::Sat, Answer::Sat, Answer::Unsat], "{a:?}");
+
+        // A variable reachable only from a popped assertion is no longer part
+        // of the problem; it may still be in `declared`, but a variable that
+        // was never declared must not be carried by the cache.
+        let (_, _, solver) = run("(declare-const b (_ BitVec 8))
+             (assert (bvult b #x40))
+             (push 1)(assert (= b (bvadd b #x01)))(check-sat)(pop 1)(check-sat)");
+        let model = solver.model().expect("sat");
+        assert_eq!(model.len(), 1, "only `b` is in scope: {model:?}");
+    }
+
+    /// A pop that is followed by *as many* new assertions as it retired leaves
+    /// the assertion vector the same length it was, so the cache's length test
+    /// says "still extends" and only the element-by-element comparison catches
+    /// it. Found by mutation testing: deleting that comparison broke nothing
+    /// else in the suite, including the incremental one.
+    #[test]
+    fn prefix_scan_notices_a_prefix_that_changed_without_changing_length() {
+        // The retired assertion carries "unsupported sort"; its replacement
+        // does not, so a stale cache answers `unknown` for a pure BV problem.
+        let (a, _, _) = run("(declare-const b (_ BitVec 8))(declare-const i Int)
+             (assert (bvult b #x40))
+             (push 1)(assert (> i 3))(check-sat)(pop 1)
+             (push 1)(assert (bvugt b #x10))(check-sat)");
+        assert!(matches!(a[0], Answer::Unknown(_)), "{a:?}");
+        assert_eq!(a[1], Answer::Sat, "{a:?}");
+
+        // And the other direction: the replacement carries the fact and the
+        // retired assertion did not, so a stale cache answers a problem it
+        // cannot encode.
+        let (a, _, _) = run("(declare-const b (_ BitVec 8))(declare-const i Int)
+             (assert (bvult b #x40))
+             (push 1)(assert (bvugt b #x10))(check-sat)(pop 1)
+             (push 1)(assert (> i 3))(check-sat)");
+        assert_eq!(a[0], Answer::Sat, "{a:?}");
+        assert!(matches!(a[1], Answer::Unknown(_)), "{a:?}");
+    }
+
+    /// Each check's assumptions get their own stamp, and a term one check
+    /// walked has to be walked again by the next.
+    ///
+    /// Also mutation-found: making every query share one mark leaves the second
+    /// of two identical `check-sat-assuming`s seeing an empty DAG and answering
+    /// from the assertions alone.
+    #[test]
+    fn prefix_scan_rewalks_assumptions_on_every_check() {
+        let (a, _, _) = run("(declare-const b (_ BitVec 8))(declare-const i Int)
+             (assert (bvult b #x40))
+             (check-sat-assuming ((> i 3)))
+             (check-sat-assuming ((> i 3)))");
+        assert!(matches!(a[0], Answer::Unknown(_)), "{a:?}");
+        assert!(
+            matches!(a[1], Answer::Unknown(_)),
+            "first check's stamps \
+                                                     swallowed the second: {a:?}"
+        );
+
+        // A term an assumption stamped, later *asserted*: it comes into the
+        // prefix carrying a fact, and the prefix walk must not skip it because
+        // some earlier query already touched it.
+        let (a, _, _) = run("(declare-const b (_ BitVec 8))(declare-const i Int)
+             (assert (bvult b #x40))
+             (check-sat-assuming ((> i 3)))
+             (check-sat)
+             (assert (> i 3))(check-sat)");
+        assert!(matches!(a[0], Answer::Unknown(_)), "{a:?}");
+        assert_eq!(a[1], Answer::Sat, "{a:?}");
+        assert!(matches!(a[2], Answer::Unknown(_)), "{a:?}");
+    }
+
+    /// An assumption's facts belong to *that* check only. A float or a string
+    /// assumed once must not make the next check take the lowering path, and
+    /// the variables it drags in must not stay in the model set.
+    #[test]
+    fn prefix_scan_does_not_keep_an_assumption_from_the_previous_check() {
+        let mut pool = TermPool::new();
+        let script = parse_script(
+            "(declare-const b (_ BitVec 8))(declare-const c (_ BitVec 8))
+             (assert (bvult b #x40))",
+            &mut pool,
+        )
+        .expect("parse");
+        let mut solver = Solver::new();
+        // Only `b` is declared, so `c` can reach the model set only through the
+        // assumption that mentions it.
+        solver.declared = vec![script.declared[0]];
+        for cmd in &script.commands {
+            if let Command::Assert(t, _) = cmd {
+                solver.assert(*t);
+            }
+        }
+        let c = pool.var(script.declared[1]);
+        let k = pool.bv_u64(8, 3);
+        let q = pool.mk(Op::BvUlt, &[c, k]).expect("well-sorted");
+
+        assert_eq!(solver.check_sat(&mut pool, &[q]), Answer::Sat);
+        assert!(
+            solver
+                .model()
+                .expect("sat")
+                .contains_key(&script.declared[1]),
+            "the assumption's variable needs a value in that check's model"
+        );
+        assert_eq!(solver.check_sat(&mut pool, &[]), Answer::Sat);
+        assert!(
+            !solver
+                .model()
+                .expect("sat")
+                .contains_key(&script.declared[1]),
+            "a variable only the previous assumption reached is still in the model"
+        );
     }
 }

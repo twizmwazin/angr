@@ -244,9 +244,9 @@ fn core_survives_bounded_variable_elimination() {
     c.core_refutes();
 }
 
-/// `pop` throws the engine away and rebuilds it, so the activation literals
-/// are re-minted in a fresh variable numbering. A core taken after the rebuild
-/// must describe the assertions that are live *then*.
+/// The first `pop` throws the engine away and rebuilds it, so the activation
+/// literals are re-minted in a fresh variable numbering. A core taken after
+/// the rebuild must describe the assertions that are live *then*.
 #[test]
 fn core_after_push_and_pop() {
     let c = run("
@@ -260,6 +260,65 @@ fn core_after_push_and_pop() {
         (check-sat)");
     assert_eq!(c.answers, vec![Answer::Unsat, Answer::Unsat]);
     assert_eq!(c.core(), ["base", "outer"]);
+    c.core_refutes();
+}
+
+/// Once a script has popped enough to earn guarded mode, levels are retired
+/// with an activation literal instead of a rebuild, so a core is read off an
+/// engine that carries *two* kinds of activation literal: the ones naming
+/// tracked assertions and the ones naming push levels. Only the first kind may
+/// appear in a core, and the second kind has to be in force while it is
+/// computed — including in the verification re-solve, which would otherwise
+/// run with the whole open level switched off and widen the core back to
+/// everything.
+#[test]
+fn core_inside_a_guarded_push_level() {
+    let c = run("
+        (declare-const x (_ BitVec 8))
+        (assert (! (bvult x #x40) :named base))
+        (assert (! (bvugt x #x02) :named spare))
+        (push 1)
+        (assert (! (bvult x #x10) :named lvl1))
+        (check-sat)
+        (pop 1)
+        (push 1)
+        (assert (! (bvult x #x20) :named lvl2))
+        (check-sat)
+        (pop 1)
+        (push 1)
+        (assert (! (bvugt x #x80) :named lvl3))
+        (check-sat)
+        (pop 1)
+        (check-sat)");
+    // The last check runs at the base scope: satisfiable, so no core.
+    assert_eq!(
+        c.answers,
+        vec![Answer::Sat, Answer::Sat, Answer::Unsat, Answer::Sat]
+    );
+}
+
+/// The same shape, but with the `unsat` last so the core is the one reported.
+/// The final level is asserted into an engine that has already retired two
+/// levels in place, which is where a stale activation literal would show up.
+#[test]
+fn core_from_a_level_reopened_after_a_guarded_pop() {
+    let c = run("
+        (declare-const x (_ BitVec 8))
+        (assert (! (bvult x #x40) :named base))
+        (assert (! (bvult x #xf0) :named loose))
+        (push 1)
+        (assert (! (bvugt x #x80) :named first))
+        (check-sat)
+        (pop 1)
+        (push 1)
+        (assert (! (bvugt x #x84) :named second))
+        (check-sat)
+        (pop 1)
+        (push 1)
+        (assert (! (bvugt x #x90) :named third))
+        (check-sat)");
+    assert_eq!(c.answers, vec![Answer::Unsat, Answer::Unsat, Answer::Unsat]);
+    assert_eq!(c.core(), ["base", "third"]);
     c.core_refutes();
 }
 
