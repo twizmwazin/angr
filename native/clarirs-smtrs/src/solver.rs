@@ -227,10 +227,11 @@ pub struct SmtrsSolver<'c> {
     unsat_core: bool,
     /// Identifies this solver's persistent engine in [`SOLVER_CACHE`].
     cache_id: u64,
-    /// The cache id of the solver this one was cloned from, consumed by the
-    /// first engine build to fork the parent's engine instead of rebuilding.
-    /// `Cell` because the build path runs behind `&self`.
-    fork_source: std::cell::Cell<Option<u64>>,
+    /// The cache id of the solver this one was cloned from (0 = none, valid
+    /// ids start at 1), consumed by the first engine build to fork the
+    /// parent's engine instead of rebuilding. Atomic because the build path
+    /// runs behind `&self` and the containing pyclass must be `Sync`.
+    fork_source: std::sync::atomic::AtomicU64,
 }
 
 impl<'c> Clone for SmtrsSolver<'c> {
@@ -246,9 +247,9 @@ impl<'c> Clone for SmtrsSolver<'c> {
         // actually solved.
         let source = SOLVER_CACHE.with(|cell| {
             if cell.borrow().contains_key(&self.cache_id) {
-                Some(self.cache_id)
+                self.cache_id
             } else {
-                self.fork_source.get()
+                self.fork_source.load(Ordering::Relaxed)
             }
         });
         SmtrsSolver {
@@ -257,7 +258,7 @@ impl<'c> Clone for SmtrsSolver<'c> {
             timeout: self.timeout,
             unsat_core: self.unsat_core,
             cache_id: next_solver_id(),
-            fork_source: std::cell::Cell::new(source),
+            fork_source: std::sync::atomic::AtomicU64::new(source),
         }
     }
 }
@@ -288,7 +289,7 @@ impl<'c> SmtrsSolver<'c> {
             timeout,
             unsat_core,
             cache_id: next_solver_id(),
-            fork_source: std::cell::Cell::new(None),
+            fork_source: std::sync::atomic::AtomicU64::new(0),
         }
     }
 
@@ -363,7 +364,8 @@ impl<'c> SmtrsSolver<'c> {
                     // (state splits, has_true probes) otherwise force on
                     // every first check.
                     let mut seeded = false;
-                    if let Some(parent_id) = self.fork_source.take() {
+                    let parent_id = self.fork_source.swap(0, Ordering::Relaxed);
+                    if parent_id != 0 {
                         let parent_terms: Option<Vec<TermId>> = {
                             let map = cell.borrow();
                             map.get(&parent_id)
