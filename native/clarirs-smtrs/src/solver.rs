@@ -34,6 +34,12 @@ struct CachedSolver {
     /// on (parallel to the assertion list); used to map core members back to
     /// constraint indices.
     tracked: Vec<SymbolId>,
+    /// The converted terms asserted into `solver`, in order. A clone forking
+    /// this engine verifies that these are exactly its own converted prefix —
+    /// the precise condition under which the engine's content is a valid
+    /// starting point for it (survives the parent clearing and re-asserting
+    /// something else under the same cache id).
+    asserted_terms: Vec<TermId>,
     timeout: Option<u32>,
     unsat_core: bool,
     /// Stats already harvested into [`GLOBAL_STATS`] from this engine, so each
@@ -73,6 +79,7 @@ struct GlobalStats {
     prop_abs: f64,
     /// Backend-side numbers.
     solver_clones: u64,
+    engine_forks: u64,
     cache_invalidations: u64,
     watchdogs_armed: u64,
     backend_checks: u64,
@@ -89,6 +96,7 @@ static GLOBAL_STATS: Mutex<GlobalStats> = Mutex::new(GlobalStats {
     model: 0.0,
     prop_abs: 0.0,
     solver_clones: 0,
+    engine_forks: 0,
     cache_invalidations: 0,
     watchdogs_armed: 0,
     backend_checks: 0,
@@ -130,7 +138,8 @@ pub fn global_stats_json() -> String {
         concat!(
             "{{\"checks\":{},\"rebuilds\":{},\"lower_fp\":{:.3},\"lower_str\":{:.3},",
             "\"rewrite_preprocess\":{:.3},\"blast\":{:.3},\"sat\":{:.3},\"model\":{:.3},",
-            "\"prop_abs\":{:.3},\"solver_clones\":{},\"cache_invalidations\":{},",
+            "\"prop_abs\":{:.3},\"solver_clones\":{},\"engine_forks\":{},",
+            "\"cache_invalidations\":{},",
             "\"watchdogs_armed\":{},\"backend_checks\":{}}}"
         ),
         g.checks,
@@ -143,6 +152,7 @@ pub fn global_stats_json() -> String {
         g.model,
         g.prop_abs,
         g.solver_clones,
+        g.engine_forks,
         g.cache_invalidations,
         g.watchdogs_armed,
         g.backend_checks,
@@ -217,17 +227,37 @@ pub struct SmtrsSolver<'c> {
     unsat_core: bool,
     /// Identifies this solver's persistent engine in [`SOLVER_CACHE`].
     cache_id: u64,
+    /// The cache id of the solver this one was cloned from, consumed by the
+    /// first engine build to fork the parent's engine instead of rebuilding.
+    /// `Cell` because the build path runs behind `&self`.
+    fork_source: std::cell::Cell<Option<u64>>,
 }
 
 impl<'c> Clone for SmtrsSolver<'c> {
     fn clone(&self) -> Self {
         GLOBAL_STATS.lock().expect("stats lock").solver_clones += 1;
+        // Remember where this clone came from: on its first check it can fork
+        // that solver's engine instead of rebuilding from scratch. Lazily,
+        // because angr clones far more often than it checks (state splits,
+        // has_true probes), and an eager fork would tax every clone for the
+        // few that ever solve. When this solver has no engine of its own yet
+        // (a clone of a clone that never checked), pass its own fork source
+        // through, so a chain of copies still reaches the ancestor that
+        // actually solved.
+        let source = SOLVER_CACHE.with(|cell| {
+            if cell.borrow().contains_key(&self.cache_id) {
+                Some(self.cache_id)
+            } else {
+                self.fork_source.get()
+            }
+        });
         SmtrsSolver {
             ctx: self.ctx,
             assertions: self.assertions.clone(),
             timeout: self.timeout,
             unsat_core: self.unsat_core,
             cache_id: next_solver_id(),
+            fork_source: std::cell::Cell::new(source),
         }
     }
 }
@@ -258,6 +288,7 @@ impl<'c> SmtrsSolver<'c> {
             timeout,
             unsat_core,
             cache_id: next_solver_id(),
+            fork_source: std::cell::Cell::new(None),
         }
     }
 
@@ -322,21 +353,80 @@ impl<'c> SmtrsSolver<'c> {
                     None => false,
                 };
                 if !reusable {
-                    let mut solver = smtrs_solver::Solver::new();
-                    if self.unsat_core {
-                        solver.set_produce_unsat_cores(true);
+                    // First build for this solver: fork the engine of the
+                    // solver it was cloned from when that engine's asserted
+                    // terms are exactly this solver's own converted prefix.
+                    // The fork keeps the blasted formula and learned clauses,
+                    // so only the post-clone assertions get asserted below —
+                    // instead of paying the whole rewrite-and-blast pipeline
+                    // again, which angr's clone-heavy call patterns
+                    // (state splits, has_true probes) otherwise force on
+                    // every first check.
+                    let mut seeded = false;
+                    if let Some(parent_id) = self.fork_source.take() {
+                        let parent_terms: Option<Vec<TermId>> = {
+                            let map = cell.borrow();
+                            map.get(&parent_id)
+                                .filter(|p| {
+                                    p.timeout == self.timeout
+                                        && p.unsat_core == self.unsat_core
+                                        && p.asserted <= self.assertions.len()
+                                })
+                                .map(|p| p.asserted_terms.clone())
+                        };
+                        if let Some(pterms) = parent_terms {
+                            let mut matches = true;
+                            for (i, pt) in pterms.iter().enumerate() {
+                                if to_term(&self.assertions[i], st)? != *pt {
+                                    matches = false;
+                                    break;
+                                }
+                            }
+                            if matches {
+                                let forked = {
+                                    let map = cell.borrow();
+                                    map.get(&parent_id)
+                                        .map(|p| (p.solver.fork(), p.tracked.clone()))
+                                };
+                                if let Some((solver, tracked)) = forked {
+                                    GLOBAL_STATS.lock().expect("stats lock").engine_forks += 1;
+                                    cell.borrow_mut().insert(
+                                        self.cache_id,
+                                        CachedSolver {
+                                            solver,
+                                            asserted: pterms.len(),
+                                            tracked,
+                                            asserted_terms: pterms,
+                                            timeout: self.timeout,
+                                            unsat_core: self.unsat_core,
+                                            // fork() resets the engine's own
+                                            // stats, so deltas start at zero.
+                                            reported: ReportedStats::default(),
+                                        },
+                                    );
+                                    seeded = true;
+                                }
+                            }
+                        }
                     }
-                    cell.borrow_mut().insert(
-                        self.cache_id,
-                        CachedSolver {
-                            solver,
-                            asserted: 0,
-                            tracked: Vec::new(),
-                            timeout: self.timeout,
-                            unsat_core: self.unsat_core,
-                            reported: ReportedStats::default(),
-                        },
-                    );
+                    if !seeded {
+                        let mut solver = smtrs_solver::Solver::new();
+                        if self.unsat_core {
+                            solver.set_produce_unsat_cores(true);
+                        }
+                        cell.borrow_mut().insert(
+                            self.cache_id,
+                            CachedSolver {
+                                solver,
+                                asserted: 0,
+                                tracked: Vec::new(),
+                                asserted_terms: Vec::new(),
+                                timeout: self.timeout,
+                                unsat_core: self.unsat_core,
+                                reported: ReportedStats::default(),
+                            },
+                        );
+                    }
                 }
                 let mut map = cell.borrow_mut();
                 let cached = map
@@ -350,6 +440,7 @@ impl<'c> SmtrsSolver<'c> {
                     } else {
                         cached.solver.assert(t);
                     }
+                    cached.asserted_terms.push(t);
                     cached.asserted += 1;
                 }
                 let out = f(st, cached);
@@ -786,6 +877,58 @@ impl<'c> Solver<'c> for SmtrsSolver<'c> {
 mod tests {
     use super::*;
     use clarirs_core::solver_mixins::ModelCacheMixin;
+
+    /// Clones fork the parent's engine: answers stay correct across the
+    /// clone-then-diverge pattern angr uses everywhere (has_true probes,
+    /// state splits), including a chain of never-checked copies.
+    #[test]
+    fn test_clone_forks_engine() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let mut parent = SmtrsSolver::new(&ctx);
+        let x = ctx.bvs("fork_x", 32)?;
+        parent.add(&ctx.ugt(&x, &ctx.bvv(BitVec::from((10, 32)))?)?)?;
+        assert!(parent.satisfiable()?);
+
+        // Direct clone: diverges with its own constraint.
+        let mut child = parent.clone();
+        child.add(&ctx.ult(&x, &ctx.bvv(BitVec::from((5, 32)))?)?)?;
+        assert!(!child.satisfiable()?);
+        // The parent is unaffected.
+        assert!(parent.satisfiable()?);
+
+        // A chain of unchecked copies still resolves against the ancestor.
+        let mut grandchild = parent.clone().clone().clone();
+        grandchild.add(&ctx.eq_(&x, &ctx.bvv(BitVec::from((11, 32)))?)?)?;
+        assert!(grandchild.satisfiable()?);
+        grandchild.add(&ctx.eq_(&x, &ctx.bvv(BitVec::from((12, 32)))?)?)?;
+        assert!(!grandchild.satisfiable()?);
+        Ok(())
+    }
+
+    /// A parent that clears and re-asserts something else under the same
+    /// cache id must not leak its new engine into an older clone: the fork
+    /// guard compares asserted terms, not counts.
+    #[test]
+    fn test_fork_guard_rejects_diverged_parent() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let mut parent = SmtrsSolver::new(&ctx);
+        let x = ctx.bvs("guard_x", 8)?;
+        parent.add(&ctx.eq_(&x, &ctx.bvv(BitVec::from((1, 8)))?)?)?;
+        assert!(parent.satisfiable()?);
+
+        let mut child = parent.clone(); // remembers parent as fork source
+
+        // Parent rebuilds under the same cache id with a different set.
+        parent.clear()?;
+        parent.add(&ctx.eq_(&x, &ctx.bvv(BitVec::from((2, 8)))?)?)?;
+        assert!(parent.satisfiable()?);
+
+        // The child still answers for ITS constraints (x == 1), so x == 2
+        // must be unsat on top of them.
+        child.add(&ctx.eq_(&x, &ctx.bvv(BitVec::from((2, 8)))?)?)?;
+        assert!(!child.satisfiable()?);
+        Ok(())
+    }
 
     #[test]
     fn test_solver_simple() -> Result<(), ClarirsError> {
