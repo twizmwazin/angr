@@ -347,22 +347,40 @@ impl B<'_> {
         Ok(BoundedStr { len, chars })
     }
 
-    /// A symbolic string: fresh length and character variables, with the
-    /// canonicalization side conditions the caller must assert.
-    fn fresh(&mut self, name: &str, side: &mut Vec<TermId>) -> BoundedStr {
-        let len_sym = self
-            .pool
-            .fresh_symbol(format!("{name}!len"), Sort::BitVec(INT_BITS));
+    /// A symbolic string: length and character variables, with the
+    /// canonicalization side conditions the caller must assert. With a
+    /// `source` symbol the variables are interned per source (see
+    /// `TermPool::derived_symbol`), so re-lowering reproduces them and the
+    /// solver's engine survives; without one (`str.from_int` temporaries)
+    /// they are fresh per run.
+    fn fresh(&mut self, source: Option<SymbolId>, name: &str, side: &mut Vec<TermId>) -> BoundedStr {
+        let len_sym = match source {
+            Some(sym) => {
+                let n = format!("{name}!len");
+                self.pool
+                    .derived_symbol(sym, "len", 0, Sort::BitVec(INT_BITS), move || n)
+            }
+            None => self
+                .pool
+                .fresh_symbol(format!("{name}!len"), Sort::BitVec(INT_BITS)),
+        };
         let len = self.pool.var(len_sym);
         let bound = self.int(self.cfg.max_len as u64);
         let in_bound = self.ule(len, bound);
         side.push(in_bound);
         let mut chars = Vec::with_capacity(self.cfg.max_len as usize);
         for i in 0..self.cfg.max_len {
-            let sym = self
-                .pool
-                .fresh_symbol(format!("{name}!c{i}"), Sort::BitVec(CHAR_BITS));
-            let c = self.pool.var(sym);
+            let slot = match source {
+                Some(sym) => {
+                    let n = format!("{name}!c{i}");
+                    self.pool
+                        .derived_symbol(sym, "chr", i, Sort::BitVec(CHAR_BITS), move || n)
+                }
+                None => self
+                    .pool
+                    .fresh_symbol(format!("{name}!c{i}"), Sort::BitVec(CHAR_BITS)),
+            };
+            let c = self.pool.var(slot);
             // Slots past the end are pinned to zero so equal strings encode
             // identically (and so `=` is just a componentwise comparison).
             let idx = self.int(i as u64);
@@ -900,7 +918,7 @@ impl B<'_> {
     /// reuses the digit machinery exactly. `n` is an `INT_BITS` signed value so
     /// it needs at most 5 digits, well inside any bound we run with.
     fn str_from_int(&mut self, n: TermId, side: &mut Vec<TermId>) -> BoundedStr {
-        let out = self.fresh("from_int", side);
+        let out = self.fresh(None, "from_int", side);
         let (is_num, acc, no_overflow) = self.decode_decimal(&out);
         let zero = self.int(0);
         let nonneg = self.mk(Op::BvSle, &[zero, n]);
@@ -1241,16 +1259,17 @@ fn lower_node(
                 if let Some(bytes) = literal_bytes(&name) {
                     Val::Str(b.literal(&bytes)?)
                 } else {
-                    Val::Str(b.fresh(&name, side))
+                    Val::Str(b.fresh(Some(sym), &name, side))
                 }
             }
             Sort::Int => {
                 if let Some(v) = int_literal(&name) {
                     Val::Term(b.int(v))
                 } else {
+                    let n = format!("{name}!int");
                     let s = b
                         .pool
-                        .fresh_symbol(format!("{name}!int"), Sort::BitVec(INT_BITS));
+                        .derived_symbol(sym, "int", 0, Sort::BitVec(INT_BITS), move || n);
                     Val::Term(b.pool.var(s))
                 }
             }

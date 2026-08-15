@@ -235,10 +235,18 @@ fn lower_node(
                             let c = concrete::decode(fmt, bits);
                             return Ok(Lowered::Fp(concrete::to_unpacked(b, fmt, &c)));
                         }
+                        // Interned per source symbol so a lowering re-run
+                        // reproduces the same bits variable: that is what lets
+                        // the solver keep its engine (and learned clauses)
+                        // across checks that re-lower the same assertions.
                         let name = b.pool.symbol(sym).name.clone();
-                        let bv_sym = b
-                            .pool
-                            .fresh_symbol(format!("{name}!ieee"), Sort::BitVec(fmt.total_width()));
+                        let bv_sym = b.pool.derived_symbol(
+                            sym,
+                            "ieee",
+                            0,
+                            Sort::BitVec(fmt.total_width()),
+                            move || format!("{name}!ieee"),
+                        );
                         let bits = b.pool.var(bv_sym);
                         Ok(Lowered::Fp(unpacked::unpack(b, fmt, bits)))
                     }

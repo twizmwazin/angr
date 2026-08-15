@@ -1047,12 +1047,19 @@ impl Solver {
     ///
     /// Cheap in the case that matters: no lowering has run on the overwhelming
     /// majority of problems, and the flag is false.
+    ///
+    /// The engine is deliberately *kept*. Lowering is deterministic for the
+    /// symbols it derives (see `TermPool::derived_symbol`), so when the next
+    /// check lowers an unchanged prefix again it reproduces the very terms
+    /// the engine has already blasted — and `check_sat_lowered` re-validates
+    /// the engine against exactly that (`assertions.starts_with(&e.blasted)`)
+    /// before reusing it. A stale engine can therefore only miss the prefix
+    /// check and be rebuilt, never answer for the wrong formula.
     fn undo_lowering(&mut self) {
         if self.string_lowered || self.fp_lowered {
             self.string_lowered = false;
             self.fp_lowered = false;
             self.unsat_trustworthy = true;
-            self.engine = None;
             self.assertions = self.pristine.clone();
             // The lowerings pad `tracked` out to the lowered length (side
             // constraints belong to no named assertion); put it back in step
@@ -1556,7 +1563,10 @@ impl Solver {
                     if self.produce_cores {
                         self.tracked.resize(self.assertions.len(), None);
                     }
-                    self.engine = None;
+                    // The engine is not discarded here: with derived symbols
+                    // interned, an unchanged prefix lowers to the very terms
+                    // it already blasted, and check_sat_lowered's prefix
+                    // check accepts or rebuilds accordingly.
                     self.lowered_assumptions = lowered_assumptions.clone();
                     let mut roots2 = self.assertions.clone();
                     roots2.extend_from_slice(&lowered_assumptions);
@@ -1615,7 +1625,8 @@ impl Solver {
             if self.produce_cores {
                 self.tracked.resize(self.assertions.len(), None);
             }
-            self.engine = None; // assertion terms changed identity
+            // As in the string branch: the prefix check in check_sat_lowered
+            // decides whether the engine survives this re-lowering.
             self.lowered_assumptions = lowered_assumptions.clone();
             let mut roots2 = self.assertions.clone();
             roots2.extend_from_slice(&lowered_assumptions);
@@ -2601,6 +2612,68 @@ mod tests {
         assert_eq!(solver.check_sat(&mut pool, &[t]), Answer::Unsat);
         // And the assertions alone are still satisfiable afterwards.
         assert_eq!(solver.check_sat(&mut pool, &[]), Answer::Sat);
+    }
+
+    /// With derived symbols interned, re-lowering an unchanged FP assertion
+    /// set reproduces the engine's blasted terms exactly, so incremental FP
+    /// checks — new assertions or fresh assumptions per check — extend one
+    /// persistent engine instead of rebuilding per query. `stats.rebuilds`
+    /// is the load-independent witness.
+    #[test]
+    fn fp_engine_survives_incremental_checks() {
+        let mut pool = TermPool::new();
+        let x_sym = pool.fresh_symbol("x", Sort::Float(11, 53));
+        let x = pool.var(x_sym);
+        let bits = |pool: &mut TermPool, v: u64| {
+            let c = pool.bv_u64(64, v);
+            pool.mk(Op::FpFromIeeeBv { eb: 11, sb: 53 }, &[c]).unwrap()
+        };
+        let one = bits(&mut pool, 0x3FF0_0000_0000_0000); // 1.0
+        let two = bits(&mut pool, 0x4000_0000_0000_0000); // 2.0
+
+        let mut solver = Solver::new();
+        solver.declared = vec![x_sym];
+        let ge_one = pool.mk(Op::FpGeq, &[x, one]).unwrap();
+        solver.assert(ge_one);
+        assert_eq!(solver.check_sat(&mut pool, &[]), Answer::Sat);
+        assert_eq!(solver.stats.rebuilds, 1);
+
+        // A second check under a fresh FP assumption re-lowers and reuses.
+        let le_two = pool.mk(Op::FpLeq, &[x, two]).unwrap();
+        assert_eq!(solver.check_sat(&mut pool, &[le_two]), Answer::Sat);
+        assert_eq!(solver.stats.rebuilds, 1, "assumption check rebuilt the engine");
+
+        // Appending an FP assertion extends the same engine.
+        let lt_one = pool.mk(Op::FpLt, &[x, one]).unwrap();
+        solver.assert(lt_one);
+        assert_eq!(solver.check_sat(&mut pool, &[]), Answer::Unsat);
+        assert_eq!(solver.stats.rebuilds, 1, "incremental assert rebuilt the engine");
+    }
+
+    /// The string twin: interned length/character slots make the bounded
+    /// lowering reproducible, so assumption-bearing re-checks keep the engine.
+    #[test]
+    fn string_engine_survives_assumption_checks() {
+        let (answers, mut pool, mut solver) = run(
+            r#"(declare-const s String)(assert (= (str.len s) 3))(check-sat)"#,
+        );
+        assert_eq!(answers, vec![Answer::Sat]);
+        assert_eq!(solver.stats.rebuilds, 1);
+        let script = parse_script(
+            r#"(declare-const s String)(assert (str.prefixof "ab" s))"#,
+            &mut pool,
+        )
+        .expect("parse");
+        let Command::Assert(t, _) = script.commands[0] else {
+            panic!("expected an assert");
+        };
+        let old_s = pool.var(script.declared[0]);
+        let new_s = pool.var(solver.declared[0]);
+        let t = pool
+            .substitute(t, &FxHashMap::from_iter([(old_s, new_s)]))
+            .expect("substitute");
+        assert_eq!(solver.check_sat(&mut pool, &[t]), Answer::Sat);
+        assert_eq!(solver.stats.rebuilds, 1, "string assumption rebuilt the engine");
     }
 
     /// `minimize`/`eval_n` under assumptions that need theory lowering: the

@@ -132,6 +132,15 @@ pub struct TermPool {
     bv_consts: Vec<BvConst>,
     bv_intern: FxHashMap<BvConst, BvConstId>,
     symbols: Vec<Symbol>,
+    /// Symbols the theory lowerings derive from source symbols (an FP
+    /// variable's IEEE bits, a string variable's length and character slots),
+    /// interned per (source, tag, index) so that re-running a lowering
+    /// reproduces the *same* symbols — and, terms being hash-consed, the same
+    /// terms. That determinism is what lets a persistent engine survive a
+    /// re-lowering: the solver compares the re-lowered assertions against
+    /// what the engine already blasted, and fresh symbols per run would make
+    /// that comparison fail every time.
+    derived: FxHashMap<(SymbolId, &'static str, u32), SymbolId>,
     /// Parked traversal scratch. A `Cell` rather than a `RefCell` because
     /// `post_order` hands `&self` to its callback and callbacks do nest: the
     /// buffer is *moved out* for the duration of a traversal, so a nested call
@@ -184,6 +193,7 @@ impl TermPool {
             bv_consts: Vec::new(),
             bv_intern: FxHashMap::default(),
             symbols: Vec::new(),
+            derived: FxHashMap::default(),
             traversal: Cell::new(None),
             counters: Cell::new(WalkCounters::default()),
             true_term: TermId(0),
@@ -371,6 +381,34 @@ impl TermPool {
             sort,
         });
         id
+    }
+
+    /// The symbol a theory lowering derives from `base` under `tag`/`index`
+    /// (an FP variable's IEEE bits, a string variable's `i`th character slot),
+    /// interning it on first use so every later lowering run reproduces the
+    /// same symbol. `name` is only evaluated for that first minting; it is the
+    /// display name and carries no identity. A given (base, tag, index) must
+    /// always be requested at the same sort — the derivation it names is a
+    /// fixed function of the source symbol.
+    pub fn derived_symbol(
+        &mut self,
+        base: SymbolId,
+        tag: &'static str,
+        index: u32,
+        sort: Sort,
+        name: impl FnOnce() -> String,
+    ) -> SymbolId {
+        if let Some(&sym) = self.derived.get(&(base, tag, index)) {
+            debug_assert_eq!(
+                self.symbols[sym.0 as usize].sort, sort,
+                "derived symbol {tag}/{index} of {} re-requested at a different sort",
+                self.symbols[base.0 as usize].name
+            );
+            return sym;
+        }
+        let sym = self.fresh_symbol(name(), sort);
+        self.derived.insert((base, tag, index), sym);
+        sym
     }
 
     pub fn var(&mut self, sym: SymbolId) -> TermId {
