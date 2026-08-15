@@ -36,6 +36,125 @@ struct CachedSolver {
     tracked: Vec<SymbolId>,
     timeout: Option<u32>,
     unsat_core: bool,
+    /// Stats already harvested into [`GLOBAL_STATS`] from this engine, so each
+    /// harvest adds only the delta since the previous one.
+    reported: ReportedStats,
+}
+
+/// The portion of an engine's [`smtrs_solver::SolverStats`] already added to
+/// the process-global accumulator.
+#[derive(Default, Clone, Copy)]
+struct ReportedStats {
+    checks: u64,
+    rebuilds: u64,
+    lower_fp: f64,
+    lower_str: f64,
+    rewrite_preprocess: f64,
+    blast: f64,
+    sat: f64,
+    model: f64,
+    prop_abs: f64,
+}
+
+/// Process-global solver statistics, aggregated across every engine on every
+/// thread. Read through [`global_stats_json`]; costs one mutex lock per
+/// solver operation, which is noise next to the operation itself.
+#[derive(Default)]
+struct GlobalStats {
+    /// Engine-side numbers, deltas harvested after each backend operation.
+    checks: u64,
+    rebuilds: u64,
+    lower_fp: f64,
+    lower_str: f64,
+    rewrite_preprocess: f64,
+    blast: f64,
+    sat: f64,
+    model: f64,
+    prop_abs: f64,
+    /// Backend-side numbers.
+    solver_clones: u64,
+    cache_invalidations: u64,
+    watchdogs_armed: u64,
+    backend_checks: u64,
+}
+
+static GLOBAL_STATS: Mutex<GlobalStats> = Mutex::new(GlobalStats {
+    checks: 0,
+    rebuilds: 0,
+    lower_fp: 0.0,
+    lower_str: 0.0,
+    rewrite_preprocess: 0.0,
+    blast: 0.0,
+    sat: 0.0,
+    model: 0.0,
+    prop_abs: 0.0,
+    solver_clones: 0,
+    cache_invalidations: 0,
+    watchdogs_armed: 0,
+    backend_checks: 0,
+});
+
+/// Add this engine's stats growth since the last harvest to the global
+/// accumulator.
+fn harvest(cached: &mut CachedSolver) {
+    let s = &cached.solver.stats;
+    let p = &s.phases;
+    let r = &mut cached.reported;
+    let mut g = GLOBAL_STATS.lock().expect("stats lock");
+    g.checks += s.checks - r.checks;
+    g.rebuilds += s.rebuilds - r.rebuilds;
+    g.lower_fp += p.lower_fp - r.lower_fp;
+    g.lower_str += p.lower_str - r.lower_str;
+    g.rewrite_preprocess += p.rewrite_preprocess - r.rewrite_preprocess;
+    g.blast += p.blast - r.blast;
+    g.sat += p.sat - r.sat;
+    g.model += p.model - r.model;
+    g.prop_abs += p.prop_abs - r.prop_abs;
+    *r = ReportedStats {
+        checks: s.checks,
+        rebuilds: s.rebuilds,
+        lower_fp: p.lower_fp,
+        lower_str: p.lower_str,
+        rewrite_preprocess: p.rewrite_preprocess,
+        blast: p.blast,
+        sat: p.sat,
+        model: p.model,
+        prop_abs: p.prop_abs,
+    };
+}
+
+/// The process-global solver statistics as a JSON object.
+pub fn global_stats_json() -> String {
+    let g = GLOBAL_STATS.lock().expect("stats lock");
+    format!(
+        concat!(
+            "{{\"checks\":{},\"rebuilds\":{},\"lower_fp\":{:.3},\"lower_str\":{:.3},",
+            "\"rewrite_preprocess\":{:.3},\"blast\":{:.3},\"sat\":{:.3},\"model\":{:.3},",
+            "\"prop_abs\":{:.3},\"solver_clones\":{},\"cache_invalidations\":{},",
+            "\"watchdogs_armed\":{},\"backend_checks\":{}}}"
+        ),
+        g.checks,
+        g.rebuilds,
+        g.lower_fp,
+        g.lower_str,
+        g.rewrite_preprocess,
+        g.blast,
+        g.sat,
+        g.model,
+        g.prop_abs,
+        g.solver_clones,
+        g.cache_invalidations,
+        g.watchdogs_armed,
+        g.backend_checks,
+    )
+}
+
+/// Zero the process-global solver statistics.
+pub fn reset_global_stats() {
+    let mut g = GLOBAL_STATS.lock().expect("stats lock");
+    *g = GlobalStats::default();
+    // Engines keep their cumulative internal stats; the per-engine `reported`
+    // marks are NOT reset, so the next harvests keep adding only fresh deltas.
 }
 
 thread_local! {
@@ -102,6 +221,7 @@ pub struct SmtrsSolver<'c> {
 
 impl<'c> Clone for SmtrsSolver<'c> {
     fn clone(&self) -> Self {
+        GLOBAL_STATS.lock().expect("stats lock").solver_clones += 1;
         SmtrsSolver {
             ctx: self.ctx,
             assertions: self.assertions.clone(),
@@ -177,7 +297,9 @@ impl<'c> SmtrsSolver<'c> {
     /// Required whenever the assertion set changes other than by appending.
     fn invalidate_cache(&self) {
         SOLVER_CACHE.with(|cell| {
-            cell.borrow_mut().remove(&self.cache_id);
+            if cell.borrow_mut().remove(&self.cache_id).is_some() {
+                GLOBAL_STATS.lock().expect("stats lock").cache_invalidations += 1;
+            }
         });
     }
 
@@ -212,6 +334,7 @@ impl<'c> SmtrsSolver<'c> {
                             tracked: Vec::new(),
                             timeout: self.timeout,
                             unsat_core: self.unsat_core,
+                            reported: ReportedStats::default(),
                         },
                     );
                 }
@@ -229,7 +352,9 @@ impl<'c> SmtrsSolver<'c> {
                     }
                     cached.asserted += 1;
                 }
-                f(st, cached)
+                let out = f(st, cached);
+                harvest(cached);
+                out
             })
         })
     }
@@ -466,6 +591,7 @@ impl<'c> SmtrsSolver<'c> {
 /// can fire into it) and arm the watchdog when a timeout is configured.
 fn watch(cached: &mut CachedSolver) -> Option<Watchdog> {
     cached.timeout.map(|ms| {
+        GLOBAL_STATS.lock().expect("stats lock").watchdogs_armed += 1;
         let flag = Arc::new(AtomicBool::new(false));
         cached.solver.set_terminate(Arc::clone(&flag));
         Watchdog::arm(ms, flag)
@@ -480,6 +606,7 @@ fn check(
     cached: &mut CachedSolver,
     assumptions: &[TermId],
 ) -> Result<Answer, ClarirsError> {
+    GLOBAL_STATS.lock().expect("stats lock").backend_checks += 1;
     cached.solver.declared.clone_from(&st.declared);
     let _guard = watch(cached);
     Ok(cached.solver.check_sat(&mut st.pool, assumptions))

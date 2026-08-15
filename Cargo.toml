@@ -63,3 +63,8 @@ repository = "https://github.com/angr/angr.git"
 [workspace.lints.clippy]
 all = "warn"
 cargo = "warn"
+
+# Line tables only: enough for py-spy to attribute native samples to crate
+# functions, without the size or compile cost of full debug info.
+[profile.release]
+debug = "line-tables-only"

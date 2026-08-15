@@ -16,7 +16,7 @@
 mod convert;
 mod solver;
 
-pub use solver::SmtrsSolver;
+pub use solver::{SmtrsSolver, global_stats_json, reset_global_stats};
 
 use std::cell::RefCell;
 use std::collections::HashMap;

@@ -1118,7 +1118,22 @@ impl PyCompositeSolver {
     }
 }
 
+/// Process-global smtrs backend statistics as a JSON string: engine phase
+/// times (seconds), check/rebuild counts, and backend-side counters.
+#[pyfunction]
+fn smtrs_backend_stats() -> String {
+    clarirs_smtrs::global_stats_json()
+}
+
+/// Zero the process-global smtrs backend statistics.
+#[pyfunction]
+fn smtrs_backend_stats_reset() {
+    clarirs_smtrs::reset_global_stats();
+}
+
 pub(crate) fn import(_: Python, m: &Bound<PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(smtrs_backend_stats, m)?)?;
+    m.add_function(wrap_pyfunction!(smtrs_backend_stats_reset, m)?)?;
     m.add_class::<PySolver>()?;
     m.add_class::<PyConcreteSolver>()?;
     m.add_class::<PyZ3Solver>()?;
