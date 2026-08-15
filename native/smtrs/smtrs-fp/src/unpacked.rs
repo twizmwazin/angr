@@ -212,22 +212,50 @@ impl B<'_> {
     /// Count leading zeros of `t` as a BV of the same width (used to
     /// renormalize subnormals and post-subtraction cancellation).
     pub fn clz(&mut self, t: TermId) -> TermId {
+        // Binary-search mux tree, not the old linear chain of full-width
+        // adders (w sequential w-bit additions: ~w^2 gates at ripple depth,
+        // which for the f64 adder's 56-bit working word dominated every
+        // FP operation's encoding). Here: is the top half zero? That is the
+        // count's next-most-significant bit; then recurse into whichever half
+        // holds the leading one. Linear gates, logarithmic depth, and the
+        // count assembles by concatenation — no adders at all.
+        //
+        // The recursion's invariant is a non-zero word (each selected half
+        // then really contains the leading one, so every level's sub-count
+        // stays below its half width and the concatenation is exact). Padding
+        // the *low* end with ones up to a power of two establishes it for
+        // free: ones below `t` add no leading zeros, and an all-zero `t`
+        // stops the count exactly at the pad boundary, i.e. at w.
         let w = self.width(t);
-        // Linear chain: count = sum over i of (all bits above i are zero).
-        // Built as a running "still all zeros from the top" predicate.
-        let mut count = self.zeros(w);
-        let mut still_zero = self.tt();
-        let zero_bit = self.bv(1, 0);
-        let one_w = self.bv(w, 1);
-        let zero_w = self.zeros(w);
-        for i in (0..w).rev() {
-            let bit = self.extract(t, i, i);
-            let bit_is_zero = self.eq(bit, zero_bit);
-            still_zero = self.and(&[still_zero, bit_is_zero]);
-            let inc = self.ite(still_zero, one_w, zero_w);
-            count = self.add(count, inc);
+        let wp = (w + 1).next_power_of_two().max(2);
+        let ones = {
+            let z = self.zeros(wp - w);
+            self.mk(Op::BvNot, &[z])
+        };
+        let padded = self.mk(Op::Concat, &[t, ones]);
+        let cnt = self.clz_nonzero(padded);
+        self.resize(cnt, w)
+    }
+
+    /// Leading-zero count of a power-of-two-width, provably non-zero word,
+    /// in `log2(width)` bits. See [`Self::clz`].
+    fn clz_nonzero(&mut self, t: TermId) -> TermId {
+        let w = self.width(t);
+        debug_assert!(w.is_power_of_two() && w >= 2);
+        let hi = self.extract(t, w - 1, w / 2);
+        if w == 2 {
+            // One bit left: the count is 1 exactly when the top bit is 0.
+            let one = self.bv(1, 1);
+            return self.mk(Op::BvXor, &[hi, one]);
         }
-        count
+        let lo = self.extract(t, w / 2 - 1, 0);
+        let hi_zero = self.is_zero_bv(hi);
+        let sel = self.ite(hi_zero, lo, hi);
+        let rest = self.clz_nonzero(sel);
+        let one = self.bv(1, 1);
+        let zero = self.bv(1, 0);
+        let top = self.ite(hi_zero, one, zero);
+        self.mk(Op::Concat, &[top, rest])
     }
 }
 
@@ -479,4 +507,33 @@ pub fn pack(b: &mut B, x: &Unpacked) -> TermId {
     let r = b.ite(x.zero, zero_bits, finite);
     let r = b.ite(x.inf, inf_bits, r);
     b.ite(x.nan, nan_bits, r)
+}
+
+#[cfg(test)]
+mod clz_tests {
+    use super::*;
+    use smtrs_core::{TermPool, eval};
+
+    /// Exhaustive against the arithmetic definition, across widths that cover
+    /// the padding cases (already power-of-two, one below, odd) and every
+    /// value including zero — where the count must be exactly the width.
+    #[test]
+    fn clz_matches_reference_exhaustively() {
+        for w in 1..=11u32 {
+            let mut pool = TermPool::new();
+            let mut b = B { pool: &mut pool };
+            for v in 0..(1u64 << w) {
+                let t = b.bv(w, v);
+                let c = b.clz(t);
+                let vals = eval(b.pool, &[c], &Default::default()).expect("constant clz");
+                let got = vals[0].as_bv().and_then(|c| c.as_u64()).expect("bv");
+                let expected = if v == 0 {
+                    u64::from(w)
+                } else {
+                    u64::from(w) - (64 - u64::from(v.leading_zeros()))
+                };
+                assert_eq!(got, expected, "clz({v:#b}) at width {w}");
+            }
+        }
+    }
 }
