@@ -5,6 +5,7 @@ import logging
 import pypcode
 from pypcode import OpCode, PcodeOp, Varnode
 
+from angr.calling_conventions import SimRegArg, default_cc
 from angr.engines.pcode.lifter import IRSB
 from angr.utils.constants import DEFAULT_STATEMENT
 
@@ -558,7 +559,10 @@ class PCodeIRSBConverter(Converter):
         """
         Convert a p-code call operation
         """
-        ret_reg_offset = self._manager.arch.ret_offset
+        # the register a call returns its value in belongs to the calling convention, not to the arch definition
+        cc_cls = default_cc(self._manager.arch.name)
+        ret_val = None if cc_cls is None else cc_cls.RETURN_VAL
+        ret_reg_offset = ret_val.check_offset(self._manager.arch) if isinstance(ret_val, SimRegArg) else None
         ret_expr = (
             None
             if ret_reg_offset is None
@@ -589,8 +593,15 @@ class PCodeIRSBConverter(Converter):
         """
         Convert a p-code indirect call operation
         """
-        ret_reg_offset = self._manager.arch.ret_offset
-        ret_expr = Register(None, ret_reg_offset, self._manager.arch.bits, ins_addr=self._manager.ins_addr)  # ???
+        # the register a call returns its value in belongs to the calling convention, not to the arch definition
+        cc_cls = default_cc(self._manager.arch.name)
+        ret_val = None if cc_cls is None else cc_cls.RETURN_VAL
+        ret_reg_offset = ret_val.check_offset(self._manager.arch) if isinstance(ret_val, SimRegArg) else None
+        ret_expr = (
+            None
+            if ret_reg_offset is None
+            else Register(None, ret_reg_offset, self._manager.arch.bits, ins_addr=self._manager.ins_addr)
+        )  # ???
         dest = self._get_value(self._current_op.inputs[0])
         call_expr = Call(
             self._manager.next_atom(),

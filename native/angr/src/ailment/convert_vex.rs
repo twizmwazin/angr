@@ -253,6 +253,29 @@ impl<'py> ArchCtx<'py> {
         })
     }
 
+    /// The register offset a function returns its value in. This belongs to the calling convention, not
+    /// to the arch definition, so it comes from the arch's default `SimCC.RETURN_VAL` rather than from
+    /// the `archinfo.Arch.ret_offset` field. `None` when the arch has no default calling convention, or
+    /// its convention does not return values in a register.
+    fn ret_offset(&self) -> PyResult<Option<i64>> {
+        let cc_mod = self.arch.py().import("angr.calling_conventions")?;
+        let cc_cls = cc_mod
+            .getattr("default_cc")?
+            .call1((self.arch.getattr("name")?,))?;
+        if cc_cls.is_none() {
+            return Ok(None);
+        }
+        let ret_val = cc_cls.getattr("RETURN_VAL")?;
+        if !ret_val.is_instance(&cc_mod.getattr("SimRegArg")?)? {
+            return Ok(None);
+        }
+        Ok(Some(
+            ret_val
+                .call_method1("check_offset", (&self.arch,))?
+                .extract()?,
+        ))
+    }
+
     fn reg_name(&mut self, offset: i64, size: u32) -> PyResult<Option<String>> {
         if let Some(v) = self.reg_name_memo.get(&(offset, size)) {
             return Ok(v.clone());
@@ -1291,26 +1314,32 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
     }
 
     fn emit_call_tail(&mut self, jk: &str, statements: &mut Vec<AilStatement>) -> PyResult<()> {
-        let ret_offset: i64 = self.arch.arch.getattr("ret_offset")?.extract()?;
+        let ret_offset = self.arch.ret_offset()?;
         let bits = self.arch.bits;
-        let ret_name = self.arch.reg_name(ret_offset, bits)?;
-        let ret_expr = {
-            let aidx = self.next_atom();
-            let mut tags = self.tags();
-            if let Some(n) = ret_name {
-                tags.extras.insert(TagKey::RegName, TagExtra::Str(n));
-            }
-            AilExpression {
-                header: ExprHeader::new(aidx, 0, bits, tags),
-                inner: ExprInner::Register {
-                    reg_offset: ret_offset,
-                },
+        let ret_expr: Option<AilExpression> = match ret_offset {
+            None => None,
+            Some(ret_offset) => {
+                let ret_name = self.arch.reg_name(ret_offset, bits)?;
+                let aidx = self.next_atom();
+                let mut tags = self.tags();
+                if let Some(n) = ret_name {
+                    tags.extras.insert(TagKey::RegName, TagExtra::Str(n));
+                }
+                Some(AilExpression {
+                    header: ExprHeader::new(aidx, 0, bits, tags),
+                    inner: ExprInner::Register {
+                        reg_offset: ret_offset,
+                    },
+                })
             }
         };
 
+        // TODO: `fp_ret_offset` belongs to the calling convention as well (`SimCC.FP_RETURN_VAL`), but that
+        // register disagrees with this archinfo field on several arches -- AMD64 has no `fp_ret_offset` yet
+        // returns floats in xmm0 -- so moving it over changes the emitted AIL and is left to its own change.
         let fp_ret_offset: Option<i64> = self.arch.arch.getattr("fp_ret_offset")?.extract()?;
         let fp_ret_expr: Option<AilExpression> = if let Some(fp_ret_offset) = fp_ret_offset {
-            if fp_ret_offset == ret_offset {
+            if Some(fp_ret_offset) == ret_offset {
                 None
             } else {
                 let fp_name = self.arch.reg_name(fp_ret_offset, bits)?;
@@ -1339,7 +1368,7 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
             new_dirty_expr(didx, "syscall".to_string(), bits, Tags::default())
         };
 
-        let ret_bits = ret_expr.header.bits;
+        let ret_bits = ret_expr.as_ref().map_or(bits, |e| e.header.bits);
         let call_expr = {
             let cidx = self.next_atom();
             let depth = target.header.depth + 1;
@@ -1359,7 +1388,7 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
             self.tags(),
             StmtInner::SideEffectStatement {
                 expr: Arc::new(call_expr),
-                ret_expr: Some(Arc::new(ret_expr)),
+                ret_expr: ret_expr.map(Arc::new),
                 fp_ret_expr: fp_ret_expr.map(Arc::new),
             },
         ));
