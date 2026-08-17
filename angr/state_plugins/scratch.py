@@ -15,6 +15,45 @@ from .sim_action import SimActionData, SimActionObject
 l = logging.getLogger(name=__name__)
 
 
+class DirtyAddrRanges:
+    """
+    Tracks the address ranges written during the current basic block, for self-modifying code detection.
+
+    Half-open ``[start, end)`` intervals are stored instead of individual addresses, so recording a store of
+    ``n`` bytes costs O(1) instead of O(n).
+    """
+
+    __slots__ = ("_ranges",)
+
+    def __init__(self):
+        self._ranges: list[tuple[int, int]] = []
+
+    def add_range(self, start: int, size: int) -> None:
+        if size <= 0:
+            return
+        end = start + size
+        if self._ranges:
+            last_start, last_end = self._ranges[-1]
+            # stores tend to be sequential, so coalescing with the previous range keeps the list tiny
+            if start <= last_end and last_start <= end:
+                self._ranges[-1] = (min(start, last_start), max(end, last_end))
+                return
+        self._ranges.append((start, end))
+
+    def overlaps(self, start: int, size: int) -> bool:
+        end = start + size
+        return any(start < r_end and r_start < end for r_start, r_end in self._ranges)
+
+    def __contains__(self, addr: int) -> bool:
+        return any(r_start <= addr < r_end for r_start, r_end in self._ranges)
+
+    def __bool__(self) -> bool:
+        return bool(self._ranges)
+
+    def clear(self) -> None:
+        self._ranges.clear()
+
+
 class SimStateScratch(SimStatePlugin):
     """
     Implements the scratch state plugin.
@@ -51,7 +90,7 @@ class SimStateScratch(SimStatePlugin):
         self.tyenv = None
 
         # dirtied addresses, for dealing with self-modifying code
-        self.dirty_addrs = set()
+        self.dirty_addrs = DirtyAddrRanges()
         self.num_insns = 0
 
         # pcode IR-relative jumps

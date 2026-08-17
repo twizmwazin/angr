@@ -250,9 +250,8 @@ class HeavyVEXMixin(SuccessorsEngine, ClaripyDataMixin, SimStateStorageMixin, VE
                 # Conservatively assume it is the maximum instruction
                 # length for the purpose of dirty checks.
                 instruction_len = self.project.arch.max_inst_bytes
-            for subaddr in range(instruction_len):
-                if subaddr + stmt.addr in self.state.scratch.dirty_addrs:
-                    raise errors.SimReliftException(self.state)
+            if self.state.scratch.dirty_addrs.overlaps(stmt.addr, instruction_len):
+                raise errors.SimReliftException(self.state)
 
         # HACK: mips64 may put an instruction which may fault in the delay slot of a branch likely instruction
         # if the branch is not taken, we must not execute that instruction if the condition fails (i.e. the current
