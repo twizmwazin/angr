@@ -663,18 +663,21 @@ class Clinic(Analysis, Serializable):
 
         # update all callee return nodes with caller successor
         ail_graph = networkx.union(ail_graph, callee_graph)
+        # the register a function returns its value in belongs to the calling convention, not to the arch definition
+        ret_val = self.project.factory.cc().RETURN_VAL
+        ret_reg_offset = ret_val.check_offset(self.project.arch) if isinstance(ret_val, SimRegArg) else None
         for blk in callee_graph.nodes():
             for idx, stmt in enumerate(list(blk.statements)):
                 if isinstance(stmt, ailment.Stmt.Return):
                     # replace the return statement with an assignment to the return register
                     blk.statements.pop(idx)
 
-                    if stmt.ret_exprs and self.project.arch.ret_offset is not None:
+                    if stmt.ret_exprs and ret_reg_offset is not None:
                         assign_to_retreg = ailment.Stmt.Assignment(
                             self._ail_manager.next_atom(),
                             ailment.Expr.Register(
                                 self._ail_manager.next_atom(),
-                                self.project.arch.ret_offset,
+                                ret_reg_offset,
                                 self.project.arch.bits,
                             ),
                             stmt.ret_exprs[0],
@@ -1698,7 +1701,9 @@ class Clinic(Analysis, Serializable):
 
                 target_func = self.kb.functions.get_by_addr(target.value)
 
-                ret_reg_offset = self.project.arch.ret_offset
+                # the return value register belongs to the calling convention, not to the arch definition
+                ret_val = self.project.factory.cc().RETURN_VAL
+                ret_reg_offset = ret_val.check_offset(self.project.arch) if isinstance(ret_val, SimRegArg) else None
                 if target_func.returning and ret_reg_offset is not None:
                     tags = dict(target.tags)
                     tags.pop("reg_name", None)

@@ -147,8 +147,11 @@ class SimEngineFactCollectorVEX(
         super().__init__(project)
 
     def _process_block_end(self, stmt_result: list, whitelist: set[int] | None) -> None:
-        if self.block.vex.jumpkind == "Ijk_Call" and self.arch.ret_offset is not None:
-            self.state.register_written(self.arch.ret_offset, self.arch.bytes)
+        if self.block.vex.jumpkind == "Ijk_Call":
+            # the register a call clobbers with its return value is defined by the calling convention, not by the arch
+            ret_val = self.project.factory.cc().RETURN_VAL
+            if isinstance(ret_val, SimRegArg):
+                self.state.register_written(ret_val.check_offset(self.arch), ret_val.size)
 
     def _top(self, bits: int):
         return None

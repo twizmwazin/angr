@@ -11,6 +11,7 @@ from angr.ailment.statement import Assignment, ConditionalJump, Jump, Return
 from angr.analyses.analysis import AnalysesHub, Analysis
 from angr.analyses.s_liveness import SLivenessAnalysis
 from angr.analyses.s_reaching_definitions import SReachingDefinitions
+from angr.calling_conventions import SimRegArg
 from angr.knowledge_plugins.functions import Function
 from angr.utils.graph import Dominators, compute_dominance_frontier, subgraph_between_nodes
 from angr.utils.ssa import is_phi_assignment
@@ -174,8 +175,16 @@ class Outliner(Analysis):
             bits=self.project.arch.bits,
             ins_addr=src_node.addr,
         )
+        # the register the outlined function returns through belongs to the calling convention, not to the arch
+        # definition. A REGISTER vvar has to name a register, so outlining needs a convention that returns in one.
+        ret_val = self.project.factory.cc().RETURN_VAL
+        assert isinstance(ret_val, SimRegArg), "Outlining requires a calling convention that returns in a register"
         switch_vvar = VirtualVariable(
-            None, vvar_id, self.project.arch.bits, VirtualVariableCategory.REGISTER, oident=self.project.arch.ret_offset
+            None,
+            vvar_id,
+            self.project.arch.bits,
+            VirtualVariableCategory.REGISTER,
+            oident=ret_val.check_offset(self.project.arch),
         )
         call_stmt = Assignment(None, switch_vvar, call_expr, ins_addr=src_node.addr)
         new_src_node = Block(src_node.addr, src_node.original_size, statements=[call_stmt], idx=src_node.idx)

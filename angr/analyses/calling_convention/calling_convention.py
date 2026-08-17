@@ -943,9 +943,13 @@ class CallingConventionAnalysis(Analysis):
                     restored_reg_vars.add(SimRegArg(reg_name, var_.size))
 
             else:
+                # the return value register is never callee-saved; which register that is belongs to the calling
+                # convention, not to the arch definition
+                ret_val = self.project.factory.cc().RETURN_VAL
+                ret_offset = ret_val.check_offset(self.project.arch) if isinstance(ret_val, SimRegArg) else None
                 reg_offsets: set[int] = {r.reg for r in reg_vars_with_single_access}
                 for var_ in var_manager.get_variables(sort="reg"):
-                    if var_.reg in (reg_offsets - {self.project.arch.ret_offset}):
+                    if var_.reg in (reg_offsets - {ret_offset}):
                         # check if there is only a write to it
                         accesses = var_manager.get_variable_accesses(var_)
                         if len(accesses) == 1 and accesses[0].access_type == VariableAccessSort.WRITE:

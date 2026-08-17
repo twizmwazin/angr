@@ -11,7 +11,7 @@ import pyvex
 from angr.analyses.analysis import AnalysesHub, Analysis
 from angr.analyses.propagator.vex_vars import VEXReg, VEXTmp
 from angr.block import Block
-from angr.calling_conventions import SimStackArg
+from angr.calling_conventions import SimRegArg, SimStackArg
 from angr.codenode import BlockNode, FuncNode, HookNode
 from angr.engines.light import RegisterOffset, SimEngineLight, SimEngineNostmtVEX, SpOffset
 from angr.knowledge_plugins.functions import Function
@@ -133,7 +133,10 @@ class SimEngineFCPVEX(
 
     def _process_block_end(self, stmt_result: list, whitelist: set[int] | None) -> None:
         if self.block.vex.jumpkind == "Ijk_Call":
-            self.state.register_written(self.arch.ret_offset, self.arch.bytes, None)
+            # the register a call clobbers with its return value is defined by the calling convention, not by the arch
+            ret_val = self.project.factory.cc().RETURN_VAL
+            if isinstance(ret_val, SimRegArg):
+                self.state.register_written(ret_val.check_offset(self.arch), ret_val.size, None)
 
     def _top(self, bits: int):
         return None

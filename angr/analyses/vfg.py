@@ -14,6 +14,7 @@ from angr import sim_options
 from angr.analyses.analysis import AnalysesHub, Analysis
 from angr.analyses.cfg import CFGEmulated
 from angr.analyses.forward_analysis import ForwardAnalysis
+from angr.calling_conventions import SimRegArg
 from angr.engines import SimSuccessors
 from angr.engines.procedure import ProcedureEngine
 from angr.errors import (
@@ -1484,8 +1485,9 @@ class VFG(ForwardAnalysis[SimState, VFGNode, VFGJob, BlockID, SimState], Analysi
                 successor_state.registers.store(arch.sp_offset, reg_sp_expr)
 
                 # Clear the return value with a TOP
-                top_si = claripy.BVS("unnamed", arch.bits)
-                successor_state.registers.store(arch.ret_offset, top_si)
+                ret_val = self.project.factory.cc().RETURN_VAL
+                if isinstance(ret_val, SimRegArg):
+                    ret_val.set_value(successor_state, claripy.BVS("unnamed", ret_val.size * arch.byte_width))
 
             if job.call_skipped:
                 # TODO: Make sure the return values make sense
