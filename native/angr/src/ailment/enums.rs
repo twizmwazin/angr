@@ -53,10 +53,6 @@ impl VirtualVariableCategory {
         format!("<VirtualVariableCategory.{}: {}>", self.name(), *self as u8)
     }
 
-    fn __int__(&self) -> u8 {
-        *self as u8
-    }
-
     fn __hash__(&self) -> u64 {
         *self as u64
     }
@@ -258,10 +254,6 @@ impl ExpressionKind {
         format!("<ExpressionKind.{}: {}>", self.as_str(), *self as u8)
     }
 
-    fn __int__(&self) -> u8 {
-        *self as u8
-    }
-
     fn __hash__(&self) -> u64 {
         *self as u64
     }
@@ -396,10 +388,6 @@ impl StatementKind {
         format!("<StatementKind.{}: {}>", self.as_str(), *self as u8)
     }
 
-    fn __int__(&self) -> u8 {
-        *self as u8
-    }
-
     fn __hash__(&self) -> u64 {
         *self as u64
     }
@@ -511,10 +499,6 @@ impl RoundingMode {
 
     fn __repr__(&self) -> String {
         format!("<RoundingMode.{}: {}>", self.name(), *self as u8)
-    }
-
-    fn __int__(&self) -> u8 {
-        *self as u8
     }
 
     fn __hash__(&self) -> u64 {

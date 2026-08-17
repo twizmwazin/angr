@@ -2465,7 +2465,7 @@ impl<'py> IrReader for PyReader<'py> {
             _ => {
                 // Match the original converter's label: f"unsupported_{type(expr)!s}".
                 // `unsupported_expr` prepends "unsupported_", so pass str(type(expr)).
-                let label = expr.get_type().str()?.to_string();
+                let label = expr.get_type().str()?.extract::<String>()?;
                 ExprKind::Unsupported {
                     label,
                     bits: self.result_size(expr),

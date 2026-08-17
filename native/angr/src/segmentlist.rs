@@ -2,7 +2,7 @@ use std::cmp::{max, min};
 use std::collections::HashSet;
 use std::ops::Range;
 
-use pyo3::{exceptions::PyStopIteration, prelude::*, types::PyTuple};
+use pyo3::{prelude::*, types::PyTuple};
 use rangemap::RangeMap;
 
 #[pyclass(module = "angr.rustylib.segmentlist", from_py_object)]
@@ -61,12 +61,6 @@ impl SegmentList {
 
     pub fn is_empty(&self) -> bool {
         self.map.is_empty()
-    }
-
-    pub fn get_segment(&self, address: u64) -> Option<(u64, u64, Option<String>)> {
-        self.map
-            .get_key_value(&address)
-            .map(|(range, sort)| (range.start, range.end - range.start, sort.clone()))
     }
 
     /// The last segment that starts before `before`.
@@ -328,10 +322,8 @@ impl SegmentListIter {
         self_
     }
 
-    fn __next__(&mut self) -> PyResult<Segment> {
-        self.segments
-            .next()
-            .ok_or_else(|| PyErr::new::<PyStopIteration, _>(""))
+    fn __next__(&mut self) -> Option<Segment> {
+        self.segments.next()
     }
 }
 
