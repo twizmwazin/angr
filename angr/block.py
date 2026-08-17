@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import logging
+from functools import lru_cache
 from typing import TYPE_CHECKING
 
+import capstone
 import pyvex
 from archinfo import Arch, ArchARM
 from pyvex import IRSB
@@ -81,6 +83,35 @@ class DisassemblerInsn:
 
     def __repr__(self):
         return f'<DisassemblerInsn "{self.mnemonic}" for {self.address:#x}>'
+
+
+@lru_cache(maxsize=32)
+def _build_capstone(cs_arch: int, cs_mode: int, x86_syntax: str) -> capstone.Cs:
+    cs = capstone.Cs(cs_arch, cs_mode)
+    cs.syntax = capstone.CS_OPT_SYNTAX_ATT if x86_syntax == "at&t" else capstone.CS_OPT_SYNTAX_INTEL
+    cs.detail = True
+    return cs
+
+
+def capstone_for_arch(arch: Arch, thumb: bool = False, x86_syntax: str | None = None) -> capstone.Cs:
+    """
+    Get a Capstone instance for the given architecture.
+
+    ``arch.capstone`` caches a single instance on the Arch object, and its x86 syntax can only be changed by assigning
+    to ``arch.capstone_x86_syntax``. Since Arch objects are shared project-wide, that turns a local formatting
+    preference into global state. Pass ``x86_syntax`` here instead to get a separate (cached) instance for that syntax
+    and leave the arch untouched.
+
+    :param arch:        The architecture to disassemble for.
+    :param thumb:       Whether to disassemble in ARM Thumb mode.
+    :param x86_syntax:  Either ``"intel"`` or ``"at&t"``. Only meaningful for X86 and AMD64; ignored on other
+                        architectures. When None, the arch's own instance and syntax setting are used.
+    """
+    if x86_syntax is not None and hasattr(arch, "capstone_x86_syntax"):
+        if x86_syntax not in ("intel", "at&t"):
+            raise ValueError(f'Unsupported Capstone x86 syntax "{x86_syntax}". It must be either "intel" or "at&t".')
+        return _build_capstone(arch.cs_arch, arch.cs_mode, x86_syntax)
+    return arch.capstone_thumb if thumb else arch.capstone  # type: ignore
 
 
 class CapstoneBlock(DisassemblerBlock):
@@ -448,7 +479,19 @@ class Block(Serializable):
         if self._capstone:
             return self._capstone
 
-        cs = self.arch.capstone if not self.thumb else self.arch.capstone_thumb  # type: ignore
+        self._capstone = self.disassemble_capstone()
+        return self._capstone
+
+    def disassemble_capstone(self, x86_syntax: str | None = None) -> CapstoneBlock:
+        """
+        Disassemble this block with Capstone.
+
+        :param x86_syntax:  Either ``"intel"`` or ``"at&t"``, to disassemble x86 and AMD64 code in a syntax other than
+                            the arch default. Ignored on other architectures. When it is None, the arch's own Capstone
+                            instance (and therefore its own syntax setting) is used.
+        :return:            The disassembled block.
+        """
+        cs = capstone_for_arch(self.arch, thumb=self.thumb, x86_syntax=x86_syntax)
 
         insns = []
 
@@ -457,10 +500,7 @@ class Block(Serializable):
             block_bytes = block_bytes[: self.size]  # type: ignore
         for cs_insn in cs.disasm(block_bytes, self.addr):
             insns.append(CapstoneInsn(cs_insn))
-        block = CapstoneBlock(self.addr, insns, self.thumb, self.arch)
-
-        self._capstone = block
-        return block
+        return CapstoneBlock(self.addr, insns, self.thumb, self.arch)
 
     @property
     def pcode(self) -> PCodeBlock:

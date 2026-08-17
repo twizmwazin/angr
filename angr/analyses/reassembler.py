@@ -928,7 +928,7 @@ class BasicBlock:
 
         # re-lifting
         block = self.project.factory.fresh_block(self.addr, self.size)
-        capstone_obj = block.capstone
+        capstone_obj = block.disassemble_capstone(x86_syntax=self.binary.syntax)
 
         # Fill in instructions
         for idx, instr in enumerate(capstone_obj.insns):
@@ -2403,16 +2403,6 @@ class Reassembler(Analysis):
 
         self.cfg = cfg
 
-        old_capstone_syntax = self.project.arch.capstone_x86_syntax
-        if old_capstone_syntax is None:
-            old_capstone_syntax = "intel"
-
-        if self.syntax == "at&t":
-            # switch capstone to AT&T style
-            self.project.arch.capstone_x86_syntax = "at&t"
-            # clear the block cache in lifter!
-            self.project.factory.default_engine.clear_cache()
-
         # initialize symbol manager
         self.symbol_manager = SymbolManager(self, cfg)
 
@@ -2625,11 +2615,6 @@ class Reassembler(Analysis):
 
         # CGC-specific data filtering
         self.data = [d for d in self.data if d.section_name not in section_names_to_ignore]
-
-        # restore capstone X86 syntax at the end
-        if self.project.arch.capstone_x86_syntax != old_capstone_syntax:
-            self.project.arch.capstone_x86_syntax = old_capstone_syntax
-            self.project.factory.default_engine.clear_cache()
 
         l.debug("Initialized.")
 
