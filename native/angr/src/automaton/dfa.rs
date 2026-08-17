@@ -22,8 +22,6 @@ pub struct DFA {
     alphabet: HashSet<SymbolId>,
     /// Mapping from DFA states to original NFA states (if created via subset construction)
     state_mapping: Option<HashMap<StateId, Vec<StateId>>>,
-    /// Labels for transitions (for graph export)
-    transition_labels: HashMap<(StateId, SymbolId), Vec<u8>>,
 }
 
 impl DFA {
@@ -37,7 +35,6 @@ impl DFA {
             reverse_transitions: HashMap::new(),
             alphabet: HashSet::new(),
             state_mapping: None,
-            transition_labels: HashMap::new(),
         }
     }
 
@@ -103,11 +100,6 @@ impl DFA {
     /// Get the state mapping.
     pub fn state_mapping(&self) -> Option<&HashMap<StateId, Vec<StateId>>> {
         self.state_mapping.as_ref()
-    }
-
-    /// Get transition labels.
-    pub fn transition_labels(&self) -> &HashMap<(StateId, SymbolId), Vec<u8>> {
-        &self.transition_labels
     }
 
     /// Check if the DFA is empty (accepts no strings).
@@ -331,13 +323,6 @@ impl DFA {
                         && let Some(&new_dest) = state_to_partition.get(&dest)
                     {
                         minimized.add_transition(part_idx as StateId, symbol, new_dest);
-
-                        // Copy label if exists
-                        if let Some(label) = self.transition_labels.get(&(representative, symbol)) {
-                            minimized
-                                .transition_labels
-                                .insert((part_idx as StateId, symbol), label.clone());
-                        }
                     }
                 }
             }
