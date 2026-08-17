@@ -137,7 +137,11 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
             #       plugins that are getting toggled (=> mutual dependence).
             self.ip_is_soot_addr = False
         else:
-            self._arch = arch if arch is not None else project.arch.copy() if project is not None else None
+            # Share the project's Arch rather than copying it. Arch is meant to be an immutable description, so there
+            # is normally nothing to isolate; the one place in angr that does write to it
+            # (engines.vex.heavy.dirty.x86g_dirtyhelper_write_cr0) copies on write, which keeps that mutation local to
+            # the state that made it without charging every other state for a copy it never uses.
+            self._arch = arch if arch is not None else project.arch if project is not None else None
             if type(self._arch) is str:
                 self._arch = archinfo.arch_from_id(self._arch)
 

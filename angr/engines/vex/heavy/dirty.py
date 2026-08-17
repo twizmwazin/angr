@@ -386,7 +386,8 @@ amd64g_dirtyhelper_FINIT = x86g_dirtyhelper_FINIT
 
 
 def x86g_dirtyhelper_write_cr0(state, value):
-    # make a deep copy of the arch before modifying it so we don't accidentally modify it for all other states
+    # States share their Project's Arch, so this copy is what keeps the write local to this state rather than leaking
+    # into every other state and analysis in the project. Do not drop it without giving cr0 a home outside of Arch.
     state.arch = state.arch.copy()
     state.arch.vex_archinfo["x86_cr0"] = state.solver.eval_one(value)
     return None, []
