@@ -241,6 +241,112 @@ impl Hash for AilStatement {
 }
 
 impl AilStatement {
+    /// Render this statement to its ``str()`` form.
+    ///
+    /// Takes `&self` rather than going through the pyclass wrapper: the
+    /// wrapper is only needed to hand an expression to Python, and
+    /// building one here deep-cloned the subtree and re-entered the
+    /// interpreter once per node purely to throw the wrapper away.
+    pub fn render(&self, py: Python<'_>) -> PyResult<String> {
+        match &self.inner {
+            StmtInner::Assignment { dst, src } => {
+                let d = dst.render(py)?;
+                let s = src.render(py)?;
+                Ok(format!("{} = {}", d, s))
+            }
+            StmtInner::WeakAssignment { dst, src } => {
+                let d = dst.render(py)?;
+                let s = src.render(py)?;
+                Ok(format!("{} =w {}", d, s))
+            }
+            StmtInner::Label { name } => Ok(format!("Label {}:", name)),
+            StmtInner::Store {
+                addr,
+                data,
+                size,
+                endness,
+                guard,
+                ..
+            } => {
+                let a = addr.render(py)?;
+                let d = data.render(py)?;
+                let g = match guard {
+                    Some(gx) => format!(" (guarded by {})", gx.render(py)?),
+                    None => String::new(),
+                };
+                Ok(format!(
+                    "STORE(addr={}, data={}, size={}, endness={}){}",
+                    a, d, size, endness, g
+                ))
+            }
+            StmtInner::Jump { target, .. } => {
+                let s = match target {
+                    CFGTarget::Expr(e) => e.render(py)?,
+                    CFGTarget::Symbol(name) => name.clone(),
+                };
+                Ok(format!("Goto({})", s))
+            }
+            StmtInner::ConditionalJump {
+                condition,
+                true_target,
+                false_target,
+                ..
+            } => {
+                let c = condition.render(py)?;
+                let render = |opt: &Option<CFGTarget>| -> PyResult<String> {
+                    Ok(match opt {
+                        Some(CFGTarget::Expr(e)) => e.render(py)?,
+                        Some(CFGTarget::Symbol(s)) => s.clone(),
+                        None => "None".into(),
+                    })
+                };
+                let t = render(true_target)?;
+                let f = render(false_target)?;
+                Ok(format!("if ({}) {{ Goto {} }} else {{ Goto {} }}", c, t, f))
+            }
+            StmtInner::SideEffectStatement { expr, .. } => Ok(expr.render(py)?),
+            StmtInner::Return { ret_exprs } => {
+                let parts: Vec<String> = ret_exprs
+                    .iter()
+                    .map(|e| e.render(py).unwrap_or_default())
+                    .collect();
+                Ok(format!("Return ({})", parts.join(", ")))
+            }
+            StmtInner::CAS {
+                addr,
+                data_lo,
+                data_hi,
+                expd_lo,
+                expd_hi,
+                old_lo,
+                old_hi,
+                endness,
+            } => {
+                let a = addr.render(py)?;
+                let dl = data_lo.render(py)?;
+                let dh = match data_hi {
+                    Some(x) => x.render(py)?,
+                    None => "None".into(),
+                };
+                let el = expd_lo.render(py)?;
+                let eh = match expd_hi {
+                    Some(x) => x.render(py)?,
+                    None => "None".into(),
+                };
+                let ol = old_lo.render(py)?;
+                let oh = match old_hi {
+                    Some(x) => x.render(py)?,
+                    None => "None".into(),
+                };
+                Ok(format!(
+                    "({}, {}) = CAS({}, ({}, {}), ({}, {}), {})",
+                    ol, oh, a, el, eh, dl, dh, endness
+                ))
+            }
+            StmtInner::DirtyStatement { dirty } => Ok(dirty.render(py)?),
+            StmtInner::NoOp => Ok("NoOp".to_string()),
+        }
+    }
     pub fn kind(&self) -> StatementKind {
         self.inner.kind()
     }
@@ -867,7 +973,7 @@ impl Statement {
     /// MultiStatementExpression's ``__str__``). Same logic as the
     /// ``#[getter]``-exposed ``__str__``.
     pub fn render(&self, py: Python<'_>) -> PyResult<String> {
-        self.__str__(py)
+        self.stmt.render(py)
     }
 }
 
@@ -1710,111 +1816,7 @@ impl Statement {
     }
 
     fn __str__(&self, py: Python<'_>) -> PyResult<String> {
-        match &self.stmt.inner {
-            StmtInner::Assignment { dst, src } => {
-                let d = Expression::wrap((**dst).clone()).render(py)?;
-                let s = Expression::wrap((**src).clone()).render(py)?;
-                Ok(format!("{} = {}", d, s))
-            }
-            StmtInner::WeakAssignment { dst, src } => {
-                let d = Expression::wrap((**dst).clone()).render(py)?;
-                let s = Expression::wrap((**src).clone()).render(py)?;
-                Ok(format!("{} =w {}", d, s))
-            }
-            StmtInner::Label { name } => Ok(format!("Label {}:", name)),
-            StmtInner::Store {
-                addr,
-                data,
-                size,
-                endness,
-                guard,
-                ..
-            } => {
-                let a = Expression::wrap((**addr).clone()).render(py)?;
-                let d = Expression::wrap((**data).clone()).render(py)?;
-                let g = match guard {
-                    Some(gx) => format!(
-                        " (guarded by {})",
-                        Expression::wrap((**gx).clone()).render(py)?
-                    ),
-                    None => String::new(),
-                };
-                Ok(format!(
-                    "STORE(addr={}, data={}, size={}, endness={}){}",
-                    a, d, size, endness, g
-                ))
-            }
-            StmtInner::Jump { target, .. } => {
-                let s = match target {
-                    CFGTarget::Expr(e) => Expression::wrap((**e).clone()).render(py)?,
-                    CFGTarget::Symbol(name) => name.clone(),
-                };
-                Ok(format!("Goto({})", s))
-            }
-            StmtInner::ConditionalJump {
-                condition,
-                true_target,
-                false_target,
-                ..
-            } => {
-                let c = Expression::wrap((**condition).clone()).render(py)?;
-                let render = |opt: &Option<CFGTarget>| -> PyResult<String> {
-                    Ok(match opt {
-                        Some(CFGTarget::Expr(e)) => Expression::wrap((**e).clone()).render(py)?,
-                        Some(CFGTarget::Symbol(s)) => s.clone(),
-                        None => "None".into(),
-                    })
-                };
-                let t = render(true_target)?;
-                let f = render(false_target)?;
-                Ok(format!("if ({}) {{ Goto {} }} else {{ Goto {} }}", c, t, f))
-            }
-            StmtInner::SideEffectStatement { expr, .. } => {
-                Ok(Expression::wrap((**expr).clone()).render(py)?)
-            }
-            StmtInner::Return { ret_exprs } => {
-                let parts: Vec<String> = ret_exprs
-                    .iter()
-                    .map(|e| Expression::wrap(e.clone()).render(py).unwrap_or_default())
-                    .collect();
-                Ok(format!("Return ({})", parts.join(", ")))
-            }
-            StmtInner::CAS {
-                addr,
-                data_lo,
-                data_hi,
-                expd_lo,
-                expd_hi,
-                old_lo,
-                old_hi,
-                endness,
-            } => {
-                let a = Expression::wrap((**addr).clone()).render(py)?;
-                let dl = Expression::wrap((**data_lo).clone()).render(py)?;
-                let dh = match data_hi {
-                    Some(x) => Expression::wrap((**x).clone()).render(py)?,
-                    None => "None".into(),
-                };
-                let el = Expression::wrap((**expd_lo).clone()).render(py)?;
-                let eh = match expd_hi {
-                    Some(x) => Expression::wrap((**x).clone()).render(py)?,
-                    None => "None".into(),
-                };
-                let ol = Expression::wrap((**old_lo).clone()).render(py)?;
-                let oh = match old_hi {
-                    Some(x) => Expression::wrap((**x).clone()).render(py)?,
-                    None => "None".into(),
-                };
-                Ok(format!(
-                    "({}, {}) = CAS({}, ({}, {}), ({}, {}), {})",
-                    ol, oh, a, el, eh, dl, dh, endness
-                ))
-            }
-            StmtInner::DirtyStatement { dirty } => {
-                Ok(Expression::wrap((**dirty).clone()).render(py)?)
-            }
-            StmtInner::NoOp => Ok("NoOp".to_string()),
-        }
+        self.stmt.render(py)
     }
 
     // --- Byte serialization --------------------------------------------

@@ -196,15 +196,17 @@ impl Block {
         for (i, stmt) in stmts.iter().enumerate() {
             // Native `ins_addr` read off the statement's tags (now a plain
             // field), avoiding a `getattr("tags")` + `tags.get(...)` round-trip.
-            let ins_addr = stmt
-                .cast::<Statement>()
-                .ok()
+            let native = stmt.cast::<Statement>().ok();
+            let ins_addr = native
                 .and_then(|st| st.borrow().stmt.header.tags.ins_addr)
                 .unwrap_or(0);
-            parts.push(format!(
-                "{indent_str}{i:02} | {ins_addr:#x} | {}",
-                stmt.str()?
-            ));
+            // Non-Statement entries (e.g. IncompleteSwitchCaseHeadStatement)
+            // still go through Python's `str()`.
+            let rendered = match native {
+                Some(st) => st.borrow().stmt.render(py)?,
+                None => stmt.str()?.to_string(),
+            };
+            parts.push(format!("{indent_str}{i:02} | {ins_addr:#x} | {rendered}"));
         }
         s.push_str(&parts.join("\n"));
         s.push('\n');
