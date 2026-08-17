@@ -255,6 +255,28 @@ class TestCallingConvention(TestCase):
             arg_locs = list(cc.arg_locs(proto))
             assert arg_locs is not None
 
+    def test_default_cc_return_val(self):
+        # angr reads the return value register off the default calling convention rather than off
+        # archinfo's Arch.ret_offset, which is wrong for S390X (r1) and RISCV64 (not a register at all)
+        expected = {
+            "AMD64": "rax",
+            "X86": "eax",
+            "ARMEL": "r0",
+            "ARMHF": "r0",
+            "AARCH64": "x0",
+            "MIPS32": "v0",
+            "MIPS64": "v0",
+            "PPC32": "r3",
+            "PPC64": "r3",
+            "S390X": "r2",
+            "RISCV64": "a0",
+        }
+        for arch_name, reg_name in expected.items():
+            arch = archinfo.arch_from_id(arch_name)
+            ret_val = default_cc(arch.name).RETURN_VAL
+            assert isinstance(ret_val, SimRegArg), arch_name
+            assert ret_val.check_offset(arch) == arch.registers[reg_name][0], arch_name
+
 
 if __name__ == "__main__":
     main()
