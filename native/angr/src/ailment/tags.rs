@@ -678,7 +678,7 @@ impl TagsView {
     /// `dict(tags)` works by iterating items; provide a fast path returning
     /// the underlying dict.
     fn __dict_repr__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
-        self.inner.to_py_dict(py)
+        self.to_dict(py)
     }
 
     // Pickle helpers so TagsView round-trips with pickle.

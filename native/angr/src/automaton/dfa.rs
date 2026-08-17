@@ -5,8 +5,6 @@ use crate::automaton::symbol::SymbolId;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 /// A labeled edge in the graph representation: (source, destination, label).
-pub type GraphEdge = (StateId, StateId, Vec<u8>);
-
 /// A Deterministic Finite Automaton.
 #[derive(Debug, Clone)]
 pub struct DFA {
@@ -70,18 +68,6 @@ impl DFA {
             .entry((destination, symbol))
             .or_insert_with(|| StateSet::with_capacity(self.num_states as usize))
             .insert(source);
-    }
-
-    /// Add a transition with a label (for graph export).
-    pub fn add_transition_with_label(
-        &mut self,
-        source: StateId,
-        symbol: SymbolId,
-        destination: StateId,
-        label: Vec<u8>,
-    ) {
-        self.add_transition(source, symbol, destination);
-        self.transition_labels.insert((source, symbol), label);
     }
 
     /// Get the transition from a state on a symbol.
@@ -375,24 +361,6 @@ impl DFA {
         }
 
         minimized
-    }
-
-    /// Convert to a graph representation (edges with labels).
-    /// Returns: (nodes, edges) where edges are (src, dst, label)
-    pub fn to_graph(&self) -> (Vec<StateId>, Vec<GraphEdge>) {
-        let nodes: Vec<StateId> = (0..self.num_states).collect();
-        let mut edges = Vec::new();
-
-        for (&(src, symbol), &dst) in &self.transitions {
-            let label = self
-                .transition_labels
-                .get(&(src, symbol))
-                .cloned()
-                .unwrap_or_else(|| format!("{symbol}").into_bytes());
-            edges.push((src, dst, label));
-        }
-
-        (nodes, edges)
     }
 }
 

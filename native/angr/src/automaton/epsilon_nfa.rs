@@ -2,7 +2,6 @@
 
 use crate::automaton::state::{StateId, StateSet};
 use crate::automaton::symbol::{EPSILON, SymbolId, is_epsilon};
-use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 /// An Epsilon Non-deterministic Finite Automaton.
@@ -235,21 +234,6 @@ impl EpsilonNFA {
         self.transitions
             .iter()
             .flat_map(|(&(src, sym), dests)| dests.iter().map(move |dst| (src, sym, dst)))
-    }
-
-    /// Convert to a map representation for debugging.
-    pub fn to_transition_map(&self) -> IndexMap<StateId, IndexMap<SymbolId, Vec<StateId>>> {
-        let mut map: IndexMap<StateId, IndexMap<SymbolId, Vec<StateId>>> = IndexMap::new();
-
-        for ((src, sym), dests) in &self.transitions {
-            map.entry(*src)
-                .or_default()
-                .entry(*sym)
-                .or_default()
-                .extend(dests.iter());
-        }
-
-        map
     }
 }
 

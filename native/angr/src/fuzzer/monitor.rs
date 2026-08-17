@@ -109,7 +109,7 @@ impl Monitor for CallbackMonitor {
             };
             if let Some(self_callback) = &self.callback {
                 self_callback
-                    .call1(py, (stats, event_msg.to_string(), sender_id.0))
+                    .call1(py, (stats, event_msg, sender_id.0))
                     .unwrap(); // FIXME: Remove unwrap
             }
             Ok(())

@@ -658,13 +658,6 @@ impl OIdent {
             let big: i128 = obj.extract()?;
             Ok(big as i64)
         }
-        fn extract_reg_list(t: &Bound<'_, PyTuple>) -> PyResult<Vec<i64>> {
-            let mut out = Vec::with_capacity(t.len());
-            for x in t.iter() {
-                out.push(x.extract::<i64>()?);
-            }
-            Ok(out)
-        }
         match category {
             VirtualVariableCategory::Register
             | VirtualVariableCategory::Memory
@@ -674,7 +667,7 @@ impl OIdent {
                 let t = obj.cast::<PyTuple>().map_err(|_| {
                     PyTypeError::new_err("COMBO_REGISTER oident must be a tuple of int")
                 })?;
-                Ok(Self::RegList(extract_reg_list(t)?))
+                Ok(Self::RegList(t.extract::<Vec<i64>>()?))
             }
             VirtualVariableCategory::Parameter => {
                 let t = obj.cast::<PyTuple>().map_err(|_| {
@@ -705,7 +698,7 @@ impl OIdent {
                                 "PARAMETER+COMBO_REGISTER inner payload must be a tuple of int",
                             )
                         })?;
-                        ParameterOIdent::ComboRegister(extract_reg_list(tt)?)
+                        ParameterOIdent::ComboRegister(tt.extract::<Vec<i64>>()?)
                     }
                     _ => {
                         return Err(PyTypeError::new_err(format!(
@@ -5167,13 +5160,7 @@ fn phi_validation_error(py: Python<'_>, msg: &str) -> PyErr {
     let trace = py
         .import("traceback")
         .and_then(|tb| tb.call_method0("format_stack"))
-        .and_then(|frames| {
-            let parts: Vec<String> = frames
-                .try_iter()?
-                .map(|f| f.and_then(|x| x.extract::<String>()))
-                .collect::<PyResult<Vec<_>>>()?;
-            Ok(parts.join(""))
-        })
+        .and_then(|frames| Ok(frames.extract::<Vec<String>>()?.concat()))
         .unwrap_or_default();
     PyTypeError::new_err(format!("{}\n  Producer traceback:\n{}", msg, trace))
 }

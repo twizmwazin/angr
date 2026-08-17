@@ -62,7 +62,6 @@ impl TryFrom<&PyInMemoryCorpus> for InMemoryCorpus<BytesInput> {
 
     fn try_from(value: &PyInMemoryCorpus) -> Result<Self, Self::Error> {
         InMemoryCorpus::<BytesInput>::try_from(&value.inner)
-            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
     }
 }
 
@@ -70,8 +69,7 @@ impl TryFrom<&InMemoryCorpus<BytesInput>> for PyInMemoryCorpus {
     type Error = PyErr;
 
     fn try_from(value: &InMemoryCorpus<BytesInput>) -> Result<Self, Self::Error> {
-        let serialized = SerializedCorpus::try_from(value)
-            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let serialized = SerializedCorpus::try_from(value)?;
         Ok(PyInMemoryCorpus { inner: serialized })
     }
 }
@@ -370,17 +368,8 @@ impl TryFrom<&PyInMemoryCorpus> for DynCorpus<BytesInput> {
     type Error = PyErr;
 
     fn try_from(value: &PyInMemoryCorpus) -> Result<Self, Self::Error> {
-        let inner: InMemoryCorpus<BytesInput> = InMemoryCorpus::<BytesInput>::try_from(value)
-            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let inner: InMemoryCorpus<BytesInput> = InMemoryCorpus::<BytesInput>::try_from(value)?;
         Ok(DynCorpus::InMem(inner))
-    }
-}
-
-impl TryFrom<&PyOnDiskCorpus> for DynCorpus<BytesInput> {
-    type Error = PyErr;
-
-    fn try_from(value: &PyOnDiskCorpus) -> Result<Self, Self::Error> {
-        Ok(DynCorpus::OnDisk(value.inner.clone()))
     }
 }
 
