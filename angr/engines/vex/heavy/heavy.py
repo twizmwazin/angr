@@ -7,6 +7,7 @@ import pyvex
 
 from angr import errors
 from angr import sim_options as o
+from angr.calling_conventions import SimRegArg
 from angr.engines.successors import SuccessorsEngine
 from angr.engines.vex.claripy.datalayer import ClaripyDataMixin, symbol
 from angr.engines.vex.lifter import VEXLifter
@@ -194,9 +195,13 @@ class HeavyVEXMixin(SuccessorsEngine, ClaripyDataMixin, SimStateStorageMixin, VE
             exit_jumpkind = exit_state.history.jumpkind or ""
 
             if o.CALLLESS in self.state.options and exit_jumpkind == "Ijk_Call":
-                exit_state.registers.store(
-                    exit_state.arch.ret_offset, exit_state.solver.Unconstrained("fake_ret_value", exit_state.arch.bits)
-                )
+                # the register a return value lives in is defined by the calling convention, not by the architecture
+                ret_val = self.project.factory.cc().RETURN_VAL
+                if isinstance(ret_val, SimRegArg):
+                    ret_val.set_value(
+                        exit_state,
+                        exit_state.solver.Unconstrained("fake_ret_value", ret_val.size * exit_state.arch.byte_width),
+                    )
                 exit_state.scratch.target = claripy.BVV(successors.addr + irsb.size, exit_state.arch.bits)
                 exit_state.history.jumpkind = "Ijk_FakeRet"
                 exit_state.regs.ip = exit_state.scratch.target
@@ -211,9 +216,12 @@ class HeavyVEXMixin(SuccessorsEngine, ClaripyDataMixin, SimStateStorageMixin, VE
                 ret_state = exit_state.copy()
                 guard = claripy.true() if o.TRUE_RET_EMULATION_GUARD in self.state.options else claripy.false()
                 ret_target = claripy.BVV(successors.addr + irsb.size, ret_state.arch.bits)
-                ret_state.registers.store(
-                    ret_state.arch.ret_offset, ret_state.solver.Unconstrained("fake_ret_value", ret_state.arch.bits)
-                )
+                ret_val = self.project.factory.cc().RETURN_VAL
+                if isinstance(ret_val, SimRegArg):
+                    ret_val.set_value(
+                        ret_state,
+                        ret_state.solver.Unconstrained("fake_ret_value", ret_val.size * ret_state.arch.byte_width),
+                    )
                 if ret_state.arch.call_pushes_ret and not exit_jumpkind.startswith("Ijk_Sys"):
                     ret_state.regs.sp = ret_state.regs.sp + ret_state.arch.bytes
                 successors.add_successor(

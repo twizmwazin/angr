@@ -7,7 +7,7 @@ import claripy
 
 from angr import errors
 from angr import sim_options as o
-from angr.calling_conventions import DEFAULT_CC, SimRegArg, default_cc
+from angr.calling_conventions import SimRegArg
 from angr.engines.successors import SimSuccessors, SuccessorsEngine
 from angr.misc.ux import once
 from angr.utils.constants import DEFAULT_STATEMENT
@@ -188,34 +188,19 @@ class HeavyPcodeMixin(
                 exit_jumpkind = ""
 
             if o.CALLLESS in self.state.options and exit_jumpkind == "Ijk_Call":
-                # get the default calling convention for the architecture and retrieve the return value offset
-                if exit_state.arch.name in DEFAULT_CC:
-                    cc = default_cc(
-                        exit_state.arch.name,
-                        platform=self.project.simos.name if self.project.simos is not None else None,
+                # the register a return value lives in is defined by the calling convention, not by the architecture
+                ret_val = self.project.factory.cc().RETURN_VAL
+                if isinstance(ret_val, SimRegArg):
+                    ret_val.set_value(
+                        exit_state,
+                        exit_state.solver.Unconstrained("fake_ret_value", ret_val.size * exit_state.arch.byte_width),
                     )
-                    ret_reg = cc.RETURN_VAL
-                    if isinstance(ret_reg, SimRegArg):
-                        ret_offset = exit_state.arch.registers[ret_reg.reg_name][0]
-                        exit_state.registers.store(
-                            ret_offset,
-                            exit_state.solver.Unconstrained("fake_ret_value", exit_state.arch.bits),
-                        )
-                    else:
-                        if once("return_val_is_not_reg"):
-                            l.warning(
-                                "The return value of the default calling convention for architecture %s is not "
-                                "stored in a register. We cannot set the fake return value in Call-less mode. "
-                                "Please report to GitHub.",
-                                exit_state.arch.name,
-                            )
-                else:
-                    if once("missing_default_cc"):
-                        l.warning(
-                            "Default calling convention is not set for architecture %s. We cannot set the fake "
-                            "return value in Call-less mode.",
-                            exit_state.arch.name,
-                        )
+                elif once("missing_ret_offset"):
+                    l.warning(
+                        "The default calling convention for architecture %s is unknown or does not return values in "
+                        "a register. We cannot set the fake return value in Call-less mode.",
+                        exit_state.arch.name,
+                    )
                 exit_state.scratch.target = claripy.BVV(
                     successors.addr + self.state.scratch.irsb.size, exit_state.arch.bits
                 )
