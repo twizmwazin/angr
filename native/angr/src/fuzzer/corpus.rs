@@ -57,14 +57,6 @@ pub struct PyInMemoryCorpus {
     inner: SerializedCorpus<BytesInput>,
 }
 
-impl TryFrom<&PyInMemoryCorpus> for InMemoryCorpus<BytesInput> {
-    type Error = PyErr;
-
-    fn try_from(value: &PyInMemoryCorpus) -> Result<Self, Self::Error> {
-        InMemoryCorpus::<BytesInput>::try_from(&value.inner)
-    }
-}
-
 impl TryFrom<&InMemoryCorpus<BytesInput>> for PyInMemoryCorpus {
     type Error = PyErr;
 
@@ -107,7 +99,7 @@ impl PyInMemoryCorpus {
     }
 
     fn __getitem__(&self, id: usize) -> PyResult<Vec<u8>> {
-        let deserialized = InMemoryCorpus::<BytesInput>::try_from(self)?;
+        let deserialized = InMemoryCorpus::<BytesInput>::try_from(&self.inner)?;
         let corpus_id = CorpusId::from(id);
         let testcase_ref = deserialized
             .get(corpus_id)
@@ -120,7 +112,7 @@ impl PyInMemoryCorpus {
     }
 
     fn __len__(&self) -> PyResult<usize> {
-        Ok(InMemoryCorpus::<BytesInput>::try_from(self)?.count())
+        Ok(InMemoryCorpus::<BytesInput>::try_from(&self.inner)?.count())
     }
 
     fn __getstate__(&self) -> PyResult<Vec<u8>> {
@@ -368,7 +360,8 @@ impl TryFrom<&PyInMemoryCorpus> for DynCorpus<BytesInput> {
     type Error = PyErr;
 
     fn try_from(value: &PyInMemoryCorpus) -> Result<Self, Self::Error> {
-        let inner: InMemoryCorpus<BytesInput> = InMemoryCorpus::<BytesInput>::try_from(value)?;
+        let inner: InMemoryCorpus<BytesInput> =
+            InMemoryCorpus::<BytesInput>::try_from(&value.inner)?;
         Ok(DynCorpus::InMem(inner))
     }
 }
