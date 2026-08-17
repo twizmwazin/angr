@@ -15,6 +15,7 @@ from angr import sim_options as o
 from angr.calling_conventions import (
     DEFAULT_CC,
     ArgSession,
+    SimRegArg,
     SimTypeChar,
     SimTypeFunction,
     SimTypeNum,
@@ -284,9 +285,9 @@ class SimProcedure:
                     state.regs.lr = saved_lr
                 inst.arguments = sim_args
                 inst.use_state_arguments = True
-                inst.call_ret_expr = state.registers.load(
-                    state.arch.ret_offset, state.arch.bytes, endness=state.arch.register_endness
-                )
+                assert inst.cc is not None
+                ret_val = inst.cc.RETURN_VAL
+                inst.call_ret_expr = ret_val.get_value(state) if isinstance(ret_val, SimRegArg) else None
                 for name, val in saved_local_vars:
                     setattr(inst, name, val)
             else:
