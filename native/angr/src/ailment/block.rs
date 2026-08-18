@@ -188,17 +188,23 @@ impl Block {
         let stmts = self_.statements.bind(py);
         let mut parts = Vec::with_capacity(stmts.len());
         for (i, stmt) in stmts.iter().enumerate() {
-            // Native `ins_addr` read off the statement's tags (now a plain
-            // field), avoiding a `getattr("tags")` + `tags.get(...)` round-trip.
-            let ins_addr = stmt
-                .cast::<Statement>()
-                .ok()
-                .and_then(|st| st.borrow().stmt.header.tags.ins_addr)
-                .unwrap_or(0);
-            parts.push(format!(
-                "{indent_str}{i:02} | {ins_addr:#x} | {}",
-                stmt.str()?
-            ));
+            // One cast serves both reads: `ins_addr` comes off the statement's
+            // tags (now a plain field, so no `getattr("tags")` + `tags.get(...)`
+            // round-trip) and the text off `AilStatement::render`, which walks
+            // the subtree in Rust instead of re-entering the interpreter.
+            // Entries that are not a `Statement` -- e.g.
+            // `IncompleteSwitchCaseHeadStatement` -- still render via `str()`.
+            let (ins_addr, text) = match stmt.cast::<Statement>() {
+                Ok(st) => {
+                    let st = st.borrow();
+                    (
+                        st.stmt.header.tags.ins_addr.unwrap_or(0),
+                        st.stmt.render(py)?,
+                    )
+                }
+                Err(_) => (0, stmt.str()?.to_string()),
+            };
+            parts.push(format!("{indent_str}{i:02} | {ins_addr:#x} | {text}"));
         }
         s.push_str(&parts.join("\n"));
         s.push('\n');

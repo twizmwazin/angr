@@ -25,7 +25,7 @@ use pyo3::exceptions::{PyAttributeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyList, PyString, PyTuple};
 
-use crate::ailment::ail_stmt::{AilStatement, Statement};
+use crate::ailment::ail_stmt::AilStatement;
 use crate::ailment::const_value::ConstValue;
 use crate::ailment::enums::{ConvertType, ExpressionKind, RoundingMode, VirtualVariableCategory};
 use crate::ailment::tags::{Tags, TagsView};
@@ -2500,6 +2500,252 @@ impl AilExpression {
     pub fn matches(&self, other: &AilExpression) -> bool {
         self.cmp_ail::<{ CmpMode::Matches.as_u8() }>(other)
     }
+
+    /// Render to the text ``Expression.__str__`` returns. Recursion stays
+    /// on ``&AilExpression``: rendering never hands a node to Python, so
+    /// routing a child through the pyclass would deep-clone its subtree and
+    /// allocate an ``Expression`` only to read a string back out of it.
+    pub fn render(&self, py: Python<'_>) -> PyResult<String> {
+        match &self.inner {
+            ExprInner::Const { value, .. } => {
+                let v = value.clone().into_pyobject(py)?;
+                Ok(format!("{}<{}>", v.str()?, self.header.bits))
+            }
+            ExprInner::Tmp { tmp_idx, .. } => Ok(format!("t{}", tmp_idx)),
+            ExprInner::Register { reg_offset, .. } => {
+                Ok(format!("reg{}<{}>", reg_offset, self.header.bits))
+            }
+            ExprInner::ComboRegister { registers, .. } => {
+                let parts = registers
+                    .iter()
+                    .map(|r| r.render(py))
+                    .collect::<PyResult<Vec<String>>>()?;
+                Ok(format!("ComboRegister({})", parts.join(", ")))
+            }
+            ExprInner::Phi { src_and_vvars, .. } => {
+                let parts: Vec<String> = src_and_vvars
+                    .iter()
+                    .map(|e| {
+                        let src_idx = match e.src_idx {
+                            Some(v) => v.to_string(),
+                            None => "None".into(),
+                        };
+                        let vv = match &e.vvar {
+                            Some(v) => v.render(py).unwrap_or_else(|_| "<err>".into()),
+                            None => "None".into(),
+                        };
+                        format!("(({}, {}), {})", e.src_addr, src_idx, vv)
+                    })
+                    .collect();
+                Ok(format!("Phi([{}])", parts.join(", ")))
+            }
+            ExprInner::VirtualVariable {
+                varid,
+                category,
+                oident,
+                ..
+            } => {
+                let size = self.header.bits / 8;
+                let ori_str = match (category, oident) {
+                    (VirtualVariableCategory::Register, OIdent::Int(v)) => {
+                        format!("{{r{}|{}b}}", v, size)
+                    }
+                    (VirtualVariableCategory::Stack, OIdent::Int(v)) => {
+                        format!("{{s{}|{}b}}", v, size)
+                    }
+                    (VirtualVariableCategory::ComboRegister, OIdent::RegList(offs)) => {
+                        let parts: Vec<String> = offs.iter().map(|x| x.to_string()).collect();
+                        format!("{{combo_reg ({})}}", parts.join(", "))
+                    }
+                    _ => String::new(),
+                };
+                Ok(format!("vvar_{}{}", varid, ori_str))
+            }
+            ExprInner::UnaryOp { op, operand, .. } => {
+                let o = operand.render(py)?;
+                Ok(format!("({} {})", op, o))
+            }
+            ExprInner::Convert {
+                operand,
+                from_bits,
+                to_bits,
+                is_signed,
+                from_type,
+                to_type,
+                ..
+            } => {
+                let o = operand.render(py)?;
+                let ft = if *from_type == ConvertType::TypeFp {
+                    "F"
+                } else {
+                    ""
+                };
+                let tt = if *to_type == ConvertType::TypeFp {
+                    "F"
+                } else {
+                    ""
+                };
+                let s = if *is_signed { "s" } else { "" };
+                Ok(format!(
+                    "Conv({}{}->{}{}{}, {})",
+                    from_bits, ft, s, to_bits, tt, o
+                ))
+            }
+            ExprInner::Reinterpret {
+                operand,
+                from_bits,
+                from_type,
+                to_bits,
+                to_type,
+                ..
+            } => {
+                let o = operand.render(py)?;
+                Ok(format!(
+                    "Reinterpret({}{}->{}{}, {})",
+                    from_type, from_bits, to_type, to_bits, o
+                ))
+            }
+            ExprInner::BinaryOp { op, operands, .. } => {
+                let lhs = operands[0].render(py)?;
+                let rhs = operands[1].render(py)?;
+                Ok(format!("({} {} {})", lhs, op, rhs))
+            }
+            ExprInner::Load {
+                addr,
+                size,
+                endness,
+                ..
+            } => {
+                let a = addr.render(py)?;
+                Ok(format!(
+                    "Load(addr={}, size={}, endness={})",
+                    a, size, endness
+                ))
+            }
+            ExprInner::Call { target, args, .. } => {
+                let args_str = match args {
+                    None => String::new(),
+                    Some(v) => {
+                        let parts = v
+                            .iter()
+                            .map(|x| x.render(py))
+                            .collect::<PyResult<Vec<String>>>()?;
+                        format!("({})", parts.join(", "))
+                    }
+                };
+                let target_str = match target {
+                    CFGTarget::Expr(e) => e.render(py)?,
+                    CFGTarget::Symbol(s) => s.clone(),
+                };
+                Ok(format!("Call({}, {})", target_str, args_str))
+            }
+            ExprInner::ITE {
+                cond,
+                iffalse,
+                iftrue,
+                ..
+            } => {
+                let c = cond.render(py)?;
+                let t = iftrue.render(py)?;
+                let f = iffalse.render(py)?;
+                Ok(format!("(({}) ? ({}) : ({}))", c, t, f))
+            }
+            ExprInner::Extract { base, offset, .. } => {
+                let b = base.render(py)?;
+                let o = offset.render(py)?;
+                Ok(format!("Extract({}, {}bits@{})", b, self.header.bits, o))
+            }
+            ExprInner::Insert {
+                base,
+                offset,
+                value,
+                ..
+            } => {
+                let b = base.render(py)?;
+                let o = offset.render(py)?;
+                let v = value.render(py)?;
+                Ok(format!("Insert({}, {}, {})", b, o, v))
+            }
+            ExprInner::StringLiteral { data } => Ok(format!("StringLiteral({:?})", data)),
+            ExprInner::BasePointerOffset { base, offset, .. } => {
+                Ok(format!("{}{:+}", base, offset))
+            }
+            ExprInner::StackBaseOffset { offset } => Ok(format!("sp{:+}", offset)),
+            ExprInner::DirtyExpression {
+                callee, operands, ..
+            } => {
+                let parts = operands
+                    .iter()
+                    .map(|o| o.render(py))
+                    .collect::<PyResult<Vec<String>>>()?;
+                Ok(format!("[D] {}({})", callee, parts.join(", ")))
+            }
+            ExprInner::VEXCCallExpression { callee, operands } => {
+                let parts = operands
+                    .iter()
+                    .map(|o| o.render(py))
+                    .collect::<PyResult<Vec<String>>>()?;
+                Ok(format!("{}({})", callee, parts.join(", ")))
+            }
+            ExprInner::MultiStatementExpression { stmts, expr } => {
+                let mut parts: Vec<String> = Vec::new();
+                for s in stmts {
+                    parts.push(s.render(py)?);
+                }
+                parts.push(expr.render(py)?);
+                Ok(format!("({})", parts.join(", ")))
+            }
+            ExprInner::Struct { name, fields, .. } => {
+                let parts: Vec<String> = fields
+                    .iter()
+                    .map(|(off, e)| Ok::<_, PyErr>(format!("{}: {}", off, e.render(py)?)))
+                    .collect::<PyResult<_>>()?;
+                Ok(format!("{} {{{}}}", name, parts.join(", ")))
+            }
+            ExprInner::RustEnum { name, fields } => {
+                let parts: Vec<String> = fields
+                    .iter()
+                    .map(|f| f.render(py))
+                    .collect::<PyResult<_>>()?;
+                Ok(format!("{}({})", name, parts.join(", ")))
+            }
+            ExprInner::Array { elements } => {
+                let parts: Vec<String> = elements
+                    .iter()
+                    .map(|e| e.render(py))
+                    .collect::<PyResult<_>>()?;
+                Ok(format!("[{}]", parts.join(", ")))
+            }
+            ExprInner::Let { src, .. } => Ok(format!("let (_) = {}", src.render(py)?)),
+            ExprInner::Macro {
+                name, delimiter, ..
+            } => {
+                let mut chars = delimiter.chars();
+                let open = chars.next().unwrap_or('(');
+                let close = chars.next().unwrap_or(')');
+                Ok(format!("{}!{}{}", name, open, close))
+            }
+            ExprInner::FunctionLikeMacro {
+                name,
+                delimiter,
+                args,
+                ..
+            } => {
+                let mut chars = delimiter.chars();
+                let open = chars.next().unwrap_or('(');
+                let close = chars.next().unwrap_or(')');
+                let args_s = match args {
+                    Some(v) => {
+                        let parts: Vec<String> =
+                            v.iter().map(|a| a.render(py)).collect::<PyResult<_>>()?;
+                        parts.join(", ")
+                    }
+                    None => "".into(),
+                };
+                Ok(format!("{}!{}{}{}", name, open, args_s, close))
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -4633,261 +4879,7 @@ impl Expression {
     }
 
     pub fn __str__(&self, py: Python<'_>) -> PyResult<String> {
-        match &self.expr.inner {
-            ExprInner::Const { value, .. } => {
-                let v = value.clone().into_pyobject(py)?;
-                Ok(format!("{}<{}>", v.str()?, self.expr.header.bits))
-            }
-            ExprInner::Tmp { tmp_idx, .. } => Ok(format!("t{}", tmp_idx)),
-            ExprInner::Register { reg_offset, .. } => {
-                Ok(format!("reg{}<{}>", reg_offset, self.expr.header.bits))
-            }
-            ExprInner::ComboRegister { registers, .. } => {
-                let parts = registers
-                    .iter()
-                    .map(|r| Expression::wrap(r.clone()).__str__(py))
-                    .collect::<PyResult<Vec<String>>>()?;
-                Ok(format!("ComboRegister({})", parts.join(", ")))
-            }
-            ExprInner::Phi { src_and_vvars, .. } => {
-                let parts: Vec<String> = src_and_vvars
-                    .iter()
-                    .map(|e| {
-                        let src_idx = match e.src_idx {
-                            Some(v) => v.to_string(),
-                            None => "None".into(),
-                        };
-                        let vv = match &e.vvar {
-                            Some(v) => Expression::wrap((**v).clone())
-                                .__str__(py)
-                                .unwrap_or_else(|_| "<err>".into()),
-                            None => "None".into(),
-                        };
-                        format!("(({}, {}), {})", e.src_addr, src_idx, vv)
-                    })
-                    .collect();
-                Ok(format!("Phi([{}])", parts.join(", ")))
-            }
-            ExprInner::VirtualVariable {
-                varid,
-                category,
-                oident,
-                ..
-            } => {
-                let size = self.expr.header.bits / 8;
-                let ori_str = match (category, oident) {
-                    (VirtualVariableCategory::Register, OIdent::Int(v)) => {
-                        format!("{{r{}|{}b}}", v, size)
-                    }
-                    (VirtualVariableCategory::Stack, OIdent::Int(v)) => {
-                        format!("{{s{}|{}b}}", v, size)
-                    }
-                    (VirtualVariableCategory::ComboRegister, OIdent::RegList(offs)) => {
-                        let parts: Vec<String> = offs.iter().map(|x| x.to_string()).collect();
-                        format!("{{combo_reg ({})}}", parts.join(", "))
-                    }
-                    _ => String::new(),
-                };
-                Ok(format!("vvar_{}{}", varid, ori_str))
-            }
-            ExprInner::UnaryOp { op, operand, .. } => {
-                let o = Expression::wrap((**operand).clone()).__str__(py)?;
-                Ok(format!("({} {})", op, o))
-            }
-            ExprInner::Convert {
-                operand,
-                from_bits,
-                to_bits,
-                is_signed,
-                from_type,
-                to_type,
-                ..
-            } => {
-                let o = Expression::wrap((**operand).clone()).__str__(py)?;
-                let ft = if *from_type == ConvertType::TypeFp {
-                    "F"
-                } else {
-                    ""
-                };
-                let tt = if *to_type == ConvertType::TypeFp {
-                    "F"
-                } else {
-                    ""
-                };
-                let s = if *is_signed { "s" } else { "" };
-                Ok(format!(
-                    "Conv({}{}->{}{}{}, {})",
-                    from_bits, ft, s, to_bits, tt, o
-                ))
-            }
-            ExprInner::Reinterpret {
-                operand,
-                from_bits,
-                from_type,
-                to_bits,
-                to_type,
-                ..
-            } => {
-                let o = Expression::wrap((**operand).clone()).__str__(py)?;
-                Ok(format!(
-                    "Reinterpret({}{}->{}{}, {})",
-                    from_type, from_bits, to_type, to_bits, o
-                ))
-            }
-            ExprInner::BinaryOp { op, operands, .. } => {
-                let lhs = Expression::wrap((*operands[0]).clone()).__str__(py)?;
-                let rhs = Expression::wrap((*operands[1]).clone()).__str__(py)?;
-                Ok(format!("({} {} {})", lhs, op, rhs))
-            }
-            ExprInner::Load {
-                addr,
-                size,
-                endness,
-                ..
-            } => {
-                let a = Expression::wrap((**addr).clone()).__str__(py)?;
-                Ok(format!(
-                    "Load(addr={}, size={}, endness={})",
-                    a, size, endness
-                ))
-            }
-            ExprInner::Call { target, args, .. } => {
-                let args_str = match args {
-                    None => String::new(),
-                    Some(v) => {
-                        let parts = v
-                            .iter()
-                            .map(|x| Expression::wrap(x.clone()).__str__(py))
-                            .collect::<PyResult<Vec<String>>>()?;
-                        format!("({})", parts.join(", "))
-                    }
-                };
-                let target_str = match target {
-                    CFGTarget::Expr(e) => Expression::wrap((**e).clone()).__str__(py)?,
-                    CFGTarget::Symbol(s) => s.clone(),
-                };
-                Ok(format!("Call({}, {})", target_str, args_str))
-            }
-            ExprInner::ITE {
-                cond,
-                iffalse,
-                iftrue,
-                ..
-            } => {
-                let c = Expression::wrap((**cond).clone()).__str__(py)?;
-                let t = Expression::wrap((**iftrue).clone()).__str__(py)?;
-                let f = Expression::wrap((**iffalse).clone()).__str__(py)?;
-                Ok(format!("(({}) ? ({}) : ({}))", c, t, f))
-            }
-            ExprInner::Extract { base, offset, .. } => {
-                let b = Expression::wrap((**base).clone()).__str__(py)?;
-                let o = Expression::wrap((**offset).clone()).__str__(py)?;
-                Ok(format!(
-                    "Extract({}, {}bits@{})",
-                    b, self.expr.header.bits, o
-                ))
-            }
-            ExprInner::Insert {
-                base,
-                offset,
-                value,
-                ..
-            } => {
-                let b = Expression::wrap((**base).clone()).__str__(py)?;
-                let o = Expression::wrap((**offset).clone()).__str__(py)?;
-                let v = Expression::wrap((**value).clone()).__str__(py)?;
-                Ok(format!("Insert({}, {}, {})", b, o, v))
-            }
-            ExprInner::StringLiteral { data } => Ok(format!("StringLiteral({:?})", data)),
-            ExprInner::BasePointerOffset { base, offset, .. } => {
-                Ok(format!("{}{:+}", base, offset))
-            }
-            ExprInner::StackBaseOffset { offset } => Ok(format!("sp{:+}", offset)),
-            ExprInner::DirtyExpression {
-                callee, operands, ..
-            } => {
-                let parts = operands
-                    .iter()
-                    .map(|o| Expression::wrap(o.clone()).__str__(py))
-                    .collect::<PyResult<Vec<String>>>()?;
-                Ok(format!("[D] {}({})", callee, parts.join(", ")))
-            }
-            ExprInner::VEXCCallExpression { callee, operands } => {
-                let parts = operands
-                    .iter()
-                    .map(|o| Expression::wrap(o.clone()).__str__(py))
-                    .collect::<PyResult<Vec<String>>>()?;
-                Ok(format!("{}({})", callee, parts.join(", ")))
-            }
-            ExprInner::MultiStatementExpression { stmts, expr } => {
-                let mut parts: Vec<String> = Vec::new();
-                for s in stmts {
-                    parts.push(Statement::wrap(s.clone()).__str__(py)?);
-                }
-                parts.push(Expression::wrap((**expr).clone()).__str__(py)?);
-                Ok(format!("({})", parts.join(", ")))
-            }
-            ExprInner::Struct { name, fields, .. } => {
-                let parts: Vec<String> = fields
-                    .iter()
-                    .map(|(off, e)| {
-                        Ok::<_, PyErr>(format!(
-                            "{}: {}",
-                            off,
-                            Expression::wrap((**e).clone()).__str__(py)?
-                        ))
-                    })
-                    .collect::<PyResult<_>>()?;
-                Ok(format!("{} {{{}}}", name, parts.join(", ")))
-            }
-            ExprInner::RustEnum { name, fields } => {
-                let parts: Vec<String> = fields
-                    .iter()
-                    .map(|f| Expression::wrap((**f).clone()).__str__(py))
-                    .collect::<PyResult<_>>()?;
-                Ok(format!("{}({})", name, parts.join(", ")))
-            }
-            ExprInner::Array { elements } => {
-                let parts: Vec<String> = elements
-                    .iter()
-                    .map(|e| Expression::wrap((**e).clone()).__str__(py))
-                    .collect::<PyResult<_>>()?;
-                Ok(format!("[{}]", parts.join(", ")))
-            }
-            ExprInner::Let { src, .. } => Ok(format!(
-                "let (_) = {}",
-                Expression::wrap((**src).clone()).__str__(py)?
-            )),
-            ExprInner::Macro {
-                name, delimiter, ..
-            } => {
-                let mut chars = delimiter.chars();
-                let open = chars.next().unwrap_or('(');
-                let close = chars.next().unwrap_or(')');
-                Ok(format!("{}!{}{}", name, open, close))
-            }
-            ExprInner::FunctionLikeMacro {
-                name,
-                delimiter,
-                args,
-                ..
-            } => {
-                let mut chars = delimiter.chars();
-                let open = chars.next().unwrap_or('(');
-                let close = chars.next().unwrap_or(')');
-                let args_s = match args {
-                    Some(v) => {
-                        let parts: Vec<String> = v
-                            .iter()
-                            .map(|a| Expression::wrap((**a).clone()).__str__(py))
-                            .collect::<PyResult<_>>()?;
-                        parts.join(", ")
-                    }
-                    None => "".into(),
-                };
-                Ok(format!("{}!{}{}{}", name, open, args_s, close))
-            }
-        }
+        self.expr.render(py)
     }
 
     // --- Byte serialization ------------------------------------------
