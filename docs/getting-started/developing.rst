@@ -81,6 +81,10 @@ Most importantly, please consider the following when writing code as part of ang
   ``AssertionError`` and ``Exception`` are not handled anywhere and
   force-terminate analyses.
 
+* angr is type-checked with pyright. See :doc:`typing` for how to run the
+  checker, how the error baseline works, and why suppressing an error with
+  ``# type: ignore`` is not an acceptable fix.
+
 * Avoid tabs; use space indentation instead. Even though it's wrong, the de
   facto standard is 4 spaces. It is a good idea to adopt this from the
   beginning, as merging code that mixes both tab and space indentation is awful.

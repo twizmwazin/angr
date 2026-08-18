@@ -6,4 +6,5 @@ Getting Started
 
    installing
    developing
+   typing
    helpwanted
