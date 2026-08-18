@@ -5,18 +5,19 @@ import itertools
 import logging
 import weakref
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, overload
 
 import archinfo
 import claripy
 from archinfo import Arch
 from archinfo.arch_soot import SootAddressDescriptor
 from cle import Clemory
+from typing_extensions import TypeVar
 
 import angr
 
 from . import sim_options as o
-from .errors import SimMergeError, SimSolverModeError, SimStateError, SimValueError
+from .errors import AngrNoPluginError, SimMergeError, SimSolverModeError, SimStateError, SimValueError
 from .misc.plugins import PluginHub, PluginPreset
 from .sim_state_options import SimStateOptions
 from .state_plugins.plugin import SimStatePlugin
@@ -26,10 +27,14 @@ if TYPE_CHECKING:
     from angr.simos.javavm import SimJavaVM
 
     from .state_plugins.callstack import CallStack
+    from .state_plugins.globals import SimStateGlobals
     from .state_plugins.heap.heap_base import SimHeapBase
     from .state_plugins.history import SimStateHistory
     from .state_plugins.inspect import SimInspector
     from .state_plugins.jni_references import SimStateJNIReferences
+    from .state_plugins.libc import SimStateLibc
+    from .state_plugins.log import SimStateLog
+    from .state_plugins.markers import PluginKey, StateWith
     from .state_plugins.posix import SimSystemPosix
     from .state_plugins.scratch import SimStateScratch
     from .state_plugins.solver import SimSolver
@@ -38,6 +43,11 @@ if TYPE_CHECKING:
 
 
 l = logging.getLogger(name=__name__)
+
+_P1 = TypeVar("_P1", bound=SimStatePlugin)
+_P2 = TypeVar("_P2", bound=SimStatePlugin)
+_P3 = TypeVar("_P3", bound=SimStatePlugin)
+_P4 = TypeVar("_P4", bound=SimStatePlugin)
 
 
 def arch_overridable(f):
@@ -79,19 +89,34 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
     :ivar unicorn:      Control of the Unicorn Engine
     """
 
-    # Type Annotations for default plugins to allow type inference
-    solver: SimSolver
-    posix: SimSystemPosix
-    registers: DefaultMemory
-    regs: SimRegNameView
-    memory: DefaultMemory
+    # The machinery of symbolic execution itself: these exist on a state regardless of what is
+    # being executed, so they are declared here and ``state.<name>`` is inferred as the plugin
+    # class rather than falling back to PluginHub.__getattr__'s SimStatePlugin.
+    #
+    # Everything else is deliberately absent, and reached through a marker from
+    # angr.state_plugins.markers instead. That covers the obviously situational plugins -- cgc, the
+    # javavm_* group, unicorn, icicle -- and also `fs`: only SimLinux registers a filesystem, and a
+    # bare-metal or blob target has none.
+    #
+    # posix, libc and heap belong in the same category and for the same reason -- they model a
+    # userland process under an OS -- but they are still declared here. Moving them costs 174 errors
+    # at the ~110 files that reach for them, which wants its own pass with StateWithPosix,
+    # StateWithLibc and StateWithHeap (below) applied to those signatures.
     callstack: CallStack
-    mem: SimMemView
+    globals: SimStateGlobals
+    heap: SimHeapBase
     history: SimStateHistory
     inspect: SimInspector
     jni_references: SimStateJNIReferences
+    libc: SimStateLibc
+    log: SimStateLog
+    mem: SimMemView
+    memory: DefaultMemory
+    posix: SimSystemPosix
+    regs: SimRegNameView
+    registers: DefaultMemory
     scratch: SimStateScratch
-    heap: SimHeapBase
+    solver: SimSolver
 
     def __init__(
         self,
@@ -437,6 +462,47 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
             # In case of the JavaVM with JNI support, also check for toggled plugins.
             return super().has_plugin(name) or super().has_plugin(name + "_soot")
         return super().has_plugin(name)
+
+    def active_plugin(self, name):
+        if self._is_java_jni_project:
+            # Same toggling as get_plugin(), but without falling back to the preset.
+            suffix = "_soot" if self.ip_is_soot_addr else "_vex"
+            plugin = super().active_plugin(name + suffix)
+            if plugin is not None:
+                return plugin
+        return super().active_plugin(name)
+
+    @overload
+    def require(self, k1: PluginKey[_P1], /) -> StateWith[_P1, IPTypeConc, IPTypeSym]: ...
+    @overload
+    def require(self, k1: PluginKey[_P1], k2: PluginKey[_P2], /) -> StateWith[_P1 | _P2, IPTypeConc, IPTypeSym]: ...
+    @overload
+    def require(
+        self, k1: PluginKey[_P1], k2: PluginKey[_P2], k3: PluginKey[_P3], /
+    ) -> StateWith[_P1 | _P2 | _P3, IPTypeConc, IPTypeSym]: ...
+    @overload
+    def require(
+        self, k1: PluginKey[_P1], k2: PluginKey[_P2], k3: PluginKey[_P3], k4: PluginKey[_P4], /
+    ) -> StateWith[_P1 | _P2 | _P3 | _P4, IPTypeConc, IPTypeSym]: ...
+
+    def require(self, *keys: PluginKey[Any]) -> Any:
+        """Assert that this state carries the named plugins, and say so in its type.
+
+        Returns self, typed as a :class:`~angr.state_plugins.markers.StateWith` promising every
+        plugin given, so it can be passed to an API that asks for them::
+
+            rewind(state.require(UNICORN, CGC))
+
+        :raises AngrNoPluginError: if any of the plugins is not active on this state.
+        """
+        for key in keys:
+            plugin = self.active_plugin(key.name)
+            if not isinstance(plugin, key.cls):
+                raise AngrNoPluginError(
+                    f"This state does not carry the {key.name!r} plugin. It is not part of every "
+                    f"state; register it, or use a state built by a SimOS that provides it."
+                )
+        return self
 
     def register_plugin(self, name, plugin, inhibit_init=False):  # pylint: disable=arguments-differ
         # l.debug("Adding plugin %s of type %s", name, plugin.__class__.__name__)

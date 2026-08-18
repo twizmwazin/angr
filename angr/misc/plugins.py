@@ -179,6 +179,17 @@ class PluginHub[P]:
         """
         return name in self._active_plugins
 
+    def active_plugin(self, name: str) -> P | None:
+        """
+        Return the plugin named ``name`` if it is already active, or None if it is not.
+
+        Unlike :meth:`get_plugin`, this never falls back to the preset and so never constructs a
+        plugin as a side effect of being asked about one. Use it to answer "does this hub have that
+        plugin", where ``getattr``/``hasattr`` would answer "could it have one", and would install
+        it while finding out.
+        """
+        return self._active_plugins.get(name)
+
     def register_plugin(self, name: str, plugin: P) -> P:
         """
         Add a new plugin ``plugin`` with name ``name`` to the active plugins.
