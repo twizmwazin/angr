@@ -2197,6 +2197,8 @@ impl VEXIRSBConverter {
             irsb: irsb.clone(),
             tyenv,
             statements: irsb.getattr("statements")?.cast_into::<PyList>()?,
+            next: irsb.getattr("next")?,
+            irconst_ty: py.import("pyvex")?.getattr("const")?.getattr("IRConst")?,
         };
         VEXIRSBConverter::run(py, &reader, Some(block_addr), &manager, arch)
     }
@@ -2210,6 +2212,12 @@ struct PyReader<'py> {
     irsb: Bound<'py, PyAny>,
     tyenv: Bound<'py, PyAny>,
     statements: Bound<'py, PyList>,
+    /// `IRSB.next`, fetched up front: `IrReader::next_expr` is infallible, so
+    /// reading it on demand would have to panic when the attribute is missing.
+    next: Bound<'py, PyAny>,
+    /// `pyvex.const.IRConst`, imported up front: `expr_kind` runs once per
+    /// expression node and would otherwise redo the lookup for every node.
+    irconst_ty: Bound<'py, PyAny>,
 }
 
 impl<'py> PyReader<'py> {
@@ -2253,7 +2261,7 @@ impl<'py> IrReader for PyReader<'py> {
     }
 
     fn next_expr(&self) -> Self::E {
-        self.irsb.getattr("next").unwrap().unbind()
+        self.next.clone().unbind()
     }
 
     fn num_stmts(&self) -> usize {
@@ -2387,8 +2395,7 @@ impl<'py> IrReader for PyReader<'py> {
     fn expr_kind(&self, py: Python<'_>, e: &Self::E) -> PyResult<ExprKind<Self::E>> {
         let expr = e.bind(py);
         // pyvex.const.IRConst (e.g. Exit.dst) -> const_n in the original.
-        let irconst_ty = py.import("pyvex")?.getattr("const")?.getattr("IRConst")?;
-        if expr.is_instance(&irconst_ty)? {
+        if expr.is_instance(&self.irconst_ty)? {
             return Ok(ExprKind::Const {
                 value: expr.getattr("value")?.extract()?,
                 bits: expr.getattr("size")?.extract()?,
