@@ -21,6 +21,8 @@ class VmExit:
 
     @override
     def __eq__(self, other: object) -> bool: ...
+    @override
+    def __hash__(self) -> int: ...
 
 class ExceptionCode:
     """
@@ -68,6 +70,8 @@ class ExceptionCode:
 
     @override
     def __eq__(self, other: object) -> bool: ...
+    @override
+    def __hash__(self) -> int: ...
 
 class Icicle:
     """
