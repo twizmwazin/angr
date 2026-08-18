@@ -3,17 +3,21 @@ from __future__ import annotations
 import ctypes
 import datetime
 import gc
+import importlib
 import importlib.metadata
+import importlib.util
 import os
 import sys
 import sysconfig
+from collections.abc import Callable
+from typing import Any
 
-have_gitpython = False
 try:
     from git import InvalidGitRepositoryError, Repo
 
     have_gitpython = True
 except ImportError:
+    have_gitpython = False
     print("If you install gitpython (`pip install gitpython`), I can give you git info too!")
 
 
@@ -27,11 +31,15 @@ angr_modules = [
     "unicorn",
     "z3",
 ]
-native_modules = {
-    "angr": lambda: angr.state_plugins.unicorn_engine._UC_NATIVE,  # pylint: disable=undefined-variable
-    "pyvex": lambda: pyvex.pvc,  # pylint: disable=undefined-variable
-    "unicorn": lambda: unicorn.unicorn._uc,  # pylint: disable=undefined-variable
-    "z3": lambda: next(x for x in gc.get_objects() if type(x) is ctypes.CDLL and "z3" in str(x)),  # YIKES FOREVER
+# Each entry maps a module name to a function that, given that module, digs out the handle to the
+# native library behind it. The module is passed in rather than imported at the top of this file:
+# these are exactly the imports most likely to be broken in an environment someone is reporting a
+# bug about, so they must not be able to break the report itself.
+native_modules: dict[str, Callable[[Any], object]] = {
+    "angr": lambda m: m.state_plugins.unicorn_engine._UC_NATIVE,
+    "pyvex": lambda m: m.pvc,
+    "unicorn": lambda m: m.unicorn_py3.unicorn.uclib,
+    "z3": lambda m: next(x for x in gc.get_objects() if type(x) is ctypes.CDLL and "z3" in str(x)),  # YIKES FOREVER
 }
 python_packages = {"z3": "z3-solver"}
 
@@ -46,12 +54,19 @@ def print_versions():
     for m in angr_modules:
         print(f"######## {m} #########")
         try:
-            python_filename = importlib.util.find_spec(m).origin
+            spec = importlib.util.find_spec(m)
         except ImportError:
             print("Python could not find " + m)
             continue
         except Exception as e:  # pylint: disable=broad-except
             print(f"An error occurred importing {m}: {e}")
+            continue
+        # find_spec returns None for a module that is not installed, and a spec with origin None
+        # for a namespace package -- neither of which has a file to report or a repo to inspect.
+        if spec is None or spec.origin is None:
+            print("Python could not find " + m)
+            continue
+        python_filename = spec.origin
         print(f"Python found it in {python_filename}")
         try:
             pip_package = python_packages.get(m, m)
@@ -96,9 +111,9 @@ def print_native_info():
     print("######### Native Module Info ##########")
     for module, funcs in native_modules.items():
         try:
-            globals()[module] = __import__(module)
+            imported = importlib.import_module(module)
             try:
-                print(f"{module}: {funcs()}")
+                print(f"{module}: {funcs(imported)}")
             except Exception as e:  # pylint: disable=broad-except
                 print(f"{module}: imported but path finding raised a {type(e)}: {e}")
         except ModuleNotFoundError:

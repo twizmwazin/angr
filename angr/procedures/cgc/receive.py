@@ -84,7 +84,9 @@ class receive(angr.SimProcedure):
                 # the write didn't occur (i.e., size of 0)
                 self.data = None
         else:
+            # count is provably zero, so nothing was read and nothing was written
             self.data = None
+            read_length = 0
 
         self.size = read_length
         if type(read_length) is int:

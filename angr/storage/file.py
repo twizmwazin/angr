@@ -919,6 +919,8 @@ class SimFileDescriptor(SimFileDescriptorBase):
             new_pos = self._pos + offset
         elif whence == "end":
             new_pos = self.file.size + offset
+        else:
+            raise SimFileError(f'seek(): whence must be "start", "current" or "end", not {whence!r}')
 
         success_condition = claripy.And(claripy.SGE(new_pos, 0), claripy.SLE(new_pos, self.file.size))
         self._pos = _deps_unpack(claripy.If(success_condition, new_pos, self._pos))[0]
