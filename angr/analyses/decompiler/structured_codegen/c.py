@@ -810,11 +810,7 @@ class CFunction(CConstruct):  # pylint:disable=abstract-method
         if self.codegen.show_externs and self.codegen.cexterns:
             # Emit struct definitions for types used by externs
             extern_types = []
-            defined_struct_names = (
-                set(name_to_structtypes.keys())  # type: ignore[possibly-undefined]
-                if self.codegen.show_local_types
-                else set()
-            )
+            defined_struct_names = set(name_to_structtypes.keys()) if self.codegen.show_local_types else set()
             # iterate externs in a stable, rename-independent order (by variable address) so the emission order of the
             # discovered struct types are deterministic
             for v in sorted(self.codegen.cexterns, key=cextern_sort_key):
@@ -4217,8 +4213,8 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
         expr_reference_values = self._variable_map.reference_values(expr)
         if reference_values is None and expr_reference_values is not None:
             reference_values = expr_reference_values.copy()
-        if type_ is None and reference_values is not None and len(reference_values) == 1:  # type: ignore
-            type_ = next(iter(reference_values))  # type: ignore
+        if type_ is None and reference_values is not None and len(reference_values) == 1:
+            type_ = next(iter(reference_values))
 
         if reference_values is None:
             reference_values = {}

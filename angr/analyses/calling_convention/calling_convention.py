@@ -267,8 +267,8 @@ class CallingConventionAnalysis(Analysis):
                         )
                         if prototype.args:
                             break
-                self.cc = cc  # type: ignore
-                self.prototype = prototype  # type: ignore
+                self.cc = cc
+                self.prototype = prototype
             return
         if self._function.is_plt:
             r_plt = self._analyze_plt()
@@ -1172,7 +1172,7 @@ class CallingConventionAnalysis(Analysis):
                     continue
                 for stmt in irsb.statements:
                     if isinstance(stmt, Put) and isinstance(stmt.data, RdTmp):
-                        reg_size = irsb.tyenv.sizeof(stmt.data.tmp) // self.project.arch.byte_width  # type: ignore
+                        reg_size = irsb.tyenv.sizeof(stmt.data.tmp) // self.project.arch.byte_width
                         reg_name = self.project.arch.translate_register_name(stmt.offset, size=reg_size)
                         if isinstance(cc.FP_RETURN_VAL, SimRegArg) and reg_name == cc.FP_RETURN_VAL.reg_name:
                             fpretval_updated = True

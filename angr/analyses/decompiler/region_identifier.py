@@ -78,7 +78,7 @@ class RegionIdentifier(Analysis):
         assert graph is not None
         if not update_graph:
             # copy the graph so updates don't affect the original graph
-            graph = copy_graph(graph)  # type: ignore
+            graph = copy_graph(graph)
 
         self.region: TOverlay | None = None
         self.overlay_manager: TManager | None = None

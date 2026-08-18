@@ -100,7 +100,7 @@ class HashLookupAPIDeobfuscator(Analysis):
 
     def _analyze2(self, ins_addr: int, callme: Callable[..., claripy.ast.BV], conc_args: list[int]):
         try:
-            result_bv: claripy.ast.BV = callme(*conc_args)  # type: ignore
+            result_bv: claripy.ast.BV = callme(*conc_args)
         except AngrCallableError:
             return
         if result_bv.concrete and (result_sym := self.project.loader.find_symbol(result_bv.concrete_value)) is not None:

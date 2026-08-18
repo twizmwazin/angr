@@ -954,7 +954,7 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
         if size is None:
             size = len(data)
 
-        data = bytes(pyvex.ffi.buffer(data, size))  # type: ignore
+        data = bytes(pyvex.ffi.buffer(data, size))
         for x in range(256):
             p_x = float(data.count(x)) / size
             if p_x > 0:

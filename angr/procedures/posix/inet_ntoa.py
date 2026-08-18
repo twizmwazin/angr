@@ -17,7 +17,7 @@ class inet_ntoa(angr.SimProcedure):
     # inet_ntoa is for ipv4 addresses, so we do not need 4(6|8) bytes to store it
     INET_INADDRSTRLEN = 16
 
-    def run(self, addr_in: SimStructValue):  # type: ignore # pylint:disable=arguments-differ,unused-argument
+    def run(self, addr_in: SimStructValue):  # pylint:disable=arguments-differ,unused-argument
         """
         Run the simprocedure
 

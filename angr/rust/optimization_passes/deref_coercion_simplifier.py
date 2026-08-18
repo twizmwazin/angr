@@ -27,7 +27,7 @@ class StrCmpSimplifierWalker(AILBlockRewriter):
 
     def _handle_BinaryOp(
         self, expr_idx: int, expr: BinaryOp, stmt_idx: int, stmt: Statement | None, block: Block | None
-    ):  # pyright: ignore[reportIncompatibleMethodOverride]
+    ):
         if expr.op == "CmpEQ" and isinstance(expr.operands[1], Const) and expr.operands[1].value == 0:  # noqa: SIM102
             if (
                 isinstance(expr.operands[0], Call)

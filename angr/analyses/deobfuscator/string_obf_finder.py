@@ -709,7 +709,7 @@ class StringObfuscationFinder(Analysis):
                     func.addr,
                     call_sites[i].addr,
                     call_sites[i].function_address,
-                    cfg,  # type: ignore
+                    cfg,
                 )
                 if data is None:
                     continue

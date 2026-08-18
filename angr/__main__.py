@@ -198,9 +198,7 @@ def disassemble(args):
     proj = angr.Project(args.binary, auto_load_libs=False, main_opts=loader_main_opts_kwargs)
 
     with _stderr_progress(err, "Recovering control flow graph", show=show_status) as progress_cb:
-        proj.analyses.CFG(  # pyright: ignore[reportCallIssue]
-            normalize=True, data_references=True, progress_callback=progress_cb
-        )
+        proj.analyses.CFG(normalize=True, data_references=True, progress_callback=progress_cb)
 
     # Collect disassemblable functions
     funcs = [
@@ -288,9 +286,7 @@ def decompile(args):
 
     # CFG recovery with progress on stderr
     with _stderr_progress(err, "Recovering control flow graph", show=show_status) as progress_cb:
-        cfg = proj.analyses.CFG(  # pyright: ignore[reportCallIssue]
-            normalize=True, data_references=True, progress_callback=progress_cb
-        )
+        cfg = proj.analyses.CFG(normalize=True, data_references=True, progress_callback=progress_cb)
 
     # Complete calling conventions with progress on stderr. Rust decompilation always needs this
     # to recover prototypes before TypeDBLoader can refine them.

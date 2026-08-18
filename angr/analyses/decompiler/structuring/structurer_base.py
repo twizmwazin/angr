@@ -306,7 +306,7 @@ class StructurerBase(Analysis):
                         and this_node.statements
                         and isinstance(this_node.statements[-1], (ailment.Stmt.Jump, ailment.Stmt.ConditionalJump))
                     ):
-                        jump_stmt = this_node.statements[-1]  # type: ignore
+                        jump_stmt = this_node.statements[-1]
                     elif (
                         isinstance(this_node, MultiNode)
                         and this_node.nodes
@@ -902,7 +902,7 @@ class StructurerBase(Analysis):
                 if isinstance(last_stmt.false_target, ailment.Expr.Const):
                     jump_targets.append((last_stmt.false_target.value, last_stmt.false_target_idx))
             if any(tpl in addr_and_ids for tpl in jump_targets):
-                return remove_last_statement(node)  # type: ignore
+                return remove_last_statement(node)
         return None
 
     @staticmethod
@@ -918,7 +918,7 @@ class StructurerBase(Analysis):
                     and block.statements
                     and isinstance(block.statements[-1], ailment.Stmt.Jump)
                 ):
-                    the_stmt = block.statements[-1]  # type: ignore
+                    the_stmt = block.statements[-1]
                     break
 
             if the_stmt is not None:
@@ -931,7 +931,7 @@ class StructurerBase(Analysis):
             return None
 
         if len(last_stmts) == 1 and isinstance(last_stmts[0], (ailment.Stmt.Jump, ailment.Stmt.ConditionalJump)):
-            return remove_last_statement(node)  # type: ignore
+            return remove_last_statement(node)
         return None
 
     @staticmethod
@@ -947,7 +947,7 @@ class StructurerBase(Analysis):
                     and block.statements
                     and isinstance(block.statements[-1], ailment.Stmt.Jump)
                 ):
-                    the_stmt = block.statements[-1]  # type: ignore
+                    the_stmt = block.statements[-1]
                     break
 
             if the_stmt is not None:
@@ -962,7 +962,7 @@ class StructurerBase(Analysis):
         if len(last_stmts) == 1 and isinstance(
             last_stmts[0], (ailment.Stmt.Jump, ailment.Stmt.ConditionalJump, IncompleteSwitchCaseHeadStatement)
         ):
-            return remove_last_statement(node)  # type: ignore
+            return remove_last_statement(node)
         return None
 
     @staticmethod

@@ -63,7 +63,7 @@ class LLMClient:
 
         if Agent is None:
             try:
-                from pydantic_ai import Agent  # type: ignore
+                from pydantic_ai import Agent
             except ImportError:
                 raise ImportError(
                     "pydantic-ai is required for LLM support. You can install it with: pip install angr[llm] or "
@@ -84,7 +84,7 @@ class LLMClient:
     def infer_provider(self, provider: str) -> Provider[Any]:
         """Infer the provider from the provider name."""
         if provider.startswith("gateway/"):
-            from pydantic_ai.providers.gateway import gateway_provider  # type: ignore
+            from pydantic_ai.providers.gateway import gateway_provider
 
             upstream_provider = provider.removeprefix("gateway/")
             return gateway_provider(upstream_provider)
@@ -103,8 +103,8 @@ class LLMClient:
             global OpenAIChatModel, OpenAIProvider
 
             if OpenAIChatModel is None or OpenAIProvider is None:
-                from pydantic_ai.models.openai import OpenAIChatModel  # type: ignore
-                from pydantic_ai.providers.openai import OpenAIProvider  # type: ignore
+                from pydantic_ai.models.openai import OpenAIChatModel
+                from pydantic_ai.providers.openai import OpenAIProvider
 
             provider = OpenAIProvider(base_url=self.api_base, api_key=self.api_key or "no-key")
             return OpenAIChatModel(self.model, provider=provider)
@@ -117,7 +117,7 @@ class LLMClient:
 
         return infer_model(
             model_name,
-            provider_factory=self.infer_provider,  # type:ignore
+            provider_factory=self.infer_provider,
         )  # pylint:disable=unexpected-keyword-arg
 
     @classmethod
@@ -136,7 +136,7 @@ class LLMClient:
         return cls(model=model, api_key=api_key, api_base=api_base)
 
     def _model_settings(self) -> ModelSettings:
-        from pydantic_ai.settings import ModelSettings  # type:ignore
+        from pydantic_ai.settings import ModelSettings
 
         return ModelSettings(temperature=self.temperature, max_tokens=self.max_tokens)
 

@@ -48,19 +48,19 @@ class RustTypeTranslator(TypeTranslator):
     def _translate_Pointer32(self, tc):
         return self._translate_Pointer64(tc)
 
-    def _translate_Int8(self, tc):  # type: ignore[override]
+    def _translate_Int8(self, tc):
         return RustSimTypeInt(size=8, signed=False).with_arch(self.arch)
 
-    def _translate_Int16(self, tc):  # type: ignore[override]
+    def _translate_Int16(self, tc):
         return RustSimTypeInt(size=16, signed=False).with_arch(self.arch)
 
     def _translate_Int32(self, tc):
         return RustSimTypeInt(size=32, signed=False).with_arch(self.arch)
 
-    def _translate_Int64(self, tc):  # type: ignore[override]
+    def _translate_Int64(self, tc):
         return RustSimTypeInt(size=64, signed=False).with_arch(self.arch)
 
-    def _translate_Int128(self, tc):  # type: ignore[override]
+    def _translate_Int128(self, tc):
         return RustSimTypeInt(size=128, signed=False).with_arch(self.arch)
 
     def _translate_IntVar(self, tc: IntVar):

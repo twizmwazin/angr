@@ -142,7 +142,7 @@ class CASIntrinsics(PeepholeOptimizationMultiStmtBase):
                     )
 
                 assignment_dst = cas_stmt.old_lo
-                stmt = Assignment(cas_stmt.idx, assignment_dst, call_expr, **cas_stmt.tags)  # type: ignore
+                stmt = Assignment(cas_stmt.idx, assignment_dst, call_expr, **cas_stmt.tags)
                 return [stmt]
 
         if next_stmt.tags["ins_addr"] <= cas_stmt.tags["ins_addr"] and not self._is_cas_writeback_ite(
@@ -166,7 +166,7 @@ class CASIntrinsics(PeepholeOptimizationMultiStmtBase):
                 ins_addr=cas_stmt.tags["ins_addr"],
             )
             assignment_dst = cas_stmt.old_lo
-            stmt = Assignment(cas_stmt.idx, assignment_dst, call_expr, **cas_stmt.tags)  # type: ignore
+            stmt = Assignment(cas_stmt.idx, assignment_dst, call_expr, **cas_stmt.tags)
             return [stmt, next_stmt]
 
         return None

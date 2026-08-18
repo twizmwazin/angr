@@ -385,7 +385,7 @@ class VariableMap:
         for idx, proto_json in data.get("prototypes", {}).items():
             proto = SimType.from_json(proto_json)
             if proto is not None:
-                vm._prototypes[int(idx)] = proto  # type: ignore[assignment]
+                vm._prototypes[int(idx)] = proto
         for idx, cc_json in data.get("calling_conventions", {}).items():
             cc = cls._cc_from_json(cc_json)
             if cc is not None:

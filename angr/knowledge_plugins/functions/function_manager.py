@@ -136,11 +136,11 @@ class FunctionDict(SortedDict[K, Function], FunctionDictBase[K]):
     @overload
     def get(self, key: K, default: None = None, /, meta_only: bool = False) -> Function: ...
     @overload
-    def get(self, key: K, default: Function, /, meta_only: bool = False) -> Function: ...  # type: ignore
+    def get(self, key: K, default: Function, /, meta_only: bool = False) -> Function: ...
     @overload
-    def get[T](self, key: K, default: T, /, meta_only: bool = False) -> Function | T: ...  # type: ignore
+    def get[T](self, key: K, default: T, /, meta_only: bool = False) -> Function | T: ...
 
-    def get(self, addr: K, default=_missing, /, meta_only: bool = False):  # type: ignore #pylint:disable=unused-argument
+    def get(self, addr: K, default=_missing, /, meta_only: bool = False):  # pylint:disable=unused-argument
         try:
             return super().__getitem__(addr)
         except KeyError:
@@ -365,9 +365,9 @@ class SpillingFunctionDict(UserDict[K, Function], FunctionDictBase[K]):
     @overload
     def get(self, key: K, default: None = None, /, meta_only: bool = False) -> Function: ...
     @overload
-    def get(self, key: K, default: Function, /, meta_only: bool = False) -> Function: ...  # type: ignore
+    def get(self, key: K, default: Function, /, meta_only: bool = False) -> Function: ...
     @overload
-    def get[T](self, key: K, default: T, /, meta_only: bool = False) -> Function | T: ...  # type: ignore
+    def get[T](self, key: K, default: T, /, meta_only: bool = False) -> Function | T: ...
 
     def get(self, addr, default=_missing, /, meta_only: bool = False):  # type: ignore
         # First check in-memory

@@ -131,7 +131,7 @@ class FunctionPrototypeInference(OptimizationPass, CFAMixin, SSAVariableMixin):
         # The copy reuses call_expr.idx; the original stmt is being replaced, so updating the shared entry is fine.
         vm.set_prototype(call, prototype)
         dst_vvar = self.new_stack_vvar(arg0.operand.stack_offset, call.bits, arg0.operand.tags)
-        dst_vvar.tags["type"] = returnty  # pyright: ignore[reportGeneralTypeIssues]
+        dst_vvar.tags["type"] = returnty
         self.project.kb.type_hints.add_type_hint(dst_vvar, returnty, self._func.addr)
         return Assignment(self.manager.next_atom(), dst_vvar, call, **call.tags)
 
@@ -149,7 +149,7 @@ class FunctionPrototypeInference(OptimizationPass, CFAMixin, SSAVariableMixin):
             and isinstance(stmt.dst, VirtualVariable)
             and stmt.dst.was_reg
         ):
-            stmt.dst.tags["type"] = returnty  # pyright: ignore[reportGeneralTypeIssues]
+            stmt.dst.tags["type"] = returnty
             self.project.kb.type_hints.add_type_hint(stmt.dst, returnty, self._func.addr)
 
     def _detect_callsite_discriminant_hint(self, post_callsite_path):

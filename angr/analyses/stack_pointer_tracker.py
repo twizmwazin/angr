@@ -654,7 +654,7 @@ class StackPointerTracker(Analysis, ForwardAnalysis):
                         raise CouldNotResolveException
                     if arg1_expr is BOTTOM:
                         return BOTTOM
-                    return arg0_expr + arg1_expr  # type: ignore
+                    return arg0_expr + arg1_expr
                 if expr.op.startswith("Iop_Sub"):
                     arg0_expr = _resolve_expr(arg0)
                     if arg0_expr is None:
@@ -666,7 +666,7 @@ class StackPointerTracker(Analysis, ForwardAnalysis):
                         raise CouldNotResolveException
                     if arg1_expr is BOTTOM:
                         return BOTTOM
-                    return arg0_expr - arg1_expr  # type: ignore
+                    return arg0_expr - arg1_expr
                 if expr.op.startswith("Iop_And"):
                     # handle stack pointer alignments
                     arg0_expr = _resolve_expr(arg0)

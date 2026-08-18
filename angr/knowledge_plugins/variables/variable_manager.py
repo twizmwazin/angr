@@ -331,21 +331,21 @@ class VariableManagerInternal(Serializable):
         for regvar_pb2 in cmsg.regvars:
             all_vars.append(
                 (
-                    regvar_pb2.base.is_phi,  # type: ignore[reportAttributeAccessIssue]
+                    regvar_pb2.base.is_phi,
                     SimRegisterVariable.parse_from_cmessage(regvar_pb2),
                 )
             )
         for stackvar_pb2 in cmsg.stackvars:
             all_vars.append(
                 (
-                    stackvar_pb2.base.is_phi,  # type: ignore[reportAttributeAccessIssue]
+                    stackvar_pb2.base.is_phi,
                     SimStackVariable.parse_from_cmessage(stackvar_pb2),
                 )
             )
         for memvar_pb2 in cmsg.memvars:
             all_vars.append(
                 (
-                    memvar_pb2.base.is_phi,  # type: ignore[reportAttributeAccessIssue]
+                    memvar_pb2.base.is_phi,
                     SimMemoryVariable.parse_from_cmessage(memvar_pb2),
                 )
             )

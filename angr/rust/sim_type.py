@@ -28,9 +28,7 @@ class RustSimType(SimType):
     def repr(self, name=None, full=0, memo=None, indent: int | None = 0):
         raise NotImplementedError
 
-    def c_repr(  # type: ignore[override]
-        self, name=None, full=0, memo=None, indent: int | None = 0, name_parens: bool = True, **kwargs
-    ):
+    def c_repr(self, name=None, full=0, memo=None, indent: int | None = 0, name_parens: bool = True, **kwargs):
         del name_parens, kwargs
         return self.repr(name, full, memo, indent)
 
@@ -153,7 +151,7 @@ class RustSimTypeFunction(RustSimType, SimTypeFunction):  # pyright: ignore[repo
         :param returnty: The return type of the function, or none for void
         :param variadic: Whether the function accepts varargs
         """
-        super().__init__(args, returnty, label, arg_names, variadic)  # pyright: ignore[reportArgumentType]
+        super().__init__(args, returnty, label, arg_names, variadic)
         self.is_arg0_retbuf = is_arg0_retbuf
         self.is_class_member_function = is_class_member_function
 
@@ -213,8 +211,8 @@ class RustSimTypeFunction(RustSimType, SimTypeFunction):  # pyright: ignore[repo
     def _init_str(self):
         return "{}([{}], {}{}{}{})".format(
             self.__class__.__name__,
-            ", ".join([arg._init_str() for arg in self.args]),  # pyright: ignore[reportAttributeAccessIssue]
-            self.returnty._init_str(),  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
+            ", ".join([arg._init_str() for arg in self.args]),
+            self.returnty._init_str() if self.returnty else "void",
             (f', label="{self.label}"') if self.label else "",
             (f", arg_names=[{self._arg_names_str(show_variadic=False)}]") if self.arg_names else "",
             ", variadic=True" if self.variadic else "",

@@ -176,7 +176,7 @@ class SpillingVariableInternalDict(collections.abc.MutableMapping):
         return {"manager": self._manager, "cache_limit": self._cache_limit, "serialized": serialized}
 
     def __setstate__(self, state: dict) -> None:
-        self.__init__(state["manager"], cache_limit=state["cache_limit"])  # type: ignore[misc]
+        self.__init__(state["manager"], cache_limit=state["cache_limit"])
         # defer the LMDB import to the first real access; the knowledge base may still be mid-unpickle here
         self._pending_import = dict(state["serialized"])
         self._spilled = set(self._pending_import)

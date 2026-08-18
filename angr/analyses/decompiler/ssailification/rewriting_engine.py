@@ -180,7 +180,7 @@ class SimEngineSSARewriting(
         if new_dst is not None or new_src is not None:
             return WeakAssignment(
                 stmt.idx,
-                stmt.dst if new_dst is None else new_dst,  # type: ignore
+                stmt.dst if new_dst is None else new_dst,
                 stmt.src if new_src is None else new_src,
                 **stmt.tags,
             )

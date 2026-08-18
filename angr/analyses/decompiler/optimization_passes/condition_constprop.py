@@ -206,7 +206,7 @@ class ConditionConstantPropagation(OptimizationPass):
                         op0.varid,
                         op1,
                         stmt.true_target.value,
-                        stmt.true_target_idx,  # type: ignore
+                        stmt.true_target_idx,
                     )
                     cconds.append(ccond)
                 elif op == "CmpNE":
@@ -214,6 +214,6 @@ class ConditionConstantPropagation(OptimizationPass):
                         op0.varid,
                         op1,
                         stmt.false_target.value,
-                        stmt.false_target_idx,  # type: ignore
+                        stmt.false_target_idx,
                     )
                     cconds.append(ccond)

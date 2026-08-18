@@ -609,7 +609,7 @@ class ExpressionReplacer(AILBlockRewriter):
         if changed:
             if not new_statements:
                 # it is no longer a multi-statement expression
-                return new_expr  # type: ignore
+                return new_expr
             expr_ = expr.copy()
             expr_.expr = new_expr
             expr_.stmts = new_statements

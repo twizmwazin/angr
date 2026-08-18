@@ -247,7 +247,7 @@ class SpillingDecompilationDict(collections.abc.MutableMapping):
         }
 
     def __setstate__(self, state: dict) -> None:
-        self.__init__(state["kb"], cache_limit=state["cache_limit"])  # type: ignore[misc]
+        self.__init__(state["kb"], cache_limit=state["cache_limit"])
         # defer the LMDB import to the first real access; the knowledge base may still be mid-unpickle here
         self._pending_import = dict(state["serialized"])
         self._spilled = set(self._pending_import)

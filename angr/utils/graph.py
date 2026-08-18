@@ -909,7 +909,7 @@ class GraphUtils:
             graph_copy.add_edge(src, dst)
 
         # add loners
-        out_degree_zero_nodes = [node for (node, degree) in graph.out_degree() if degree == 0]  # type: ignore
+        out_degree_zero_nodes = [node for (node, degree) in graph.out_degree() if degree == 0]
         for node in out_degree_zero_nodes:
             if graph.in_degree(node) == 0:
                 graph_copy.add_node(node)
@@ -1008,7 +1008,7 @@ class GraphUtils:
             # pick the first one
             loop_head = min(scc, key=GraphUtils.sort_node)
 
-        subgraph: networkx.DiGraph = graph.subgraph(scc).copy()  # type: ignore
+        subgraph: networkx.DiGraph = graph.subgraph(scc).copy()
         for src, _ in list(subgraph.in_edges(loop_head)):
             subgraph.remove_edge(src, loop_head)
 
@@ -1281,7 +1281,7 @@ class DirectedGraphHelper[T]:
             self._node_order.pop(node, None)
 
         if node == self._head:
-            self._head = None  # type: ignore
+            self._head = None
 
     def add_node_successor(self, node: T, successor: T) -> None:
         if self._postorder_node_to_llnode is not None and successor not in self._postorder_node_to_llnode:

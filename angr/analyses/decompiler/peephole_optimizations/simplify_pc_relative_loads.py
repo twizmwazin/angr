@@ -32,7 +32,7 @@ class SimplifyPcRelativeLoads(PeepholeOptimizationExprBase):
                 isinstance(op1, Const)
                 and op1.is_int
                 and "ins_addr" in expr.tags
-                and is_pc(self.project, expr.tags["ins_addr"], op1.value)  # type: ignore
+                and is_pc(self.project, expr.tags["ins_addr"], op1.value)
                 and isinstance(op0.addr, Const)
                 and op0.addr.is_int
             ):

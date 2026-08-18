@@ -35,9 +35,7 @@ class Pathfinder:
                 super().__init__()
                 self.pred_block = None
 
-            def _handle_Phi(  # pyright: ignore[reportIncompatibleMethodOverride]
-                self, expr_idx: int, expr: Phi, stmt_idx: int, stmt: Statement | None, block: Block | None
-            ):
+            def _handle_Phi(self, expr_idx: int, expr: Phi, stmt_idx: int, stmt: Statement | None, block: Block | None):
                 if self.pred_block:
                     pred = (self.pred_block.addr, self.pred_block.idx)
                     for src, vvar in expr.src_and_vvars:

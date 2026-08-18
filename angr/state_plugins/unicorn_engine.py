@@ -33,8 +33,8 @@ try:
     from unicorn.unicorn_py3.unicorn import HOOK_MEM_INVALID_CFUNC
 except ImportError:
     l.info("Unicorn is not installed. Support disabled.")
-    unicorn = None  # type: ignore
-    HOOK_MEM_INVALID_CFUNC = None  # type: ignore
+    unicorn = None
+    HOOK_MEM_INVALID_CFUNC = None
 
 
 class MEM_PATCH(ctypes.Structure):

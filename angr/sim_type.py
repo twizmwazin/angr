@@ -432,7 +432,7 @@ class SimTypeReg(SimType):
         with contextlib.suppress(AttributeError):
             value = value.ast  # type: ignore
         if isinstance(value, claripy.ast.Bits):  # pylint:disable=isinstance-second-argument-not-valid-type
-            if value.size() != self.size:  # type: ignore
+            if value.size() != self.size:
                 raise ValueError("size of expression is wrong size for type")
         elif isinstance(value, int):
             value = claripy.BVV(value, self.size)
@@ -494,7 +494,7 @@ class SimTypeNum(SimType):
         store_endness = state.arch.memory_endness
 
         if isinstance(value, claripy.ast.Bits):  # pylint:disable=isinstance-second-argument-not-valid-type
-            if value.size() != self.size:  # type: ignore
+            if value.size() != self.size:
                 raise ValueError("size of expression is wrong size for type")
         elif isinstance(value, int) and self.size is not None:
             value = claripy.BVV(value, self.size)

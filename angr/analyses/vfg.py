@@ -339,7 +339,7 @@ class VFG(ForwardAnalysis[SimState, VFGNode, VFGJob, BlockID, SimState], Analysi
 
         ForwardAnalysis.__init__(
             self, order_jobs=True, allow_merging=True, allow_widening=True, status_callback=status_callback
-        )  # type: ignore
+        )
 
         # Related CFG.
         # We can still perform analysis if you don't specify a CFG. But providing a CFG may give you better result.
@@ -1480,7 +1480,7 @@ class VFG(ForwardAnalysis[SimState, VFGNode, VFGJob, BlockID, SimState], Analysi
                 reg_sp_expr = (
                     successor_state.registers.load(reg_sp_offset, size=arch.bytes, endness=arch.register_endness)
                     + sp_difference
-                )  # type: ignore
+                )
                 successor_state.registers.store(arch.sp_offset, reg_sp_expr)
 
                 # Clear the return value with a TOP
@@ -1514,7 +1514,7 @@ class VFG(ForwardAnalysis[SimState, VFGNode, VFGJob, BlockID, SimState], Analysi
             else:
                 self._pending_returns[new_block_id] = PendingJob(
                     new_block_id, successor_state, new_call_stack, job.block_id, stmt_idx, ins_addr
-                )  # type: ignore
+                )
                 job.dbg_exit_status[successor] = "Pending"
 
         else:
@@ -1794,7 +1794,7 @@ class VFG(ForwardAnalysis[SimState, VFGNode, VFGJob, BlockID, SimState], Analysi
         else:
             raise AngrVFGError("from and to should be of the same type")
 
-        return networkx.all_simple_paths(self.graph, n_begin, n_end)  # type: ignore
+        return networkx.all_simple_paths(self.graph, n_begin, n_end)
 
     def _merge_points(self, function_address):
         """

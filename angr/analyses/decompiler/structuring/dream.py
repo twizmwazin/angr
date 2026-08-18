@@ -385,7 +385,7 @@ class DreamStructurer(StructurerBase):
             node.condition_and_nodes = new_cond_and_nodes
 
             if node.else_node is not None:
-                node.else_node = walker._handle(node.else_node)  # type: ignore
+                node.else_node = walker._handle(node.else_node)
             return node
 
         def _handle_SwitchCaseNode(node, **kwargs):  # pylint:disable=unused-argument

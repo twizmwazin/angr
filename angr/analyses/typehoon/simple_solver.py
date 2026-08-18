@@ -438,8 +438,8 @@ class Sketch:
                     and basetype.size > 0
                     and max_size // basetype.size > 1
                     and basetype.size <= 8
-                ):  # type: ignore
-                    supertype = Array(element=basetype, count=max_size // basetype.size)  # type: ignore
+                ):
+                    supertype = Array(element=basetype, count=max_size // basetype.size)
 
         if SimpleSolver._typevar_inside_set(subtype, PRIMITIVE_TYPES) and not SimpleSolver._typevar_inside_set(
             supertype, PRIMITIVE_TYPES

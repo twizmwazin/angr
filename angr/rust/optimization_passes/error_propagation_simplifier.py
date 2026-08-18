@@ -141,7 +141,7 @@ class ErrorPropagationWalker(SequenceWalker):
                 new_ok_node = super()._handle(ok_node)
                 return new_ok_node or ok_node
             if isinstance(node.scrutinee, Call):
-                node.scrutinee.tags["propagates_error"] = True  # pyright: ignore[reportGeneralTypeIssues]
+                node.scrutinee.tags["propagates_error"] = True
                 new_ok_node = super()._handle(ok_node)
                 return new_ok_node or ok_node
 

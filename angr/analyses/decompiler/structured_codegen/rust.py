@@ -209,7 +209,7 @@ def guess_value_type(value: float, project: angr.Project) -> SimType | None:
 
 def _with_arch(ty, arch):
     if hasattr(ty, "with_arch"):
-        return ty.with_arch(arch)  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
+        return ty.with_arch(arch)
     return ty
 
 

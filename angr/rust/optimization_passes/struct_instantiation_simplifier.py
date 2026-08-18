@@ -263,7 +263,7 @@ class StructInstantiationSimplifier(OptimizationPass, SRDAMixin, CFAMixin, DFAMi
                 first_stack_def = used_defs[0]
                 new_vvar = self.new_stack_vvar(vvar.stack_offset, struct.bits, vvar.tags)
                 src = self._convert_to_stack_vvar(struct) or struct
-                src.tags["type"] = struct_ty  # pyright: ignore[reportGeneralTypeIssues]
+                src.tags["type"] = struct_ty
                 new_stmt = Assignment(self.manager.next_atom(), new_vvar, src, **first_stack_def.stmt.tags)
 
                 # Collect type hints

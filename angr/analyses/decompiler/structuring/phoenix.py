@@ -3579,7 +3579,7 @@ class PhoenixStructurer(StructurerBase):
             src, dst = edge_
             dst_in_degree = graph.in_degree[dst]
             src_out_degree = graph.out_degree[src]
-            return -node_seq[dst], dst_in_degree, src_out_degree, -src.addr, -dst.addr  # type: ignore
+            return -node_seq[dst], dst_in_degree, src_out_degree, -src.addr, -dst.addr
 
         return sorted(edges, key=_sort_edge, reverse=True)
 

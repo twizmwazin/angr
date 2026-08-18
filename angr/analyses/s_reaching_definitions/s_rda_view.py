@@ -277,7 +277,7 @@ class SRDAView:
                 if isinstance(func_arg, VirtualVariable):
                     func_arg_category = func_arg.parameter_category
                     if func_arg_category == VirtualVariableCategory.STACK:
-                        func_arg_stackoff = func_arg.oident[1]  # type: ignore
+                        func_arg_stackoff = func_arg.oident[1]
                         if func_arg_stackoff == stack_offset and func_arg.size == size:
                             vvars.append(func_arg)
         # there might be multiple vvars; we prioritize the one whose size fits the best

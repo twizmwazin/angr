@@ -298,7 +298,7 @@ class Block(Serializable):
                 if type(self._bytes) is memoryview:
                     self._bytes = bytes(self._bytes)
                 elif type(self._bytes) is not bytes:
-                    self._bytes = bytes(pyvex.ffi.buffer(self._bytes, size))  # type: ignore
+                    self._bytes = bytes(pyvex.ffi.buffer(self._bytes, size))
             else:
                 self._bytes = None
         elif type(byte_string) is bytes:
@@ -309,7 +309,7 @@ class Block(Serializable):
         else:
             # Convert bytestring to a str
             # size will ALWAYS be known at this point
-            self._bytes = bytes(pyvex.ffi.buffer(byte_string, self.size))  # type: ignore
+            self._bytes = bytes(pyvex.ffi.buffer(byte_string, self.size))
 
     def _parse_vex_info(self, vex_block):
         if vex_block is not None:
@@ -366,7 +366,7 @@ class Block(Serializable):
     def _vex_engine(self) -> VEXLifter | PcodeLifterEngineMixin:
         if self._project is None:
             raise ValueError("Project is not set")
-        return self._project.factory.default_engine  # type: ignore
+        return self._project.factory.default_engine
 
     def _lift_nocache(self, skip_stmts: bool) -> IRSB | PcodeIRSB:
         clemory = None

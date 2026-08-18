@@ -546,7 +546,7 @@ class SpillingDiGraph(networkx.DiGraph):
         self._addr_type: CFG_ADDR_TYPES = addr_type
         super().__init__(**attr)
 
-    def adjlist_outer_dict_factory(self) -> SpillingAdjDict:  # type:ignore
+    def adjlist_outer_dict_factory(self) -> SpillingAdjDict:
         return SpillingAdjDict(self.addr_type, self._rtdb, self._edge_cache_limit, self._edge_db_batch_size)
 
     @staticmethod

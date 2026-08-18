@@ -837,11 +837,9 @@ class SimCC:
     def is_fp_value(val):
         return (
             isinstance(val, (float, claripy.ast.FP))
-            or (isinstance(val, claripy.ast.Base) and val.op.startswith("fp"))  # type: ignore
+            or (isinstance(val, claripy.ast.Base) and val.op.startswith("fp"))
             or (
-                isinstance(val, claripy.ast.Base)
-                and val.op == "Reverse"  # type: ignore
-                and val.args[0].op.startswith("fp")  # type: ignore
+                isinstance(val, claripy.ast.Base) and val.op == "Reverse" and val.args[0].op.startswith("fp")  # type: ignore
             )
         )
 
@@ -1318,7 +1316,7 @@ class SimLyingRegArg(SimRegArg):
             value = claripy.fpToFP(
                 claripy.fp.RM.RM_NearestTiesEven,  # pyright: ignore[reportAttributeAccessIssue]
                 value.raw_to_fp(),
-                claripy.FSORT_DOUBLE,  # type: ignore
+                claripy.FSORT_DOUBLE,
             )
         state.registers.store(self.reg_name, value)
         # super(SimLyingRegArg, self).set_value(state, value, endness=endness, **kwargs)

@@ -318,7 +318,7 @@ class Analysis:
             l.error(
                 "Caught and logged %s with resilience: %s",
                 error.exc_type.__name__ if error.exc_type is not None else "UnknownException",
-                error.exc_value,  # type: ignore
+                error.exc_value,
                 exc_info=True,
             )
             if name is None:

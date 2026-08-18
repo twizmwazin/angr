@@ -97,7 +97,7 @@ def _detach_child_stdio() -> None:
             io.BufferedReader(io.FileIO(0, "rb", closefd=False)), encoding="utf-8", errors="replace"
         )
     except OSError:
-        sys.stdin = None  # type: ignore[assignment]
+        sys.stdin = None
 
     try:
         sys.stdout = io.TextIOWrapper(
@@ -107,7 +107,7 @@ def _detach_child_stdio() -> None:
             line_buffering=True,
         )
     except OSError:
-        sys.stdout = None  # type: ignore[assignment]
+        sys.stdout = None
 
 
 def protect_stdio_from_forked_children() -> None:

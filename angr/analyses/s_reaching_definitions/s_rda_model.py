@@ -318,9 +318,9 @@ class SRDAModel:
         if vvar_ids is None:
             return set()
         if isinstance(vvar_ids, int):
-            vvar_ids = (vvar_ids,)  # type: ignore
+            vvar_ids = (vvar_ids,)
         defs: set[Definition[atoms.VirtualVariable, AILCodeLocation]] = set()
-        for vvar_id in vvar_ids:  # type: ignore
+        for vvar_id in vvar_ids:
             vvar = self.varid_to_vvar[vvar_id]
             defs.add(
                 Definition(
