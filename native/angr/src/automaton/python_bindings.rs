@@ -131,15 +131,25 @@ impl PyEpsilon {
 
 const EPSILON_HASH: u64 = 0xDEAD_BEEF_CAFE_BABE;
 
+/// Identity of a Python object inside an [`ObjectMapper`]: its hash paired
+/// with its repr, so two equal-but-distinct objects share one id.
+#[derive(Clone, PartialEq, Eq, Hash)]
+struct ObjKey(isize, String);
+
+impl ObjKey {
+    fn of(py: Python<'_>, value: &Py<PyAny>) -> PyResult<Self> {
+        let obj = value.bind(py);
+        Ok(Self(obj.hash()?, obj.repr()?.extract()?))
+    }
+}
+
 /// Helper struct for tracking Python object to ID mappings.
 #[derive(Clone)]
 struct ObjectMapper {
-    /// Maps Python object hash + repr to state IDs
-    state_to_id: IndexMap<(isize, String), StateId>,
+    state_to_id: IndexMap<ObjKey, StateId>,
     /// Maps state IDs back to Python objects
     id_to_state: Vec<Py<PyAny>>,
-    /// Maps Python object hash + repr to symbol IDs
-    symbol_to_id: IndexMap<(isize, String), SymbolId>,
+    symbol_to_id: IndexMap<ObjKey, SymbolId>,
     /// Maps symbol IDs back to Python objects
     id_to_symbol: Vec<Py<PyAny>>,
 }
@@ -155,10 +165,7 @@ impl ObjectMapper {
     }
 
     fn get_or_create_state_id(&mut self, py: Python<'_>, state: &PyState) -> PyResult<StateId> {
-        let hash = state.value.bind(py).hash()?;
-        let repr = state.value.bind(py).repr()?.to_string();
-        let key = (hash, repr);
-
+        let key = ObjKey::of(py, &state.value)?;
         if let Some(&id) = self.state_to_id.get(&key) {
             Ok(id)
         } else {
@@ -175,10 +182,7 @@ impl ObjectMapper {
     }
 
     fn get_or_create_symbol_id(&mut self, py: Python<'_>, symbol: &PySymbol) -> PyResult<SymbolId> {
-        let hash = symbol.value.bind(py).hash()?;
-        let repr = symbol.value.bind(py).repr()?.to_string();
-        let key = (hash, repr);
-
+        let key = ObjKey::of(py, &symbol.value)?;
         if let Some(&id) = self.symbol_to_id.get(&key) {
             Ok(id)
         } else {
