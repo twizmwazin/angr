@@ -26,15 +26,30 @@ if TYPE_CHECKING:
     from angr.simos.javavm import SimJavaVM
 
     from .state_plugins.callstack import CallStack
+    from .state_plugins.cgc import SimStateCGC
+    from .state_plugins.debug_variables import SimDebugVariablePlugin
+    from .state_plugins.filesystem import SimFilesystem
+    from .state_plugins.gdb import GDB
+    from .state_plugins.globals import SimStateGlobals
     from .state_plugins.heap.heap_base import SimHeapBase
     from .state_plugins.history import SimStateHistory
+    from .state_plugins.icicle import SimStateIcicle
     from .state_plugins.inspect import SimInspector
+    from .state_plugins.javavm_classloader import SimJavaVmClassloader
     from .state_plugins.jni_references import SimStateJNIReferences
+    from .state_plugins.libc import SimStateLibc
+    from .state_plugins.log import SimStateLog
+    from .state_plugins.loop_data import SimStateLoopData
     from .state_plugins.posix import SimSystemPosix
+    from .state_plugins.preconstrainer import SimStatePreconstrainer
     from .state_plugins.scratch import SimStateScratch
     from .state_plugins.solver import SimSolver
+    from .state_plugins.symbolizer import SimSymbolizer
+    from .state_plugins.uc_manager import SimUCManager
+    from .state_plugins.unicorn_engine import Unicorn
     from .state_plugins.view import SimMemView, SimRegNameView
     from .storage import DefaultMemory
+    from .storage.memory_mixins import AbstractMemory, FastMemory, JavaVmMemory, KeyValueMemory
 
 
 l = logging.getLogger(name=__name__)
@@ -79,19 +94,39 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
     :ivar unicorn:      Control of the Unicorn Engine
     """
 
-    # Type Annotations for default plugins to allow type inference
-    solver: SimSolver
-    posix: SimSystemPosix
-    registers: DefaultMemory
-    regs: SimRegNameView
-    memory: DefaultMemory
+    # Type annotations for the plugins registered in the default preset, so that ``state.<plugin>`` is
+    # inferred as the plugin class instead of falling back to PluginHub.__getattr__'s SimStatePlugin.
+    # Every name registered via SimState.register_default() belongs here.
+    abs_memory: AbstractMemory
     callstack: CallStack
-    mem: SimMemView
-    history: SimStateHistory
-    inspect: SimInspector
-    jni_references: SimStateJNIReferences
-    scratch: SimStateScratch
+    cgc: SimStateCGC
+    dvars: SimDebugVariablePlugin
+    fast_memory: FastMemory
+    fs: SimFilesystem
+    gdb: GDB
+    globals: SimStateGlobals
     heap: SimHeapBase
+    history: SimStateHistory
+    icicle: SimStateIcicle
+    inspect: SimInspector
+    javavm_classloader: SimJavaVmClassloader
+    jni_references: SimStateJNIReferences
+    keyvalue_memory: KeyValueMemory
+    libc: SimStateLibc
+    log: SimStateLog
+    loop_data: SimStateLoopData
+    mem: SimMemView
+    memory: DefaultMemory
+    posix: SimSystemPosix
+    preconstrainer: SimStatePreconstrainer
+    regs: SimRegNameView
+    registers: DefaultMemory
+    scratch: SimStateScratch
+    solver: SimSolver
+    sym_memory: DefaultMemory
+    symbolizer: SimSymbolizer
+    uc_manager: SimUCManager
+    unicorn: Unicorn
 
     def __init__(
         self,
@@ -458,7 +493,7 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
     #
 
     @property
-    def javavm_memory(self):
+    def javavm_memory(self) -> JavaVmMemory:
         """
         In case of an JavaVM with JNI support, a state can store the memory
         plugin twice; one for the native and one for the java view of the state.

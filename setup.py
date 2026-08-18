@@ -66,7 +66,10 @@ def build_unicornlib():
 
 def build_protos():
     proto_files = sorted(glob.glob("angr/protos/*.proto"))
-    cmd = [sys.executable, "-m", "grpc_tools.protoc", "-I.", "--python_out=.", *proto_files]
+    # --pyi_out emits a .pyi stub next to each generated module. Without it the message classes are
+    # invisible to type checkers, because protobuf builds them dynamically from the descriptor at import
+    # time, and every `pb2.SomeMessage()` call site reads as an unknown module attribute.
+    cmd = [sys.executable, "-m", "grpc_tools.protoc", "-I.", "--python_out=.", "--pyi_out=.", *proto_files]
     try:
         subprocess.run(cmd, check=True)
     except (FileNotFoundError, subprocess.CalledProcessError) as err:

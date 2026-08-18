@@ -1,0 +1,2157 @@
+{
+ "counts": {
+  "angr/ail_callable.py": {
+   "reportArgumentType": 1
+  },
+  "angr/ailment/__init__.py": {
+   "reportAttributeAccessIssue": 1,
+   "reportOptionalMemberAccess": 2,
+   "reportPossiblyUnboundVariable": 2
+  },
+  "angr/ailment/block_walker.py": {
+   "reportAssignmentType": 1
+  },
+  "angr/ailment/converter_pcode.py": {
+   "reportArgumentType": 11,
+   "reportAttributeAccessIssue": 1,
+   "reportOptionalMemberAccess": 21
+  },
+  "angr/analyses/backward_slice.py": {
+   "reportAttributeAccessIssue": 1,
+   "reportOptionalMemberAccess": 3
+  },
+  "angr/analyses/bindiff.py": {
+   "reportArgumentType": 2,
+   "reportAttributeAccessIssue": 1,
+   "reportGeneralTypeIssues": 2,
+   "reportOperatorIssue": 2,
+   "reportOptionalMemberAccess": 5
+  },
+  "angr/analyses/callee_cleanup_finder.py": {
+   "reportAttributeAccessIssue": 1,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/calling_convention/calling_convention.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 1,
+   "reportReturnType": 1
+  },
+  "angr/analyses/cdg.py": {
+   "reportArgumentType": 3,
+   "reportAttributeAccessIssue": 1,
+   "reportOptionalIterable": 2,
+   "reportOptionalMemberAccess": 2,
+   "reportRedeclaration": 1
+  },
+  "angr/analyses/cfg/cfb.py": {
+   "reportAttributeAccessIssue": 2,
+   "reportOptionalOperand": 1
+  },
+  "angr/analyses/cfg/cfg_arch_options.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/cfg/cfg_base.py": {
+   "reportArgumentType": 23,
+   "reportAssignmentType": 1,
+   "reportCallIssue": 10,
+   "reportInconsistentOverload": 2,
+   "reportOperatorIssue": 1,
+   "reportOptionalSubscript": 1,
+   "reportReturnType": 1
+  },
+  "angr/analyses/cfg/cfg_emulated.py": {
+   "reportArgumentType": 12,
+   "reportAssignmentType": 3,
+   "reportAttributeAccessIssue": 17,
+   "reportCallIssue": 3,
+   "reportGeneralTypeIssues": 3,
+   "reportIncompatibleMethodOverride": 1,
+   "reportOperatorIssue": 2,
+   "reportOptionalIterable": 1,
+   "reportOptionalMemberAccess": 31,
+   "reportOptionalSubscript": 4
+  },
+  "angr/analyses/cfg/cfg_fast.py": {
+   "reportArgumentType": 36,
+   "reportAssignmentType": 3,
+   "reportAttributeAccessIssue": 11,
+   "reportIncompatibleMethodOverride": 2,
+   "reportOperatorIssue": 9,
+   "reportOptionalIterable": 2,
+   "reportOptionalMemberAccess": 27,
+   "reportOptionalOperand": 2,
+   "reportOptionalSubscript": 7,
+   "reportPossiblyUnboundVariable": 1,
+   "reportReturnType": 1
+  },
+  "angr/analyses/cfg/cfg_fast_soot.py": {
+   "reportArgumentType": 9,
+   "reportAttributeAccessIssue": 7,
+   "reportIncompatibleMethodOverride": 1,
+   "reportPossiblyUnboundVariable": 14
+  },
+  "angr/analyses/cfg/cfg_job_base.py": {
+   "reportArgumentType": 1,
+   "reportCallIssue": 1
+  },
+  "angr/analyses/cfg/indirect_jump_resolvers/aarch64_macho_got.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/cfg/indirect_jump_resolvers/amd64_elf_got.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/cfg/indirect_jump_resolvers/amd64_pe_iat.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/cfg/indirect_jump_resolvers/const_resolver.py": {
+   "reportArgumentType": 1
+  },
+  "angr/analyses/cfg/indirect_jump_resolvers/constant_value_manager.py": {
+   "reportArgumentType": 1
+  },
+  "angr/analyses/cfg/indirect_jump_resolvers/jumptable.py": {
+   "reportIncompatibleMethodOverride": 1,
+   "reportOperatorIssue": 2
+  },
+  "angr/analyses/cfg/indirect_jump_resolvers/mips_elf_fast.py": {
+   "reportArgumentType": 1
+  },
+  "angr/analyses/cfg/indirect_jump_resolvers/x86_elf_pic_plt.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/analyses/cfg/indirect_jump_resolvers/x86_pe_iat.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/cfg/meta_structs.py": {
+   "reportAttributeAccessIssue": 2
+  },
+  "angr/analyses/class_identifier.py": {
+   "reportArgumentType": 1,
+   "reportOptionalMemberAccess": 3
+  },
+  "angr/analyses/code_tagging.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/codecave.py": {
+   "reportArgumentType": 2
+  },
+  "angr/analyses/complete_calling_conventions.py": {
+   "reportAttributeAccessIssue": 3
+  },
+  "angr/analyses/congruency_check.py": {
+   "reportOptionalMemberAccess": 40,
+   "reportPossiblyUnboundVariable": 1
+  },
+  "angr/analyses/data_dep/data_dependency_analysis.py": {
+   "reportArgumentType": 19,
+   "reportAttributeAccessIssue": 5,
+   "reportCallIssue": 4,
+   "reportOperatorIssue": 1,
+   "reportOptionalMemberAccess": 39,
+   "reportOptionalSubscript": 1,
+   "reportReturnType": 1
+  },
+  "angr/analyses/data_dep/dep_nodes.py": {
+   "reportArgumentType": 2,
+   "reportOperatorIssue": 2,
+   "reportOptionalMemberAccess": 2,
+   "reportReturnType": 2
+  },
+  "angr/analyses/datagraph_meta.py": {
+   "reportAttributeAccessIssue": 8
+  },
+  "angr/analyses/ddg.py": {
+   "reportArgumentType": 2,
+   "reportAssignmentType": 2,
+   "reportGeneralTypeIssues": 1,
+   "reportOptionalIterable": 1,
+   "reportOptionalMemberAccess": 7,
+   "reportOptionalSubscript": 24,
+   "reportPossiblyUnboundVariable": 3
+  },
+  "angr/analyses/decompiler/ail_simplifier.py": {
+   "reportArgumentType": 2,
+   "reportCallIssue": 1
+  },
+  "angr/analyses/decompiler/ailgraph_walker.py": {
+   "reportArgumentType": 1
+  },
+  "angr/analyses/decompiler/block_io_finder.py": {
+   "reportArgumentType": 2,
+   "reportAttributeAccessIssue": 2,
+   "reportCallIssue": 1,
+   "reportIncompatibleMethodOverride": 10
+  },
+  "angr/analyses/decompiler/block_similarity.py": {
+   "reportAttributeAccessIssue": 4,
+   "reportReturnType": 3
+  },
+  "angr/analyses/decompiler/callsite_maker.py": {
+   "reportArgumentType": 2,
+   "reportAttributeAccessIssue": 5
+  },
+  "angr/analyses/decompiler/ccall_rewriters/x86_ccalls.py": {
+   "reportArgumentType": 5,
+   "reportAttributeAccessIssue": 3
+  },
+  "angr/analyses/decompiler/clinic.py": {
+   "reportArgumentType": 7,
+   "reportAttributeAccessIssue": 16,
+   "reportCallIssue": 1,
+   "reportOperatorIssue": 4,
+   "reportOptionalIterable": 1,
+   "reportOptionalMemberAccess": 1,
+   "reportOptionalSubscript": 1
+  },
+  "angr/analyses/decompiler/condition_processor.py": {
+   "reportArgumentType": 15,
+   "reportCallIssue": 1,
+   "reportReturnType": 1
+  },
+  "angr/analyses/decompiler/counters/boolean_counter.py": {
+   "reportIncompatibleMethodOverride": 1
+  },
+  "angr/analyses/decompiler/counters/expression_counters.py": {
+   "reportIncompatibleMethodOverride": 3
+  },
+  "angr/analyses/decompiler/decompilation_cache.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/analyses/decompiler/decompilation_options.py": {
+   "reportArgumentType": 1
+  },
+  "angr/analyses/decompiler/decompiler.py": {
+   "reportAttributeAccessIssue": 4,
+   "reportCallIssue": 3,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/decompiler/dephication/graph_dephication.py": {
+   "reportArgumentType": 1
+  },
+  "angr/analyses/decompiler/dephication/seqnode_dephication.py": {
+   "reportArgumentType": 2,
+   "reportGeneralTypeIssues": 1,
+   "reportReturnType": 1
+  },
+  "angr/analyses/decompiler/dirty_rewriters/amd64_dirty.py": {
+   "reportArgumentType": 3
+  },
+  "angr/analyses/decompiler/edits/ops.py": {
+   "reportArgumentType": 6,
+   "reportAttributeAccessIssue": 3,
+   "reportOptionalMemberAccess": 4,
+   "reportReturnType": 2
+  },
+  "angr/analyses/decompiler/edits/resolve.py": {
+   "reportArgumentType": 3
+  },
+  "angr/analyses/decompiler/empty_node_remover.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/analyses/decompiler/expression_narrower.py": {
+   "reportAttributeAccessIssue": 3
+  },
+  "angr/analyses/decompiler/node_replacer.py": {
+   "reportArgumentType": 1
+  },
+  "angr/analyses/decompiler/optimization_passes/base_ptr_save_simplifier.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/decompiler/optimization_passes/call_stmt_rewriter.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/decompiler/optimization_passes/code_motion.py": {
+   "reportArgumentType": 1,
+   "reportOptionalMemberAccess": 4
+  },
+  "angr/analyses/decompiler/optimization_passes/const_derefs.py": {
+   "reportIncompatibleMethodOverride": 1,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/decompiler/optimization_passes/const_prop_reverter.py": {
+   "reportArgumentType": 2,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/decompiler/optimization_passes/cross_jump_reverter.py": {
+   "reportArgumentType": 1,
+   "reportOptionalMemberAccess": 9
+  },
+  "angr/analyses/decompiler/optimization_passes/div_simplifier.py": {
+   "reportAttributeAccessIssue": 1,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/decompiler/optimization_passes/duplication_reverter/ail_merge_graph.py": {
+   "reportArgumentType": 4,
+   "reportAssignmentType": 1,
+   "reportAttributeAccessIssue": 6,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/decompiler/optimization_passes/duplication_reverter/duplication_reverter.py": {
+   "reportArgumentType": 7,
+   "reportAttributeAccessIssue": 7,
+   "reportGeneralTypeIssues": 3,
+   "reportIncompatibleMethodOverride": 1,
+   "reportOperatorIssue": 1,
+   "reportOptionalMemberAccess": 28,
+   "reportOptionalSubscript": 2,
+   "reportRedeclaration": 1,
+   "reportReturnType": 1
+  },
+  "angr/analyses/decompiler/optimization_passes/duplication_reverter/similarity.py": {
+   "reportOptionalSubscript": 5
+  },
+  "angr/analyses/decompiler/optimization_passes/duplication_reverter/utils.py": {
+   "reportAssignmentType": 1
+  },
+  "angr/analyses/decompiler/optimization_passes/eager_std_string_concatenation.py": {
+   "reportAttributeAccessIssue": 5,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/decompiler/optimization_passes/eager_std_string_eval.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 3,
+   "reportIncompatibleMethodOverride": 1,
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/analyses/decompiler/optimization_passes/engine_base.py": {
+   "reportAttributeAccessIssue": 5
+  },
+  "angr/analyses/decompiler/optimization_passes/expr_op_swapper.py": {
+   "reportAttributeAccessIssue": 6,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/decompiler/optimization_passes/flip_boolean_cmp.py": {
+   "reportArgumentType": 1,
+   "reportIncompatibleMethodOverride": 1,
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/analyses/decompiler/optimization_passes/inlined_strcpy_simplifier.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 10,
+   "reportOptionalMemberAccess": 5
+  },
+  "angr/analyses/decompiler/optimization_passes/inlined_wcscpy_simplifier.py": {
+   "reportArgumentType": 3,
+   "reportAttributeAccessIssue": 32,
+   "reportOptionalMemberAccess": 4
+  },
+  "angr/analyses/decompiler/optimization_passes/ite_expr_converter.py": {
+   "reportGeneralTypeIssues": 1,
+   "reportOperatorIssue": 1,
+   "reportOptionalIterable": 1,
+   "reportOptionalMemberAccess": 3
+  },
+  "angr/analyses/decompiler/optimization_passes/ite_region_converter.py": {
+   "reportAttributeAccessIssue": 11,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/decompiler/optimization_passes/lowered_switch_simplifier.py": {
+   "reportArgumentType": 7,
+   "reportCallIssue": 7,
+   "reportOperatorIssue": 1,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/decompiler/optimization_passes/mod_simplifier.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/decompiler/optimization_passes/optimization_pass.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/decompiler/optimization_passes/register_save_area_simplifier.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/decompiler/optimization_passes/ret_addr_save_simplifier.py": {
+   "reportOptionalCall": 3,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/decompiler/optimization_passes/ret_deduplicator.py": {
+   "reportCallIssue": 1,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/decompiler/optimization_passes/return_duplicator_base.py": {
+   "reportAttributeAccessIssue": 2,
+   "reportOperatorIssue": 1
+  },
+  "angr/analyses/decompiler/optimization_passes/return_duplicator_low.py": {
+   "reportArgumentType": 1,
+   "reportOptionalMemberAccess": 1,
+   "reportOptionalSubscript": 1
+  },
+  "angr/analyses/decompiler/optimization_passes/stack_canary_simplifier.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 8,
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/analyses/decompiler/optimization_passes/static_vvar_rewriter.py": {
+   "reportArgumentType": 10,
+   "reportAttributeAccessIssue": 9,
+   "reportCallIssue": 2,
+   "reportIncompatibleMethodOverride": 6,
+   "reportOptionalIterable": 1,
+   "reportOptionalMemberAccess": 5
+  },
+  "angr/analyses/decompiler/optimization_passes/switch_default_case_duplicator.py": {
+   "reportArgumentType": 3,
+   "reportOptionalMemberAccess": 2,
+   "reportOptionalSubscript": 1
+  },
+  "angr/analyses/decompiler/optimization_passes/switch_reused_entry_rewriter.py": {
+   "reportArgumentType": 1,
+   "reportOptionalMemberAccess": 2,
+   "reportOptionalSubscript": 1
+  },
+  "angr/analyses/decompiler/optimization_passes/tag_slicer.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/decompiler/optimization_passes/win_stack_canary_simplifier.py": {
+   "reportArgumentType": 1,
+   "reportOperatorIssue": 1,
+   "reportOptionalOperand": 2
+  },
+  "angr/analyses/decompiler/optimization_passes/x86_gcc_getpc_simplifier.py": {
+   "reportAttributeAccessIssue": 2,
+   "reportOperatorIssue": 1,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/decompiler/peephole_optimizations/arm_cmpf.py": {
+   "reportArgumentType": 5,
+   "reportAttributeAccessIssue": 2,
+   "reportGeneralTypeIssues": 2
+  },
+  "angr/analyses/decompiler/peephole_optimizations/base.py": {
+   "reportReturnType": 1
+  },
+  "angr/analyses/decompiler/peephole_optimizations/basepointeroffset_add_n.py": {
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/analyses/decompiler/peephole_optimizations/cas_intrinsics.py": {
+   "reportAttributeAccessIssue": 10
+  },
+  "angr/analyses/decompiler/peephole_optimizations/cmpord_rewriter.py": {
+   "reportCallIssue": 1
+  },
+  "angr/analyses/decompiler/peephole_optimizations/constant_derefs.py": {
+   "reportOptionalMemberAccess": 5
+  },
+  "angr/analyses/decompiler/peephole_optimizations/eager_eval.py": {
+   "reportAttributeAccessIssue": 8
+  },
+  "angr/analyses/decompiler/peephole_optimizations/remove_redundant_shifts_around_comparators.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/analyses/decompiler/peephole_optimizations/rewrite_cxx_operator_calls.py": {
+   "reportAttributeAccessIssue": 16
+  },
+  "angr/analyses/decompiler/peephole_optimizations/rewrite_mips_gp_loads.py": {
+   "reportOptionalMemberAccess": 8
+  },
+  "angr/analyses/decompiler/peephole_optimizations/rol_ror.py": {
+   "reportOptionalMemberAccess": 2,
+   "reportOptionalOperand": 3
+  },
+  "angr/analyses/decompiler/peephole_optimizations/single_bit_xor.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/analyses/decompiler/peephole_optimizations/tidy_stack_addr.py": {
+   "reportAssignmentType": 3
+  },
+  "angr/analyses/decompiler/region_identifier.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/analyses/decompiler/region_overlay.py": {
+   "reportReturnType": 3
+  },
+  "angr/analyses/decompiler/region_simplifiers/cascading_cond_transformer.py": {
+   "reportIncompatibleMethodOverride": 1
+  },
+  "angr/analyses/decompiler/region_simplifiers/expr_folding.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 7,
+   "reportIncompatibleMethodOverride": 4
+  },
+  "angr/analyses/decompiler/region_simplifiers/goto.py": {
+   "reportAttributeAccessIssue": 3
+  },
+  "angr/analyses/decompiler/region_simplifiers/ifelse.py": {
+   "reportArgumentType": 4
+  },
+  "angr/analyses/decompiler/region_simplifiers/loop.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 2
+  },
+  "angr/analyses/decompiler/region_simplifiers/region_simplifier.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/analyses/decompiler/region_simplifiers/switch_cluster_simplifier.py": {
+   "reportArgumentType": 3,
+   "reportAttributeAccessIssue": 6
+  },
+  "angr/analyses/decompiler/semantic_naming/call_result_naming.py": {
+   "reportArgumentType": 1
+  },
+  "angr/analyses/decompiler/semantic_naming/pointer_naming.py": {
+   "reportArgumentType": 1
+  },
+  "angr/analyses/decompiler/semantic_naming/size_naming.py": {
+   "reportArgumentType": 2,
+   "reportAttributeAccessIssue": 3
+  },
+  "angr/analyses/decompiler/ssailification/rewriting.py": {
+   "reportArgumentType": 1,
+   "reportOptionalIterable": 2
+  },
+  "angr/analyses/decompiler/ssailification/rewriting_engine.py": {
+   "reportArgumentType": 6,
+   "reportAttributeAccessIssue": 4,
+   "reportOperatorIssue": 3,
+   "reportOptionalIterable": 1
+  },
+  "angr/analyses/decompiler/ssailification/ssailification.py": {
+   "reportArgumentType": 1
+  },
+  "angr/analyses/decompiler/ssailification/traversal.py": {
+   "reportArgumentType": 1
+  },
+  "angr/analyses/decompiler/ssailification/traversal_engine.py": {
+   "reportArgumentType": 1
+  },
+  "angr/analyses/decompiler/structured_codegen/base.py": {
+   "reportAttributeAccessIssue": 4
+  },
+  "angr/analyses/decompiler/structured_codegen/c.py": {
+   "reportArgumentType": 13,
+   "reportAssignmentType": 1,
+   "reportAttributeAccessIssue": 8,
+   "reportOptionalCall": 1,
+   "reportOptionalMemberAccess": 1,
+   "reportOptionalSubscript": 1,
+   "reportReturnType": 1
+  },
+  "angr/analyses/decompiler/structured_codegen/c_serialize.py": {
+   "reportArgumentType": 2,
+   "reportAttributeAccessIssue": 10,
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/analyses/decompiler/structured_codegen/dummy.py": {
+   "reportAttributeAccessIssue": 3
+  },
+  "angr/analyses/decompiler/structured_codegen/dwarf_import.py": {
+   "reportOptionalSubscript": 1
+  },
+  "angr/analyses/decompiler/structured_codegen/rust.py": {
+   "reportArgumentType": 3,
+   "reportAttributeAccessIssue": 11,
+   "reportReturnType": 2
+  },
+  "angr/analyses/decompiler/structurer_nodes.py": {
+   "reportAttributeAccessIssue": 1,
+   "reportIncompatibleVariableOverride": 2
+  },
+  "angr/analyses/decompiler/structuring/dream.py": {
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/analyses/decompiler/structuring/phoenix.py": {
+   "reportArgumentType": 11,
+   "reportAttributeAccessIssue": 14,
+   "reportOperatorIssue": 1,
+   "reportOptionalMemberAccess": 5
+  },
+  "angr/analyses/decompiler/structuring/recursive_structurer.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/analyses/decompiler/structuring/structurer_base.py": {
+   "reportOperatorIssue": 1
+  },
+  "angr/analyses/decompiler/utils.py": {
+   "reportArgumentType": 4,
+   "reportCallIssue": 4,
+   "reportGeneralTypeIssues": 1
+  },
+  "angr/analyses/deobfuscator/api_obf_finder.py": {
+   "reportAttributeAccessIssue": 1,
+   "reportCallIssue": 1,
+   "reportOperatorIssue": 2,
+   "reportOptionalSubscript": 4
+  },
+  "angr/analyses/deobfuscator/api_obf_peephole_optimizer.py": {
+   "reportOperatorIssue": 2,
+   "reportOptionalMemberAccess": 22
+  },
+  "angr/analyses/deobfuscator/api_obf_type2_finder.py": {
+   "reportArgumentType": 1
+  },
+  "angr/analyses/deobfuscator/data_transformation_embedder.py": {
+   "reportArgumentType": 2,
+   "reportAttributeAccessIssue": 8,
+   "reportCallIssue": 1,
+   "reportOptionalIterable": 2,
+   "reportOptionalMemberAccess": 11
+  },
+  "angr/analyses/deobfuscator/hash_lookup_api_deobfuscator.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 3
+  },
+  "angr/analyses/deobfuscator/string_obf_finder.py": {
+   "reportArgumentType": 7,
+   "reportOperatorIssue": 5
+  },
+  "angr/analyses/deobfuscator/string_obf_opt_passes.py": {
+   "reportAssignmentType": 1,
+   "reportAttributeAccessIssue": 2,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/deobfuscator/string_obf_peephole_optimizer.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 10,
+   "reportOptionalMemberAccess": 7
+  },
+  "angr/analyses/disassembly.py": {
+   "reportArgumentType": 3,
+   "reportAttributeAccessIssue": 12,
+   "reportCallIssue": 1,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/dominance_frontier.py": {
+   "reportInconsistentOverload": 1
+  },
+  "angr/analyses/fcp/fcp.py": {
+   "reportArgumentType": 7,
+   "reportAssignmentType": 4,
+   "reportGeneralTypeIssues": 2,
+   "reportIncompatibleMethodOverride": 8,
+   "reportReturnType": 2
+  },
+  "angr/analyses/find_objects_static.py": {
+   "reportArgumentType": 5,
+   "reportAttributeAccessIssue": 4,
+   "reportCallIssue": 1,
+   "reportOperatorIssue": 1,
+   "reportOptionalMemberAccess": 11
+  },
+  "angr/analyses/forward_analysis/visitors/single_node_graph.py": {
+   "reportIncompatibleMethodOverride": 1
+  },
+  "angr/analyses/identifier/custom_callable.py": {
+   "reportArgumentType": 1,
+   "reportOptionalCall": 1,
+   "reportOptionalMemberAccess": 4
+  },
+  "angr/analyses/identifier/func.py": {
+   "reportIndexIssue": 1
+  },
+  "angr/analyses/identifier/functions/atoi.py": {
+   "reportIncompatibleMethodOverride": 1
+  },
+  "angr/analyses/identifier/functions/based_atoi.py": {
+   "reportIncompatibleMethodOverride": 1
+  },
+  "angr/analyses/identifier/functions/fdprintf.py": {
+   "reportIncompatibleMethodOverride": 2
+  },
+  "angr/analyses/identifier/functions/free.py": {
+   "reportIncompatibleMethodOverride": 1
+  },
+  "angr/analyses/identifier/functions/int2str.py": {
+   "reportIncompatibleMethodOverride": 4
+  },
+  "angr/analyses/identifier/functions/malloc.py": {
+   "reportIncompatibleMethodOverride": 1
+  },
+  "angr/analyses/identifier/functions/memcmp.py": {
+   "reportIncompatibleMethodOverride": 2
+  },
+  "angr/analyses/identifier/functions/memcpy.py": {
+   "reportIncompatibleMethodOverride": 2,
+   "reportOptionalMemberAccess": 4
+  },
+  "angr/analyses/identifier/functions/memset.py": {
+   "reportIncompatibleMethodOverride": 1
+  },
+  "angr/analyses/identifier/functions/printf.py": {
+   "reportIncompatibleMethodOverride": 2
+  },
+  "angr/analyses/identifier/functions/recv_until.py": {
+   "reportIncompatibleMethodOverride": 2,
+   "reportOperatorIssue": 6,
+   "reportOptionalIterable": 6
+  },
+  "angr/analyses/identifier/functions/skip_calloc.py": {
+   "reportIncompatibleMethodOverride": 1
+  },
+  "angr/analyses/identifier/functions/skip_realloc.py": {
+   "reportIncompatibleMethodOverride": 1
+  },
+  "angr/analyses/identifier/functions/snprintf.py": {
+   "reportIncompatibleMethodOverride": 2
+  },
+  "angr/analyses/identifier/functions/sprintf.py": {
+   "reportIncompatibleMethodOverride": 2
+  },
+  "angr/analyses/identifier/functions/strcasecmp.py": {
+   "reportIncompatibleMethodOverride": 2
+  },
+  "angr/analyses/identifier/functions/strcmp.py": {
+   "reportIncompatibleMethodOverride": 2
+  },
+  "angr/analyses/identifier/functions/strcpy.py": {
+   "reportIncompatibleMethodOverride": 1
+  },
+  "angr/analyses/identifier/functions/strncmp.py": {
+   "reportIncompatibleMethodOverride": 2
+  },
+  "angr/analyses/identifier/functions/strncpy.py": {
+   "reportIncompatibleMethodOverride": 2
+  },
+  "angr/analyses/identifier/functions/strtol.py": {
+   "reportIncompatibleMethodOverride": 1
+  },
+  "angr/analyses/identifier/identify.py": {
+   "reportArgumentType": 3,
+   "reportAttributeAccessIssue": 8,
+   "reportOperatorIssue": 1,
+   "reportOptionalMemberAccess": 7
+  },
+  "angr/analyses/identifier/runner.py": {
+   "reportOptionalMemberAccess": 13
+  },
+  "angr/analyses/init_finder.py": {
+   "reportArgumentType": 4,
+   "reportPrivateImportUsage": 1
+  },
+  "angr/analyses/loop_analysis.py": {
+   "reportOptionalIterable": 1,
+   "reportOptionalMemberAccess": 3
+  },
+  "angr/analyses/loop_analysis/loop_analysis.py": {
+   "reportArgumentType": 10,
+   "reportOptionalMemberAccess": 5
+  },
+  "angr/analyses/loop_unroller/loop_unroller.py": {
+   "reportArgumentType": 1,
+   "reportOptionalMemberAccess": 6
+  },
+  "angr/analyses/loopfinder.py": {
+   "reportAssignmentType": 2
+  },
+  "angr/analyses/pathfinder.py": {
+   "reportArgumentType": 4,
+   "reportAssignmentType": 2,
+   "reportAttributeAccessIssue": 4,
+   "reportOptionalMemberAccess": 3
+  },
+  "angr/analyses/propagator/engine_base.py": {
+   "reportAbstractUsage": 1
+  },
+  "angr/analyses/propagator/engine_vex.py": {
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/analyses/propagator/propagator.py": {
+   "reportAssignmentType": 1,
+   "reportAttributeAccessIssue": 2,
+   "reportOperatorIssue": 1,
+   "reportOptionalMemberAccess": 2,
+   "reportOptionalSubscript": 5,
+   "reportRedeclaration": 3,
+   "reportReturnType": 1
+  },
+  "angr/analyses/propagator/top_checker_mixin.py": {
+   "reportAttributeAccessIssue": 1,
+   "reportInvalidTypeArguments": 1
+  },
+  "angr/analyses/propagator/values.py": {
+   "reportIncompatibleMethodOverride": 1
+  },
+  "angr/analyses/proximity_graph.py": {
+   "reportArgumentType": 2,
+   "reportAttributeAccessIssue": 1,
+   "reportOptionalMemberAccess": 8
+  },
+  "angr/analyses/purity/engine.py": {
+   "reportAttributeAccessIssue": 3,
+   "reportIndexIssue": 2
+  },
+  "angr/analyses/reaching_definitions/__init__.py": {
+   "reportAssignmentType": 2,
+   "reportGeneralTypeIssues": 1,
+   "reportOptionalIterable": 1,
+   "reportUnhashable": 1
+  },
+  "angr/analyses/reaching_definitions/dep_graph.py": {
+   "reportInvalidTypeArguments": 42,
+   "reportOverlappingOverload": 8,
+   "reportReturnType": 1
+  },
+  "angr/analyses/reaching_definitions/engine_ail.py": {
+   "reportArgumentType": 5,
+   "reportAttributeAccessIssue": 4
+  },
+  "angr/analyses/reaching_definitions/engine_vex.py": {
+   "reportArgumentType": 3,
+   "reportInvalidTypeArguments": 1
+  },
+  "angr/analyses/reaching_definitions/function_handler.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 5,
+   "reportIncompatibleVariableOverride": 1
+  },
+  "angr/analyses/reaching_definitions/function_handler_library/stdio.py": {
+   "reportCallIssue": 10
+  },
+  "angr/analyses/reaching_definitions/function_handler_library/stdlib.py": {
+   "reportCallIssue": 3
+  },
+  "angr/analyses/reaching_definitions/function_handler_library/string.py": {
+   "reportCallIssue": 4
+  },
+  "angr/analyses/reaching_definitions/function_handler_library/unistd.py": {
+   "reportCallIssue": 3
+  },
+  "angr/analyses/reaching_definitions/rd_initializer.py": {
+   "reportArgumentType": 2
+  },
+  "angr/analyses/reaching_definitions/reaching_definitions.py": {
+   "reportArgumentType": 9,
+   "reportAssignmentType": 4,
+   "reportAttributeAccessIssue": 3,
+   "reportIncompatibleMethodOverride": 1,
+   "reportReturnType": 1
+  },
+  "angr/analyses/reassembler.py": {
+   "reportArgumentType": 13,
+   "reportAttributeAccessIssue": 15,
+   "reportCallIssue": 2,
+   "reportGeneralTypeIssues": 1,
+   "reportIncompatibleMethodOverride": 1,
+   "reportIndexIssue": 3,
+   "reportOperatorIssue": 2,
+   "reportOptionalIterable": 13,
+   "reportOptionalMemberAccess": 28,
+   "reportOptionalOperand": 1,
+   "reportOptionalSubscript": 16
+  },
+  "angr/analyses/s_reaching_definitions/s_rda_view.py": {
+   "reportAssignmentType": 3
+  },
+  "angr/analyses/soot_class_hierarchy.py": {
+   "reportAttributeAccessIssue": 12,
+   "reportPossiblyUnboundVariable": 1
+  },
+  "angr/analyses/stack_pointer_tracker.py": {
+   "reportAttributeAccessIssue": 1,
+   "reportOptionalMemberAccess": 6
+  },
+  "angr/analyses/typehoon/dfa.py": {
+   "reportAssignmentType": 1,
+   "reportGeneralTypeIssues": 2
+  },
+  "angr/analyses/typehoon/simple_solver.py": {
+   "reportArgumentType": 4,
+   "reportReturnType": 1
+  },
+  "angr/analyses/typehoon/translator.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 4,
+   "reportOptionalOperand": 1,
+   "reportReturnType": 5
+  },
+  "angr/analyses/typehoon/typehoon.py": {
+   "reportReturnType": 1
+  },
+  "angr/analyses/unpacker/obfuscation_detector.py": {
+   "reportAttributeAccessIssue": 1,
+   "reportOptionalMemberAccess": 3
+  },
+  "angr/analyses/unpacker/packing_detector.py": {
+   "reportArgumentType": 4,
+   "reportCallIssue": 1,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/analyses/variable_recovery/engine_ail.py": {
+   "reportArgumentType": 5,
+   "reportAssignmentType": 37,
+   "reportIncompatibleMethodOverride": 41
+  },
+  "angr/analyses/variable_recovery/engine_base.py": {
+   "reportArgumentType": 2,
+   "reportIncompatibleMethodOverride": 1
+  },
+  "angr/analyses/variable_recovery/engine_vex.py": {
+   "reportArgumentType": 12,
+   "reportIncompatibleMethodOverride": 7,
+   "reportOptionalCall": 1,
+   "reportUndefinedVariable": 3
+  },
+  "angr/analyses/variable_recovery/variable_recovery.py": {
+   "reportArgumentType": 1,
+   "reportCallIssue": 4
+  },
+  "angr/analyses/variable_recovery/variable_recovery_base.py": {
+   "reportGeneralTypeIssues": 2
+  },
+  "angr/analyses/veritesting.py": {
+   "reportArgumentType": 2,
+   "reportOptionalMemberAccess": 1,
+   "reportPossiblyUnboundVariable": 1
+  },
+  "angr/analyses/vfg.py": {
+   "reportArgumentType": 27,
+   "reportAssignmentType": 1,
+   "reportAttributeAccessIssue": 11,
+   "reportCallIssue": 7,
+   "reportIncompatibleMethodOverride": 3,
+   "reportIndexIssue": 2,
+   "reportOperatorIssue": 1,
+   "reportOptionalMemberAccess": 14,
+   "reportReturnType": 2
+  },
+  "angr/analyses/vsa_ddg.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/angrdb/db.py": {
+   "reportOptionalSubscript": 1
+  },
+  "angr/angrdb/serializers/kb.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/angrdb/serializers/loader.py": {
+   "reportArgumentType": 4,
+   "reportGeneralTypeIssues": 2
+  },
+  "angr/blade.py": {
+   "reportOptionalMemberAccess": 15,
+   "reportOptionalSubscript": 2
+  },
+  "angr/block.py": {
+   "reportAttributeAccessIssue": 2
+  },
+  "angr/callable.py": {
+   "reportAttributeAccessIssue": 5,
+   "reportOperatorIssue": 1,
+   "reportOptionalCall": 1
+  },
+  "angr/code_location.py": {
+   "reportOperatorIssue": 2
+  },
+  "angr/codenode.py": {
+   "reportArgumentType": 3
+  },
+  "angr/concretization_strategies/norepeats_range.py": {
+   "reportArgumentType": 2,
+   "reportOptionalOperand": 1
+  },
+  "angr/distributed/server.py": {
+   "reportAttributeAccessIssue": 2,
+   "reportOptionalContextManager": 1
+  },
+  "angr/engines/__init__.py": {
+   "reportIncompatibleMethodOverride": 24
+  },
+  "angr/engines/ail/callstack.py": {
+   "reportAttributeAccessIssue": 14
+  },
+  "angr/engines/ail/engine_light.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 10
+  },
+  "angr/engines/icicle.py": {
+   "reportArgumentType": 1
+  },
+  "angr/engines/light/data.py": {
+   "reportArgumentType": 12,
+   "reportOperatorIssue": 1
+  },
+  "angr/engines/light/engine.py": {
+   "reportArgumentType": 2,
+   "reportAttributeAccessIssue": 1,
+   "reportFunctionMemberAccess": 7
+  },
+  "angr/engines/pcode/behavior.py": {
+   "reportArgumentType": 5,
+   "reportCallIssue": 1,
+   "reportIndexIssue": 2
+  },
+  "angr/engines/pcode/emulate.py": {
+   "reportArgumentType": 2,
+   "reportAttributeAccessIssue": 7,
+   "reportOptionalMemberAccess": 34
+  },
+  "angr/engines/pcode/engine.py": {
+   "reportArgumentType": 2,
+   "reportOperatorIssue": 3,
+   "reportOptionalMemberAccess": 7
+  },
+  "angr/engines/pcode/lifter.py": {
+   "reportArgumentType": 8,
+   "reportAssignmentType": 4,
+   "reportAttributeAccessIssue": 2,
+   "reportIncompatibleMethodOverride": 1,
+   "reportOperatorIssue": 5,
+   "reportOptionalMemberAccess": 3,
+   "reportOptionalOperand": 2,
+   "reportOptionalSubscript": 5,
+   "reportPrivateImportUsage": 4,
+   "reportReturnType": 2
+  },
+  "angr/engines/soot/engine.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 2,
+   "reportOptionalMemberAccess": 5
+  },
+  "angr/engines/soot/expressions/base.py": {
+   "reportAttributeAccessIssue": 2
+  },
+  "angr/engines/soot/expressions/cast.py": {
+   "reportAttributeAccessIssue": 4
+  },
+  "angr/engines/soot/expressions/condition.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/engines/soot/expressions/constants.py": {
+   "reportAttributeAccessIssue": 6
+  },
+  "angr/engines/soot/expressions/instanceOf.py": {
+   "reportAttributeAccessIssue": 2
+  },
+  "angr/engines/soot/expressions/newArray.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/engines/soot/expressions/newMultiArray.py": {
+   "reportAttributeAccessIssue": 2
+  },
+  "angr/engines/soot/values/arrayref.py": {
+   "reportAttributeAccessIssue": 2
+  },
+  "angr/engines/soot/values/instancefieldref.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/engines/successors.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 26,
+   "reportOptionalMemberAccess": 4
+  },
+  "angr/engines/syscall.py": {
+   "reportArgumentType": 1
+  },
+  "angr/engines/unicorn.py": {
+   "reportArgumentType": 13,
+   "reportAttributeAccessIssue": 4,
+   "reportIncompatibleMethodOverride": 1,
+   "reportOptionalMemberAccess": 25,
+   "reportOptionalSubscript": 1,
+   "reportPossiblyUnboundVariable": 4
+  },
+  "angr/engines/vex/claripy/ccall.py": {
+   "reportAttributeAccessIssue": 1,
+   "reportCallIssue": 1,
+   "reportOptionalOperand": 5,
+   "reportPossiblyUnboundVariable": 5,
+   "reportReturnType": 1
+  },
+  "angr/engines/vex/claripy/datalayer.py": {
+   "reportIncompatibleMethodOverride": 5
+  },
+  "angr/engines/vex/claripy/irop.py": {
+   "reportArgumentType": 20,
+   "reportAttributeAccessIssue": 19,
+   "reportOperatorIssue": 50,
+   "reportOptionalCall": 2,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/engines/vex/heavy/actions.py": {
+   "reportArgumentType": 4,
+   "reportIncompatibleMethodOverride": 9,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/engines/vex/heavy/concretizers.py": {
+   "reportAttributeAccessIssue": 7
+  },
+  "angr/engines/vex/heavy/heavy.py": {
+   "reportArgumentType": 2,
+   "reportAttributeAccessIssue": 1,
+   "reportCallIssue": 1,
+   "reportIncompatibleMethodOverride": 13,
+   "reportOperatorIssue": 1,
+   "reportOptionalMemberAccess": 6
+  },
+  "angr/engines/vex/heavy/super_fastpath.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/engines/vex/lifter.py": {
+   "reportArgumentType": 1,
+   "reportAssignmentType": 1,
+   "reportAttributeAccessIssue": 1,
+   "reportIncompatibleMethodOverride": 1,
+   "reportOptionalMemberAccess": 3,
+   "reportReturnType": 2
+  },
+  "angr/engines/vex/light/light.py": {
+   "reportOptionalMemberAccess": 4,
+   "reportOptionalSubscript": 2
+  },
+  "angr/engines/vex/light/slicing.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/exploration_techniques/base.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/exploration_techniques/common.py": {
+   "reportAssignmentType": 1,
+   "reportRedeclaration": 1
+  },
+  "angr/exploration_techniques/director.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 5,
+   "reportCallIssue": 2,
+   "reportOptionalCall": 1
+  },
+  "angr/exploration_techniques/driller_core.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/exploration_techniques/explorer.py": {
+   "reportAttributeAccessIssue": 1,
+   "reportIncompatibleMethodOverride": 1,
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/exploration_techniques/loop_seer.py": {
+   "reportCallIssue": 1,
+   "reportOptionalIterable": 4,
+   "reportOptionalMemberAccess": 3
+  },
+  "angr/exploration_techniques/spiller.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/exploration_techniques/suggestions.py": {
+   "reportAttributeAccessIssue": 1,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/exploration_techniques/tracer.py": {
+   "reportArgumentType": 9,
+   "reportAttributeAccessIssue": 2,
+   "reportIncompatibleMethodOverride": 1,
+   "reportOptionalMemberAccess": 21,
+   "reportOptionalSubscript": 34,
+   "reportPossiblyUnboundVariable": 1
+  },
+  "angr/factory.py": {
+   "reportAttributeAccessIssue": 1,
+   "reportFunctionMemberAccess": 4,
+   "reportInconsistentOverload": 1
+  },
+  "angr/flirt/build_sig.py": {
+   "reportArgumentType": 1,
+   "reportCallIssue": 1,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/knowledge_plugins/cfg/cfg_model.py": {
+   "reportArgumentType": 7,
+   "reportAttributeAccessIssue": 5,
+   "reportIncompatibleMethodOverride": 1,
+   "reportOperatorIssue": 1,
+   "reportOptionalMemberAccess": 2,
+   "reportOptionalOperand": 1
+  },
+  "angr/knowledge_plugins/cfg/cfg_node.py": {
+   "reportArgumentType": 4,
+   "reportAttributeAccessIssue": 3,
+   "reportIncompatibleMethodOverride": 3,
+   "reportOperatorIssue": 2
+  },
+  "angr/knowledge_plugins/cfg/memory_data.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 1,
+   "reportIncompatibleMethodOverride": 1,
+   "reportOptionalMemberAccess": 3,
+   "reportOptionalSubscript": 1
+  },
+  "angr/knowledge_plugins/cfg/spilling_cfg.py": {
+   "reportArgumentType": 6,
+   "reportCallIssue": 1,
+   "reportReturnType": 2
+  },
+  "angr/knowledge_plugins/cfg/spilling_digraph.py": {
+   "reportArgumentType": 1,
+   "reportIndexIssue": 2
+  },
+  "angr/knowledge_plugins/debug_variables.py": {
+   "reportArgumentType": 2,
+   "reportOperatorIssue": 1,
+   "reportOptionalIterable": 1,
+   "reportOptionalMemberAccess": 2,
+   "reportReturnType": 2
+  },
+  "angr/knowledge_plugins/functions/function.py": {
+   "reportAttributeAccessIssue": 3,
+   "reportMissingImports": 1
+  },
+  "angr/knowledge_plugins/functions/function_manager.py": {
+   "reportArgumentType": 27,
+   "reportAttributeAccessIssue": 1,
+   "reportCallIssue": 2,
+   "reportReturnType": 4
+  },
+  "angr/knowledge_plugins/functions/function_parser.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 3
+  },
+  "angr/knowledge_plugins/functions/soot_function.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/knowledge_plugins/indirect_jumps.py": {
+   "reportIncompatibleMethodOverride": 1
+  },
+  "angr/knowledge_plugins/key_definitions/atoms.py": {
+   "reportAttributeAccessIssue": 1,
+   "reportReturnType": 3
+  },
+  "angr/knowledge_plugins/key_definitions/definition.py": {
+   "reportArgumentType": 2,
+   "reportReturnType": 1
+  },
+  "angr/knowledge_plugins/key_definitions/environment.py": {
+   "reportArgumentType": 1
+  },
+  "angr/knowledge_plugins/key_definitions/live_definitions.py": {
+   "reportCallIssue": 4,
+   "reportInvalidTypeArguments": 15
+  },
+  "angr/knowledge_plugins/key_definitions/liveness.py": {
+   "reportArgumentType": 12
+  },
+  "angr/knowledge_plugins/key_definitions/rd_model.py": {
+   "reportArgumentType": 3,
+   "reportCallIssue": 3,
+   "reportInconsistentOverload": 2,
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/knowledge_plugins/labels.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/knowledge_plugins/patches.py": {
+   "reportArgumentType": 2,
+   "reportAttributeAccessIssue": 2,
+   "reportOptionalSubscript": 2,
+   "reportReturnType": 1
+  },
+  "angr/knowledge_plugins/propagations/prop_value.py": {
+   "reportIndexIssue": 1,
+   "reportReturnType": 2
+  },
+  "angr/knowledge_plugins/propagations/propagation_manager.py": {
+   "reportReturnType": 1
+  },
+  "angr/knowledge_plugins/propagations/propagation_model.py": {
+   "reportArgumentType": 1,
+   "reportOptionalSubscript": 1
+  },
+  "angr/knowledge_plugins/propagations/states.py": {
+   "reportArgumentType": 1,
+   "reportIncompatibleMethodOverride": 2
+  },
+  "angr/knowledge_plugins/types.py": {
+   "reportIncompatibleMethodOverride": 1
+  },
+  "angr/knowledge_plugins/variables/variable_access.py": {
+   "reportAttributeAccessIssue": 2
+  },
+  "angr/knowledge_plugins/variables/variable_manager.py": {
+   "reportArgumentType": 4,
+   "reportAttributeAccessIssue": 3,
+   "reportReturnType": 2
+  },
+  "angr/knowledge_plugins/xrefs/xref.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 4
+  },
+  "angr/knowledge_plugins/xrefs/xref_manager.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 2,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/llm_client.py": {
+   "reportCallIssue": 1
+  },
+  "angr/misc/ansi.py": {
+   "reportArgumentType": 1,
+   "reportInvalidTypeForm": 1
+  },
+  "angr/misc/autoimport.py": {
+   "reportArgumentType": 1
+  },
+  "angr/misc/bug_report.py": {
+   "reportAttributeAccessIssue": 1,
+   "reportOperatorIssue": 1,
+   "reportOptionalMemberAccess": 3,
+   "reportPossiblyUnboundVariable": 4,
+   "reportUndefinedVariable": 3
+  },
+  "angr/misc/loggers.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/procedures/cgc/allocate.py": {
+   "reportOptionalMemberAccess": 4
+  },
+  "angr/procedures/cgc/deallocate.py": {
+   "reportOperatorIssue": 2
+  },
+  "angr/procedures/cgc/receive.py": {
+   "reportAttributeAccessIssue": 1,
+   "reportOptionalMemberAccess": 2,
+   "reportPossiblyUnboundVariable": 4
+  },
+  "angr/procedures/cgc/transmit.py": {
+   "reportArgumentType": 1
+  },
+  "angr/procedures/definitions/__init__.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 4,
+   "reportReturnType": 3
+  },
+  "angr/procedures/definitions/parse_glibc.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/procedures/glibc/__libc_start_main.py": {
+   "reportArgumentType": 4,
+   "reportAttributeAccessIssue": 2,
+   "reportOptionalCall": 1,
+   "reportOptionalMemberAccess": 8
+  },
+  "angr/procedures/java/__init__.py": {
+   "reportAttributeAccessIssue": 1,
+   "reportIncompatibleMethodOverride": 3,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/procedures/java/unconstrained.py": {
+   "reportAttributeAccessIssue": 24,
+   "reportOptionalMemberAccess": 7
+  },
+  "angr/procedures/java_io/read.py": {
+   "reportAttributeAccessIssue": 3
+  },
+  "angr/procedures/java_jni/__init__.py": {
+   "reportArgumentType": 2,
+   "reportAttributeAccessIssue": 3,
+   "reportCallIssue": 1,
+   "reportIncompatibleMethodOverride": 1,
+   "reportOptionalCall": 1,
+   "reportOptionalMemberAccess": 3,
+   "reportOptionalOperand": 1
+  },
+  "angr/procedures/java_jni/array_operations.py": {
+   "reportCallIssue": 2
+  },
+  "angr/procedures/java_jni/field_access.py": {
+   "reportAttributeAccessIssue": 2,
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/procedures/java_jni/method_calls.py": {
+   "reportAttributeAccessIssue": 2,
+   "reportOptionalMemberAccess": 3
+  },
+  "angr/procedures/java_jni/not_implemented.py": {
+   "reportAttributeAccessIssue": 2,
+   "reportIndexIssue": 1,
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/procedures/java_lang/string.py": {
+   "reportAttributeAccessIssue": 2
+  },
+  "angr/procedures/java_util/collection.py": {
+   "reportArgumentType": 1
+  },
+  "angr/procedures/java_util/iterator.py": {
+   "reportArgumentType": 1
+  },
+  "angr/procedures/java_util/list.py": {
+   "reportArgumentType": 1
+  },
+  "angr/procedures/java_util/map.py": {
+   "reportArgumentType": 2
+  },
+  "angr/procedures/java_util/scanner_nextline.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/procedures/libc/access.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/procedures/libc/atoi.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/procedures/libc/error.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 2,
+   "reportIncompatibleMethodOverride": 1,
+   "reportOptionalCall": 1,
+   "reportOptionalMemberAccess": 5
+  },
+  "angr/procedures/libc/feof.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/procedures/libc/fgetc.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/procedures/libc/fgets.py": {
+   "reportOptionalMemberAccess": 3
+  },
+  "angr/procedures/libc/fopen.py": {
+   "reportAttributeAccessIssue": 12
+  },
+  "angr/procedures/libc/fprintf.py": {
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/procedures/libc/fseek.py": {
+   "reportArgumentType": 1,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/procedures/libc/getdelim.py": {
+   "reportArgumentType": 1
+  },
+  "angr/procedures/libc/memcmp.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/procedures/libc/memset.py": {
+   "reportArgumentType": 2,
+   "reportOperatorIssue": 1
+  },
+  "angr/procedures/libc/printf.py": {
+   "reportOptionalMemberAccess": 4
+  },
+  "angr/procedures/libc/rand.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/procedures/libc/snprintf.py": {
+   "reportOptionalMemberAccess": 8
+  },
+  "angr/procedures/libc/sprintf.py": {
+   "reportOptionalMemberAccess": 10
+  },
+  "angr/procedures/libc/strlen.py": {
+   "reportAttributeAccessIssue": 4
+  },
+  "angr/procedures/libc/strncmp.py": {
+   "reportArgumentType": 1
+  },
+  "angr/procedures/libc/strtol.py": {
+   "reportAttributeAccessIssue": 6,
+   "reportOperatorIssue": 1,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/procedures/libc/system.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/procedures/linux_kernel/arm_user_helpers.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/procedures/linux_kernel/fstat.py": {
+   "reportArgumentType": 1
+  },
+  "angr/procedures/linux_kernel/fstat64.py": {
+   "reportArgumentType": 1,
+   "reportOptionalMemberAccess": 6
+  },
+  "angr/procedures/linux_kernel/futex.py": {
+   "reportOperatorIssue": 1,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/procedures/linux_kernel/getegid.py": {
+   "reportArgumentType": 2
+  },
+  "angr/procedures/linux_kernel/geteuid.py": {
+   "reportArgumentType": 2
+  },
+  "angr/procedures/linux_kernel/getgid.py": {
+   "reportArgumentType": 2
+  },
+  "angr/procedures/linux_kernel/getrlimit.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/procedures/linux_kernel/getuid.py": {
+   "reportArgumentType": 2
+  },
+  "angr/procedures/linux_kernel/iovec.py": {
+   "reportArgumentType": 2
+  },
+  "angr/procedures/linux_kernel/mmap.py": {
+   "reportIncompatibleMethodOverride": 1
+  },
+  "angr/procedures/linux_kernel/mprotect.py": {
+   "reportArgumentType": 2,
+   "reportOperatorIssue": 3
+  },
+  "angr/procedures/linux_kernel/sigaction.py": {
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/procedures/linux_kernel/sigprocmask.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/procedures/linux_kernel/stat.py": {
+   "reportIncompatibleMethodOverride": 1
+  },
+  "angr/procedures/linux_kernel/tgkill.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/procedures/linux_kernel/vsyscall.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/procedures/linux_loader/sim_loader.py": {
+   "reportAttributeAccessIssue": 3,
+   "reportOptionalMemberAccess": 6
+  },
+  "angr/procedures/linux_loader/tls.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/procedures/msvcr/fmode.py": {
+   "reportAttributeAccessIssue": 4,
+   "reportOptionalMemberAccess": 4
+  },
+  "angr/procedures/ntdll/exceptions.py": {
+   "reportAttributeAccessIssue": 4,
+   "reportOptionalMemberAccess": 1,
+   "reportOptionalOperand": 1
+  },
+  "angr/procedures/posix/accept.py": {
+   "reportArgumentType": 4,
+   "reportCallIssue": 2
+  },
+  "angr/procedures/posix/bind.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/procedures/posix/bzero.py": {
+   "reportIncompatibleMethodOverride": 1,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/procedures/posix/fcntl.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/procedures/posix/fdopen.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 12
+  },
+  "angr/procedures/posix/fork.py": {
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/procedures/posix/getenv.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/procedures/posix/gethostbyname.py": {
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/procedures/posix/inet_ntoa.py": {
+   "reportArgumentType": 1,
+   "reportCallIssue": 1,
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/procedures/posix/listen.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/procedures/posix/poll.py": {
+   "reportArgumentType": 1,
+   "reportOperatorIssue": 1,
+   "reportOptionalMemberAccess": 5
+  },
+  "angr/procedures/posix/pthread.py": {
+   "reportAttributeAccessIssue": 1,
+   "reportOptionalMemberAccess": 4
+  },
+  "angr/procedures/posix/readdir.py": {
+   "reportArgumentType": 1,
+   "reportCallIssue": 1,
+   "reportOptionalMemberAccess": 5
+  },
+  "angr/procedures/posix/select.py": {
+   "reportArgumentType": 3,
+   "reportOptionalMemberAccess": 4
+  },
+  "angr/procedures/posix/send.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/procedures/posix/sim_time.py": {
+   "reportOptionalMemberAccess": 4
+  },
+  "angr/procedures/posix/socket.py": {
+   "reportOptionalOperand": 1
+  },
+  "angr/procedures/posix/syslog.py": {
+   "reportArgumentType": 1,
+   "reportCallIssue": 1,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/procedures/stubs/Redirect.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/procedures/stubs/ReturnUnconstrained.py": {
+   "reportAttributeAccessIssue": 1,
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/procedures/stubs/UserHook.py": {
+   "reportAttributeAccessIssue": 2,
+   "reportOptionalCall": 1
+  },
+  "angr/procedures/stubs/format_parser.py": {
+   "reportArgumentType": 1,
+   "reportOperatorIssue": 1,
+   "reportOptionalOperand": 3
+  },
+  "angr/procedures/stubs/syscall_stub.py": {
+   "reportAttributeAccessIssue": 1,
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/procedures/tracer/transmit.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/procedures/win32/GetCommandLine.py": {
+   "reportAttributeAccessIssue": 2,
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/procedures/win32/GetModuleHandle.py": {
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/procedures/win32/dynamic_loading.py": {
+   "reportIncompatibleMethodOverride": 1,
+   "reportOptionalMemberAccess": 6
+  },
+  "angr/procedures/win32/heap.py": {
+   "reportArgumentType": 1,
+   "reportIncompatibleMethodOverride": 1,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/procedures/win32/local_storage.py": {
+   "reportIncompatibleMethodOverride": 1
+  },
+  "angr/procedures/win32/system_paths.py": {
+   "reportOptionalOperand": 8
+  },
+  "angr/procedures/win_user32/messagebox.py": {
+   "reportIncompatibleMethodOverride": 2,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/project.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 2
+  },
+  "angr/rust/analyses/rust_calling_convention/rust_calling_convention.py": {
+   "reportAttributeAccessIssue": 2,
+   "reportOptionalOperand": 1,
+   "reportReturnType": 12
+  },
+  "angr/rust/analyses/type_db_loader.py": {
+   "reportArgumentType": 5,
+   "reportAssignmentType": 1,
+   "reportAttributeAccessIssue": 2,
+   "reportCallIssue": 3
+  },
+  "angr/rust/mixins/cfa_mixin.py": {
+   "reportReturnType": 1
+  },
+  "angr/rust/mixins/srda_mixin.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/rust/optimization_passes/deref_coercion_simplifier.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/rust/optimization_passes/error_propagation_simplifier.py": {
+   "reportArgumentType": 1,
+   "reportOptionalSubscript": 1
+  },
+  "angr/rust/optimization_passes/function_prototype_inference.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 4
+  },
+  "angr/rust/optimization_passes/outliners/unwrap_outliner.py": {
+   "reportArgumentType": 3,
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/rust/optimization_passes/outliners/vec_outliner.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/rust/optimization_passes/struct_instantiation_simplifier.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 3,
+   "reportOptionalOperand": 2
+  },
+  "angr/rust/optimization_passes/struct_return_simplifier.py": {
+   "reportArgumentType": 3,
+   "reportAttributeAccessIssue": 8,
+   "reportOptionalOperand": 2
+  },
+  "angr/rust/sim_type.py": {
+   "reportArgumentType": 2,
+   "reportAttributeAccessIssue": 5,
+   "reportIncompatibleMethodOverride": 4,
+   "reportOptionalOperand": 1
+  },
+  "angr/rust/typehoon/translator.py": {
+   "reportArgumentType": 4,
+   "reportAttributeAccessIssue": 2,
+   "reportIncompatibleMethodOverride": 1
+  },
+  "angr/sim_manager.py": {
+   "reportArgumentType": 3,
+   "reportAssignmentType": 1,
+   "reportAttributeAccessIssue": 4,
+   "reportCallIssue": 1,
+   "reportGeneralTypeIssues": 1,
+   "reportIndexIssue": 5,
+   "reportOptionalIterable": 1,
+   "reportOptionalMemberAccess": 1,
+   "reportOptionalSubscript": 2
+  },
+  "angr/sim_procedure.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 8,
+   "reportOptionalMemberAccess": 3,
+   "reportOptionalSubscript": 4
+  },
+  "angr/sim_state.py": {
+   "reportArgumentType": 5,
+   "reportAttributeAccessIssue": 3,
+   "reportCallIssue": 26,
+   "reportIncompatibleMethodOverride": 1,
+   "reportIndexIssue": 3,
+   "reportOperatorIssue": 5,
+   "reportOptionalMemberAccess": 2,
+   "reportOptionalSubscript": 3,
+   "reportReturnType": 5
+  },
+  "angr/sim_state_options.py": {
+   "reportArgumentType": 1,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/sim_type.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 2,
+   "reportCallIssue": 1
+  },
+  "angr/sim_variable.py": {
+   "reportAttributeAccessIssue": 1,
+   "reportIncompatibleMethodOverride": 2,
+   "reportReturnType": 1
+  },
+  "angr/simos/cgc.py": {
+   "reportIncompatibleMethodOverride": 1,
+   "reportOptionalIterable": 1
+  },
+  "angr/simos/javavm.py": {
+   "reportAttributeAccessIssue": 2,
+   "reportCallIssue": 1,
+   "reportIncompatibleMethodOverride": 1,
+   "reportOperatorIssue": 1,
+   "reportOptionalCall": 1,
+   "reportOptionalOperand": 1
+  },
+  "angr/simos/linux.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 8,
+   "reportIncompatibleMethodOverride": 3,
+   "reportOptionalMemberAccess": 1,
+   "reportPrivateImportUsage": 1
+  },
+  "angr/simos/simos.py": {
+   "reportAttributeAccessIssue": 10,
+   "reportReturnType": 1
+  },
+  "angr/simos/userland.py": {
+   "reportArgumentType": 1,
+   "reportCallIssue": 1,
+   "reportOperatorIssue": 1,
+   "reportOptionalMemberAccess": 1,
+   "reportOptionalOperand": 1
+  },
+  "angr/simos/windows.py": {
+   "reportArgumentType": 2,
+   "reportAttributeAccessIssue": 1,
+   "reportIncompatibleMethodOverride": 2,
+   "reportOptionalMemberAccess": 2,
+   "reportOptionalOperand": 3
+  },
+  "angr/state_plugins/callstack.py": {
+   "reportArgumentType": 9,
+   "reportAttributeAccessIssue": 28,
+   "reportCallIssue": 2,
+   "reportOperatorIssue": 1,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/state_plugins/cgc.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 8,
+   "reportCallIssue": 1
+  },
+  "angr/state_plugins/debug_variables.py": {
+   "reportArgumentType": 4,
+   "reportOperatorIssue": 2,
+   "reportOptionalMemberAccess": 1,
+   "reportReturnType": 2
+  },
+  "angr/state_plugins/edge_hitmap.py": {
+   "reportArgumentType": 3
+  },
+  "angr/state_plugins/filesystem.py": {
+   "reportAttributeAccessIssue": 5
+  },
+  "angr/state_plugins/gdb.py": {
+   "reportArgumentType": 2,
+   "reportOperatorIssue": 2
+  },
+  "angr/state_plugins/heap/heap_base.py": {
+   "reportAssignmentType": 1,
+   "reportIncompatibleVariableOverride": 1,
+   "reportReturnType": 1
+  },
+  "angr/state_plugins/heap/heap_brk.py": {
+   "reportArgumentType": 1,
+   "reportIncompatibleMethodOverride": 1
+  },
+  "angr/state_plugins/heap/heap_ptmalloc.py": {
+   "reportArgumentType": 6,
+   "reportIncompatibleMethodOverride": 1,
+   "reportOperatorIssue": 8,
+   "reportOptionalMemberAccess": 8
+  },
+  "angr/state_plugins/history.py": {
+   "reportArgumentType": 2,
+   "reportOptionalMemberAccess": 2,
+   "reportPossiblyUnboundVariable": 6
+  },
+  "angr/state_plugins/inspect.py": {
+   "reportMissingImports": 1,
+   "reportOptionalCall": 1
+  },
+  "angr/state_plugins/javavm_classloader.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 5,
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/state_plugins/jni_references.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/state_plugins/libc.py": {
+   "reportAttributeAccessIssue": 20,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/state_plugins/log.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/state_plugins/posix.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 24,
+   "reportIncompatibleMethodOverride": 10,
+   "reportIncompatibleVariableOverride": 2,
+   "reportOperatorIssue": 4,
+   "reportOptionalMemberAccess": 5,
+   "reportOptionalSubscript": 2
+  },
+  "angr/state_plugins/preconstrainer.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 10
+  },
+  "angr/state_plugins/scratch.py": {
+   "reportArgumentType": 1
+  },
+  "angr/state_plugins/sim_action.py": {
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/state_plugins/sim_action_object.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 39,
+   "reportIncompatibleMethodOverride": 2,
+   "reportIndexIssue": 1,
+   "reportReturnType": 2
+  },
+  "angr/state_plugins/solver.py": {
+   "reportArgumentType": 8,
+   "reportAssignmentType": 1,
+   "reportAttributeAccessIssue": 10,
+   "reportCallIssue": 2,
+   "reportGeneralTypeIssues": 1,
+   "reportReturnType": 6
+  },
+  "angr/state_plugins/symbolizer.py": {
+   "reportArgumentType": 8,
+   "reportAttributeAccessIssue": 2,
+   "reportCallIssue": 3,
+   "reportOptionalMemberAccess": 4,
+   "reportOptionalSubscript": 4
+  },
+  "angr/state_plugins/trace_additions.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 10,
+   "reportCallIssue": 1,
+   "reportOperatorIssue": 2,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/state_plugins/uc_manager.py": {
+   "reportOperatorIssue": 2,
+   "reportOptionalOperand": 1
+  },
+  "angr/state_plugins/unicorn_engine.py": {
+   "reportArgumentType": 20,
+   "reportAttributeAccessIssue": 23,
+   "reportCallIssue": 15,
+   "reportIndexIssue": 2,
+   "reportOperatorIssue": 6,
+   "reportOptionalCall": 2,
+   "reportOptionalIterable": 4,
+   "reportOptionalMemberAccess": 85,
+   "reportOptionalOperand": 1,
+   "reportOptionalSubscript": 11,
+   "reportPrivateImportUsage": 2
+  },
+  "angr/state_plugins/view.py": {
+   "reportAssignmentType": 1,
+   "reportAttributeAccessIssue": 1,
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/storage/file.py": {
+   "reportArgumentType": 36,
+   "reportAttributeAccessIssue": 16,
+   "reportCallIssue": 3,
+   "reportGeneralTypeIssues": 3,
+   "reportIncompatibleMethodOverride": 2,
+   "reportIndexIssue": 4,
+   "reportOperatorIssue": 1,
+   "reportOptionalIterable": 3,
+   "reportOptionalMemberAccess": 2,
+   "reportOptionalOperand": 1,
+   "reportOptionalSubscript": 14,
+   "reportPossiblyUnboundVariable": 3
+  },
+  "angr/storage/memory_mixins/__init__.py": {
+   "reportCallIssue": 2,
+   "reportIncompatibleMethodOverride": 3,
+   "reportIncompatibleVariableOverride": 2
+  },
+  "angr/storage/memory_mixins/actions_mixin.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 5
+  },
+  "angr/storage/memory_mixins/address_concretization_mixin.py": {
+   "reportArgumentType": 4,
+   "reportAttributeAccessIssue": 1,
+   "reportOptionalIterable": 2
+  },
+  "angr/storage/memory_mixins/bvv_conversion_mixin.py": {
+   "reportAttributeAccessIssue": 1
+  },
+  "angr/storage/memory_mixins/convenient_mappings_mixin.py": {
+   "reportArgumentType": 1,
+   "reportIncompatibleVariableOverride": 1
+  },
+  "angr/storage/memory_mixins/default_filler_mixin.py": {
+   "reportArgumentType": 3,
+   "reportIncompatibleVariableOverride": 2
+  },
+  "angr/storage/memory_mixins/hex_dumper_mixin.py": {
+   "reportArgumentType": 2
+  },
+  "angr/storage/memory_mixins/javavm_memory_mixin.py": {
+   "reportArgumentType": 3,
+   "reportAttributeAccessIssue": 5,
+   "reportIncompatibleMethodOverride": 3,
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/storage/memory_mixins/keyvalue_memory_mixin.py": {
+   "reportIncompatibleMethodOverride": 1,
+   "reportReturnType": 1
+  },
+  "angr/storage/memory_mixins/label_merger_mixin.py": {
+   "reportIncompatibleVariableOverride": 1
+  },
+  "angr/storage/memory_mixins/multi_value_merger_mixin.py": {
+   "reportAttributeAccessIssue": 2,
+   "reportIncompatibleVariableOverride": 1
+  },
+  "angr/storage/memory_mixins/name_resolution_mixin.py": {
+   "reportArgumentType": 2,
+   "reportAttributeAccessIssue": 2
+  },
+  "angr/storage/memory_mixins/paged_memory/page_backer_mixins.py": {
+   "reportArgumentType": 2,
+   "reportAssignmentType": 1,
+   "reportIncompatibleVariableOverride": 2,
+   "reportReturnType": 1
+  },
+  "angr/storage/memory_mixins/paged_memory/paged_memory_mixin.py": {
+   "reportArgumentType": 8,
+   "reportAttributeAccessIssue": 2,
+   "reportCallIssue": 6,
+   "reportIncompatibleMethodOverride": 3,
+   "reportInvalidTypeArguments": 1,
+   "reportOptionalIterable": 1,
+   "reportOptionalMemberAccess": 3
+  },
+  "angr/storage/memory_mixins/paged_memory/paged_memory_multivalue_mixin.py": {
+   "reportAttributeAccessIssue": 8
+  },
+  "angr/storage/memory_mixins/paged_memory/pages/base.py": {
+   "reportIncompatibleVariableOverride": 1
+  },
+  "angr/storage/memory_mixins/paged_memory/pages/cooperation.py": {
+   "reportArgumentType": 4,
+   "reportAttributeAccessIssue": 4,
+   "reportIncompatibleMethodOverride": 5,
+   "reportOptionalMemberAccess": 3,
+   "reportUnhashable": 1
+  },
+  "angr/storage/memory_mixins/paged_memory/pages/history_tracking_mixin.py": {
+   "reportArgumentType": 1,
+   "reportIncompatibleVariableOverride": 1,
+   "reportOptionalOperand": 1
+  },
+  "angr/storage/memory_mixins/paged_memory/pages/list_page.py": {
+   "reportArgumentType": 7,
+   "reportAssignmentType": 1,
+   "reportAttributeAccessIssue": 1,
+   "reportIncompatibleMethodOverride": 2,
+   "reportOperatorIssue": 3,
+   "reportOptionalMemberAccess": 4,
+   "reportOptionalOperand": 11,
+   "reportRedeclaration": 1
+  },
+  "angr/storage/memory_mixins/paged_memory/pages/mv_list_page.py": {
+   "reportArgumentType": 6,
+   "reportAssignmentType": 2,
+   "reportAttributeAccessIssue": 3,
+   "reportCallIssue": 2,
+   "reportGeneralTypeIssues": 4,
+   "reportIncompatibleMethodOverride": 5,
+   "reportOperatorIssue": 2,
+   "reportOptionalIterable": 1,
+   "reportOptionalMemberAccess": 2,
+   "reportRedeclaration": 2,
+   "reportReturnType": 1
+  },
+  "angr/storage/memory_mixins/paged_memory/pages/permissions_mixin.py": {
+   "reportIncompatibleVariableOverride": 1
+  },
+  "angr/storage/memory_mixins/paged_memory/pages/refcount_mixin.py": {
+   "reportIncompatibleVariableOverride": 1
+  },
+  "angr/storage/memory_mixins/paged_memory/pages/ultra_page.py": {
+   "reportArgumentType": 8,
+   "reportAssignmentType": 2,
+   "reportAttributeAccessIssue": 13,
+   "reportIncompatibleMethodOverride": 2,
+   "reportIndexIssue": 7,
+   "reportOperatorIssue": 4,
+   "reportOptionalMemberAccess": 6,
+   "reportOptionalOperand": 2
+  },
+  "angr/storage/memory_mixins/paged_memory/privileged_mixin.py": {
+   "reportIncompatibleMethodOverride": 1
+  },
+  "angr/storage/memory_mixins/paged_memory/stack_allocation_mixin.py": {
+   "reportArgumentType": 2,
+   "reportIncompatibleMethodOverride": 1,
+   "reportIncompatibleVariableOverride": 1,
+   "reportOptionalOperand": 4
+  },
+  "angr/storage/memory_mixins/regioned_memory/region_meta_mixin.py": {
+   "reportArgumentType": 1
+  },
+  "angr/storage/memory_mixins/regioned_memory/regioned_address_concretization_mixin.py": {
+   "reportArgumentType": 3,
+   "reportAttributeAccessIssue": 6,
+   "reportCallIssue": 1
+  },
+  "angr/storage/memory_mixins/regioned_memory/regioned_memory_mixin.py": {
+   "reportArgumentType": 2,
+   "reportAssignmentType": 2,
+   "reportAttributeAccessIssue": 2,
+   "reportIncompatibleMethodOverride": 1,
+   "reportInvalidTypeForm": 1,
+   "reportOptionalCall": 1,
+   "reportOptionalMemberAccess": 10,
+   "reportOptionalOperand": 2
+  },
+  "angr/storage/memory_mixins/simple_interface_mixin.py": {
+   "reportArgumentType": 3,
+   "reportCallIssue": 3
+  },
+  "angr/storage/memory_mixins/size_resolution_mixin.py": {
+   "reportArgumentType": 3,
+   "reportCallIssue": 2,
+   "reportIncompatibleVariableOverride": 1,
+   "reportOptionalMemberAccess": 1,
+   "reportOptionalOperand": 2
+  },
+  "angr/storage/memory_mixins/slotted_memory.py": {
+   "reportArgumentType": 2,
+   "reportIncompatibleVariableOverride": 1,
+   "reportOptionalSubscript": 1
+  },
+  "angr/storage/memory_mixins/smart_find_mixin.py": {
+   "reportOperatorIssue": 1,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/storage/memory_mixins/top_merger_mixin.py": {
+   "reportAttributeAccessIssue": 1,
+   "reportIncompatibleVariableOverride": 1
+  },
+  "angr/storage/memory_mixins/unwrapper_mixin.py": {
+   "reportArgumentType": 1
+  },
+  "angr/storage/memory_object.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 2,
+   "reportCallIssue": 1,
+   "reportIndexIssue": 1,
+   "reportOptionalMemberAccess": 1
+  },
+  "angr/tablespecs.py": {
+   "reportArgumentType": 1,
+   "reportAttributeAccessIssue": 2
+  },
+  "angr/utils/ail_serialization.py": {
+   "reportOptionalSubscript": 1
+  },
+  "angr/utils/balancer.py": {
+   "reportReturnType": 1
+  },
+  "angr/utils/dynamic_dictlist.py": {
+   "reportArgumentType": 2,
+   "reportAttributeAccessIssue": 1,
+   "reportOperatorIssue": 1,
+   "reportOptionalIterable": 1,
+   "reportOptionalSubscript": 3,
+   "reportReturnType": 2
+  },
+  "angr/utils/formatting.py": {
+   "reportIndexIssue": 1,
+   "reportOperatorIssue": 1
+  },
+  "angr/utils/funcid.py": {
+   "reportArgumentType": 1,
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/utils/graph.py": {
+   "reportArgumentType": 5,
+   "reportInvalidTypeArguments": 2,
+   "reportReturnType": 1
+  },
+  "angr/utils/lazy_import.py": {
+   "reportArgumentType": 2,
+   "reportOptionalMemberAccess": 2
+  },
+  "angr/utils/library.py": {
+   "reportOptionalMemberAccess": 1,
+   "reportReturnType": 2
+  },
+  "angr/utils/mp.py": {
+   "reportArgumentType": 1
+  },
+  "angr/utils/ssa/__init__.py": {
+   "reportAttributeAccessIssue": 3
+  },
+  "angr/utils/ssa/tmp_uses_collector.py": {
+   "reportIncompatibleMethodOverride": 1
+  },
+  "angr/utils/types.py": {
+   "reportArgumentType": 2
+  },
+  "angr/vaults.py": {
+   "reportAttributeAccessIssue": 1,
+   "reportIncompatibleMethodOverride": 1
+  }
+ },
+ "total": 4274
+}

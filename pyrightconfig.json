@@ -1,0 +1,28 @@
+{
+  "//": "angr's type-checking configuration. See docs/getting-started/developing.rst for the policy this encodes.",
+  "include": [
+    "angr"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    "**/node_modules"
+  ],
+  "ignore": [
+    "angr/protos/*_pb2.py"
+  ],
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "standard",
+  "useLibraryCodeForTypes": true,
+  "//rules": [
+    "Rules below are promotions on top of 'basic'. A rule is only listed here once the tree is",
+    "already clean for it, so that turning it on cannot regress CI. The staged promotions still",
+    "outstanding -- and what each currently costs -- are tracked in docs/appendix/typing.md."
+  ],
+  "reportTypeCommentUsage": "error",
+  "reportUntypedBaseClass": "error",
+  "reportUntypedClassDecorator": "error",
+  "reportUntypedFunctionDecorator": "error",
+  "reportUnusedCoroutine": "error",
+  "reportUnusedExpression": "error",
+  "//mode": "standard is pyright CLI default; declaring it pins the level CI already enforces."
+}
