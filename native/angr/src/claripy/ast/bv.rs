@@ -19,7 +19,7 @@ use crate::claripy::pyslicemethodsext::PySliceMethodsExt;
 static BVS_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static PY_BV_CACHE: LazyLock<DashMap<u64, Py<PyWeakrefReference>>> = LazyLock::new(DashMap::new);
 
-#[pyclass(extends=Bits, subclass, frozen, weakref, module="angr.rustylib.claripy.ast.bv")]
+#[pyclass(extends=Bits, subclass, frozen, module="angr.rustylib.claripy.ast.bv")]
 pub struct BV {
     pub(crate) inner: AstRef<'static>,
 }

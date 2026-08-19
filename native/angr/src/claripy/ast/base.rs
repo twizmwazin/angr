@@ -10,6 +10,9 @@ use crate::claripy::prelude::*;
 /// (structure queries, hashing, simplification, replacement, annotation
 /// management). The sort-specific subclasses (`Bool`, `BV`, `FP`, `String`)
 /// inherit these and add only their own typed operations.
+///
+/// `weakref` belongs here and only here: the slot is inherited, so repeating it
+/// on a subclass just adds a second, unused pointer to every instance.
 #[pyclass(subclass, frozen, weakref, module = "angr.rustylib.claripy.ast.base")]
 pub struct Base {
     inner: AstRef<'static>,

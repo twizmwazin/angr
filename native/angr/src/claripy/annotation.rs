@@ -69,7 +69,8 @@ fn cached_annotation<'py>(
 /// `claripy.annotation.Annotation`
 ///
 /// The base class for every annotation. User code can subclass it, and the
-/// built-in annotations below are genuine subclasses.
+/// built-in annotations below are genuine subclasses. As with `Base`, `weakref`
+/// is declared here only: subclasses inherit the slot.
 #[pyclass(
     name = "Annotation",
     subclass,
@@ -239,7 +240,7 @@ fn upcast<'py, T>(bound: Bound<'py, T>) -> Result<Bound<'py, PyAnnotation>, Clar
 }
 
 /// `claripy.annotation.SimplificationAvoidanceAnnotation`
-#[pyclass(extends = PyAnnotation, subclass, frozen, weakref, module = "angr.rustylib.claripy.annotation")]
+#[pyclass(extends = PyAnnotation, subclass, frozen, module = "angr.rustylib.claripy.annotation")]
 pub struct SimplificationAvoidanceAnnotation;
 
 #[pymethods]
@@ -273,13 +274,16 @@ impl SimplificationAvoidanceAnnotation {
 }
 
 /// `claripy.annotation.StridedIntervalAnnotation`
-#[pyclass(extends = PyAnnotation, subclass, frozen, weakref, module = "angr.rustylib.claripy.annotation")]
+#[pyclass(
+    extends = PyAnnotation,
+    subclass,
+    frozen,
+    get_all,
+    module = "angr.rustylib.claripy.annotation"
+)]
 pub struct StridedIntervalAnnotation {
-    #[pyo3(get)]
     stride: BigUint,
-    #[pyo3(get)]
     lower_bound: BigUint,
-    #[pyo3(get)]
     upper_bound: BigUint,
 }
 
@@ -328,7 +332,7 @@ impl StridedIntervalAnnotation {
 }
 
 /// `claripy.annotation.EmptyStridedIntervalAnnotation`
-#[pyclass(extends = PyAnnotation, subclass, frozen, weakref, module = "angr.rustylib.claripy.annotation")]
+#[pyclass(extends = PyAnnotation, subclass, frozen, module = "angr.rustylib.claripy.annotation")]
 pub struct EmptyStridedIntervalAnnotation;
 
 #[pymethods]
@@ -362,11 +366,15 @@ impl EmptyStridedIntervalAnnotation {
 }
 
 /// `claripy.annotation.RegionAnnotation`
-#[pyclass(extends = PyAnnotation, subclass, frozen, weakref, module = "angr.rustylib.claripy.annotation")]
+#[pyclass(
+    extends = PyAnnotation,
+    subclass,
+    frozen,
+    get_all,
+    module = "angr.rustylib.claripy.annotation"
+)]
 pub struct RegionAnnotation {
-    #[pyo3(get)]
     region_id: String,
-    #[pyo3(get)]
     region_base_addr: BigUint,
 }
 
@@ -406,7 +414,7 @@ impl RegionAnnotation {
 }
 
 /// `claripy.annotation.UninitializedAnnotation`
-#[pyclass(extends = PyAnnotation, subclass, frozen, weakref, module = "angr.rustylib.claripy.annotation")]
+#[pyclass(extends = PyAnnotation, subclass, frozen, module = "angr.rustylib.claripy.annotation")]
 pub struct UninitializedAnnotation;
 
 #[pymethods]

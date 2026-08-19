@@ -16,10 +16,12 @@ static PY_FP_CACHE: LazyLock<DashMap<u64, Py<PyWeakrefReference>>> = LazyLock::n
 #[pyclass(
     name = "RM",
     module = "angr.rustylib.claripy.ast.fp",
+    frozen,
     eq,
+    hash,
     from_py_object
 )]
-#[derive(Clone, PartialEq, Eq, Default)]
+#[derive(Clone, PartialEq, Eq, Hash, Default)]
 #[allow(non_camel_case_types)]
 pub enum PyRM {
     #[default]
@@ -78,9 +80,12 @@ impl From<&FPRM> for PyRM {
 #[pyclass(
     name = "FSort",
     module = "angr.rustylib.claripy.ast.fp",
+    frozen,
+    eq,
+    hash,
     from_py_object
 )]
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct PyFSort(FSort);
 
 impl PyFSort {
@@ -113,22 +118,6 @@ impl PyFSort {
         let class = py.get_type::<PyFSort>();
         let from_size = class.getattr("from_size")?;
         Ok((from_size.into_any(), (self.0.size(),)))
-    }
-
-    pub fn __eq__(&self, other: &PyFSort) -> bool {
-        self.0 == other.0
-    }
-
-    pub fn __ne__(&self, other: &PyFSort) -> bool {
-        self.0 != other.0
-    }
-
-    pub fn __hash__(&self) -> u64 {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-        let mut h = DefaultHasher::new();
-        self.0.size().hash(&mut h);
-        h.finish()
     }
 
     pub fn __repr__(&self) -> String {
@@ -172,7 +161,7 @@ pub fn fsort_double() -> PyFSort {
     PyFSort(FSort::f64())
 }
 
-#[pyclass(extends=Bits, subclass, frozen, weakref, module="angr.rustylib.claripy.ast.fp")]
+#[pyclass(extends=Bits, subclass, frozen, module="angr.rustylib.claripy.ast.fp")]
 pub struct FP {
     pub(crate) inner: AstRef<'static>,
 }
