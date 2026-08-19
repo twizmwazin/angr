@@ -163,9 +163,6 @@ ignore = [
 "angr/engines/soot/expressions/*" = [
     "N999",
 ]
-"angr/misc/bug_report.py" = [
-    "F821", # name not found
-]
 "angr/procedures/**" = [
     "N999",
 ]

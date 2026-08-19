@@ -28,10 +28,10 @@ angr_modules = [
     "z3",
 ]
 native_modules = {
-    "angr": lambda: angr.state_plugins.unicorn_engine._UC_NATIVE,  # pylint: disable=undefined-variable
-    "pyvex": lambda: pyvex.pvc,  # pylint: disable=undefined-variable
-    "unicorn": lambda: unicorn.unicorn._uc,  # pylint: disable=undefined-variable
-    "z3": lambda: next(x for x in gc.get_objects() if type(x) is ctypes.CDLL and "z3" in str(x)),  # YIKES FOREVER
+    "angr": lambda mod: mod.state_plugins.unicorn_engine._UC_NATIVE,
+    "pyvex": lambda mod: mod.pvc,
+    "unicorn": lambda mod: mod.unicorn._uc,
+    "z3": lambda mod: next(x for x in gc.get_objects() if type(x) is ctypes.CDLL and "z3" in str(x)),  # YIKES FOREVER
 }
 python_packages = {"z3": "z3-solver"}
 
@@ -94,19 +94,22 @@ def print_system_info():
 
 def print_native_info():
     print("######### Native Module Info ##########")
-    for module, funcs in native_modules.items():
+    for module, get_native in native_modules.items():
         try:
-            globals()[module] = __import__(module)
-            try:
-                print(f"{module}: {funcs()}")
-            except Exception as e:  # pylint: disable=broad-except
-                print(f"{module}: imported but path finding raised a {type(e)}: {e}")
+            mod = importlib.import_module(module)
         except ModuleNotFoundError:
             print(f"{module}: NOT FOUND")
+            continue
         except ImportError:
             print(f"{module}: FOUND BUT FAILED TO IMPORT")
+            continue
         except Exception as e:  # pylint: disable=broad-except
-            print(f"{module}: __import__ raised a {type(e)}: {e}")
+            print(f"{module}: import raised a {type(e)}: {e}")
+            continue
+        try:
+            print(f"{module}: {get_native(mod)}")
+        except Exception as e:  # pylint: disable=broad-except
+            print(f"{module}: imported but path finding raised a {type(e)}: {e}")
 
 
 def bug_report():
