@@ -4,6 +4,8 @@ mod float;
 mod string;
 
 #[cfg(test)]
+mod test_annotations;
+#[cfg(test)]
 mod test_bool;
 #[cfg(test)]
 mod test_bv;
@@ -109,6 +111,59 @@ impl<'c> SimplifyState<'c> {
     }
 }
 
+/// Fold `f(x, x)` for the operations whose result is fixed when both operands
+/// are the *same value*.
+///
+/// The equality test is on [`AstRef`]s, deliberately **not** on [`AstOp`]s.
+/// Annotations live on `AstNode`, not on `AstOp`, so `a.op() == b.op()`
+/// compares everything except the annotations of `a` and `b` themselves, and
+/// would happily fold `f(x@ann1, x@ann2)`. Consumers rely on annotations being
+/// part of AST identity -- angr's variable recovery, for instance, gives every
+/// unknown value the same singleton `top` symbol and tells them apart purely by
+/// their `VariableAnnotation` -- so folding across differing annotations is
+/// unsound. Centralising the check here keeps every reflexive rule
+/// annotation-aware and means a newly added comparison op only has to be listed
+/// in the match below.
+///
+/// Float operands are excluded on purpose: `NaN == NaN` is false, so `Eq`/`Neq`
+/// are not reflexive over floats.
+fn reflexive_fold<'c>(
+    state: &mut SimplifyState<'c>,
+) -> Result<Option<AstRef<'c>>, SimplifyError<'c>> {
+    enum Fold {
+        True,
+        False,
+        Zero,
+    }
+
+    let fold = match state.expr.op() {
+        AstOp::Eq(..) | AstOp::ULE(..) | AstOp::UGE(..) | AstOp::SLE(..) | AstOp::SGE(..) => {
+            Fold::True
+        }
+        AstOp::Neq(..) | AstOp::ULT(..) | AstOp::UGT(..) | AstOp::SLT(..) | AstOp::SGT(..) => {
+            Fold::False
+        }
+        AstOp::Sub(..) => Fold::Zero,
+        _ => return Ok(None),
+    };
+
+    let lhs = state.get_child_simplified(0)?;
+    if matches!(lhs.ast_type(), AstType::Float(_)) {
+        return Ok(None);
+    }
+    let rhs = state.get_child_simplified(1)?;
+    if lhs != rhs {
+        return Ok(None);
+    }
+
+    let ctx = state.expr.context();
+    Ok(Some(match fold {
+        Fold::True => ctx.true_()?,
+        Fold::False => ctx.false_()?,
+        Fold::Zero => ctx.bvv(BitVec::zeros(lhs.size()))?,
+    }))
+}
+
 fn simplify<'c>(
     ast: &AstRef<'c>,
     respect_annotations: bool,
@@ -142,11 +197,17 @@ fn simplify<'c>(
             };
             let inner_result = match cached {
                 Some(cached) => Ok(cached),
-                None => match state.expr.ast_type() {
-                    AstType::Bool => bool::simplify_bool(&mut state),
-                    AstType::BitVec(_) => bv::simplify_bv(&mut state, error_on_dbz),
-                    AstType::Float(_) => float::simplify_float(&mut state),
-                    AstType::String => string::simplify_string(&mut state),
+                // `reflexive_fold` runs ahead of the per-sort rules so that every
+                // `f(x, x)` fold goes through one annotation-aware equality test.
+                None => match reflexive_fold(&mut state) {
+                    Ok(Some(folded)) => Ok(folded),
+                    Ok(None) => match state.expr.ast_type() {
+                        AstType::Bool => bool::simplify_bool(&mut state),
+                        AstType::BitVec(_) => bv::simplify_bv(&mut state, error_on_dbz),
+                        AstType::Float(_) => float::simplify_float(&mut state),
+                        AstType::String => string::simplify_string(&mut state),
+                    },
+                    Err(err) => Err(err),
                 },
             };
             match inner_result {
