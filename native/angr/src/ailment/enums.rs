@@ -9,23 +9,17 @@ use serde::{Deserialize, Serialize};
     eq_int,
     module = "angr.rustylib.ailment",
     name = "VirtualVariableCategory",
+    rename_all = "SCREAMING_SNAKE_CASE",
     skip_from_py_object
 )]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum VirtualVariableCategory {
-    #[pyo3(name = "REGISTER")]
     Register = 0,
-    #[pyo3(name = "STACK")]
     Stack = 1,
-    #[pyo3(name = "MEMORY")]
     Memory = 2,
-    #[pyo3(name = "PARAMETER")]
     Parameter = 3,
-    #[pyo3(name = "TMP")]
     Tmp = 4,
-    #[pyo3(name = "COMBO_REGISTER")]
     ComboRegister = 5,
-    #[pyo3(name = "UNKNOWN")]
     Unknown = 6,
 }
 
@@ -51,10 +45,6 @@ impl VirtualVariableCategory {
 
     fn __repr__(&self) -> String {
         format!("<VirtualVariableCategory.{}: {}>", self.name(), *self as u8)
-    }
-
-    fn __int__(&self) -> u8 {
-        *self as u8
     }
 
     fn __hash__(&self) -> u64 {
@@ -132,13 +122,12 @@ impl<'py> FromPyObject<'_, 'py> for VirtualVariableCategory {
     eq_int,
     module = "angr.rustylib.ailment",
     name = "ConvertType",
+    rename_all = "SCREAMING_SNAKE_CASE",
     from_py_object
 )]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ConvertType {
-    #[pyo3(name = "TYPE_INT")]
     TypeInt = 0,
-    #[pyo3(name = "TYPE_FP")]
     TypeFp = 1,
 }
 
@@ -256,10 +245,6 @@ impl ExpressionKind {
 
     fn __repr__(&self) -> String {
         format!("<ExpressionKind.{}: {}>", self.as_str(), *self as u8)
-    }
-
-    fn __int__(&self) -> u8 {
-        *self as u8
     }
 
     fn __hash__(&self) -> u64 {
@@ -396,10 +381,6 @@ impl StatementKind {
         format!("<StatementKind.{}: {}>", self.as_str(), *self as u8)
     }
 
-    fn __int__(&self) -> u8 {
-        *self as u8
-    }
-
     fn __hash__(&self) -> u64 {
         *self as u64
     }
@@ -511,10 +492,6 @@ impl RoundingMode {
 
     fn __repr__(&self) -> String {
         format!("<RoundingMode.{}: {}>", self.name(), *self as u8)
-    }
-
-    fn __int__(&self) -> u8 {
-        *self as u8
     }
 
     fn __hash__(&self) -> u64 {

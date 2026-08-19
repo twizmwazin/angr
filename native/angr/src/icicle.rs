@@ -43,7 +43,7 @@ impl icicle_vm::cpu::RegHandler for X86FlagsRegHandler {
 }
 
 /// VmExit is the result of a VM execution. Borrowed directly from icicle.
-#[pyclass(module = "angr.rustylib.icicle", from_py_object)]
+#[pyclass(module = "angr.rustylib.icicle", from_py_object, eq)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VmExit {
     /// The VM is still running.
@@ -68,13 +68,6 @@ pub enum VmExit {
     UnhandledException,
 }
 
-#[pymethods]
-impl VmExit {
-    pub fn __eq__(&self, other: &Self) -> bool {
-        *self == *other
-    }
-}
-
 impl From<icicle_vm::VmExit> for VmExit {
     fn from(exit: icicle_vm::VmExit) -> Self {
         match exit {
@@ -92,7 +85,7 @@ impl From<icicle_vm::VmExit> for VmExit {
     }
 }
 
-#[pyclass(module = "angr.rustylib.icicle", from_py_object)]
+#[pyclass(module = "angr.rustylib.icicle", from_py_object, eq)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u64)]
 pub enum ExceptionCode {
@@ -140,13 +133,6 @@ pub enum ExceptionCode {
 impl ExceptionCode {
     pub fn from_code(code: u32) -> Self {
         icicle_vm::cpu::ExceptionCode::from_u32(code).into()
-    }
-}
-
-#[pymethods]
-impl ExceptionCode {
-    pub fn __eq__(&self, other: &Self) -> bool {
-        *self == *other
     }
 }
 
