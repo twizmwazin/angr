@@ -89,21 +89,10 @@ impl Bool {
         annotations: Option<Vec<Bound<'py, PyAnnotation>>>,
     ) -> Result<Py<Bool>, ClaripyError> {
         let inner = match op {
+            // Ops that are not a plain "call this context method on these args".
             "BoolS" => GLOBAL_CONTEXT.bools(&args[0].extract::<String>(py)?)?,
             "BoolV" => GLOBAL_CONTEXT.boolv(args[0].extract::<bool>(py)?)?,
-            "Not" => GLOBAL_CONTEXT.not(&args[0].cast_bound::<Bool>(py)?.get().inner)?,
-            "And" => GLOBAL_CONTEXT.and2(
-                &args[0].cast_bound::<Bool>(py)?.get().inner,
-                &args[1].cast_bound::<Bool>(py)?.get().inner,
-            )?,
-            "Or" => GLOBAL_CONTEXT.or2(
-                &args[0].cast_bound::<Bool>(py)?.get().inner,
-                &args[1].cast_bound::<Bool>(py)?.get().inner,
-            )?,
-            "Xor" => GLOBAL_CONTEXT.xor2(
-                &args[0].cast_bound::<Bool>(py)?.get().inner,
-                &args[1].cast_bound::<Bool>(py)?.get().inner,
-            )?,
+            // (Dis)equality is polymorphic in the operand type.
             "__eq__" => {
                 if args[0].cast_bound::<Bool>(py).is_ok() {
                     GLOBAL_CONTEXT.eq_(
@@ -140,85 +129,34 @@ impl Bool {
                     )?
                 }
             }
-            "ULE" | "__le__" => GLOBAL_CONTEXT.ule(
-                &args[0].cast_bound::<BV>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            "ULT" | "__lt__" => GLOBAL_CONTEXT.ult(
-                &args[0].cast_bound::<BV>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            "UGE" | "__ge__" => GLOBAL_CONTEXT.uge(
-                &args[0].cast_bound::<BV>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            "UGT" | "__gt__" => GLOBAL_CONTEXT.ugt(
-                &args[0].cast_bound::<BV>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            "SLT" => GLOBAL_CONTEXT.slt(
-                &args[0].cast_bound::<BV>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            "SLE" => GLOBAL_CONTEXT.sle(
-                &args[0].cast_bound::<BV>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            "SGT" => GLOBAL_CONTEXT.sgt(
-                &args[0].cast_bound::<BV>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            "SGE" => GLOBAL_CONTEXT.sge(
-                &args[0].cast_bound::<BV>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            "fpEQ" => GLOBAL_CONTEXT.fp_eq(
-                &args[0].cast_bound::<FP>(py)?.get().inner,
-                &args[1].cast_bound::<FP>(py)?.get().inner,
-            )?,
-            "fpNEQ" => GLOBAL_CONTEXT.fp_neq(
-                &args[0].cast_bound::<FP>(py)?.get().inner,
-                &args[1].cast_bound::<FP>(py)?.get().inner,
-            )?,
-            "fpLT" => GLOBAL_CONTEXT.fp_lt(
-                &args[0].cast_bound::<FP>(py)?.get().inner,
-                &args[1].cast_bound::<FP>(py)?.get().inner,
-            )?,
-            "fpLEQ" => GLOBAL_CONTEXT.fp_leq(
-                &args[0].cast_bound::<FP>(py)?.get().inner,
-                &args[1].cast_bound::<FP>(py)?.get().inner,
-            )?,
-            "fpGT" => GLOBAL_CONTEXT.fp_gt(
-                &args[0].cast_bound::<FP>(py)?.get().inner,
-                &args[1].cast_bound::<FP>(py)?.get().inner,
-            )?,
-            "fpGEQ" => GLOBAL_CONTEXT.fp_geq(
-                &args[0].cast_bound::<FP>(py)?.get().inner,
-                &args[1].cast_bound::<FP>(py)?.get().inner,
-            )?,
-            "fpIsNan" => GLOBAL_CONTEXT.fp_is_nan(&args[0].cast_bound::<FP>(py)?.get().inner)?,
-            "fpIsInf" => GLOBAL_CONTEXT.fp_is_inf(&args[0].cast_bound::<FP>(py)?.get().inner)?,
-            "StrContains" => GLOBAL_CONTEXT.str_contains(
-                &args[0].cast_bound::<PyAstString>(py)?.get().inner,
-                &args[1].cast_bound::<PyAstString>(py)?.get().inner,
-            )?,
-            "StrPrefixOf" => GLOBAL_CONTEXT.str_prefix_of(
-                &args[0].cast_bound::<PyAstString>(py)?.get().inner,
-                &args[1].cast_bound::<PyAstString>(py)?.get().inner,
-            )?,
-            "StrSuffixOf" => GLOBAL_CONTEXT.str_suffix_of(
-                &args[0].cast_bound::<PyAstString>(py)?.get().inner,
-                &args[1].cast_bound::<PyAstString>(py)?.get().inner,
-            )?,
-            "StrIsDigit" => {
-                GLOBAL_CONTEXT.str_is_digit(&args[0].cast_bound::<PyAstString>(py)?.get().inner)?
-            }
-            "If" => GLOBAL_CONTEXT.ite(
-                &args[0].cast_bound::<Bool>(py)?.get().inner,
-                &args[1].cast_bound::<Bool>(py)?.get().inner,
-                &args[2].cast_bound::<Bool>(py)?.get().inner,
-            )?,
-            _ => return Err(ClaripyError::InvalidOperation(op.to_string())),
+            _ => py_new_op_table! {
+                py, args, op;
+                "Not" => not(Bool[0]),
+                "And" => and2(Bool[0], Bool[1]),
+                "Or" => or2(Bool[0], Bool[1]),
+                "Xor" => xor2(Bool[0], Bool[1]),
+                "ULE" | "__le__" => ule(BV[0], BV[1]),
+                "ULT" | "__lt__" => ult(BV[0], BV[1]),
+                "UGE" | "__ge__" => uge(BV[0], BV[1]),
+                "UGT" | "__gt__" => ugt(BV[0], BV[1]),
+                "SLT" => slt(BV[0], BV[1]),
+                "SLE" => sle(BV[0], BV[1]),
+                "SGT" => sgt(BV[0], BV[1]),
+                "SGE" => sge(BV[0], BV[1]),
+                "fpEQ" => fp_eq(FP[0], FP[1]),
+                "fpNEQ" => fp_neq(FP[0], FP[1]),
+                "fpLT" => fp_lt(FP[0], FP[1]),
+                "fpLEQ" => fp_leq(FP[0], FP[1]),
+                "fpGT" => fp_gt(FP[0], FP[1]),
+                "fpGEQ" => fp_geq(FP[0], FP[1]),
+                "fpIsNan" => fp_is_nan(FP[0]),
+                "fpIsInf" => fp_is_inf(FP[0]),
+                "StrContains" => str_contains(PyAstString[0], PyAstString[1]),
+                "StrPrefixOf" => str_prefix_of(PyAstString[0], PyAstString[1]),
+                "StrSuffixOf" => str_suffix_of(PyAstString[0], PyAstString[1]),
+                "StrIsDigit" => str_is_digit(PyAstString[0]),
+                "If" => ite(Bool[0], Bool[1], Bool[2]),
+            },
         };
 
         let inner_with_annotations = if let Some(annots) = annotations {
@@ -269,12 +207,7 @@ impl Bool {
         py: Python<'py>,
         other: CoerceBool,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .and2(&self.inner, <CoerceBool as Into<AstRef>>::into(other))?
-                .simplify()?,
-        )
+        bool_binop!(self, py, other, and2)
     }
 
     pub fn __or__<'py>(
@@ -282,12 +215,7 @@ impl Bool {
         py: Python<'py>,
         other: CoerceBool,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .or2(&self.inner, <CoerceBool as Into<AstRef>>::into(other))?
-                .simplify()?,
-        )
+        bool_binop!(self, py, other, or2)
     }
 
     pub fn __xor__<'py>(
@@ -295,12 +223,7 @@ impl Bool {
         py: Python<'py>,
         other: CoerceBool,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .xor2(&self.inner, <CoerceBool as Into<AstRef>>::into(other))?
-                .simplify()?,
-        )
+        bool_binop!(self, py, other, xor2)
     }
 
     pub fn __eq__<'py>(
@@ -308,12 +231,7 @@ impl Bool {
         py: Python<'py>,
         other: CoerceBool,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .eq_(&self.inner, <CoerceBool as Into<AstRef>>::into(other))?
-                .simplify()?,
-        )
+        bool_binop!(self, py, other, eq_)
     }
 
     pub fn __ne__<'py>(
@@ -321,12 +239,7 @@ impl Bool {
         py: Python<'py>,
         other: CoerceBool,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .neq(&self.inner, <CoerceBool as Into<AstRef>>::into(other))?
-                .simplify()?,
-        )
+        bool_binop!(self, py, other, neq)
     }
 
     // `Base` defines `__hash__`, but Python makes a class unhashable if it

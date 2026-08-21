@@ -88,73 +88,13 @@ impl BV {
         annotations: Option<Vec<Bound<'py, PyAnnotation>>>,
     ) -> Result<Py<BV>, ClaripyError> {
         let inner = match op {
+            // Ops that are not a plain "call this context method on these args".
             "BVS" => GLOBAL_CONTEXT.bvs(args[0].extract::<String>(py)?, args[1].extract(py)?)?,
             "BVV" => GLOBAL_CONTEXT.bvv(BitVec::from((
                 args[0].extract::<BigUint>(py)?,
                 args[1].extract::<u32>(py)?,
             )))?,
-            "__and__" => GLOBAL_CONTEXT.and2(
-                &args[0].cast_bound::<BV>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            "__or__" => GLOBAL_CONTEXT.or2(
-                &args[0].cast_bound::<BV>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            "__xor__" => GLOBAL_CONTEXT.xor2(
-                &args[0].cast_bound::<BV>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            "__neg__" => GLOBAL_CONTEXT.neg(&args[0].cast_bound::<BV>(py)?.get().inner)?,
-            "__invert__" => GLOBAL_CONTEXT.not(&args[0].cast_bound::<BV>(py)?.get().inner)?,
-            "__add__" => GLOBAL_CONTEXT.add(
-                &args[0].cast_bound::<BV>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            "__sub__" => GLOBAL_CONTEXT.sub(
-                &args[0].cast_bound::<BV>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            "__mul__" => GLOBAL_CONTEXT.mul(
-                &args[0].cast_bound::<BV>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            "__floordiv__" => GLOBAL_CONTEXT.udiv(
-                &args[0].cast_bound::<BV>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            "SDiv" => GLOBAL_CONTEXT.sdiv(
-                &args[0].cast_bound::<BV>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            "__mod__" => GLOBAL_CONTEXT.urem(
-                &args[0].cast_bound::<BV>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            "SMod" => GLOBAL_CONTEXT.srem(
-                &args[0].cast_bound::<BV>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            "__lshift__" => GLOBAL_CONTEXT.shl(
-                &args[0].cast_bound::<BV>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            "LShR" => GLOBAL_CONTEXT.lshr(
-                &args[0].cast_bound::<BV>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            "__rshift__" => GLOBAL_CONTEXT.ashr(
-                &args[0].cast_bound::<BV>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            "RotateLeft" => GLOBAL_CONTEXT.rotate_left(
-                &args[0].cast_bound::<BV>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            "RotateRight" => GLOBAL_CONTEXT.rotate_right(
-                &args[0].cast_bound::<BV>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-            )?,
+            // The extend/extract ops carry their widths *before* the operand.
             "ZeroExt" => GLOBAL_CONTEXT.zero_ext(
                 &args[1].cast_bound::<BV>(py)?.get().inner,
                 args[0].extract(py)?,
@@ -175,33 +115,34 @@ impl BV {
                     .collect::<Result<_, _>>()?;
                 GLOBAL_CONTEXT.concat(concat_args)?
             }
-            "Reverse" => GLOBAL_CONTEXT.byte_reverse(&args[0].cast_bound::<BV>(py)?.get().inner)?,
-            "fpToIEEEBV" => {
-                GLOBAL_CONTEXT.fp_to_ieeebv(&args[0].cast_bound::<FP>(py)?.get().inner)?
-            }
-            // "fpToUBV" => GLOBAL_CONTEXT.fp_to_ubv(
-            //     &args[0].cast_bound::<FP>(py)?.get().inner,
-            // )?,
-            // "fpToSBV" => GLOBAL_CONTEXT.fp_to_sbv(
-            //     &args[0].cast_bound::<FP>(py)?.get().inner,
-            // )?,
-            "StrLen" => {
-                GLOBAL_CONTEXT.str_len(&args[0].cast_bound::<PyAstString>(py)?.get().inner)?
-            }
-            "StrIndexOf" => GLOBAL_CONTEXT.str_index_of(
-                &args[0].cast_bound::<PyAstString>(py)?.get().inner,
-                &args[1].cast_bound::<PyAstString>(py)?.get().inner,
-                &args[2].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            "StrToBV" => {
-                GLOBAL_CONTEXT.str_to_bv(&args[0].cast_bound::<PyAstString>(py)?.get().inner)?
-            }
-            "If" => GLOBAL_CONTEXT.ite(
-                &args[0].cast_bound::<Bool>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-                &args[2].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            _ => return Err(ClaripyError::InvalidOperation(op.to_string())),
+            _ => py_new_op_table! {
+                py, args, op;
+                "__and__" => and2(BV[0], BV[1]),
+                "__or__" => or2(BV[0], BV[1]),
+                "__xor__" => xor2(BV[0], BV[1]),
+                "__neg__" => neg(BV[0]),
+                "__invert__" => not(BV[0]),
+                "__add__" => add(BV[0], BV[1]),
+                "__sub__" => sub(BV[0], BV[1]),
+                "__mul__" => mul(BV[0], BV[1]),
+                "__floordiv__" => udiv(BV[0], BV[1]),
+                "SDiv" => sdiv(BV[0], BV[1]),
+                "__mod__" => urem(BV[0], BV[1]),
+                "SMod" => srem(BV[0], BV[1]),
+                "__lshift__" => shl(BV[0], BV[1]),
+                "LShR" => lshr(BV[0], BV[1]),
+                "__rshift__" => ashr(BV[0], BV[1]),
+                "RotateLeft" => rotate_left(BV[0], BV[1]),
+                "RotateRight" => rotate_right(BV[0], BV[1]),
+                "Reverse" => byte_reverse(BV[0]),
+                "fpToIEEEBV" => fp_to_ieeebv(FP[0]),
+                // "fpToUBV" => fp_to_ubv(FP[0]),
+                // "fpToSBV" => fp_to_sbv(FP[0]),
+                "StrLen" => str_len(PyAstString[0]),
+                "StrIndexOf" => str_index_of(PyAstString[0], PyAstString[1], BV[2]),
+                "StrToBV" => str_to_bv(PyAstString[0]),
+                "If" => ite(Bool[0], BV[1], BV[2]),
+            },
         };
 
         let inner_with_annotations = if let Some(annots) = annotations {
@@ -392,12 +333,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .add(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify_ext(true, true)?,
-        )
+        bv_binop!(self, py, other, add)
     }
 
     pub fn __radd__<'py>(
@@ -413,12 +349,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .sub(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify_ext(true, true)?,
-        )
+        bv_binop!(self, py, other, sub)
     }
 
     pub fn __rsub__<'py>(
@@ -426,12 +357,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .sub(&other.unpack_like(py, self)?.get().inner, &self.inner)?
-                .simplify_ext(true, true)?,
-        )
+        bv_rbinop!(self, py, other, sub)
     }
 
     pub fn __mul__<'py>(
@@ -439,12 +365,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .mul(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify_ext(true, true)?,
-        )
+        bv_binop!(self, py, other, mul)
     }
 
     pub fn __rmul__<'py>(
@@ -460,12 +381,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .udiv(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify_ext(true, true)?,
-        )
+        bv_binop!(self, py, other, udiv)
     }
 
     pub fn __rtruediv__<'py>(
@@ -473,12 +389,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .udiv(&other.unpack_like(py, self)?.get().inner, &self.inner)?
-                .simplify_ext(true, true)?,
-        )
+        bv_rbinop!(self, py, other, udiv)
     }
 
     pub fn __floordiv__<'py>(
@@ -486,12 +397,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .udiv(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify_ext(true, true)?,
-        )
+        bv_binop!(self, py, other, udiv)
     }
 
     pub fn __rfloordiv__<'py>(
@@ -499,12 +405,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .udiv(&other.unpack_like(py, self)?.get().inner, &self.inner)?
-                .simplify_ext(true, true)?,
-        )
+        bv_rbinop!(self, py, other, udiv)
     }
 
     pub fn __mod__<'py>(
@@ -512,12 +413,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .urem(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify_ext(true, true)?,
-        )
+        bv_binop!(self, py, other, urem)
     }
 
     pub fn __rmod__<'py>(
@@ -525,12 +421,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .urem(&other.unpack_like(py, self)?.get().inner, &self.inner)?
-                .simplify_ext(true, true)?,
-        )
+        bv_rbinop!(self, py, other, urem)
     }
 
     pub fn SDiv<'py>(
@@ -538,12 +429,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .sdiv(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify_ext(true, true)?,
-        )
+        bv_binop!(self, py, other, sdiv)
     }
 
     pub fn SMod<'py>(
@@ -551,12 +437,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .srem(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify_ext(true, true)?,
-        )
+        bv_binop!(self, py, other, srem)
     }
 
     pub fn __and__<'py>(
@@ -564,12 +445,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .and2(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify_ext(true, true)?,
-        )
+        bv_binop!(self, py, other, and2)
     }
 
     pub fn __rand__<'py>(
@@ -585,12 +461,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .or2(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify_ext(true, true)?,
-        )
+        bv_binop!(self, py, other, or2)
     }
 
     pub fn __ror__<'py>(
@@ -606,12 +477,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .xor2(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify_ext(true, true)?,
-        )
+        bv_binop!(self, py, other, xor2)
     }
 
     pub fn __rxor__<'py>(
@@ -627,12 +493,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .shl(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify_ext(true, true)?,
-        )
+        bv_binop!(self, py, other, shl)
     }
 
     pub fn __rlshift__<'py>(
@@ -640,12 +501,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .shl(&other.unpack_like(py, self)?.get().inner, &self.inner)?
-                .simplify_ext(true, true)?,
-        )
+        bv_rbinop!(self, py, other, shl)
     }
 
     pub fn __rshift__<'py>(
@@ -653,12 +509,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .ashr(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify_ext(true, true)?,
-        )
+        bv_binop!(self, py, other, ashr)
     }
 
     pub fn __rrshift__<'py>(
@@ -666,12 +517,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .ashr(&other.unpack_like(py, self)?.get().inner, &self.inner)?
-                .simplify_ext(true, true)?,
-        )
+        bv_rbinop!(self, py, other, ashr)
     }
 
     pub fn LShR<'py>(
@@ -679,26 +525,15 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .lshr(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify_ext(true, true)?,
-        )
+        bv_binop!(self, py, other, lshr)
     }
 
     pub fn __neg__<'py>(&self, py: Python<'py>) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT.neg(&self.inner)?.simplify_ext(true, true)?,
-        )
+        bv_op!(self, py, neg)
     }
 
     pub fn __invert__<'py>(&self, py: Python<'py>) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT.not(&self.inner)?.simplify_ext(true, true)?,
-        )
+        bv_op!(self, py, not)
     }
 
     pub fn __pos__(self_: Bound<BV>) -> Result<Bound<BV>, ClaripyError> {
@@ -710,12 +545,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .eq_(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify()?,
-        )
+        cmp_op!(self, py, other, eq_)
     }
 
     pub fn __ne__<'py>(
@@ -723,12 +553,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .neq(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify()?,
-        )
+        cmp_op!(self, py, other, neq)
     }
 
     // `Base` defines `__hash__`, but Python makes a class unhashable if it
@@ -742,12 +567,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .ult(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify()?,
-        )
+        cmp_op!(self, py, other, ult)
     }
 
     pub fn __le__<'py>(
@@ -755,12 +575,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .ule(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify()?,
-        )
+        cmp_op!(self, py, other, ule)
     }
 
     pub fn __gt__<'py>(
@@ -768,12 +583,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .ugt(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify()?,
-        )
+        cmp_op!(self, py, other, ugt)
     }
 
     pub fn __ge__<'py>(
@@ -781,12 +591,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .uge(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify()?,
-        )
+        cmp_op!(self, py, other, uge)
     }
 
     pub fn ULT<'py>(
@@ -794,12 +599,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .ult(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify()?,
-        )
+        cmp_op!(self, py, other, ult)
     }
 
     pub fn ULE<'py>(
@@ -807,12 +607,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .ule(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify()?,
-        )
+        cmp_op!(self, py, other, ule)
     }
 
     pub fn UGT<'py>(
@@ -820,12 +615,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .ugt(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify()?,
-        )
+        cmp_op!(self, py, other, ugt)
     }
 
     pub fn UGE<'py>(
@@ -833,12 +623,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .uge(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify()?,
-        )
+        cmp_op!(self, py, other, uge)
     }
 
     pub fn SLT<'py>(
@@ -846,12 +631,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .slt(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify()?,
-        )
+        cmp_op!(self, py, other, slt)
     }
 
     pub fn SLE<'py>(
@@ -859,12 +639,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .sle(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify()?,
-        )
+        cmp_op!(self, py, other, sle)
     }
 
     pub fn SGT<'py>(
@@ -872,12 +647,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .sgt(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify()?,
-        )
+        cmp_op!(self, py, other, sgt)
     }
 
     pub fn SGE<'py>(
@@ -885,12 +655,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .sge(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify()?,
-        )
+        cmp_op!(self, py, other, sge)
     }
 
     pub fn Extract<'py>(
@@ -899,12 +664,7 @@ impl BV {
         upper_bound: u32,
         lower_bound: u32,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .extract(&self.inner, upper_bound, lower_bound)?
-                .simplify_ext(true, true)?,
-        )
+        bv_op!(self, py, extract, upper_bound, lower_bound)
     }
 
     #[pyo3(signature = (*args))]
@@ -921,12 +681,7 @@ impl BV {
         py: Python<'py>,
         amount: u32,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .zero_ext(&self.inner, amount)?
-                .simplify_ext(true, true)?,
-        )
+        bv_op!(self, py, zero_ext, amount)
     }
 
     pub fn sign_extend<'py>(
@@ -934,22 +689,12 @@ impl BV {
         py: Python<'py>,
         amount: u32,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .sign_ext(&self.inner, amount)?
-                .simplify_ext(true, true)?,
-        )
+        bv_op!(self, py, sign_ext, amount)
     }
 
     #[getter]
     pub fn reversed<'py>(&self, py: Python<'py>) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .byte_reverse(&self.inner)?
-                .simplify_ext(true, true)?,
-        )
+        bv_op!(self, py, byte_reverse)
     }
 
     pub fn get_bytes<'py>(
@@ -1086,12 +831,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .union(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify_ext(true, true)?,
-        )
+        bv_binop!(self, py, other, union)
     }
 
     pub fn intersection<'py>(
@@ -1099,12 +839,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .intersection(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify_ext(true, true)?,
-        )
+        bv_binop!(self, py, other, intersection)
     }
 
     pub fn widen<'py>(
@@ -1112,12 +847,7 @@ impl BV {
         py: Python<'py>,
         other: CoerceBV,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        BV::new(
-            py,
-            &GLOBAL_CONTEXT
-                .widen(&self.inner, &other.unpack_like(py, self)?.get().inner)?
-                .simplify_ext(true, true)?,
-        )
+        bv_binop!(self, py, other, widen)
     }
 
     #[getter]
@@ -1456,50 +1186,9 @@ pub fn VS<'py>(
     )
 }
 
-#[pyfunction]
-pub fn union<'py>(
-    py: Python<'py>,
-    lhs: CoerceBV,
-    rhs: CoerceBV,
-) -> Result<Bound<'py, BV>, ClaripyError> {
-    let (elhs, erhs) = CoerceBV::unpack_pair(py, &lhs, &rhs)?;
-    BV::new(
-        py,
-        &GLOBAL_CONTEXT
-            .union(&elhs.get().inner, &erhs.get().inner)?
-            .simplify_ext(true, true)?,
-    )
-}
-
-#[pyfunction]
-pub fn intersection<'py>(
-    py: Python<'py>,
-    lhs: CoerceBV,
-    rhs: CoerceBV,
-) -> Result<Bound<'py, BV>, ClaripyError> {
-    let (elhs, erhs) = CoerceBV::unpack_pair(py, &lhs, &rhs)?;
-    BV::new(
-        py,
-        &GLOBAL_CONTEXT
-            .intersection(&elhs.get().inner, &erhs.get().inner)?
-            .simplify_ext(true, true)?,
-    )
-}
-
-#[pyfunction]
-pub fn widen<'py>(
-    py: Python<'py>,
-    lhs: CoerceBV,
-    rhs: CoerceBV,
-) -> Result<Bound<'py, BV>, ClaripyError> {
-    let (elhs, erhs) = CoerceBV::unpack_pair(py, &lhs, &rhs)?;
-    BV::new(
-        py,
-        &GLOBAL_CONTEXT
-            .widen(&elhs.get().inner, &erhs.get().inner)?
-            .simplify_ext(true, true)?,
-    )
-}
+binop!(union, union, BV);
+binop!(intersection, intersection, BV);
+binop!(widen, widen, BV);
 
 pub(crate) fn import(_: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<BV>()?;

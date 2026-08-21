@@ -83,29 +83,17 @@ impl PyAstString {
         annotations: Option<Vec<Bound<'py, PyAnnotation>>>,
     ) -> Result<Py<PyAstString>, ClaripyError> {
         let inner = match op {
+            // Ops that are not a plain "call this context method on these args".
             "StringS" => GLOBAL_CONTEXT.strings(&args[0].extract::<String>(py)?)?,
             "StringV" => GLOBAL_CONTEXT.stringv(&args[0].extract::<String>(py)?)?,
-            "StrConcat" => GLOBAL_CONTEXT.str_concat(
-                &args[0].cast_bound::<PyAstString>(py)?.get().inner,
-                &args[1].cast_bound::<PyAstString>(py)?.get().inner,
-            )?,
-            "StrSubstr" => GLOBAL_CONTEXT.str_substr(
-                &args[0].cast_bound::<PyAstString>(py)?.get().inner,
-                &args[1].cast_bound::<BV>(py)?.get().inner,
-                &args[2].cast_bound::<BV>(py)?.get().inner,
-            )?,
-            "StrReplace" => GLOBAL_CONTEXT.str_replace(
-                &args[0].cast_bound::<PyAstString>(py)?.get().inner,
-                &args[1].cast_bound::<PyAstString>(py)?.get().inner,
-                &args[2].cast_bound::<PyAstString>(py)?.get().inner,
-            )?,
-            "IntToStr" => GLOBAL_CONTEXT.bv_to_str(&args[0].cast_bound::<BV>(py)?.get().inner)?,
-            "If" => GLOBAL_CONTEXT.ite(
-                &args[0].cast_bound::<Bool>(py)?.get().inner,
-                &args[1].cast_bound::<PyAstString>(py)?.get().inner,
-                &args[2].cast_bound::<PyAstString>(py)?.get().inner,
-            )?,
-            _ => return Err(ClaripyError::InvalidOperation(op.to_string())),
+            _ => py_new_op_table! {
+                py, args, op;
+                "StrConcat" => str_concat(PyAstString[0], PyAstString[1]),
+                "StrSubstr" => str_substr(PyAstString[0], BV[1], BV[2]),
+                "StrReplace" => str_replace(PyAstString[0], PyAstString[1], PyAstString[2]),
+                "IntToStr" => bv_to_str(BV[0]),
+                "If" => ite(Bool[0], PyAstString[1], PyAstString[2]),
+            },
         };
 
         let inner_with_annotations = if let Some(annots) = annotations {
@@ -136,12 +124,7 @@ impl PyAstString {
         py: Python<'py>,
         other: Bound<'py, PyAstString>,
     ) -> Result<Bound<'py, PyAstString>, ClaripyError> {
-        PyAstString::new(
-            py,
-            &GLOBAL_CONTEXT
-                .str_concat(&self.inner, &other.get().inner)?
-                .simplify()?,
-        )
+        str_binop!(PyAstString, self, py, other, str_concat)
     }
 
     pub fn __eq__<'py>(
@@ -149,12 +132,7 @@ impl PyAstString {
         py: Python<'py>,
         other: Bound<'py, PyAstString>,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .str_eq(&self.inner, &other.get().inner)?
-                .simplify()?,
-        )
+        str_binop!(Bool, self, py, other, str_eq)
     }
 
     pub fn __ne__<'py>(
@@ -162,12 +140,7 @@ impl PyAstString {
         py: Python<'py>,
         other: Bound<'py, PyAstString>,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .str_neq(&self.inner, &other.get().inner)?
-                .simplify()?,
-        )
+        str_binop!(Bool, self, py, other, str_neq)
     }
 
     // `Base` defines `__hash__`, but Python makes a class unhashable if it
@@ -269,19 +242,27 @@ pub fn StrSubstr<'py>(
     )
 }
 
-#[pyfunction]
-pub fn StrContains<'py>(
-    py: Python<'py>,
-    haystack: Bound<'py, PyAstString>,
-    needle: Bound<'py, PyAstString>,
-) -> Result<Bound<'py, Bool>, ClaripyError> {
-    Bool::new(
-        py,
-        &GLOBAL_CONTEXT
-            .str_contains(&haystack.get().inner, &needle.get().inner)?
-            .simplify()?,
-    )
+/// A predicate over two strings, `StrX(a, b) -> Bool`. The argument names are
+/// part of the Python API, so each op spells its own out.
+macro_rules! str_cmp_fn {
+    ($name:ident, $method:ident, $a:ident, $b:ident) => {
+        #[pyfunction]
+        pub fn $name<'py>(
+            py: Python<'py>,
+            $a: Bound<'py, PyAstString>,
+            $b: Bound<'py, PyAstString>,
+        ) -> Result<Bound<'py, Bool>, ClaripyError> {
+            Bool::new(
+                py,
+                &GLOBAL_CONTEXT
+                    .$method(&$a.get().inner, &$b.get().inner)?
+                    .simplify()?,
+            )
+        }
+    };
 }
+
+str_cmp_fn!(StrContains, str_contains, haystack, needle);
 
 #[pyfunction]
 pub fn StrIndexOf<'py>(
@@ -321,33 +302,8 @@ pub fn StrReplace<'py>(
     )
 }
 
-#[pyfunction]
-pub fn StrPrefixOf<'py>(
-    py: Python<'py>,
-    needle: Bound<'py, PyAstString>,
-    haystack: Bound<'py, PyAstString>,
-) -> Result<Bound<'py, Bool>, ClaripyError> {
-    Bool::new(
-        py,
-        &GLOBAL_CONTEXT
-            .str_prefix_of(&needle.get().inner, &haystack.get().inner)?
-            .simplify()?,
-    )
-}
-
-#[pyfunction]
-pub fn StrSuffixOf<'py>(
-    py: Python<'py>,
-    needle: Bound<'py, PyAstString>,
-    haystack: Bound<'py, PyAstString>,
-) -> Result<Bound<'py, Bool>, ClaripyError> {
-    Bool::new(
-        py,
-        &GLOBAL_CONTEXT
-            .str_suffix_of(&needle.get().inner, &haystack.get().inner)?
-            .simplify()?,
-    )
-}
+str_cmp_fn!(StrPrefixOf, str_prefix_of, needle, haystack);
+str_cmp_fn!(StrSuffixOf, str_suffix_of, needle, haystack);
 
 #[pyfunction]
 pub fn StrToInt<'py>(
@@ -381,33 +337,8 @@ pub fn StrIsDigit<'py>(
     )
 }
 
-#[pyfunction]
-pub fn StrEq<'py>(
-    py: Python<'py>,
-    s1: Bound<'py, PyAstString>,
-    s2: Bound<'py, PyAstString>,
-) -> Result<Bound<'py, Bool>, ClaripyError> {
-    Bool::new(
-        py,
-        &GLOBAL_CONTEXT
-            .str_eq(&s1.get().inner, &s2.get().inner)?
-            .simplify()?,
-    )
-}
-
-#[pyfunction]
-pub fn StrNeq<'py>(
-    py: Python<'py>,
-    s1: Bound<'py, PyAstString>,
-    s2: Bound<'py, PyAstString>,
-) -> Result<Bound<'py, Bool>, ClaripyError> {
-    Bool::new(
-        py,
-        &GLOBAL_CONTEXT
-            .str_neq(&s1.get().inner, &s2.get().inner)?
-            .simplify()?,
-    )
-}
+str_cmp_fn!(StrEq, str_eq, s1, s2);
+str_cmp_fn!(StrNeq, str_neq, s1, s2);
 
 pub(crate) fn import(_: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<PyAstString>()?;
