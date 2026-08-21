@@ -5,11 +5,10 @@ use std::sync::LazyLock;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use clarirs_vsa::cardinality::Cardinality;
-use dashmap::DashMap;
 use num_bigint::{BigInt, BigUint, Sign};
 use num_traits::Euclid;
 use pyo3::exceptions::{PyTypeError, PyValueError};
-use pyo3::types::{PySlice, PyWeakrefReference};
+use pyo3::types::PySlice;
 
 use crate::claripy::ast::fp::{PyFSort, PyRM};
 use crate::claripy::ast::{and, not, or, xor};
@@ -17,7 +16,7 @@ use crate::claripy::prelude::*;
 use crate::claripy::pyslicemethodsext::PySliceMethodsExt;
 
 static BVS_COUNTER: AtomicUsize = AtomicUsize::new(0);
-static PY_BV_CACHE: LazyLock<DashMap<u64, Py<PyWeakrefReference>>> = LazyLock::new(DashMap::new);
+static PY_BV_CACHE: LazyLock<WrapperCache> = LazyLock::new(WrapperCache::new);
 
 #[pyclass(extends=Bits, subclass, frozen, weakref, module="angr.rustylib.claripy.ast.bv")]
 pub struct BV {
@@ -39,41 +38,21 @@ impl BV {
         inner: &AstRef<'static>,
         name: Option<String>,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
-        if let Some(cache_hit) = PY_BV_CACHE.get(&inner.hash()).and_then(|cache_hit| {
-            cache_hit
-                .bind(py)
-                .upgrade_as::<BV>()
-                .expect("bool cache poisoned")
-        }) {
-            Ok(cache_hit)
-        } else {
-            let this = Bound::new(
-                py,
+        PY_BV_CACHE.get_or_create(py, inner, || {
+            Ok(
                 PyClassInitializer::from(Base::new_with_name(py, inner, name)?)
                     .add_subclass(Bits::new())
                     .add_subclass(BV {
                         inner: inner.clone(),
                     }),
-            )?;
-            let weakref = PyWeakrefReference::new(&this)?;
-            PY_BV_CACHE.insert(inner.hash(), weakref.unbind());
-
-            Ok(this)
-        }
+            )
+        })
     }
 }
 
 impl Drop for BV {
     fn drop(&mut self) {
-        // Evict this wrapper's cache entry so dead hashes don't accumulate.
-        // Our own weakref is already cleared by the time Drop runs, so a dead
-        // upgrade means the entry is stale; a live upgrade means the entry was
-        // re-populated with a new wrapper and must stay.
-        Python::attach(|py| {
-            PY_BV_CACHE.remove_if(&self.inner.hash(), |_, weakref| {
-                weakref.bind(py).upgrade().is_none()
-            });
-        });
+        PY_BV_CACHE.evict(self.inner.hash());
     }
 }
 

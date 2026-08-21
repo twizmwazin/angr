@@ -11,7 +11,7 @@ pub use crate::claripy::ast::{
     fp::FP,
     opstring::ToOpString,
     string::PyAstString,
-    util::NameString,
+    util::{NameString, WrapperCache},
 };
 pub use crate::claripy::error::ClaripyError;
 pub use clarirs_core::prelude::*;

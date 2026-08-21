@@ -5,13 +5,12 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 
-use dashmap::DashMap;
-use pyo3::types::{PyTuple, PyWeakrefReference};
+use pyo3::types::PyTuple;
 
 use crate::claripy::prelude::*;
 
 static FPS_COUNTER: AtomicUsize = AtomicUsize::new(0);
-static PY_FP_CACHE: LazyLock<DashMap<u64, Py<PyWeakrefReference>>> = LazyLock::new(DashMap::new);
+static PY_FP_CACHE: LazyLock<WrapperCache> = LazyLock::new(WrapperCache::new);
 
 #[pyclass(
     name = "RM",
@@ -192,41 +191,21 @@ impl FP {
         inner: &AstRef<'static>,
         name: Option<String>,
     ) -> Result<Bound<'py, FP>, ClaripyError> {
-        if let Some(cache_hit) = PY_FP_CACHE.get(&inner.hash()).and_then(|cache_hit| {
-            cache_hit
-                .bind(py)
-                .upgrade_as::<FP>()
-                .expect("bool cache poisoned")
-        }) {
-            Ok(cache_hit)
-        } else {
-            let this = Py::new(
-                py,
+        PY_FP_CACHE.get_or_create(py, inner, || {
+            Ok(
                 PyClassInitializer::from(Base::new_with_name(py, inner, name)?)
                     .add_subclass(Bits::new())
                     .add_subclass(FP {
                         inner: inner.clone(),
                     }),
-            )?;
-            let weakref = PyWeakrefReference::new(this.bind(py))?;
-            PY_FP_CACHE.insert(inner.hash(), weakref.unbind());
-
-            Ok(this.into_bound(py))
-        }
+            )
+        })
     }
 }
 
 impl Drop for FP {
     fn drop(&mut self) {
-        // Evict this wrapper's cache entry so dead hashes don't accumulate.
-        // Our own weakref is already cleared by the time Drop runs, so a dead
-        // upgrade means the entry is stale; a live upgrade means the entry was
-        // re-populated with a new wrapper and must stay.
-        Python::attach(|py| {
-            PY_FP_CACHE.remove_if(&self.inner.hash(), |_, weakref| {
-                weakref.bind(py).upgrade().is_none()
-            });
-        });
+        PY_FP_CACHE.evict(self.inner.hash());
     }
 }
 
