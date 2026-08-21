@@ -17,6 +17,7 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use pyo3::exceptions::{PyAttributeError, PyTypeError};
+use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 
@@ -259,10 +260,11 @@ impl AilStatement {
     /// MultiStatementExpression's stmts are walked through this when
     /// the parent Expression's ``deep_copy_ail`` recurses.
     pub fn deep_copy_ail_stmt(&self, manager: &Bound<'_, PyAny>) -> PyResult<AilStatement> {
-        let new_idx: i64 = manager.call_method0("next_atom")?.extract()?;
-        let vmap = manager.getattr("variable_map")?;
+        let py = manager.py();
+        let new_idx: i64 = manager.call_method0(intern!(py, "next_atom"))?.extract()?;
+        let vmap = manager.getattr(intern!(py, "variable_map"))?;
         if !vmap.is_none() {
-            vmap.call_method1("transfer", (self.header.idx, new_idx))?;
+            vmap.call_method1(intern!(py, "transfer"), (self.header.idx, new_idx))?;
         }
         let new_header = StmtHeader::new(new_idx, self.header.tags.clone());
         let recurse = |child: &AilExpression| -> PyResult<Arc<AilExpression>> {
@@ -1660,7 +1662,7 @@ impl Statement {
         let py = slf.py();
         let helper = py
             .import("angr.ailment._deepcopy")?
-            .getattr("deepcopy_via_deep_copy")?;
+            .getattr(intern!(py, "deepcopy_via_deep_copy"))?;
         Ok(helper.call1((slf, memo))?.unbind())
     }
 
@@ -1672,7 +1674,9 @@ impl Statement {
     ) -> PyResult<(Bound<'py, PyAny>, (Bound<'py, PyBytes>,))> {
         let py = slf.py();
         let bytes = slf.borrow().to_bytes(py)?;
-        let from_bytes = py.get_type::<Statement>().getattr("from_bytes")?;
+        let from_bytes = py
+            .get_type::<Statement>()
+            .getattr(intern!(py, "from_bytes"))?;
         Ok((from_bytes, (bytes,)))
     }
 

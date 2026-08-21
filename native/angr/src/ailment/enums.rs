@@ -1,5 +1,6 @@
 //! Simple PyO3-exposed enums shared across ailment expressions.
 
+use pyo3::intern;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -78,8 +79,8 @@ impl VirtualVariableCategory {
         let py = slf.py();
         let cls = py
             .import("angr.rustylib.ailment")?
-            .getattr("VirtualVariableCategory")?;
-        let from_int = cls.getattr("_from_int_py")?;
+            .getattr(intern!(py, "VirtualVariableCategory"))?;
+        let from_int = cls.getattr(intern!(py, "_from_int_py"))?;
         let v = *slf.borrow() as u8;
         let args = pyo3::types::PyTuple::new(py, [v.into_pyobject(py)?.into_any().unbind()])?;
         let tup = pyo3::types::PyTuple::new(
@@ -174,8 +175,10 @@ impl ConvertType {
 
     fn __reduce__<'py>(slf: Bound<'py, Self>) -> PyResult<Py<PyAny>> {
         let py = slf.py();
-        let cls = py.import("angr.rustylib.ailment")?.getattr("ConvertType")?;
-        let from_int = cls.getattr("_from_int_py")?;
+        let cls = py
+            .import("angr.rustylib.ailment")?
+            .getattr(intern!(py, "ConvertType"))?;
+        let from_int = cls.getattr(intern!(py, "_from_int_py"))?;
         let v = *slf.borrow() as u8;
         let args = pyo3::types::PyTuple::new(py, [v.into_pyobject(py)?.into_any().unbind()])?;
         let tup = pyo3::types::PyTuple::new(
@@ -277,8 +280,8 @@ impl ExpressionKind {
         let py = slf.py();
         let cls = py
             .import("angr.rustylib.ailment")?
-            .getattr("ExpressionKind")?;
-        let from_int = cls.getattr("_from_int_py")?;
+            .getattr(intern!(py, "ExpressionKind"))?;
+        let from_int = cls.getattr(intern!(py, "_from_int_py"))?;
         let v = *slf.borrow() as u8;
         let args = pyo3::types::PyTuple::new(py, [v.into_pyobject(py)?.into_any().unbind()])?;
         let tup = pyo3::types::PyTuple::new(
@@ -415,8 +418,8 @@ impl StatementKind {
         let py = slf.py();
         let cls = py
             .import("angr.rustylib.ailment")?
-            .getattr("StatementKind")?;
-        let from_int = cls.getattr("_from_int_py")?;
+            .getattr(intern!(py, "StatementKind"))?;
+        let from_int = cls.getattr(intern!(py, "_from_int_py"))?;
         let v = *slf.borrow() as u8;
         let args = pyo3::types::PyTuple::new(py, [v.into_pyobject(py)?.into_any().unbind()])?;
         let tup = pyo3::types::PyTuple::new(
@@ -532,8 +535,8 @@ impl RoundingMode {
         let py = slf.py();
         let cls = py
             .import("angr.rustylib.ailment")?
-            .getattr("RoundingMode")?;
-        let from_int = cls.getattr("_from_int_py")?;
+            .getattr(intern!(py, "RoundingMode"))?;
+        let from_int = cls.getattr(intern!(py, "_from_int_py"))?;
         let v = *slf.borrow() as u8;
         let args = pyo3::types::PyTuple::new(py, [v.into_pyobject(py)?.into_any().unbind()])?;
         let tup = pyo3::types::PyTuple::new(

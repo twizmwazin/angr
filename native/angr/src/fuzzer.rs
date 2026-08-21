@@ -21,6 +21,7 @@ use libafl_bolts::{
     tuples::{tuple_list, tuple_list_type},
 };
 use pyo3::exceptions::PyRuntimeError;
+use pyo3::intern;
 use pyo3::{exceptions::PyTypeError, prelude::*};
 
 use crate::fuzzer::{
@@ -79,14 +80,17 @@ impl Fuzzer {
         // Register the edge_hitmap plugin if not already present
         let py = base_state.py();
         let has_plugin: bool = base_state
-            .call_method1("has_plugin", ("edge_hitmap",))?
+            .call_method1(intern!(py, "has_plugin"), ("edge_hitmap",))?
             .extract()?;
         if !has_plugin {
             let edge_hitmap_plugin = py
                 .import("angr.state_plugins.edge_hitmap")?
-                .getattr("SimStateEdgeHitmap")?
+                .getattr(intern!(py, "SimStateEdgeHitmap"))?
                 .call0()?;
-            base_state.call_method1("register_plugin", ("edge_hitmap", edge_hitmap_plugin))?;
+            base_state.call_method1(
+                intern!(py, "register_plugin"),
+                ("edge_hitmap", edge_hitmap_plugin),
+            )?;
         }
 
         let observer = OwnedMapObserver::new("", vec![0u8; 65536]);

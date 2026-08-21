@@ -14,6 +14,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
+use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 
@@ -243,8 +244,9 @@ struct ArchCtx<'py> {
 
 impl<'py> ArchCtx<'py> {
     fn new(arch: Bound<'py, PyAny>) -> PyResult<Self> {
-        let byte_width: u32 = arch.getattr("byte_width")?.extract()?;
-        let bits: u32 = arch.getattr("bits")?.extract()?;
+        let py = arch.py();
+        let byte_width: u32 = arch.getattr(intern!(py, "byte_width"))?.extract()?;
+        let bits: u32 = arch.getattr(intern!(py, "bits"))?.extract()?;
         Ok(Self {
             arch,
             byte_width,
@@ -257,9 +259,10 @@ impl<'py> ArchCtx<'py> {
         if let Some(v) = self.reg_name_memo.get(&(offset, size)) {
             return Ok(v.clone());
         }
-        let res = self
-            .arch
-            .call_method1("translate_register_name", (offset, size))?;
+        let res = self.arch.call_method1(
+            intern!(self.arch.py(), "translate_register_name"),
+            (offset, size),
+        )?;
         let name: Option<String> = res.extract()?;
         self.reg_name_memo.insert((offset, size), name.clone());
         Ok(name)
@@ -1289,7 +1292,11 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
     }
 
     fn emit_call_tail(&mut self, jk: &str, statements: &mut Vec<AilStatement>) -> PyResult<()> {
-        let ret_offset: i64 = self.arch.arch.getattr("ret_offset")?.extract()?;
+        let ret_offset: i64 = self
+            .arch
+            .arch
+            .getattr(intern!(self.py, "ret_offset"))?
+            .extract()?;
         let bits = self.arch.bits;
         let ret_name = self.arch.reg_name(ret_offset, bits)?;
         let ret_expr = {
@@ -1306,7 +1313,11 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
             }
         };
 
-        let fp_ret_offset: Option<i64> = self.arch.arch.getattr("fp_ret_offset")?.extract()?;
+        let fp_ret_offset: Option<i64> = self
+            .arch
+            .arch
+            .getattr(intern!(self.py, "fp_ret_offset"))?
+            .extract()?;
         let fp_ret_expr: Option<AilExpression> = if let Some(fp_ret_offset) = fp_ret_offset {
             if fp_ret_offset == ret_offset {
                 None
@@ -1972,7 +1983,7 @@ fn vex_arch_int(name: &str) -> Option<u32> {
 }
 
 fn build_archinfo(arch: &Bound<'_, PyAny>) -> PyResult<vex_ffi::VexArchInfo> {
-    let vai = arch.getattr("vex_archinfo")?;
+    let vai = arch.getattr(intern!(arch.py(), "vex_archinfo"))?;
     let geti =
         |k: &str| -> PyResult<i64> { Ok(vai.get_item(k)?.extract::<Option<i64>>()?.unwrap_or(0)) };
     Ok(vex_ffi::VexArchInfo {
@@ -2064,7 +2075,7 @@ impl VEXIRSBConverter {
             PyRuntimeError::new_err("libpyvex `vex_lift` symbol not found (is pyvex imported?)")
         })?;
 
-        let vex_arch_name: String = arch.getattr("vex_arch")?.extract()?;
+        let vex_arch_name: String = arch.getattr(intern!(py, "vex_arch"))?.extract()?;
         let guest = vex_arch_int(&vex_arch_name)
             .ok_or_else(|| PyValueError::new_err(format!("unsupported VexArch {vex_arch_name}")))?;
         let archinfo = build_archinfo(&arch)?;
@@ -2175,9 +2186,9 @@ impl VEXIRSBConverter {
         manager: Bound<'_, Manager>,
     ) -> PyResult<Block> {
         vex_ffi::init_symbols(py);
-        let arch = irsb.getattr("arch")?;
-        let tyenv = irsb.getattr("tyenv")?;
-        let block_addr: i64 = irsb.getattr("addr")?.extract()?;
+        let arch = irsb.getattr(intern!(py, "arch"))?;
+        let tyenv = irsb.getattr(intern!(py, "tyenv"))?;
+        let block_addr: i64 = irsb.getattr(intern!(py, "addr"))?.extract()?;
         // Keep manager state in sync with the legacy converter.
         {
             let mut m = manager.borrow_mut();
@@ -2187,7 +2198,9 @@ impl VEXIRSBConverter {
         let reader = PyReader {
             irsb: irsb.clone(),
             tyenv,
-            statements: irsb.getattr("statements")?.cast_into::<PyList>()?,
+            statements: irsb
+                .getattr(intern!(py, "statements"))?
+                .cast_into::<PyList>()?,
         };
         VEXIRSBConverter::run(py, &reader, Some(block_addr), &manager, arch)
     }
@@ -2205,7 +2218,7 @@ struct PyReader<'py> {
 
 impl<'py> PyReader<'py> {
     fn result_size(&self, e: &Bound<'py, PyAny>) -> u32 {
-        match e.call_method1("result_size", (&self.tyenv,)) {
+        match e.call_method1(intern!(self.tyenv.py(), "result_size"), (&self.tyenv,)) {
             Ok(v) => v.extract().unwrap_or(0),
             Err(_) => 0,
         }
@@ -2224,27 +2237,30 @@ impl<'py> IrReader for PyReader<'py> {
 
     fn block_addr(&self) -> i64 {
         self.irsb
-            .getattr("addr")
+            .getattr(intern!(self.irsb.py(), "addr"))
             .and_then(|a| a.extract())
             .unwrap_or(0)
     }
 
     fn block_size(&self) -> Option<i64> {
         self.irsb
-            .getattr("size")
+            .getattr(intern!(self.irsb.py(), "size"))
             .ok()
             .and_then(|s| s.extract().ok())
     }
 
     fn jumpkind(&self) -> String {
         self.irsb
-            .getattr("jumpkind")
+            .getattr(intern!(self.irsb.py(), "jumpkind"))
             .and_then(|j| j.extract())
             .unwrap_or_default()
     }
 
     fn next_expr(&self) -> Self::E {
-        self.irsb.getattr("next").unwrap().unbind()
+        self.irsb
+            .getattr(intern!(self.irsb.py(), "next"))
+            .unwrap()
+            .unbind()
     }
 
     fn num_stmts(&self) -> usize {
@@ -2256,112 +2272,123 @@ impl<'py> IrReader for PyReader<'py> {
         let tn = Self::type_name(&stmt);
         Ok(match tn.as_str() {
             "IMark" => StmtKind::IMark {
-                addr: stmt.getattr("addr")?.extract()?,
-                delta: stmt.getattr("delta")?.extract()?,
+                addr: stmt.getattr(intern!(py, "addr"))?.extract()?,
+                delta: stmt.getattr(intern!(py, "delta"))?.extract()?,
             },
             "AbiHint" => StmtKind::AbiHint,
             "NoOp" => StmtKind::NoOp,
             "WrTmp" => {
-                let data = stmt.getattr("data")?;
+                let data = stmt.getattr(intern!(py, "data"))?;
                 let data_bits = self.result_size(&data);
                 StmtKind::WrTmp {
-                    tmp: stmt.getattr("tmp")?.extract()?,
+                    tmp: stmt.getattr(intern!(py, "tmp"))?.extract()?,
                     data: data.unbind(),
                     data_bits,
                 }
             }
             "Put" => StmtKind::Put {
-                offset: stmt.getattr("offset")?.extract()?,
-                data: stmt.getattr("data")?.unbind(),
+                offset: stmt.getattr(intern!(py, "offset"))?.extract()?,
+                data: stmt.getattr(intern!(py, "data"))?.unbind(),
             },
             "Store" => {
-                let data = stmt.getattr("data")?;
+                let data = stmt.getattr(intern!(py, "data"))?;
                 let size_bytes = (self.result_size(&data) / 8) as i32;
                 StmtKind::Store {
-                    addr: stmt.getattr("addr")?.unbind(),
+                    addr: stmt.getattr(intern!(py, "addr"))?.unbind(),
                     data: data.unbind(),
                     size_bytes,
-                    endness: stmt.getattr("endness")?.extract()?,
+                    endness: stmt.getattr(intern!(py, "endness"))?.extract()?,
                 }
             }
             "Exit" => StmtKind::Exit {
-                guard: stmt.getattr("guard")?.unbind(),
-                dst: stmt.getattr("dst")?.unbind(),
-                jk: stmt.getattr("jumpkind")?.extract()?,
+                guard: stmt.getattr(intern!(py, "guard"))?.unbind(),
+                dst: stmt.getattr(intern!(py, "dst"))?.unbind(),
+                jk: stmt.getattr(intern!(py, "jumpkind"))?.extract()?,
             },
             "LoadG" => {
-                let dst: u32 = stmt.getattr("dst")?.extract()?;
-                let dst_bits = self.tyenv.call_method1("sizeof", (dst,))?.extract()?;
+                let dst: u32 = stmt.getattr(intern!(py, "dst"))?.extract()?;
+                let dst_bits = self
+                    .tyenv
+                    .call_method1(intern!(py, "sizeof"), (dst,))?
+                    .extract()?;
                 StmtKind::LoadG {
                     dst,
                     dst_bits,
-                    cvt: stmt.getattr("cvt")?.extract()?,
-                    addr: stmt.getattr("addr")?.unbind(),
-                    alt: stmt.getattr("alt")?.unbind(),
-                    guard: stmt.getattr("guard")?.unbind(),
-                    end: stmt.getattr("end")?.extract()?,
+                    cvt: stmt.getattr(intern!(py, "cvt"))?.extract()?,
+                    addr: stmt.getattr(intern!(py, "addr"))?.unbind(),
+                    alt: stmt.getattr(intern!(py, "alt"))?.unbind(),
+                    guard: stmt.getattr(intern!(py, "guard"))?.unbind(),
+                    end: stmt.getattr(intern!(py, "end"))?.extract()?,
                 }
             }
             "StoreG" => {
-                let data = stmt.getattr("data")?;
+                let data = stmt.getattr(intern!(py, "data"))?;
                 let size_bytes = (self.result_size(&data) / 8) as i32;
                 StmtKind::StoreG {
-                    addr: stmt.getattr("addr")?.unbind(),
+                    addr: stmt.getattr(intern!(py, "addr"))?.unbind(),
                     data: data.unbind(),
                     size_bytes,
-                    endness: stmt.getattr("endness")?.extract()?,
-                    guard: stmt.getattr("guard")?.unbind(),
+                    endness: stmt.getattr(intern!(py, "endness"))?.extract()?,
+                    guard: stmt.getattr(intern!(py, "guard"))?.unbind(),
                 }
             }
             "CAS" => {
-                let data_hi: Option<Py<PyAny>> = stmt.getattr("dataHi")?.extract()?;
-                let expd_hi: Option<Py<PyAny>> = stmt.getattr("expdHi")?.extract()?;
-                let old_lo: u32 = stmt.getattr("oldLo")?.extract()?;
-                let old_hi_raw: u32 = stmt.getattr("oldHi")?.extract()?;
-                let old_lo_bits = self.tyenv.call_method1("sizeof", (old_lo,))?.extract()?;
+                let data_hi: Option<Py<PyAny>> = stmt.getattr(intern!(py, "dataHi"))?.extract()?;
+                let expd_hi: Option<Py<PyAny>> = stmt.getattr(intern!(py, "expdHi"))?.extract()?;
+                let old_lo: u32 = stmt.getattr(intern!(py, "oldLo"))?.extract()?;
+                let old_hi_raw: u32 = stmt.getattr(intern!(py, "oldHi"))?.extract()?;
+                let old_lo_bits = self
+                    .tyenv
+                    .call_method1(intern!(py, "sizeof"), (old_lo,))?
+                    .extract()?;
                 let (old_hi, old_hi_bits) = if old_hi_raw != IRTEMP_INVALID {
                     (
                         Some(old_hi_raw),
                         self.tyenv
-                            .call_method1("sizeof", (old_hi_raw,))?
+                            .call_method1(intern!(py, "sizeof"), (old_hi_raw,))?
                             .extract()?,
                     )
                 } else {
                     (None, 0)
                 };
                 StmtKind::Cas {
-                    addr: stmt.getattr("addr")?.unbind(),
-                    data_lo: stmt.getattr("dataLo")?.unbind(),
+                    addr: stmt.getattr(intern!(py, "addr"))?.unbind(),
+                    data_lo: stmt.getattr(intern!(py, "dataLo"))?.unbind(),
                     data_hi,
-                    expd_lo: stmt.getattr("expdLo")?.unbind(),
+                    expd_lo: stmt.getattr(intern!(py, "expdLo"))?.unbind(),
                     expd_hi,
                     old_lo,
                     old_lo_bits,
                     old_hi,
                     old_hi_bits,
-                    endness: stmt.getattr("endness")?.extract()?,
+                    endness: stmt.getattr(intern!(py, "endness"))?.extract()?,
                 }
             }
             "Dirty" => {
-                let tmp_raw: u32 = stmt.getattr("tmp")?.extract()?;
+                let tmp_raw: u32 = stmt.getattr(intern!(py, "tmp"))?.extract()?;
                 let (tmp, tmp_bits) = if tmp_raw != IRTEMP_INVALID {
                     (
                         Some(tmp_raw),
-                        self.tyenv.call_method1("sizeof", (tmp_raw,))?.extract()?,
+                        self.tyenv
+                            .call_method1(intern!(py, "sizeof"), (tmp_raw,))?
+                            .extract()?,
                     )
                 } else {
                     (None, 0)
                 };
-                let guard: Option<Py<PyAny>> = stmt.getattr("guard")?.extract()?;
-                let maddr: Option<Py<PyAny>> = stmt.getattr("mAddr")?.extract()?;
-                let args: Vec<Py<PyAny>> = stmt.getattr("args")?.extract()?;
+                let guard: Option<Py<PyAny>> = stmt.getattr(intern!(py, "guard"))?.extract()?;
+                let maddr: Option<Py<PyAny>> = stmt.getattr(intern!(py, "mAddr"))?.extract()?;
+                let args: Vec<Py<PyAny>> = stmt.getattr(intern!(py, "args"))?.extract()?;
                 StmtKind::Dirty {
-                    callee: stmt.getattr("cee")?.getattr("name")?.extract()?,
+                    callee: stmt
+                        .getattr(intern!(py, "cee"))?
+                        .getattr(intern!(py, "name"))?
+                        .extract()?,
                     args,
                     guard,
-                    mfx: Some(stmt.getattr("mFx")?.extract()?),
+                    mfx: Some(stmt.getattr(intern!(py, "mFx"))?.extract()?),
                     maddr,
-                    msize: Some(stmt.getattr("mSize")?.extract()?),
+                    msize: Some(stmt.getattr(intern!(py, "mSize"))?.extract()?),
                     tmp,
                     tmp_bits,
                 }
@@ -2378,40 +2405,43 @@ impl<'py> IrReader for PyReader<'py> {
     fn expr_kind(&self, py: Python<'_>, e: &Self::E) -> PyResult<ExprKind<Self::E>> {
         let expr = e.bind(py);
         // pyvex.const.IRConst (e.g. Exit.dst) -> const_n in the original.
-        let irconst_ty = py.import("pyvex")?.getattr("const")?.getattr("IRConst")?;
+        let irconst_ty = py
+            .import("pyvex")?
+            .getattr(intern!(py, "const"))?
+            .getattr(intern!(py, "IRConst"))?;
         if expr.is_instance(&irconst_ty)? {
             return Ok(ExprKind::Const {
-                value: expr.getattr("value")?.extract()?,
-                bits: expr.getattr("size")?.extract()?,
+                value: expr.getattr(intern!(py, "value"))?.extract()?,
+                bits: expr.getattr(intern!(py, "size"))?.extract()?,
             });
         }
         let tn = Self::type_name(expr);
         Ok(match tn.as_str() {
             "RdTmp" => ExprKind::RdTmp {
-                tmp: expr.getattr("tmp")?.extract()?,
+                tmp: expr.getattr(intern!(py, "tmp"))?.extract()?,
                 bits: self.result_size(expr),
             },
             "Get" => ExprKind::Get {
-                offset: expr.getattr("offset")?.extract()?,
+                offset: expr.getattr(intern!(py, "offset"))?.extract()?,
                 bits: self.result_size(expr),
             },
             "Load" => ExprKind::Load {
-                end: expr.getattr("end")?.extract()?,
+                end: expr.getattr(intern!(py, "end"))?.extract()?,
                 bits: self.result_size(expr),
-                addr: expr.getattr("addr")?.unbind(),
+                addr: expr.getattr(intern!(py, "addr"))?.unbind(),
             },
             "Unop" => ExprKind::Unop {
                 op: OpRef::Named {
-                    name: expr.getattr("op")?.extract::<String>()?,
+                    name: expr.getattr(intern!(py, "op"))?.extract::<String>()?,
                     result_bits: self.result_size(expr),
                 },
-                arg: expr.getattr("args")?.get_item(0)?.unbind(),
+                arg: expr.getattr(intern!(py, "args"))?.get_item(0)?.unbind(),
             },
             "Binop" => {
-                let args = expr.getattr("args")?;
+                let args = expr.getattr(intern!(py, "args"))?;
                 ExprKind::Binop {
                     op: OpRef::Named {
-                        name: expr.getattr("op")?.extract::<String>()?,
+                        name: expr.getattr(intern!(py, "op"))?.extract::<String>()?,
                         result_bits: self.result_size(expr),
                     },
                     arg1: args.get_item(0)?.unbind(),
@@ -2419,31 +2449,34 @@ impl<'py> IrReader for PyReader<'py> {
                 }
             }
             "Triop" => {
-                let v: Vec<Py<PyAny>> = expr.getattr("args")?.extract()?;
+                let v: Vec<Py<PyAny>> = expr.getattr(intern!(py, "args"))?.extract()?;
                 ExprKind::Triop {
                     op: OpRef::Named {
-                        name: expr.getattr("op")?.extract::<String>()?,
+                        name: expr.getattr(intern!(py, "op"))?.extract::<String>()?,
                         result_bits: self.result_size(expr),
                     },
                     args: v,
                 }
             }
             "Const" => {
-                let con = expr.getattr("con")?;
+                let con = expr.getattr(intern!(py, "con"))?;
                 ExprKind::Const {
-                    value: con.getattr("value")?.extract()?,
+                    value: con.getattr(intern!(py, "value"))?.extract()?,
                     bits: self.result_size(expr),
                 }
             }
             "ITE" => ExprKind::Ite {
-                cond: expr.getattr("cond")?.unbind(),
-                iftrue: expr.getattr("iftrue")?.unbind(),
-                iffalse: expr.getattr("iffalse")?.unbind(),
+                cond: expr.getattr(intern!(py, "cond"))?.unbind(),
+                iftrue: expr.getattr(intern!(py, "iftrue"))?.unbind(),
+                iffalse: expr.getattr(intern!(py, "iffalse"))?.unbind(),
             },
             "CCall" => {
-                let args: Vec<Py<PyAny>> = expr.getattr("args")?.extract()?;
+                let args: Vec<Py<PyAny>> = expr.getattr(intern!(py, "args"))?.extract()?;
                 ExprKind::CCall {
-                    callee: expr.getattr("cee")?.getattr("name")?.extract()?,
+                    callee: expr
+                        .getattr(intern!(py, "cee"))?
+                        .getattr(intern!(py, "name"))?
+                        .extract()?,
                     args,
                     bits: self.result_size(expr),
                 }

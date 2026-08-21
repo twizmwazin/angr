@@ -27,6 +27,7 @@ use std::collections::HashMap;
 
 use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PyKeyError, PyStopIteration, PyTypeError};
+use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyMapping, PyTuple};
 use pyo3::{Borrowed, Py, PyAny};
@@ -508,7 +509,7 @@ impl TagsView {
                 inner: self.inner.clone(),
                 parent: None,
             };
-            parent.bind(py).setattr("tags", snapshot)?;
+            parent.bind(py).setattr(intern!(py, "tags"), snapshot)?;
         }
         Ok(())
     }

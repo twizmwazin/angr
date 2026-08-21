@@ -1,4 +1,5 @@
 use num_bigint::BigUint;
+use pyo3::intern;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyTuple, PyType};
 
@@ -58,7 +59,7 @@ fn cached_annotation<'py>(
 ) -> Option<Bound<'py, PyAnnotation>> {
     let cache = original_annotations(py).ok()?;
     let obj = cache
-        .call_method1("get", (annotation.identity_hash(),))
+        .call_method1(intern!(py, "get"), (annotation.identity_hash(),))
         .ok()?;
     if obj.is_none() {
         return None;
@@ -136,22 +137,23 @@ impl PyAnnotation {
         } else {
             // Unknown, user-defined annotation: preserve it losslessly by
             // pickling the Python object so it can be reconstructed later.
+            let py = slf.py();
             let eliminatable = slf
-                .getattr("eliminatable")
+                .getattr(intern!(py, "eliminatable"))
                 .and_then(|v| v.extract::<bool>())
                 .unwrap_or(true);
             let relocatable = slf
-                .getattr("relocatable")
+                .getattr(intern!(py, "relocatable"))
                 .and_then(|v| v.extract::<bool>())
                 .unwrap_or(false);
-            let module_name = slf.getattr("__module__")?.extract::<String>()?;
-            let class_name = slf
-                .getattr("__class__")?
-                .getattr("__name__")?
+            let module_name = slf
+                .getattr(intern!(py, "__module__"))?
                 .extract::<String>()?;
-            let pickled = pickle_dumps(slf.py())?
-                .call1((slf,))?
-                .extract::<Vec<u8>>()?;
+            let class_name = slf
+                .getattr(intern!(py, "__class__"))?
+                .getattr(intern!(py, "__name__"))?
+                .extract::<String>()?;
+            let pickled = pickle_dumps(py)?.call1((slf,))?.extract::<Vec<u8>>()?;
             // Identify the annotation by the object's hash; the pickled bytes
             // are kept only to reconstruct it.
             let obj_hash = slf.hash()? as i64;
@@ -189,7 +191,7 @@ impl PyAnnotation {
 
         match annotation.type_() {
             AnnotationType::Unknown { value, .. } => {
-                let pickle_loads = py.import("pickle")?.getattr("loads")?;
+                let pickle_loads = py.import("pickle")?.getattr(intern!(py, "loads"))?;
                 Ok(pickle_loads
                     .call1((value.0.clone(),))?
                     .cast_into::<PyAnnotation>()?)

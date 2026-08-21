@@ -22,6 +22,7 @@ use std::sync::Arc;
 
 use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PyAttributeError, PyTypeError};
+use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyList, PyString, PyTuple};
 
@@ -1666,15 +1667,16 @@ impl AilExpression {
     /// re-number atoms when cloning blocks. Polymorphic Python-typed
     /// fields are cloned via Python ``copy.deepcopy``.
     pub fn deep_copy_ail(&self, manager: &Bound<'_, PyAny>) -> PyResult<AilExpression> {
-        let new_idx: i64 = manager.call_method0("next_atom")?.extract()?;
+        let py = manager.py();
+        let new_idx: i64 = manager.call_method0(intern!(py, "next_atom"))?.extract()?;
         // Mirror master's TaggedObject._transfer_varmap: when the
         // manager carries a VariableMap, copy any side-container entries
         // (variable, variable_offset, variant, returnty, ...) from the
         // old idx to the new one so deep-copied atoms keep their
         // associations.
-        let vmap = manager.getattr("variable_map")?;
+        let vmap = manager.getattr(intern!(py, "variable_map"))?;
         if !vmap.is_none() {
-            vmap.call_method1("transfer", (self.header.idx, new_idx))?;
+            vmap.call_method1(intern!(py, "transfer"), (self.header.idx, new_idx))?;
         }
         let new_header = ExprHeader::new(
             new_idx,
@@ -4571,7 +4573,7 @@ impl Expression {
         let py = slf.py();
         let helper = py
             .import("angr.ailment._deepcopy")?
-            .getattr("deepcopy_via_deep_copy")?;
+            .getattr(intern!(py, "deepcopy_via_deep_copy"))?;
         Ok(helper.call1((slf, memo))?.unbind())
     }
 
@@ -4583,7 +4585,9 @@ impl Expression {
     ) -> PyResult<(Bound<'py, PyAny>, (Bound<'py, PyBytes>,))> {
         let py = slf.py();
         let bytes = slf.borrow().to_bytes(py)?;
-        let from_bytes = py.get_type::<Expression>().getattr("from_bytes")?;
+        let from_bytes = py
+            .get_type::<Expression>()
+            .getattr(intern!(py, "from_bytes"))?;
         Ok((from_bytes, (bytes,)))
     }
 
@@ -5040,7 +5044,7 @@ fn extract_phi_entries(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<Vec<P
 fn phi_validation_error(py: Python<'_>, msg: &str) -> PyErr {
     let trace = py
         .import("traceback")
-        .and_then(|tb| tb.call_method0("format_stack"))
+        .and_then(|tb| tb.call_method0(intern!(py, "format_stack")))
         .and_then(|frames| {
             let parts: Vec<String> = frames
                 .try_iter()?

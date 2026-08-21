@@ -4,6 +4,7 @@ use std::hash::{Hash, Hasher};
 use std::sync::atomic::Ordering;
 
 use pyo3::exceptions::PyTypeError;
+use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyList, PyType};
 
@@ -137,7 +138,7 @@ impl Block {
             } else if stmt.is_none() {
                 new_list.append(&stmt)?;
             } else {
-                new_list.append(stmt.call_method1("deep_copy", (manager,))?)?;
+                new_list.append(stmt.call_method1(intern!(py, "deep_copy"), (manager,))?)?;
             }
         }
         Ok(Self {
@@ -270,12 +271,12 @@ impl Block {
         let py = slf.py();
         let helper = py
             .import("angr.ailment._deepcopy")?
-            .getattr("deepcopy_via_deep_copy")?;
+            .getattr(intern!(py, "deepcopy_via_deep_copy"))?;
         Ok(helper.call1((slf, memo))?.unbind())
     }
 
     fn __copy__<'py>(slf: Bound<'py, Self>) -> PyResult<Py<PyAny>> {
-        Ok(slf.call_method0("copy")?.unbind())
+        Ok(slf.call_method0(intern!(slf.py(), "copy"))?.unbind())
     }
 
     // --- Byte serialization --------------------------------------------

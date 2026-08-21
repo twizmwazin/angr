@@ -24,6 +24,7 @@ pub mod vexop_names;
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 
+use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyModule};
 use pyo3::wrap_pyfunction;
@@ -42,15 +43,15 @@ fn _vexop_debug(py: Python<'_>, op_int: u32) -> PyResult<Option<Py<PyDict>>> {
             let is_signed = info.is_signed();
             let is_conversion = info.is_conversion();
             let d = PyDict::new(py);
-            d.set_item("generic_name", info.generic_name)?;
-            d.set_item("output_size_bits", info.output_size_bits)?;
-            d.set_item("is_signed", is_signed)?;
-            d.set_item("is_conversion", is_conversion)?;
-            d.set_item("float", info.float)?;
-            d.set_item("from_size", info.from_size)?;
-            d.set_item("to_size", info.to_size)?;
-            d.set_item("vector_count", info.vector_count)?;
-            d.set_item("vector_size", info.vector_size)?;
+            d.set_item(intern!(py, "generic_name"), info.generic_name)?;
+            d.set_item(intern!(py, "output_size_bits"), info.output_size_bits)?;
+            d.set_item(intern!(py, "is_signed"), is_signed)?;
+            d.set_item(intern!(py, "is_conversion"), is_conversion)?;
+            d.set_item(intern!(py, "float"), info.float)?;
+            d.set_item(intern!(py, "from_size"), info.from_size)?;
+            d.set_item(intern!(py, "to_size"), info.to_size)?;
+            d.set_item(intern!(py, "vector_count"), info.vector_count)?;
+            d.set_item(intern!(py, "vector_size"), info.vector_size)?;
             Ok(Some(d.unbind()))
         }
     }

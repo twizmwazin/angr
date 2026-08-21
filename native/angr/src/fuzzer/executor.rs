@@ -6,6 +6,7 @@ use libafl::{
     state::HasExecutions,
 };
 use libafl_bolts::{ToSliceMut, tuples::RefIndexable};
+use pyo3::intern;
 use pyo3::prelude::*;
 
 use crate::fuzzer::{EM, I, OT, S, Z};
@@ -32,10 +33,10 @@ impl<S> PyExecutorInner<S> {
                 "Expected a callable function",
             ));
         }
-        let emulator_cls = base_state
-            .py()
+        let py = base_state.py();
+        let emulator_cls = py
             .import("angr.emulator")?
-            .getattr("Emulator")?
+            .getattr(intern!(py, "Emulator"))?
             .unbind();
         Ok(PyExecutorInner {
             base_state: base_state.unbind(),
@@ -63,7 +64,11 @@ impl Executor<EM, I, S, Z> for PyExecutorInner<S> {
             || -> _ {
                 // Step 1: Copy the base state and run the apply function
                 // Copy base state by calling python copy function
-                let copied_state = self.base_state.bind(py).getattr("copy")?.call0()?;
+                let copied_state = self
+                    .base_state
+                    .bind(py)
+                    .getattr(intern!(py, "copy"))?
+                    .call0()?;
 
                 // Call apply_fn on the state with the input
                 let apply_fn = self.apply_fn.bind(py);
@@ -73,10 +78,10 @@ impl Executor<EM, I, S, Z> for PyExecutorInner<S> {
                 let icicle_engine = if let Some(ref cached) = self.cached_engine {
                     cached.bind(py).clone()
                 } else {
-                    let project = copied_state.getattr("project")?;
+                    let project = copied_state.getattr(intern!(py, "project"))?;
                     let engine = py
                         .import("angr.engines.icicle")?
-                        .getattr("UberIcicleEngine")?
+                        .getattr(intern!(py, "UberIcicleEngine"))?
                         .call1((project,))?;
                     self.cached_engine = Some(engine.clone().unbind());
                     engine
@@ -92,37 +97,39 @@ impl Executor<EM, I, S, Z> for PyExecutorInner<S> {
                 // ints), use those addresses.  Otherwise fall back to auto-detecting
                 // the return address via cc.return_addr (works for shellcode where
                 // the apply_fn pushes a return address onto the stack).
-                let globals = copied_state.getattr("globals")?;
+                let globals = copied_state.getattr(intern!(py, "globals"))?;
                 let user_bps: Option<Vec<u64>> = globals
-                    .call_method1("get", ("_fuzzer_breakpoints",))?
+                    .call_method1(intern!(py, "get"), ("_fuzzer_breakpoints",))?
                     .extract()?;
                 if let Some(bp_list) = user_bps {
                     for bp in bp_list {
-                        emulator.call_method1("add_breakpoint", (bp,))?;
-                        emulator.call_method1("add_breakpoint", (bp & !1,))?;
+                        emulator.call_method1(intern!(py, "add_breakpoint"), (bp,))?;
+                        emulator.call_method1(intern!(py, "add_breakpoint"), (bp & !1,))?;
                     }
                 } else {
                     // Auto-detect: read the return address from the calling convention
-                    let project = copied_state.getattr("project")?;
-                    let cc = project.getattr("factory")?.call_method0("cc")?;
-                    let return_addr_loc = cc.getattr("return_addr")?;
+                    let project = copied_state.getattr(intern!(py, "project"))?;
+                    let cc = project
+                        .getattr(intern!(py, "factory"))?
+                        .call_method0(intern!(py, "cc"))?;
+                    let return_addr_loc = cc.getattr(intern!(py, "return_addr"))?;
                     let return_addr: u64 = return_addr_loc
-                        .call_method1("get_value", (&copied_state,))?
-                        .getattr("concrete_value")?
+                        .call_method1(intern!(py, "get_value"), (&copied_state,))?
+                        .getattr(intern!(py, "concrete_value"))?
                         .extract()
                         .map_err(|e| {
                             pyo3::exceptions::PyRuntimeError::new_err(format!(
                                 "Could not read return address from state: {e}"
                             ))
                         })?;
-                    emulator.call_method1("add_breakpoint", (return_addr,))?;
-                    emulator.call_method1("add_breakpoint", (return_addr & !1,))?;
+                    emulator.call_method1(intern!(py, "add_breakpoint"), (return_addr,))?;
+                    emulator.call_method1(intern!(py, "add_breakpoint"), (return_addr & !1,))?;
                 }
 
                 let exit = emulator
-                    .getattr("run")?
+                    .getattr(intern!(py, "run"))?
                     .call0()?
-                    .getattr("name")?
+                    .getattr(intern!(py, "name"))?
                     .extract::<String>()?;
 
                 Ok((emulator.unbind(), exit))
@@ -163,9 +170,9 @@ impl Executor<EM, I, S, Z> for PyExecutorInner<S> {
         let py_hitmap: Vec<u8> = Python::attach(|py| {
             emulator
                 .bind(py)
-                .getattr("state")?
-                .call_method1("get_plugin", ("edge_hitmap",))?
-                .getattr("edge_hitmap")?
+                .getattr(intern!(py, "state"))?
+                .call_method1(intern!(py, "get_plugin"), ("edge_hitmap",))?
+                .getattr(intern!(py, "edge_hitmap"))?
                 .extract()
         })
         .map_err(|e| libafl::Error::unknown(format!("Python error extracting hitmap: {e}")))?;

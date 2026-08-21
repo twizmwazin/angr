@@ -9,6 +9,7 @@ use clarirs_vsa::reduce::Reduce;
 use clarirs_vsa::strided_interval::ComparisonResult;
 use dashmap::DashMap;
 use pyo3::exceptions::PyValueError;
+use pyo3::intern;
 use pyo3::types::PyTuple;
 use pyo3::types::{PyDict, PyWeakrefMethods, PyWeakrefReference};
 
@@ -488,12 +489,12 @@ pub fn reverse_ite_cases<'py>(
     while let Some((condition, current_ast)) = queue.pop() {
         // Check if this is an If node
         if let Ok(base) = current_ast.cast::<Base>() {
-            let op = base.getattr("op")?;
+            let op = base.getattr(intern!(py, "op"))?;
             let op_str: String = op.extract()?;
 
             if op_str == "If" {
                 // Get the three arguments: condition, true_branch, false_branch
-                let args = base.getattr("args")?;
+                let args = base.getattr(intern!(py, "args"))?;
                 let args_vec: Vec<Bound<'py, PyAny>> = args.extract()?;
 
                 if args_vec.len() == 3 {
@@ -546,7 +547,7 @@ pub fn ite_dict<'py>(
     if d.len() <= 4 {
         let mut cases = Vec::new();
         for (k, v) in d.iter() {
-            let cond = i.call_method1("__eq__", (k,))?;
+            let cond = i.call_method1(intern!(py, "__eq__"), (k,))?;
             let tuple = PyTuple::new(py, &[cond, v])?;
             cases.push(tuple.into_any());
         }
@@ -559,7 +560,7 @@ pub fn ite_dict<'py>(
     let keys = d.keys();
 
     // Sort the keys
-    keys.getattr("sort")?.call0()?;
+    keys.getattr(intern!(py, "sort"))?.call0()?;
 
     let split_idx = (keys.len() - 1) / 2;
     let split_val = keys.get_item(split_idx)?;
@@ -569,7 +570,7 @@ pub fn ite_dict<'py>(
     let dict_high = PyDict::new(py);
 
     for (k, v) in d.iter() {
-        let le = k.call_method1("__le__", (split_val.clone(),))?;
+        let le = k.call_method1(intern!(py, "__le__"), (split_val.clone(),))?;
         let is_le: Bound<'py, Bool> = le.extract::<CoerceBool>()?.into();
 
         if is_le.get().inner.is_true() {
@@ -594,7 +595,7 @@ pub fn ite_dict<'py>(
 
     // Combine with an if-then-else
     let cond = i
-        .call_method1("__le__", (split_val,))?
+        .call_method1(intern!(py, "__le__"), (split_val,))?
         .cast_into::<Bool>()?;
 
     // Create If expression: If(cond, val_low, val_high)

@@ -9,6 +9,7 @@ use crate::automaton::subset_construction::subset_construction;
 use crate::automaton::symbol::{EPSILON, SymbolId};
 use indexmap::IndexMap;
 use pyo3::exceptions::PyValueError;
+use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PySet;
 
@@ -315,11 +316,11 @@ impl PyDFA {
     fn to_networkx<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         // Import networkx
         let nx = py.import("networkx")?;
-        let graph = nx.call_method0("MultiDiGraph")?;
+        let graph = nx.call_method0(intern!(py, "MultiDiGraph"))?;
 
         // Add nodes
         for state in 0..self.dfa.num_states() {
-            graph.call_method1("add_node", (state,))?;
+            graph.call_method1(intern!(py, "add_node"), (state,))?;
         }
 
         // Add edges with labels
@@ -335,9 +336,9 @@ impl PyDFA {
 
             // Create kwargs dict with label
             let kwargs = pyo3::types::PyDict::new(py);
-            kwargs.set_item("label", label)?;
+            kwargs.set_item(intern!(py, "label"), label)?;
 
-            graph.call_method("add_edge", (src, dst), Some(&kwargs))?;
+            graph.call_method(intern!(py, "add_edge"), (src, dst), Some(&kwargs))?;
         }
 
         Ok(graph)

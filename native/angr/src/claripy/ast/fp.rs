@@ -6,6 +6,7 @@ use std::sync::{
 };
 
 use dashmap::DashMap;
+use pyo3::intern;
 use pyo3::types::{PyTuple, PyWeakrefReference};
 
 use crate::claripy::prelude::*;
@@ -111,7 +112,7 @@ impl PyFSort {
 
     pub fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (u32,))> {
         let class = py.get_type::<PyFSort>();
-        let from_size = class.getattr("from_size")?;
+        let from_size = class.getattr(intern!(py, "from_size"))?;
         Ok((from_size.into_any(), (self.0.size(),)))
     }
 

@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 
 use clarirs_core::algorithms::{collect_vars::collect_vars, structurally_match};
+use pyo3::intern;
 use pyo3::types::{PyDict, PyFrozenSet, PySet, PyType};
 
 use crate::claripy::prelude::*;
@@ -168,7 +169,8 @@ impl Base {
         counter: Option<Bound<'py, PyAny>>,
     ) -> Result<(Bound<'py, PyDict>, Bound<'py, PyAny>, Bound<'py, Base>), ClaripyError> {
         let dict = var_map.unwrap_or_else(|| PyDict::new(py));
-        let counter_is_iter = matches!(&counter, Some(c) if c.hasattr("__next__").unwrap_or(false));
+        let counter_is_iter =
+            matches!(&counter, Some(c) if c.hasattr(intern!(py, "__next__")).unwrap_or(false));
         let mut int_counter: usize = match &counter {
             Some(c) if !counter_is_iter => c.extract::<usize>()?,
             _ => 0,
@@ -189,7 +191,7 @@ impl Base {
                         counter
                             .as_ref()
                             .expect("counter_is_iter implies counter")
-                            .call_method0("__next__")?
+                            .call_method0(intern!(py, "__next__"))?
                             .extract::<usize>()?
                     } else {
                         let idx = int_counter;
