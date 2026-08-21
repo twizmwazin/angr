@@ -179,12 +179,6 @@ impl BV {
             "fpToIEEEBV" => {
                 GLOBAL_CONTEXT.fp_to_ieeebv(&args[0].cast_bound::<FP>(py)?.get().inner)?
             }
-            // "fpToUBV" => GLOBAL_CONTEXT.fp_to_ubv(
-            //     &args[0].cast_bound::<FP>(py)?.get().inner,
-            // )?,
-            // "fpToSBV" => GLOBAL_CONTEXT.fp_to_sbv(
-            //     &args[0].cast_bound::<FP>(py)?.get().inner,
-            // )?,
             "StrLen" => {
                 GLOBAL_CONTEXT.str_len(&args[0].cast_bound::<PyAstString>(py)?.get().inner)?
             }
