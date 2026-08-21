@@ -9,13 +9,11 @@ use crate::claripy::prelude::*;
 /// symbolic BVs become `bv != 0`.
 fn bv_to_bool(bv: &BV) -> Result<AstRef<'static>, ClaripyError> {
     let inner = &bv.inner;
-    if let Ok(simplified) = inner.simplify()
-        && let AstOp::BVV(v) = simplified.op()
-    {
-        return Ok(if v.is_zero() {
-            GLOBAL_CONTEXT.false_()?
-        } else {
+    if let Ok(Some(value)) = concrete_bool(inner) {
+        return Ok(if value {
             GLOBAL_CONTEXT.true_()?
+        } else {
+            GLOBAL_CONTEXT.false_()?
         });
     }
     let zero = GLOBAL_CONTEXT.bvv(BitVec::from((0, bv.size() as u32)))?;

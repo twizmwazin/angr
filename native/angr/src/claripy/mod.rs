@@ -112,12 +112,12 @@ fn py_excavate_ite<'py>(
 #[pyfunction]
 fn is_true(expr: Bound<'_, PyAny>) -> Result<bool, ClaripyError> {
     if let Ok(bool_expr) = expr.extract::<CoerceBool>() {
-        Ok(bool_expr.0.get().inner.simplify()?.is_true())
+        Ok(concrete_bool(&bool_expr.0.get().inner)? == Some(true))
     } else if let Ok(bv_expr) = expr.extract::<CoerceBV>() {
         match bv_expr {
             CoerceBV::BV(bv_expr) => Ok(bv_expr.get().inner.simplify()?.is_true()),
             CoerceBV::Int(int_expr) => Ok(int_expr != BigInt::ZERO),
-            CoerceBV::Bool(bool_expr) => Ok(bool_expr.get().inner.simplify()?.is_true()),
+            CoerceBV::Bool(bool_expr) => Ok(concrete_bool(&bool_expr.get().inner)? == Some(true)),
         }
     } else if let Ok(fp_expr) = expr.extract::<CoerceFP>() {
         match fp_expr {
@@ -125,7 +125,7 @@ fn is_true(expr: Bound<'_, PyAny>) -> Result<bool, ClaripyError> {
             CoerceFP::Py(float) => Ok(float.extract::<f64>()? != 0.0),
         }
     } else if let Ok(string_expr) = expr.extract::<CoerceString>() {
-        Ok(string_expr.0.get().inner.simplify()?.is_true())
+        Ok(concrete_bool(&string_expr.0.get().inner)? == Some(true))
     } else {
         // Anything we cannot prove true is not true. This matches claripy
         // (whose concrete backend raises BackendError for non-AST inputs,
@@ -138,12 +138,12 @@ fn is_true(expr: Bound<'_, PyAny>) -> Result<bool, ClaripyError> {
 #[pyfunction]
 fn is_false(expr: Bound<'_, PyAny>) -> Result<bool, ClaripyError> {
     if let Ok(bool_expr) = expr.extract::<CoerceBool>() {
-        Ok(bool_expr.0.get().inner.simplify()?.is_false())
+        Ok(concrete_bool(&bool_expr.0.get().inner)? == Some(false))
     } else if let Ok(bv_expr) = expr.extract::<CoerceBV>() {
         match bv_expr {
             CoerceBV::BV(bv_expr) => Ok(bv_expr.get().inner.simplify()?.is_false()),
             CoerceBV::Int(int_expr) => Ok(int_expr == BigInt::ZERO),
-            CoerceBV::Bool(bool_expr) => Ok(bool_expr.get().inner.simplify()?.is_false()),
+            CoerceBV::Bool(bool_expr) => Ok(concrete_bool(&bool_expr.get().inner)? == Some(false)),
         }
     } else if let Ok(fp_expr) = expr.extract::<CoerceFP>() {
         match fp_expr {
@@ -151,7 +151,7 @@ fn is_false(expr: Bound<'_, PyAny>) -> Result<bool, ClaripyError> {
             CoerceFP::Py(float) => Ok(float.extract::<f64>()? == 0.0),
         }
     } else if let Ok(string_expr) = expr.extract::<CoerceString>() {
-        Ok(string_expr.0.get().inner.simplify()?.is_false())
+        Ok(concrete_bool(&string_expr.0.get().inner)? == Some(false))
     } else {
         // See is_true: claripy returns False for anything it cannot prove.
         Ok(false)

@@ -245,11 +245,11 @@ impl Bool {
     }
 
     pub fn is_true(&self) -> Result<bool, ClaripyError> {
-        Ok(self.inner.simplify()?.is_true())
+        Ok(concrete_bool(&self.inner)? == Some(true))
     }
 
     pub fn is_false(&self) -> Result<bool, ClaripyError> {
-        Ok(self.inner.simplify()?.is_false())
+        Ok(concrete_bool(&self.inner)? == Some(false))
     }
 
     #[getter]

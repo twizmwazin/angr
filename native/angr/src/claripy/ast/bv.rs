@@ -221,22 +221,12 @@ impl BV {
 
     pub fn is_true(&self) -> bool {
         // A BV is "true" if it's a concrete non-zero value
-        if let Ok(simplified) = self.inner.simplify()
-            && let AstOp::BVV(bv) = simplified.op()
-        {
-            return !bv.is_zero();
-        }
-        false
+        matches!(concrete_bool(&self.inner), Ok(Some(true)))
     }
 
     pub fn is_false(&self) -> bool {
         // A BV is "false" if it's a concrete zero value
-        if let Ok(simplified) = self.inner.simplify()
-            && let AstOp::BVV(bv) = simplified.op()
-        {
-            return bv.is_zero();
-        }
-        false
+        matches!(concrete_bool(&self.inner), Ok(Some(false)))
     }
 
     pub fn size(&self) -> usize {
