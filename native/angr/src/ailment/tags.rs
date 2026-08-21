@@ -24,6 +24,7 @@
 //! `TagsView`, which translates names <-> struct fields / `extras` entries.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PyKeyError, PyStopIteration, PyTypeError};
@@ -36,7 +37,10 @@ use serde::{Deserialize, Serialize};
 ///
 /// The primitive variants serde-round-trip cleanly; the `Opaque` variant
 /// holds a Python object (e.g. a SimVariable that hasn't been refactored to
-/// an ident yet) and is silently skipped during Serde serialization.
+/// an ident yet) and is silently skipped during Serde serialization. The
+/// object sits behind an `Arc` so that cloning a `Tags` -- which happens on
+/// every AIL node copy -- costs a Rust refcount bump instead of a Python one
+/// that would need an attached interpreter.
 #[derive(Debug, Clone)]
 pub enum TagExtra {
     Bool(bool),
@@ -46,7 +50,7 @@ pub enum TagExtra {
     IntList(Vec<i64>),
     StrList(Vec<String>),
     /// Non-primitive Python value. Serde skips it.
-    Opaque(Py<PyAny>),
+    Opaque(Arc<Py<PyAny>>),
 }
 
 impl PartialEq for TagExtra {
@@ -113,7 +117,7 @@ impl<'de> Deserialize<'de> for TagExtra {
             Helper::Str(v) => TagExtra::Str(v),
             Helper::IntList(v) => TagExtra::IntList(v),
             Helper::StrList(v) => TagExtra::StrList(v),
-            Helper::Opaque {} => TagExtra::Opaque(Python::attach(|py| py.None())),
+            Helper::Opaque {} => TagExtra::Opaque(Arc::new(Python::attach(|py| py.None()))),
         })
     }
 }
@@ -231,7 +235,7 @@ fn extra_from_py(value: &Bound<'_, PyAny>) -> TagExtra {
     } else if let Ok(v) = value.extract::<Vec<String>>() {
         TagExtra::StrList(v)
     } else {
-        TagExtra::Opaque(value.clone().unbind())
+        TagExtra::Opaque(Arc::new(value.clone().unbind()))
     }
 }
 

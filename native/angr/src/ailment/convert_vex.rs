@@ -215,7 +215,7 @@ enum StmtKind<E> {
 // ===========================================================================
 
 trait IrReader {
-    type E: Clone;
+    type E;
 
     fn block_addr(&self) -> i64;
     fn block_size(&self) -> Option<i64>;

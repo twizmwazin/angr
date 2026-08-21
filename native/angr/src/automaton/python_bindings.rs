@@ -17,10 +17,9 @@ use pyo3::types::PySet;
     name = "State",
     module = "angr.rustylib.automaton",
     frozen,
-    from_py_object,
+    skip_from_py_object,
     new = "from_fields"
 )]
-#[derive(Clone)]
 pub struct PyState {
     /// The underlying Python value
     #[pyo3(get)]
@@ -52,10 +51,9 @@ impl PyState {
     name = "Symbol",
     module = "angr.rustylib.automaton",
     frozen,
-    from_py_object,
+    skip_from_py_object,
     new = "from_fields"
 )]
-#[derive(Clone)]
 pub struct PySymbol {
     /// The underlying Python value
     #[pyo3(get)]
@@ -116,7 +114,6 @@ impl PyEpsilon {
 const EPSILON_HASH: u64 = 0xDEAD_BEEF_CAFE_BABE;
 
 /// Helper struct for tracking Python object to ID mappings.
-#[derive(Clone)]
 struct ObjectMapper {
     /// Maps Python object hash + repr to state IDs
     state_to_id: IndexMap<(isize, String), StateId>,
@@ -138,6 +135,15 @@ impl ObjectMapper {
         }
     }
 
+    fn clone_ref(&self, py: Python<'_>) -> Self {
+        Self {
+            state_to_id: self.state_to_id.clone(),
+            id_to_state: self.id_to_state.iter().map(|o| o.clone_ref(py)).collect(),
+            symbol_to_id: self.symbol_to_id.clone(),
+            id_to_symbol: self.id_to_symbol.iter().map(|o| o.clone_ref(py)).collect(),
+        }
+    }
+
     fn get_or_create_state_id(&mut self, py: Python<'_>, state: &PyState) -> PyResult<StateId> {
         let hash = state.value.bind(py).hash()?;
         let repr = state.value.bind(py).repr()?.to_string();
@@ -148,7 +154,7 @@ impl ObjectMapper {
         } else {
             let id = self.id_to_state.len() as StateId;
             self.state_to_id.insert(key, id);
-            self.id_to_state.push(state.value.clone());
+            self.id_to_state.push(state.value.clone_ref(py));
             Ok(id)
         }
     }
@@ -172,7 +178,7 @@ impl ObjectMapper {
                 return Err(PyValueError::new_err("Too many symbols"));
             }
             self.symbol_to_id.insert(key, id);
-            self.id_to_symbol.push(symbol.value.clone());
+            self.id_to_symbol.push(symbol.value.clone_ref(py));
             Ok(id)
         }
     }
@@ -220,7 +226,7 @@ impl PyEpsilonNFA {
 
         if symbol.is_instance_of::<PyEpsilon>() {
             self.nfa.add_epsilon_transition(src_id, dst_id);
-        } else if let Ok(sym) = symbol.extract::<PySymbol>() {
+        } else if let Ok(sym) = symbol.extract::<PyRef<'_, PySymbol>>() {
             let sym_id = self.mapper.get_or_create_symbol_id(py, &sym)?;
             self.nfa.add_transition(src_id, sym_id, dst_id);
         } else {
@@ -253,7 +259,7 @@ impl PyEpsilonNFA {
 
     /// Minimize the NFA by converting to DFA and minimizing.
     /// Returns a DeterministicFiniteAutomaton.
-    fn minimize(&mut self) -> PyResult<PyDFA> {
+    fn minimize(&mut self, py: Python<'_>) -> PyResult<PyDFA> {
         // Compute epsilon closures for efficiency
         self.nfa.compute_epsilon_closures();
 
@@ -265,7 +271,7 @@ impl PyEpsilonNFA {
 
         Ok(PyDFA {
             dfa: minimized,
-            mapper: self.mapper.clone(),
+            mapper: self.mapper.clone_ref(py),
         })
     }
 }
@@ -344,10 +350,10 @@ impl PyDFA {
     }
 
     /// Minimize the DFA (returns a new minimized DFA).
-    fn minimize(&self) -> PyDFA {
+    fn minimize(&self, py: Python<'_>) -> PyDFA {
         PyDFA {
             dfa: self.dfa.minimize(),
-            mapper: self.mapper.clone(),
+            mapper: self.mapper.clone_ref(py),
         }
     }
 }
