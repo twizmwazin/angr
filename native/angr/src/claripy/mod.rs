@@ -51,6 +51,40 @@ fn add_submodule<'py>(
     Ok(submodule)
 }
 
+fn add_error_types<'py>(py: Python<'py>, m: &Bound<'py, PyModule>) -> PyResult<()> {
+    for (name, error_type) in [
+        ("ClaripyError", py.get_type::<py_err::ClaripyError>()),
+        (
+            "ClaripyTypeError",
+            py.get_type::<py_err::ClaripyTypeError>(),
+        ),
+        ("UnsatError", py.get_type::<py_err::UnsatError>()),
+        (
+            "ClaripyFrontendError",
+            py.get_type::<py_err::ClaripyFrontendError>(),
+        ),
+        (
+            "ClaripySolverInterruptError",
+            py.get_type::<py_err::ClaripySolverInterruptError>(),
+        ),
+        (
+            "ClaripyOperationError",
+            py.get_type::<py_err::ClaripyOperationError>(),
+        ),
+        (
+            "ClaripyZeroDivisionError",
+            py.get_type::<py_err::ClaripyZeroDivisionError>(),
+        ),
+        (
+            "InvalidExtractBounds",
+            py.get_type::<py_err::InvalidExtractBoundsError>(),
+        ),
+    ] {
+        m.add(name, error_type)?;
+    }
+    Ok(())
+}
+
 #[pyfunction(name = "simplify")]
 fn py_simplify<'py>(
     py: Python<'py>,
@@ -274,47 +308,17 @@ pub fn claripy(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ast::fp::FP>()?;
     m.add_class::<ast::string::PyAstString>()?;
 
-    m.add("Annotation", annotation.getattr("Annotation")?)?;
-    m.add(
+    for name in [
+        "Annotation",
         "SimplificationAvoidanceAnnotation",
-        annotation.getattr("SimplificationAvoidanceAnnotation")?,
-    )?;
-    m.add(
         "StridedIntervalAnnotation",
-        annotation.getattr("StridedIntervalAnnotation")?,
-    )?;
-    m.add("RegionAnnotation", annotation.getattr("RegionAnnotation")?)?;
-    m.add(
+        "RegionAnnotation",
         "UninitializedAnnotation",
-        annotation.getattr("UninitializedAnnotation")?,
-    )?;
+    ] {
+        m.add(name, annotation.getattr(name)?)?;
+    }
 
-    m.add("ClaripyError", py.get_type::<py_err::ClaripyError>())?;
-    m.add(
-        "ClaripyTypeError",
-        py.get_type::<py_err::ClaripyTypeError>(),
-    )?;
-    m.add("UnsatError", py.get_type::<py_err::UnsatError>())?;
-    m.add(
-        "ClaripyFrontendError",
-        py.get_type::<py_err::ClaripyFrontendError>(),
-    )?;
-    m.add(
-        "ClaripySolverInterruptError",
-        py.get_type::<py_err::ClaripySolverInterruptError>(),
-    )?;
-    m.add(
-        "ClaripyOperationError",
-        py.get_type::<py_err::ClaripyOperationError>(),
-    )?;
-    m.add(
-        "ClaripyZeroDivisionError",
-        py.get_type::<py_err::ClaripyZeroDivisionError>(),
-    )?;
-    m.add(
-        "InvalidExtractBounds",
-        py.get_type::<py_err::InvalidExtractBoundsError>(),
-    )?;
+    add_error_types(py, m)?;
 
     m.add("FSORT_FLOAT", ast::fp::fsort_float())?;
     m.add("FSORT_DOUBLE", ast::fp::fsort_double())?;
@@ -349,35 +353,7 @@ pub fn claripy(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     })?;
 
     // errors
-    import_submodule(py, m, "angr.rustylib.claripy", "errors", |py, errors| {
-        errors.add("ClaripyError", py.get_type::<py_err::ClaripyError>())?;
-        errors.add(
-            "ClaripyTypeError",
-            py.get_type::<py_err::ClaripyTypeError>(),
-        )?;
-        errors.add("UnsatError", py.get_type::<py_err::UnsatError>())?;
-        errors.add(
-            "ClaripyFrontendError",
-            py.get_type::<py_err::ClaripyFrontendError>(),
-        )?;
-        errors.add(
-            "ClaripySolverInterruptError",
-            py.get_type::<py_err::ClaripySolverInterruptError>(),
-        )?;
-        errors.add(
-            "ClaripyOperationError",
-            py.get_type::<py_err::ClaripyOperationError>(),
-        )?;
-        errors.add(
-            "ClaripyZeroDivisionError",
-            py.get_type::<py_err::ClaripyZeroDivisionError>(),
-        )?;
-        errors.add(
-            "InvalidExtractBounds",
-            py.get_type::<py_err::InvalidExtractBoundsError>(),
-        )?;
-        Ok(())
-    })?;
+    import_submodule(py, m, "angr.rustylib.claripy", "errors", add_error_types)?;
 
     Ok(())
 }
