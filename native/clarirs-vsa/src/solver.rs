@@ -17,8 +17,8 @@ impl VSASolver {
 }
 
 impl HasContext for VSASolver {
-    fn context(&self) -> Arc<Context> {
-        self.ctx.clone()
+    fn context(&self) -> &Arc<Context> {
+        &self.ctx
     }
 }
 

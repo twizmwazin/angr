@@ -14,7 +14,7 @@ pub trait AstFactory: Sized {
     fn intern_ast(&self, node: AstNode) -> Result<AstRef, ClarirsError>;
 
     /// The context that owns the nodes this factory builds.
-    fn context(&self) -> Arc<Context>;
+    fn context(&self) -> &Arc<Context>;
 
     // Provided methods
 
@@ -27,7 +27,7 @@ pub trait AstFactory: Sized {
         annotations: BTreeSet<Annotation>,
     ) -> Result<AstRef, ClarirsError> {
         op.validate()?;
-        self.intern_ast(AstNode::new(self.context(), op, annotations))
+        self.intern_ast(AstNode::new(self.context().clone(), op, annotations))
     }
 
     /// Construct a node with `annotations` plus the relocatable annotations of

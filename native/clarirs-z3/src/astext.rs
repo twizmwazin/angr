@@ -111,7 +111,7 @@ impl AstExtZ3 for AstRef {
         let ast = self.simplify()?.to_z3()?;
         Z3_CONTEXT.with(|ctx| unsafe {
             let simplified_ast = RcAst::try_from(Z3_simplify(*ctx, *ast))?;
-            Self::from_z3(&self.context(), simplified_ast)
+            Self::from_z3(self.context(), simplified_ast)
         })
     }
 

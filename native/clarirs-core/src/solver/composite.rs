@@ -25,8 +25,8 @@ pub struct CompositeSolver<S: Solver> {
 }
 
 impl<S: Solver> HasContext for CompositeSolver<S> {
-    fn context(&self) -> Arc<Context> {
-        self.ctx.clone()
+    fn context(&self) -> &Arc<Context> {
+        &self.ctx
     }
 }
 

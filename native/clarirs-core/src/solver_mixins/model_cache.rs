@@ -213,7 +213,7 @@ impl<S: Solver> ModelCacheMixin<S> {
 }
 
 impl<S: Solver> HasContext for ModelCacheMixin<S> {
-    fn context(&self) -> Arc<Context> {
+    fn context(&self) -> &Arc<Context> {
         self.inner.context()
     }
 }
@@ -404,7 +404,7 @@ mod tests {
     }
 
     impl<S: Solver> HasContext for CountingSolver<S> {
-        fn context(&self) -> Arc<Context> {
+        fn context(&self) -> &Arc<Context> {
             self.inner.context()
         }
     }

@@ -153,8 +153,8 @@ impl AstFactory for Arc<Context> {
         Context::intern_string(self, s)
     }
 
-    fn context(&self) -> Arc<Context> {
-        self.clone()
+    fn context(&self) -> &Arc<Context> {
+        self
     }
 
     fn intern_ast(&self, node: AstNode) -> Result<AstRef, ClarirsError> {
@@ -165,14 +165,14 @@ impl AstFactory for Arc<Context> {
 }
 
 pub trait HasContext {
-    fn context(&self) -> Arc<Context>;
+    fn context(&self) -> &Arc<Context>;
 }
 
 impl<T> HasContext for Arc<T>
 where
     T: HasContext,
 {
-    fn context(&self) -> Arc<Context> {
+    fn context(&self) -> &Arc<Context> {
         self.as_ref().context()
     }
 }

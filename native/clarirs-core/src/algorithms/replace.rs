@@ -34,7 +34,7 @@ impl AstNode {
                     Ok(None)
                 }
             },
-            |ast, children| reconstruct_node(&ctx, &ast, children),
+            |ast, children| reconstruct_node(ctx, &ast, children),
         )
     }
 
@@ -57,7 +57,7 @@ impl AstNode {
                     Ok(None)
                 }
             },
-            |node, children| reconstruct_node(&ctx, &node, children),
+            |node, children| reconstruct_node(ctx, &node, children),
         )
     }
 }

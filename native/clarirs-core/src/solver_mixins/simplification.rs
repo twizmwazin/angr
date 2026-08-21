@@ -21,7 +21,7 @@ impl<S: Solver> SimplificationMixin<S> {
 }
 
 impl<S: Solver> HasContext for SimplificationMixin<S> {
-    fn context(&self) -> Arc<Context> {
+    fn context(&self) -> &Arc<Context> {
         self.inner.context()
     }
 }

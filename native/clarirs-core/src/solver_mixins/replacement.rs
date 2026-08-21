@@ -115,7 +115,7 @@ impl<S: Solver> ReplacementSolver<S> {
 }
 
 impl<S: Solver> HasContext for ReplacementSolver<S> {
-    fn context(&self) -> Arc<Context> {
+    fn context(&self) -> &Arc<Context> {
         self.inner.context()
     }
 }

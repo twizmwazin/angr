@@ -9,8 +9,8 @@ pub struct ConcreteSolver {
 }
 
 impl HasContext for ConcreteSolver {
-    fn context(&self) -> Arc<Context> {
-        self.ctx.clone()
+    fn context(&self) -> &Arc<Context> {
+        &self.ctx
     }
 }
 

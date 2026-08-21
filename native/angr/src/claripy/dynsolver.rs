@@ -34,7 +34,7 @@ pub(crate) enum DynSolver {
 }
 
 impl HasContext for DynSolver {
-    fn context(&self) -> Arc<Context> {
+    fn context(&self) -> &Arc<Context> {
         match self {
             DynSolver::Concrete(solver) => solver.context(),
             DynSolver::Z3(solver) => solver.context(),

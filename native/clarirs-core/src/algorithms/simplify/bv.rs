@@ -7,7 +7,7 @@ pub(crate) fn simplify_bv(
     state: &mut super::SimplifyState,
     error_on_dbz: bool,
 ) -> Result<AstRef, SimplifyError> {
-    let ctx = state.expr.context();
+    let ctx = state.expr.context().clone();
     let bv_expr = state.expr.clone();
 
     match bv_expr.op() {

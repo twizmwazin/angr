@@ -48,7 +48,7 @@ fn excavate_node(ast: &AstRef, children: &[AstRef]) -> Result<AstRef, ClarirsErr
     }
 
     if matches!(ast.op(), AstOp::ITE(..)) {
-        return reconstruct_node(&ctx, ast, children);
+        return reconstruct_node(ctx, ast, children);
     }
 
     let idx = match children
@@ -56,7 +56,7 @@ fn excavate_node(ast: &AstRef, children: &[AstRef]) -> Result<AstRef, ClarirsErr
         .position(|c| matches!(c.op(), AstOp::ITE(..)))
     {
         Some(idx) => idx,
-        None => return reconstruct_node(&ctx, ast, children),
+        None => return reconstruct_node(ctx, ast, children),
     };
 
     let cond = match children[idx].op() {
@@ -78,7 +78,7 @@ fn excavate_node(ast: &AstRef, children: &[AstRef]) -> Result<AstRef, ClarirsErr
                 else_children.push(then_.clone());
             }
             // An `ITE` on an unrelated condition: give up rather than expand.
-            AstOp::ITE(..) => return reconstruct_node(&ctx, ast, children),
+            AstOp::ITE(..) => return reconstruct_node(ctx, ast, children),
             _ => {
                 then_children.push(child.clone());
                 else_children.push(child.clone());
@@ -86,8 +86,8 @@ fn excavate_node(ast: &AstRef, children: &[AstRef]) -> Result<AstRef, ClarirsErr
         }
     }
 
-    let then_branch = reconstruct_node(&ctx, ast, &then_children)?;
-    let else_branch = reconstruct_node(&ctx, ast, &else_children)?;
+    let then_branch = reconstruct_node(ctx, ast, &then_children)?;
+    let else_branch = reconstruct_node(ctx, ast, &else_children)?;
     ctx.ite(cond, then_branch, else_branch)
 }
 

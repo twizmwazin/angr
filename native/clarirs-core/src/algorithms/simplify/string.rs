@@ -2,7 +2,7 @@ use super::SimplifyError;
 use crate::prelude::*;
 
 pub(crate) fn simplify_string(state: &mut super::SimplifyState) -> Result<AstRef, SimplifyError> {
-    let ctx = state.expr.context();
+    let ctx = state.expr.context().clone();
     let string_expr = state.expr.clone();
 
     match string_expr.op() {

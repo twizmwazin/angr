@@ -4,7 +4,7 @@ use super::SimplifyError;
 use crate::prelude::*;
 
 pub(crate) fn simplify_bool(state: &mut super::SimplifyState) -> Result<AstRef, SimplifyError> {
-    let ctx = state.expr.context();
+    let ctx = state.expr.context().clone();
     let bool_ast = state.expr.clone();
 
     match bool_ast.op() {

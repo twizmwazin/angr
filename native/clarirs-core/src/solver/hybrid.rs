@@ -115,8 +115,8 @@ impl<A: Solver, E: Solver> HybridSolver<A, E> {
 }
 
 impl<A: Solver, E: Solver> HasContext for HybridSolver<A, E> {
-    fn context(&self) -> Arc<Context> {
-        self.ctx.clone()
+    fn context(&self) -> &Arc<Context> {
+        &self.ctx
     }
 }
 

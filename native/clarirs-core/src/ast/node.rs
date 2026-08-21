@@ -57,8 +57,8 @@ impl PartialEq for AstNode {
 impl Eq for AstNode {}
 
 impl HasContext for AstNode {
-    fn context(&self) -> Arc<Context> {
-        self.ctx.clone()
+    fn context(&self) -> &Arc<Context> {
+        &self.ctx
     }
 }
 

@@ -1,7 +1,7 @@
 use crate::{algorithms::simplify::SimplifyError, prelude::*};
 
 pub(crate) fn simplify_float(state: &mut super::SimplifyState) -> Result<AstRef, SimplifyError> {
-    let ctx = state.expr.context();
+    let ctx = state.expr.context().clone();
     let float_expr = state.expr.clone();
 
     match float_expr.op() {

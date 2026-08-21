@@ -155,8 +155,8 @@ impl Z3Solver {
 }
 
 impl HasContext for Z3Solver {
-    fn context(&self) -> Arc<Context> {
-        self.ctx.clone()
+    fn context(&self) -> &Arc<Context> {
+        &self.ctx
     }
 }
 
@@ -304,7 +304,7 @@ impl Z3Solver {
         // replace the variables with the values from the model
         let model = self.make_model()?;
 
-        AstRef::from_z3(&expr.context(), model.eval(&expr.to_z3()?)?)
+        AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?)
     }
 }
 
@@ -405,7 +405,7 @@ impl Solver for Z3Solver {
                 if expr.concrete() {
                     return Ok(expr);
                 }
-                AstRef::from_z3(&expr.context(), model.eval(&expr.to_z3()?)?)
+                AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?)
             })
             .collect()
     }
@@ -442,7 +442,7 @@ impl Solver for Z3Solver {
         }
 
         let model = optimize.get_model()?;
-        AstRef::from_z3(&expr.context(), model.eval(&expr.to_z3()?)?)?
+        AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?)?
             .into_bitvec()
             .ok_or(ClarirsError::TypeError("Expected AstRef".to_string()))
     }
@@ -457,7 +457,7 @@ impl Solver for Z3Solver {
         }
 
         let model = optimize.get_model()?;
-        AstRef::from_z3(&expr.context(), model.eval(&expr.to_z3()?)?)?
+        AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?)?
             .into_bitvec()
             .ok_or(ClarirsError::TypeError("Expected AstRef".to_string()))
     }
@@ -494,7 +494,7 @@ impl Solver for Z3Solver {
         }
 
         let model = optimize.get_model()?;
-        AstRef::from_z3(&expr.context(), model.eval(&expr.to_z3()?)?)?
+        AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?)?
             .into_bitvec()
             .ok_or(ClarirsError::TypeError("Expected AstRef".to_string()))
     }
@@ -531,7 +531,7 @@ impl Solver for Z3Solver {
         }
 
         let model = optimize.get_model()?;
-        AstRef::from_z3(&expr.context(), model.eval(&expr.to_z3()?)?)?
+        AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?)?
             .into_bitvec()
             .ok_or(ClarirsError::TypeError("Expected AstRef".to_string()))
     }
@@ -616,7 +616,7 @@ impl Solver for Z3Solver {
             let model = z3_solver.model()?;
             let eval_result = model.eval(&z3_eval_target)?;
 
-            let solution = AstRef::from_z3(&ctx, eval_result)?;
+            let solution = AstRef::from_z3(ctx, eval_result)?;
 
             // Add constraint to exclude this solution
             let neq_constraint = ctx.neq(&eval_target, &solution)?;

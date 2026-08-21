@@ -27,7 +27,7 @@ impl<S: Solver> ConcreteEarlyResolutionMixin<S> {
 }
 
 impl<S: Solver> HasContext for ConcreteEarlyResolutionMixin<S> {
-    fn context(&self) -> Arc<Context> {
+    fn context(&self) -> &Arc<Context> {
         self.inner.context()
     }
 }
@@ -183,8 +183,8 @@ mod tests {
     }
 
     impl HasContext for PanickingSolver {
-        fn context(&self) -> Arc<Context> {
-            self.ctx.clone()
+        fn context(&self) -> &Arc<Context> {
+            &self.ctx
         }
     }
 
