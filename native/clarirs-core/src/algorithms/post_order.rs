@@ -19,17 +19,17 @@ use std::collections::VecDeque;
 /// results instead of recomputing them, which can significantly improve
 /// performance for trees with repeated subtrees. If you do not want to use a
 /// cache, pass `&()` as the cache.
-pub fn walk_post_order<'c, T>(
-    ast: AstRef<'c>,
-    mut callback: impl FnMut(AstRef<'c>, &[T]) -> Result<T, ClarirsError>,
+pub fn walk_post_order<T>(
+    ast: AstRef,
+    mut callback: impl FnMut(AstRef, &[T]) -> Result<T, ClarirsError>,
     cache: &impl Cache<u64, T>,
 ) -> Result<T, ClarirsError> {
     // For each node, we need to track:
     // 1. The node itself
     // 2. Whether all its children have been processed
     // 3. The transformed results of its children
-    struct NodeState<'c, T> {
-        node: AstRef<'c>,
+    struct NodeState<T> {
+        node: AstRef,
         children_processed: usize,
         num_children: usize,
         child_results: Vec<T>,
@@ -104,7 +104,7 @@ mod tests {
 
     #[test]
     fn test_walk_post_order() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 64)?;
         let y = ctx.bvs("y", 64)?;
         let add = ctx.add(&x, &y)?;
@@ -140,7 +140,7 @@ mod tests {
 
     #[test]
     fn test_walk_post_order_with_error() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 64)?;
 
         let result = walk_post_order(
@@ -161,7 +161,7 @@ mod tests {
 
     #[test]
     fn test_walk_post_order_with_cache() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 64)?;
         let y = ctx.bvs("y", 64)?;
 

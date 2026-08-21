@@ -3,7 +3,7 @@ use anyhow::Result;
 
 #[test]
 fn test_bv_to_fp_of_fp_to_ieeebv_is_identity() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let x = ctx.fps("x", FSort::f64())?;
     let round_trip = ctx.bv_to_fp(ctx.fp_to_ieeebv(&x)?, FSort::f64())?;
@@ -14,7 +14,7 @@ fn test_bv_to_fp_of_fp_to_ieeebv_is_identity() -> Result<()> {
 
 #[test]
 fn test_bv_to_fp_of_fp_to_ieeebv_different_sort_not_simplified() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     // Reinterpreting an f64's 64-bit pattern as some other 64-bit float sort
     // is NOT the identity; the round-trip must be preserved.

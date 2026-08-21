@@ -174,14 +174,11 @@ pub fn fsort_double() -> PyFSort {
 
 #[pyclass(extends=Bits, subclass, frozen, weakref, module="angr.rustylib.claripy.ast.fp")]
 pub struct FP {
-    pub(crate) inner: AstRef<'static>,
+    pub(crate) inner: AstRef,
 }
 
 impl FP {
-    pub fn new<'py>(
-        py: Python<'py>,
-        inner: &AstRef<'static>,
-    ) -> Result<Bound<'py, FP>, ClaripyError> {
+    pub fn new<'py>(py: Python<'py>, inner: &AstRef) -> Result<Bound<'py, FP>, ClaripyError> {
         Self::new_with_name(py, inner, None)
     }
 
@@ -189,7 +186,7 @@ impl FP {
     /// given.
     pub fn new_with_name<'py>(
         py: Python<'py>,
-        inner: &AstRef<'static>,
+        inner: &AstRef,
         name: Option<String>,
     ) -> Result<Bound<'py, FP>, ClaripyError> {
         if let Some(cache_hit) = PY_FP_CACHE.get(&inner.hash()).and_then(|cache_hit| {

@@ -42,11 +42,11 @@ impl ReduceResult {
 ///
 /// The result is wrapped in a [`ReduceResult`]; callers extract the relevant
 /// variant via [`ReduceResult::into_bv`]/[`ReduceResult::into_bool`].
-pub trait Reduce<'c>: Sized {
+pub trait Reduce: Sized {
     fn reduce(&self) -> Result<ReduceResult, ClarirsError>;
 }
 
-impl<'c> Reduce<'c> for AstRef<'c> {
+impl Reduce for AstRef {
     fn reduce(&self) -> Result<ReduceResult, ClarirsError> {
         let cache = GenericCache::default();
         walk_post_order(

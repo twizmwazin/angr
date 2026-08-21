@@ -12,7 +12,7 @@ use crate::claripy::prelude::*;
 /// inherit these and add only their own typed operations.
 #[pyclass(subclass, frozen, weakref, module = "angr.rustylib.claripy.ast.base")]
 pub struct Base {
-    inner: AstRef<'static>,
+    inner: AstRef,
     errored: Py<PySet>,
     name: Option<String>,
     encoded_name: Option<Vec<u8>>,
@@ -21,13 +21,13 @@ pub struct Base {
 }
 
 impl Base {
-    pub fn new(py: Python, inner: &AstRef<'static>) -> Result<Self, ClaripyError> {
+    pub fn new(py: Python, inner: &AstRef) -> Result<Self, ClaripyError> {
         Self::new_with_name(py, inner, None)
     }
 
     pub fn new_with_name(
         py: Python,
-        inner: &AstRef<'static>,
+        inner: &AstRef,
         name: Option<String>,
     ) -> Result<Self, ClaripyError> {
         let encoded_name = name.as_ref().map(|name| name.as_bytes().to_vec());
@@ -45,21 +45,18 @@ impl Base {
         })
     }
 
-    pub fn to_ast(self_: Bound<'_, Base>) -> Result<AstRef<'static>, ClaripyError> {
+    pub fn to_ast(self_: Bound<'_, Base>) -> Result<AstRef, ClaripyError> {
         Ok(self_.get().inner.clone())
     }
 
     /// A clone of the wrapped [`AstRef`].
-    pub fn ast(&self) -> AstRef<'static> {
+    pub fn ast(&self) -> AstRef {
         self.inner.clone()
     }
 
     /// Wrap an existing [`AstRef`] without simplifying it, keeping its
     /// annotation set exactly as given.
-    pub fn from_ast<'py>(
-        py: Python<'py>,
-        ast: AstRef<'static>,
-    ) -> Result<Bound<'py, Base>, ClaripyError> {
+    pub fn from_ast<'py>(py: Python<'py>, ast: AstRef) -> Result<Bound<'py, Base>, ClaripyError> {
         match ast.ast_type() {
             AstType::Bool => Bool::new(py, &ast).map(|b| b.into_any().cast_into::<Base>().unwrap()),
             AstType::BitVec(_) => {
@@ -179,7 +176,7 @@ impl Base {
         sorted_vars.sort_by_key(|v| v.variables().iter().next().cloned());
 
         let ctx = self.inner.context();
-        let mut replacements: Vec<(AstRef<'static>, AstRef<'static>)> = Vec::new();
+        let mut replacements: Vec<(AstRef, AstRef)> = Vec::new();
         for var in sorted_vars {
             let key = var.hash();
             let canonical_ast = match dict.get_item(key)? {

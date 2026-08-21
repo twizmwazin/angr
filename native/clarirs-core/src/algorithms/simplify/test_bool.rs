@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clarirs_num::BitVec;
+use std::sync::Arc;
 
 use crate::{
     ast::{
@@ -12,7 +13,7 @@ use crate::{
 
 #[test]
 fn test_prim() -> Result<()> {
-    let ctx = Context::default();
+    let ctx = Arc::new(Context::default());
     let true_ast = ctx.true_()?;
     let false_ast = ctx.false_()?;
     let sym_ast = ctx.bools("test")?;
@@ -26,7 +27,7 @@ fn test_prim() -> Result<()> {
 
 #[test]
 fn test_xor_double_negation() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let x = ctx.bools("x")?;
     let y = ctx.bools("y")?;
@@ -65,7 +66,7 @@ fn test_xor_double_negation() -> Result<()> {
 
 #[test]
 fn test_not() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let true_ast = ctx.true_()?;
     let false_ast = ctx.false_()?;
@@ -96,7 +97,7 @@ fn test_not() -> Result<()> {
 
 #[test]
 fn test_or() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let true_ast = ctx.true_()?;
     let false_ast = ctx.false_()?;
@@ -127,7 +128,7 @@ fn test_or() -> Result<()> {
 
 #[test]
 fn test_xor() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let true_ast = ctx.true_()?;
     let false_ast = ctx.false_()?;
@@ -159,7 +160,7 @@ fn test_xor() -> Result<()> {
 
 #[test]
 fn test_if() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let true_ast = ctx.true_()?;
     let false_ast = ctx.false_()?;
@@ -209,7 +210,7 @@ fn test_if() -> Result<()> {
 
 #[test]
 fn test_eq() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let true_ast = ctx.true_()?;
     let false_ast = ctx.false_()?;
@@ -241,7 +242,7 @@ fn test_eq() -> Result<()> {
 
 #[test]
 fn test_neq() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let true_ast = ctx.true_()?;
     let false_ast = ctx.false_()?;
@@ -273,7 +274,7 @@ fn test_neq() -> Result<()> {
 
 #[test]
 fn test_bv_eq_neq_constant_canonicalized_to_right() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let x = ctx.bvs("x", 64)?;
     let zero = ctx.bvv(BitVec::from((0u64, 64)))?;
@@ -303,7 +304,7 @@ fn test_bv_eq_neq_constant_canonicalized_to_right() -> Result<()> {
 
 #[test]
 fn test_ult() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table = vec![
         (
@@ -337,7 +338,7 @@ fn test_ult() -> Result<()> {
 
 #[test]
 fn test_ule() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table = vec![
         (
@@ -371,7 +372,7 @@ fn test_ule() -> Result<()> {
 
 #[test]
 fn test_ugt() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table = vec![
         (
@@ -405,7 +406,7 @@ fn test_ugt() -> Result<()> {
 
 #[test]
 fn test_uge() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table = vec![
         (
@@ -439,7 +440,7 @@ fn test_uge() -> Result<()> {
 
 #[test]
 fn test_slt() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table = vec![
         (
@@ -483,7 +484,7 @@ fn test_slt() -> Result<()> {
 
 #[test]
 fn test_sle() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table = vec![
         (
@@ -527,7 +528,7 @@ fn test_sle() -> Result<()> {
 
 #[test]
 fn test_sgt() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table = vec![
         (
@@ -571,7 +572,7 @@ fn test_sgt() -> Result<()> {
 
 #[test]
 fn test_sge() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table = vec![
         (
@@ -615,7 +616,7 @@ fn test_sge() -> Result<()> {
 
 #[test]
 fn test_boolean_identity_simplifications() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let x = ctx.bools("x")?;
     let not_x = ctx.not(&x)?.simplify()?;
@@ -647,7 +648,7 @@ fn test_boolean_identity_simplifications() -> Result<()> {
 #[test]
 fn test_booleq_identity_simplification_without_floats() -> Result<()> {
     // BoolEq(x, x) should simplify to true
-    let ctx = Context::default();
+    let ctx = Arc::new(Context::default());
     let a = ctx.bvs("a", 64)?;
     let b = ctx.bvs("b", 64)?;
 
@@ -669,7 +670,7 @@ fn test_booleq_identity_simplification_with_floats() -> Result<()> {
     // NaN != NaN applies to fp== itself, but bool== of two identical boolean
     // expressions is always true: whatever value (fp== A B) takes, both sides
     // are the same expression and thus equal.
-    let ctx = Context::default();
+    let ctx = Arc::new(Context::default());
     let a = ctx.fps("a", clarirs_num::FSort::f64())?;
     let b = ctx.fps("b", clarirs_num::FSort::f64())?;
 
@@ -687,7 +688,7 @@ fn test_booleq_identity_simplification_with_floats() -> Result<()> {
 
 #[test]
 fn test_relocatable_annotations_preserved_through_simplification() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let annotation = Annotation::new(AnnotationType::Uninitialized, true, true);
 
@@ -713,7 +714,7 @@ fn test_relocatable_annotations_preserved_through_simplification() -> Result<()>
 
 #[test]
 fn test_non_eliminatable_non_relocatable_blocks_simplification() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     // SimplificationAvoidance is !eliminatable && !relocatable
     let annotation = Annotation::new(AnnotationType::SimplificationAvoidance, false, false);
@@ -738,7 +739,7 @@ fn test_non_eliminatable_non_relocatable_blocks_simplification() -> Result<()> {
 
 #[test]
 fn test_eliminatable_non_relocatable_does_not_block_simplification() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     // An eliminatable, non-relocatable annotation should NOT block simplification
     let annotation = Annotation::new(AnnotationType::Uninitialized, true, false);

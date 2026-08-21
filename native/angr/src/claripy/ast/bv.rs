@@ -21,14 +21,11 @@ static PY_BV_CACHE: LazyLock<DashMap<u64, Py<PyWeakrefReference>>> = LazyLock::n
 
 #[pyclass(extends=Bits, subclass, frozen, weakref, module="angr.rustylib.claripy.ast.bv")]
 pub struct BV {
-    pub(crate) inner: AstRef<'static>,
+    pub(crate) inner: AstRef,
 }
 
 impl BV {
-    pub fn new<'py>(
-        py: Python<'py>,
-        inner: &AstRef<'static>,
-    ) -> Result<Bound<'py, BV>, ClaripyError> {
+    pub fn new<'py>(py: Python<'py>, inner: &AstRef) -> Result<Bound<'py, BV>, ClaripyError> {
         Self::new_with_name(py, inner, None)
     }
 
@@ -36,7 +33,7 @@ impl BV {
     /// given.
     pub fn new_with_name<'py>(
         py: Python<'py>,
-        inner: &AstRef<'static>,
+        inner: &AstRef,
         name: Option<String>,
     ) -> Result<Bound<'py, BV>, ClaripyError> {
         if let Some(cache_hit) = PY_BV_CACHE.get(&inner.hash()).and_then(|cache_hit| {

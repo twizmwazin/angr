@@ -17,7 +17,7 @@ use crate::{
 /// key without building it (e.g. `excavate_ite`) agree.
 pub(crate) fn structural_hash(
     ast_type: AstType,
-    op: &AstOp<'_>,
+    op: &AstOp,
     annotations: &BTreeSet<Annotation>,
 ) -> u64 {
     let mut hasher = AHasher::default();
@@ -97,24 +97,24 @@ impl PartialOrd for InternedString {
 }
 
 #[derive(Debug, Default)]
-pub struct Context<'c> {
-    pub(crate) ast_cache: AstCache<'c>,
-    pub(crate) excavate_ite_cache: AstCache<'c>,
+pub struct Context {
+    pub(crate) ast_cache: AstCache,
+    pub(crate) excavate_ite_cache: AstCache,
     string_interner: RwLock<HashMap<Arc<str>, Arc<str>>>,
 }
 
-impl PartialEq for Context<'_> {
+impl PartialEq for Context {
     fn eq(&self, other: &Self) -> bool {
         std::ptr::eq(self, other)
     }
 }
 
-impl Eq for Context<'_> {}
+impl Eq for Context {}
 
-unsafe impl Send for Context<'_> {}
-unsafe impl Sync for Context<'_> {}
+unsafe impl Send for Context {}
+unsafe impl Sync for Context {}
 
-impl Context<'_> {
+impl Context {
     pub fn new() -> Self {
         Self::default()
     }
@@ -145,31 +145,34 @@ impl Context<'_> {
     }
 }
 
-impl<'c> AstFactory<'c> for Context<'c> {
+/// The factory is implemented on the shared handle rather than on `Context`
+/// itself: every node stores an owning `Arc<Context>`, so building one requires
+/// a handle that can be cloned, not just a borrow.
+impl AstFactory for Arc<Context> {
     fn intern_string(&self, s: impl AsRef<str>) -> InternedString {
-        self.intern_string(s)
+        Context::intern_string(self, s)
     }
 
-    fn context(&'c self) -> &'c Context<'c> {
-        self
+    fn context(&self) -> Arc<Context> {
+        self.clone()
     }
 
-    fn intern_ast(&'c self, node: AstNode<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn intern_ast(&self, node: AstNode) -> Result<AstRef, ClarirsError> {
         let hash = node.hash();
         self.ast_cache
             .get_or_insert::<ClarirsError>(hash, || Ok(Arc::new(node)))
     }
 }
 
-pub trait HasContext<'c> {
-    fn context(&self) -> &'c Context<'c>;
+pub trait HasContext {
+    fn context(&self) -> Arc<Context>;
 }
 
-impl<'c, T> HasContext<'c> for Arc<T>
+impl<T> HasContext for Arc<T>
 where
-    T: HasContext<'c>,
+    T: HasContext,
 {
-    fn context(&self) -> &'c Context<'c> {
+    fn context(&self) -> Arc<Context> {
         self.as_ref().context()
     }
 }

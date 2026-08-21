@@ -28,7 +28,7 @@ fn child_si(children: &[ReduceResult], index: usize) -> Result<StridedInterval, 
 
 /// Reduce a AstRef to a StridedInterval
 pub(crate) fn reduce_bv(
-    ast: &AstRef<'_>,
+    ast: &AstRef,
     children: &[ReduceResult],
 ) -> Result<StridedInterval, ClarirsError> {
     Ok(match ast.op() {

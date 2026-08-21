@@ -17,26 +17,26 @@ use crate::prelude::*;
 /// the exact solver is always consulted when the approximate solver cannot
 /// give a definitive answer.
 #[derive(Clone, Debug)]
-pub struct HybridSolver<'c, A: Solver<'c>, E: Solver<'c>> {
+pub struct HybridSolver<A: Solver, E: Solver> {
     approximate: A,
     exact: E,
-    ctx: &'c Context<'c>,
+    ctx: Arc<Context>,
     /// When true, `eval_n` for more than two solutions asks the approximate
     /// backend first and only consults the exact backend when the
     /// approximation is inexact (claripy's `approximate_first`).
     approximate_first: bool,
 }
 
-impl<'c, A: Solver<'c>, E: Solver<'c>> HybridSolver<'c, A, E> {
+impl<A: Solver, E: Solver> HybridSolver<A, E> {
     /// Create a new hybrid solver with the given approximate and exact backends.
-    pub fn new(ctx: &'c Context<'c>, approximate: A, exact: E) -> Self {
+    pub fn new(ctx: Arc<Context>, approximate: A, exact: E) -> Self {
         Self::new_with_options(ctx, approximate, exact, false)
     }
 
     /// Create a new hybrid solver, optionally preferring approximate results
     /// for multi-solution `eval_n` queries.
     pub fn new_with_options(
-        ctx: &'c Context<'c>,
+        ctx: Arc<Context>,
         approximate: A,
         exact: E,
         approximate_first: bool,
@@ -63,9 +63,9 @@ impl<'c, A: Solver<'c>, E: Solver<'c>> HybridSolver<'c, A, E> {
     /// too and use whichever found fewer solutions.
     fn eval_n_approximate_first(
         &mut self,
-        expr: &AstRef<'c>,
+        expr: &AstRef,
         n: u32,
-    ) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+    ) -> Result<Vec<AstRef>, ClarirsError> {
         let mut approx = match self.approximate.eval_n(expr, n + 1) {
             Ok(approx) if !approx.is_empty() => approx,
             _ => return self.exact.eval_n(expr, n),
@@ -84,7 +84,7 @@ impl<'c, A: Solver<'c>, E: Solver<'c>> HybridSolver<'c, A, E> {
     }
 
     /// Whether any asserted constraint shares a variable with `expr`.
-    fn constraints_mention(&self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn constraints_mention(&self, expr: &AstRef) -> Result<bool, ClarirsError> {
         let expr_vars = expr.variables();
         Ok(self
             .exact
@@ -114,14 +114,14 @@ impl<'c, A: Solver<'c>, E: Solver<'c>> HybridSolver<'c, A, E> {
     }
 }
 
-impl<'c, A: Solver<'c>, E: Solver<'c>> HasContext<'c> for HybridSolver<'c, A, E> {
-    fn context(&self) -> &'c Context<'c> {
-        self.ctx
+impl<A: Solver, E: Solver> HasContext for HybridSolver<A, E> {
+    fn context(&self) -> Arc<Context> {
+        self.ctx.clone()
     }
 }
 
-impl<'c, A: Solver<'c>, E: Solver<'c>> Solver<'c> for HybridSolver<'c, A, E> {
-    fn add(&mut self, constraint: &AstRef<'c>) -> Result<(), ClarirsError> {
+impl<A: Solver, E: Solver> Solver for HybridSolver<A, E> {
+    fn add(&mut self, constraint: &AstRef) -> Result<(), ClarirsError> {
         // Add constraints to both backends. The approximate solver may ignore
         // them (as VSA does), but the exact solver tracks them.
         let _ = self.approximate.add(constraint);
@@ -133,7 +133,7 @@ impl<'c, A: Solver<'c>, E: Solver<'c>> Solver<'c> for HybridSolver<'c, A, E> {
         self.exact.clear()
     }
 
-    fn constraints(&self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+    fn constraints(&self) -> Result<Vec<AstRef>, ClarirsError> {
         self.exact.constraints()
     }
 
@@ -155,14 +155,14 @@ impl<'c, A: Solver<'c>, E: Solver<'c>> Solver<'c> for HybridSolver<'c, A, E> {
         self.exact.satisfiable()
     }
 
-    fn satisfiable_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
+    fn satisfiable_with_extra(&mut self, extra: &[AstRef]) -> Result<bool, ClarirsError> {
         if let Ok(false) = self.approximate.satisfiable_with_extra(extra) {
             return Ok(false);
         }
         self.exact.satisfiable_with_extra(extra)
     }
 
-    fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn is_true(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         if !expr.symbolic() {
             return self.approximate.is_true(expr);
         }
@@ -170,14 +170,14 @@ impl<'c, A: Solver<'c>, E: Solver<'c>> Solver<'c> for HybridSolver<'c, A, E> {
         self.exact.is_true(expr)
     }
 
-    fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn is_false(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         if !expr.symbolic() {
             return self.approximate.is_false(expr);
         }
         self.exact.is_false(expr)
     }
 
-    fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn has_true(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         if !expr.symbolic() {
             return self.approximate.has_true(expr);
         }
@@ -188,7 +188,7 @@ impl<'c, A: Solver<'c>, E: Solver<'c>> Solver<'c> for HybridSolver<'c, A, E> {
         }
     }
 
-    fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn has_false(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         if !expr.symbolic() {
             return self.approximate.has_false(expr);
         }
@@ -198,35 +198,35 @@ impl<'c, A: Solver<'c>, E: Solver<'c>> Solver<'c> for HybridSolver<'c, A, E> {
         }
     }
 
-    fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn min_unsigned(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         if !expr.symbolic() {
             return self.approximate.min_unsigned(expr);
         }
         self.exact.min_unsigned(expr)
     }
 
-    fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn max_unsigned(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         if !expr.symbolic() {
             return self.approximate.max_unsigned(expr);
         }
         self.exact.max_unsigned(expr)
     }
 
-    fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn min_signed(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         if !expr.symbolic() {
             return self.approximate.min_signed(expr);
         }
         self.exact.min_signed(expr)
     }
 
-    fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn max_signed(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         if !expr.symbolic() {
             return self.approximate.max_signed(expr);
         }
         self.exact.max_signed(expr)
     }
 
-    fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+    fn eval_n(&mut self, expr: &AstRef, n: u32) -> Result<Vec<AstRef>, ClarirsError> {
         if n == 0 {
             return Ok(Vec::new());
         }
@@ -261,10 +261,10 @@ mod tests {
 
     #[test]
     fn test_hybrid_solver_concrete() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
-        let approx = ConcreteSolver::new(&ctx);
-        let exact = ConcreteSolver::new(&ctx);
-        let mut solver = HybridSolver::new(&ctx, approx, exact);
+        let ctx = Arc::new(Context::new());
+        let approx = ConcreteSolver::new(ctx.clone());
+        let exact = ConcreteSolver::new(ctx.clone());
+        let mut solver = HybridSolver::new(ctx.clone(), approx, exact);
 
         let t = ctx.true_()?;
         let f = ctx.false_()?;

@@ -13,24 +13,23 @@ use crate::prelude::*;
 /// values. When a query is made, all known replacements are applied to the
 /// expression in a single pass before forwarding to the inner solver.
 #[derive(Clone, Debug)]
-pub struct ReplacementSolver<'c, S: Solver<'c>> {
+pub struct ReplacementSolver<S: Solver> {
     inner: S,
     /// The constraints as added, before replacement. claripy's
     /// ReplacementFrontend reports the original constraints; only the inner
     /// solver sees the replaced forms. Callers rely on this: e.g. rebuilding a
     /// solver from `constraints()` must not pick up values substituted by the
     /// replacements.
-    original_constraints: Vec<AstRef<'c>>,
+    original_constraints: Vec<AstRef>,
     /// The canonical set of replacements (hash → replacement AST).
-    replacements: HashMap<u64, AstRef<'c>>,
+    replacements: HashMap<u64, AstRef>,
     /// Cache that includes derived replacements from sub-expression traversal.
-    replacement_cache: HashMap<u64, AstRef<'c>>,
+    replacement_cache: HashMap<u64, AstRef>,
     /// Whether to automatically extract replacements from `x == <concrete>` constraints.
     auto_replace: bool,
-    _marker: std::marker::PhantomData<&'c ()>,
 }
 
-impl<'c, S: Solver<'c>> ReplacementSolver<'c, S> {
+impl<S: Solver> ReplacementSolver<S> {
     pub fn new(inner: S) -> Self {
         Self::new_with_options(inner, true)
     }
@@ -42,7 +41,6 @@ impl<'c, S: Solver<'c>> ReplacementSolver<'c, S> {
             replacements: HashMap::new(),
             replacement_cache: HashMap::new(),
             auto_replace,
-            _marker: std::marker::PhantomData,
         }
     }
 
@@ -62,7 +60,7 @@ impl<'c, S: Solver<'c>> ReplacementSolver<'c, S> {
 
     /// Add an explicit replacement mapping: occurrences of `old` will be
     /// replaced with `new` in all future queries.
-    pub fn add_replacement(&mut self, old: AstRef<'c>, new: AstRef<'c>) {
+    pub fn add_replacement(&mut self, old: AstRef, new: AstRef) {
         let hash = old.hash();
         self.replacements.insert(hash, new.clone());
         self.replacement_cache.insert(hash, new);
@@ -84,17 +82,17 @@ impl<'c, S: Solver<'c>> ReplacementSolver<'c, S> {
     }
 
     /// Get the current replacement map (hash → AstRef).
-    pub fn replacements(&self) -> &HashMap<u64, AstRef<'c>> {
+    pub fn replacements(&self) -> &HashMap<u64, AstRef> {
         &self.replacements
     }
 
     /// Apply known replacements to an AstRef.
-    fn apply_replacements(&self, ast: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn apply_replacements(&self, ast: &AstRef) -> Result<AstRef, ClarirsError> {
         ast.replace_many(&self.replacement_cache)
     }
 
     /// Try to extract a replacement from an equality constraint like `sym == concrete`.
-    fn try_extract_replacement(&mut self, constraint: &AstRef<'c>) {
+    fn try_extract_replacement(&mut self, constraint: &AstRef) {
         match constraint.op() {
             AstOp::Eq(lhs, rhs) => {
                 if lhs.symbolic() && !rhs.symbolic() {
@@ -116,14 +114,14 @@ impl<'c, S: Solver<'c>> ReplacementSolver<'c, S> {
     }
 }
 
-impl<'c, S: Solver<'c>> HasContext<'c> for ReplacementSolver<'c, S> {
-    fn context(&self) -> &'c Context<'c> {
+impl<S: Solver> HasContext for ReplacementSolver<S> {
+    fn context(&self) -> Arc<Context> {
         self.inner.context()
     }
 }
 
-impl<'c, S: Solver<'c>> Solver<'c> for ReplacementSolver<'c, S> {
-    fn add(&mut self, constraint: &AstRef<'c>) -> Result<(), ClarirsError> {
+impl<S: Solver> Solver for ReplacementSolver<S> {
+    fn add(&mut self, constraint: &AstRef) -> Result<(), ClarirsError> {
         if self.auto_replace {
             self.try_extract_replacement(constraint);
         }
@@ -138,7 +136,7 @@ impl<'c, S: Solver<'c>> Solver<'c> for ReplacementSolver<'c, S> {
         self.inner.clear()
     }
 
-    fn constraints(&self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+    fn constraints(&self) -> Result<Vec<AstRef>, ClarirsError> {
         Ok(self.original_constraints.clone())
     }
 
@@ -150,7 +148,7 @@ impl<'c, S: Solver<'c>> Solver<'c> for ReplacementSolver<'c, S> {
         self.inner.satisfiable()
     }
 
-    fn satisfiable_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
+    fn satisfiable_with_extra(&mut self, extra: &[AstRef]) -> Result<bool, ClarirsError> {
         let replaced = extra
             .iter()
             .map(|c| self.apply_replacements(c))
@@ -158,47 +156,47 @@ impl<'c, S: Solver<'c>> Solver<'c> for ReplacementSolver<'c, S> {
         self.inner.satisfiable_with_extra(&replaced)
     }
 
-    fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn is_true(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         let replaced = self.apply_replacements(expr)?;
         self.inner.is_true(&replaced)
     }
 
-    fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn is_false(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         let replaced = self.apply_replacements(expr)?;
         self.inner.is_false(&replaced)
     }
 
-    fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn has_true(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         let replaced = self.apply_replacements(expr)?;
         self.inner.has_true(&replaced)
     }
 
-    fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn has_false(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         let replaced = self.apply_replacements(expr)?;
         self.inner.has_false(&replaced)
     }
 
-    fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn min_unsigned(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         let replaced = self.apply_replacements(expr)?;
         self.inner.min_unsigned(&replaced)
     }
 
-    fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn max_unsigned(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         let replaced = self.apply_replacements(expr)?;
         self.inner.max_unsigned(&replaced)
     }
 
-    fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn min_signed(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         let replaced = self.apply_replacements(expr)?;
         self.inner.min_signed(&replaced)
     }
 
-    fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn max_signed(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         let replaced = self.apply_replacements(expr)?;
         self.inner.max_signed(&replaced)
     }
 
-    fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+    fn eval_n(&mut self, expr: &AstRef, n: u32) -> Result<Vec<AstRef>, ClarirsError> {
         let replaced = self.apply_replacements(expr)?;
         self.inner.eval_n(&replaced, n)
     }
@@ -211,8 +209,8 @@ mod tests {
 
     #[test]
     fn test_replacement_solver_basic() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
-        let inner = ConcreteSolver::new(&ctx);
+        let ctx = Arc::new(Context::new());
+        let inner = ConcreteSolver::new(ctx.clone());
         let mut solver = ReplacementSolver::new(inner);
 
         let x = ctx.bvs("x", 8)?;
@@ -230,8 +228,8 @@ mod tests {
 
     #[test]
     fn test_replacement_solver_auto_extract() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
-        let inner = ConcreteSolver::new(&ctx);
+        let ctx = Arc::new(Context::new());
+        let inner = ConcreteSolver::new(ctx.clone());
         let mut solver = ReplacementSolver::new(inner);
 
         let x = ctx.bvs("x", 8)?;
@@ -250,8 +248,8 @@ mod tests {
 
     #[test]
     fn test_replacement_solver_expression() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
-        let inner = ConcreteSolver::new(&ctx);
+        let ctx = Arc::new(Context::new());
+        let inner = ConcreteSolver::new(ctx.clone());
         let mut solver = ReplacementSolver::new(inner);
 
         let x = ctx.bvs("x", 8)?;
@@ -272,8 +270,8 @@ mod tests {
 
     #[test]
     fn test_replacement_solver_clear() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
-        let inner = ConcreteSolver::new(&ctx);
+        let ctx = Arc::new(Context::new());
+        let inner = ConcreteSolver::new(ctx.clone());
         let mut solver = ReplacementSolver::new(inner);
 
         let x = ctx.bvs("x", 8)?;
@@ -290,8 +288,8 @@ mod tests {
 
     #[test]
     fn test_replacement_solver_bool() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
-        let inner = ConcreteSolver::new(&ctx);
+        let ctx = Arc::new(Context::new());
+        let inner = ConcreteSolver::new(ctx.clone());
         let mut solver = ReplacementSolver::new(inner);
 
         let x = ctx.bools("x")?;
@@ -307,8 +305,8 @@ mod tests {
 
     #[test]
     fn test_replacement_solver_auto_replace_disabled() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
-        let inner = ConcreteSolver::new(&ctx);
+        let ctx = Arc::new(Context::new());
+        let inner = ConcreteSolver::new(ctx.clone());
         // auto_replace = false: `x == 5` should NOT register a replacement.
         let mut solver = ReplacementSolver::new_with_options(inner, false);
         assert!(!solver.auto_replace());
@@ -331,8 +329,8 @@ mod tests {
 
     #[test]
     fn test_replacement_solver_reports_original_constraints() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
-        let inner = ConcreteSolver::new(&ctx);
+        let ctx = Arc::new(Context::new());
+        let inner = ConcreteSolver::new(ctx.clone());
         let mut solver = ReplacementSolver::new(inner);
 
         let x = ctx.bvs("x", 8)?;

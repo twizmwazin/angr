@@ -3,10 +3,10 @@ use num_traits::{Num, One, Zero};
 
 use crate::{algorithms::simplify::SimplifyError, prelude::*};
 
-pub(crate) fn simplify_bv<'c>(
-    state: &mut super::SimplifyState<'c>,
+pub(crate) fn simplify_bv(
+    state: &mut super::SimplifyState,
     error_on_dbz: bool,
-) -> Result<AstRef<'c>, SimplifyError<'c>> {
+) -> Result<AstRef, SimplifyError> {
     let ctx = state.expr.context();
     let bv_expr = state.expr.clone();
 
@@ -27,7 +27,7 @@ pub(crate) fn simplify_bv<'c>(
 
             // Flatten nested Ands, fold constants, remove identities, detect absorber
             let mut bvv_acc: Option<BitVec> = None;
-            let mut sym_args: Vec<AstRef<'c>> = Vec::new();
+            let mut sym_args: Vec<AstRef> = Vec::new();
 
             for arg in &simplified {
                 match arg.op() {
@@ -233,7 +233,7 @@ pub(crate) fn simplify_bv<'c>(
 
             // Flatten nested Ors, fold constants, remove identities, detect absorber
             let mut bvv_acc: Option<BitVec> = None;
-            let mut sym_args: Vec<AstRef<'c>> = Vec::new();
+            let mut sym_args: Vec<AstRef> = Vec::new();
 
             for arg in &simplified {
                 match arg.op() {
@@ -349,7 +349,7 @@ pub(crate) fn simplify_bv<'c>(
 
             // Flatten nested Xors, fold constants, remove identities
             let mut bvv_acc: Option<BitVec> = None;
-            let mut sym_args: Vec<AstRef<'c>> = Vec::new();
+            let mut sym_args: Vec<AstRef> = Vec::new();
 
             for arg in &simplified {
                 match arg.op() {
@@ -472,7 +472,7 @@ pub(crate) fn simplify_bv<'c>(
 
             // Flatten nested Adds, fold constants, remove identities
             let mut bvv_acc: Option<BitVec> = None;
-            let mut sym_args: Vec<AstRef<'c>> = Vec::new();
+            let mut sym_args: Vec<AstRef> = Vec::new();
 
             for arg in &simplified {
                 match arg.op() {
@@ -595,7 +595,7 @@ pub(crate) fn simplify_bv<'c>(
                             // (sum + b) - c => sum + (b - c)
                             let combined_value = (b_val.clone() - v.clone())?;
                             let combined_bvv = ctx.bvv(combined_value)?;
-                            let mut new_args: Vec<AstRef<'c>> = add_args
+                            let mut new_args: Vec<AstRef> = add_args
                                 .iter()
                                 .enumerate()
                                 .filter(|(i, _)| *i != bvv_idx)
@@ -623,7 +623,7 @@ pub(crate) fn simplify_bv<'c>(
 
             // Flatten nested Muls, fold constants, remove identities, detect absorber
             let mut bvv_acc: Option<BitVec> = None;
-            let mut sym_args: Vec<AstRef<'c>> = Vec::new();
+            let mut sym_args: Vec<AstRef> = Vec::new();
 
             for arg in &simplified {
                 match arg.op() {
@@ -1068,7 +1068,7 @@ pub(crate) fn simplify_bv<'c>(
                 // extract(n, 0, a + b + ...) = extract(n, 0, a) + extract(n, 0, b) + ...
                 // This is valid because the low bits of add/sub only depend on the low bits of the operands
                 AstOp::Add(add_args) if *low == 0 => {
-                    let extracted: Vec<AstRef<'c>> = add_args
+                    let extracted: Vec<AstRef> = add_args
                         .iter()
                         .map(|a| ctx.extract(a, *high, 0))
                         .collect::<Result<_, _>>()?;
@@ -1083,7 +1083,7 @@ pub(crate) fn simplify_bv<'c>(
                 // Propagate extract through bitwise operations
                 // extract(n, m, a & b & ...) = extract(n, m, a) & extract(n, m, b) & ...
                 AstOp::And(and_args) => {
-                    let extracted: Vec<AstRef<'c>> = and_args
+                    let extracted: Vec<AstRef> = and_args
                         .iter()
                         .map(|a| ctx.extract(a, *high, *low))
                         .collect::<Result<_, _>>()?;
@@ -1091,7 +1091,7 @@ pub(crate) fn simplify_bv<'c>(
                 }
                 // extract(n, m, a | b | ...) = extract(n, m, a) | extract(n, m, b) | ...
                 AstOp::Or(or_args) => {
-                    let extracted: Vec<AstRef<'c>> = or_args
+                    let extracted: Vec<AstRef> = or_args
                         .iter()
                         .map(|a| ctx.extract(a, *high, *low))
                         .collect::<Result<_, _>>()?;
@@ -1099,7 +1099,7 @@ pub(crate) fn simplify_bv<'c>(
                 }
                 // extract(n, m, a ^ b ^ ...) = extract(n, m, a) ^ extract(n, m, b) ^ ...
                 AstOp::Xor(xor_args) => {
-                    let extracted: Vec<AstRef<'c>> = xor_args
+                    let extracted: Vec<AstRef> = xor_args
                         .iter()
                         .map(|a| ctx.extract(a, *high, *low))
                         .collect::<Result<_, _>>()?;
@@ -1218,7 +1218,7 @@ pub(crate) fn simplify_bv<'c>(
             let simplified_args = state.get_all_simplified()?;
 
             // Flatten nested Concats and filter zero-size args
-            let mut flattened: Vec<AstRef<'c>> = Vec::new();
+            let mut flattened: Vec<AstRef> = Vec::new();
             for arg in simplified_args {
                 if arg.size() == 0 {
                     continue;
@@ -1248,8 +1248,8 @@ pub(crate) fn simplify_bv<'c>(
                         AstOp::ITE(c, _, _) => c.clone(),
                         _ => unreachable!(),
                     };
-                    let mut thens: Vec<AstRef<'c>> = Vec::with_capacity(flattened.len());
-                    let mut elses: Vec<AstRef<'c>> = Vec::with_capacity(flattened.len());
+                    let mut thens: Vec<AstRef> = Vec::with_capacity(flattened.len());
+                    let mut elses: Vec<AstRef> = Vec::with_capacity(flattened.len());
                     for a in &flattened {
                         if let AstOp::ITE(_, t, e) = a.op() {
                             thens.push(t.clone());
@@ -1263,7 +1263,7 @@ pub(crate) fn simplify_bv<'c>(
             }
 
             // Merge adjacent constants and adjacent extracts of the same source.
-            let mut merged: Vec<AstRef<'c>> = Vec::new();
+            let mut merged: Vec<AstRef> = Vec::new();
             let mut merged_extracts = false;
             for arg in flattened {
                 // Concat(.., BVV(a), BVV(b)) -> Concat(.., BVV(a .. b))
@@ -1301,7 +1301,7 @@ pub(crate) fn simplify_bv<'c>(
                 && matches!(merged[0].op(), AstOp::BVV(high_val) if high_val.is_zero())
             {
                 let ext_size = merged[0].size();
-                let rest: Vec<AstRef<'c>> = merged[1..].to_vec();
+                let rest: Vec<AstRef> = merged[1..].to_vec();
                 let inner = if rest.len() == 1 {
                     rest.into_iter().next().unwrap()
                 } else {

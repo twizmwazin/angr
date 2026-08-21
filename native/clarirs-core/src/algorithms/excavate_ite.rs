@@ -6,14 +6,14 @@ use crate::{
     prelude::*,
 };
 
-impl<'c> AstNode<'c> {
+impl AstNode {
     /// Excavates if-then-else expressions to the top level of the AST.
     ///
     /// Returns a semantically equivalent AST where nested ITE expressions have
     /// been "excavated" (moved up) to the top level where possible. For
     /// example, `a + (if cond then b else c)` becomes
     /// `if cond then (a + b) else (a + c)`.
-    pub fn excavate_ite(self: &Arc<Self>) -> Result<AstRef<'c>, ClarirsError> {
+    pub fn excavate_ite(self: &Arc<Self>) -> Result<AstRef, ClarirsError> {
         walk_post_order(
             self.clone(),
             |node, children| excavate_node(&node, children),
@@ -38,10 +38,7 @@ impl<'c> AstNode<'c> {
 /// what keeps the pass linear in the size of the AST.
 ///
 /// An `ITE` is already in excavated form, so its branches are left in place.
-fn excavate_node<'c>(
-    ast: &AstRef<'c>,
-    children: &[AstRef<'c>],
-) -> Result<AstRef<'c>, ClarirsError> {
+fn excavate_node(ast: &AstRef, children: &[AstRef]) -> Result<AstRef, ClarirsError> {
     let ctx = ast.context();
 
     // Annotated nodes are opaque: rebuilding one through the context would drop
@@ -51,7 +48,7 @@ fn excavate_node<'c>(
     }
 
     if matches!(ast.op(), AstOp::ITE(..)) {
-        return reconstruct_node(ctx, ast, children);
+        return reconstruct_node(&ctx, ast, children);
     }
 
     let idx = match children
@@ -59,7 +56,7 @@ fn excavate_node<'c>(
         .position(|c| matches!(c.op(), AstOp::ITE(..)))
     {
         Some(idx) => idx,
-        None => return reconstruct_node(ctx, ast, children),
+        None => return reconstruct_node(&ctx, ast, children),
     };
 
     let cond = match children[idx].op() {
@@ -81,7 +78,7 @@ fn excavate_node<'c>(
                 else_children.push(then_.clone());
             }
             // An `ITE` on an unrelated condition: give up rather than expand.
-            AstOp::ITE(..) => return reconstruct_node(ctx, ast, children),
+            AstOp::ITE(..) => return reconstruct_node(&ctx, ast, children),
             _ => {
                 then_children.push(child.clone());
                 else_children.push(child.clone());
@@ -89,8 +86,8 @@ fn excavate_node<'c>(
         }
     }
 
-    let then_branch = reconstruct_node(ctx, ast, &then_children)?;
-    let else_branch = reconstruct_node(ctx, ast, &else_children)?;
+    let then_branch = reconstruct_node(&ctx, ast, &then_children)?;
+    let else_branch = reconstruct_node(&ctx, ast, &else_children)?;
     ctx.ite(cond, then_branch, else_branch)
 }
 

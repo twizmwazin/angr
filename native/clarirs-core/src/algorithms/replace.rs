@@ -6,13 +6,13 @@ use crate::{
     prelude::*,
 };
 
-impl<'c> AstNode<'c> {
+impl AstNode {
     /// Replaces every occurrence of `from` in this AST with `to`.
-    pub fn replace<T: Clone + Into<AstRef<'c>>>(
+    pub fn replace<T: Clone + Into<AstRef>>(
         self: &Arc<Self>,
         from: &T,
         to: &T,
-    ) -> Result<AstRef<'c>, ClarirsError> {
+    ) -> Result<AstRef, ClarirsError> {
         let from = from.clone().into();
         let to = to.clone().into();
 
@@ -34,15 +34,15 @@ impl<'c> AstNode<'c> {
                     Ok(None)
                 }
             },
-            |ast, children| reconstruct_node(ctx, &ast, children),
+            |ast, children| reconstruct_node(&ctx, &ast, children),
         )
     }
 
     /// Replaces subtrees by hash, using the given hash-to-replacement map.
     pub fn replace_many(
         self: &Arc<Self>,
-        replacements: &HashMap<u64, AstRef<'c>>,
-    ) -> Result<AstRef<'c>, ClarirsError> {
+        replacements: &HashMap<u64, AstRef>,
+    ) -> Result<AstRef, ClarirsError> {
         if replacements.is_empty() {
             return Ok(self.clone());
         }
@@ -57,7 +57,7 @@ impl<'c> AstNode<'c> {
                     Ok(None)
                 }
             },
-            |node, children| reconstruct_node(ctx, &node, children),
+            |node, children| reconstruct_node(&ctx, &node, children),
         )
     }
 }

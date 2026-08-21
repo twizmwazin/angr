@@ -12,8 +12,8 @@ use crate::prelude::*;
 /// The solver is parameterized over `S`, the backing solver type (e.g., Z3).
 /// A fresh `template` solver is cloned whenever a new child is needed.
 #[derive(Clone, Debug)]
-pub struct CompositeSolver<'c, S: Solver<'c>> {
-    ctx: &'c Context<'c>,
+pub struct CompositeSolver<S: Solver> {
+    ctx: Arc<Context>,
     template: S,
     children: HashMap<usize, S>,
     var_to_child: HashMap<InternedString, usize>,
@@ -24,14 +24,14 @@ pub struct CompositeSolver<'c, S: Solver<'c>> {
     unsat: bool,
 }
 
-impl<'c, S: Solver<'c>> HasContext<'c> for CompositeSolver<'c, S> {
-    fn context(&self) -> &'c Context<'c> {
-        self.ctx
+impl<S: Solver> HasContext for CompositeSolver<S> {
+    fn context(&self) -> Arc<Context> {
+        self.ctx.clone()
     }
 }
 
-impl<'c, S: Solver<'c>> CompositeSolver<'c, S> {
-    pub fn new(ctx: &'c Context<'c>, template: S) -> Self {
+impl<S: Solver> CompositeSolver<S> {
+    pub fn new(ctx: Arc<Context>, template: S) -> Self {
         Self {
             ctx,
             template,
@@ -126,8 +126,8 @@ impl<'c, S: Solver<'c>> CompositeSolver<'c, S> {
     }
 }
 
-impl<'c, S: Solver<'c>> Solver<'c> for CompositeSolver<'c, S> {
-    fn add(&mut self, constraint: &AstRef<'c>) -> Result<(), ClarirsError> {
+impl<S: Solver> Solver for CompositeSolver<S> {
+    fn add(&mut self, constraint: &AstRef) -> Result<(), ClarirsError> {
         let vars: BTreeSet<InternedString> = constraint.variables().clone();
 
         if vars.is_empty() {
@@ -164,7 +164,7 @@ impl<'c, S: Solver<'c>> Solver<'c> for CompositeSolver<'c, S> {
         Ok(())
     }
 
-    fn constraints(&self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+    fn constraints(&self) -> Result<Vec<AstRef>, ClarirsError> {
         let mut all = Vec::new();
         for child in self.children.values() {
             all.extend(child.constraints()?);
@@ -191,7 +191,7 @@ impl<'c, S: Solver<'c>> Solver<'c> for CompositeSolver<'c, S> {
         Ok(true)
     }
 
-    fn satisfiable_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
+    fn satisfiable_with_extra(&mut self, extra: &[AstRef]) -> Result<bool, ClarirsError> {
         if extra.is_empty() {
             return self.satisfiable();
         }
@@ -259,27 +259,27 @@ impl<'c, S: Solver<'c>> Solver<'c> for CompositeSolver<'c, S> {
         }
     }
 
-    fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn is_true(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         let vars = expr.variables().clone();
         self.with_solver_for(&vars, |s| s.is_true(expr))
     }
 
-    fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn is_false(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         let vars = expr.variables().clone();
         self.with_solver_for(&vars, |s| s.is_false(expr))
     }
 
-    fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn has_true(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         let vars = expr.variables().clone();
         self.with_solver_for(&vars, |s| s.has_true(expr))
     }
 
-    fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn has_false(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         let vars = expr.variables().clone();
         self.with_solver_for(&vars, |s| s.has_false(expr))
     }
 
-    fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn min_unsigned(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         if self.unsat {
             return Err(ClarirsError::Unsat);
         }
@@ -287,7 +287,7 @@ impl<'c, S: Solver<'c>> Solver<'c> for CompositeSolver<'c, S> {
         self.with_solver_for(&vars, |s| s.min_unsigned(expr))
     }
 
-    fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn max_unsigned(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         if self.unsat {
             return Err(ClarirsError::Unsat);
         }
@@ -295,7 +295,7 @@ impl<'c, S: Solver<'c>> Solver<'c> for CompositeSolver<'c, S> {
         self.with_solver_for(&vars, |s| s.max_unsigned(expr))
     }
 
-    fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn min_signed(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         if self.unsat {
             return Err(ClarirsError::Unsat);
         }
@@ -303,7 +303,7 @@ impl<'c, S: Solver<'c>> Solver<'c> for CompositeSolver<'c, S> {
         self.with_solver_for(&vars, |s| s.min_signed(expr))
     }
 
-    fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn max_signed(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         if self.unsat {
             return Err(ClarirsError::Unsat);
         }
@@ -311,7 +311,7 @@ impl<'c, S: Solver<'c>> Solver<'c> for CompositeSolver<'c, S> {
         self.with_solver_for(&vars, |s| s.max_signed(expr))
     }
 
-    fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+    fn eval_n(&mut self, expr: &AstRef, n: u32) -> Result<Vec<AstRef>, ClarirsError> {
         if self.unsat {
             return Err(ClarirsError::Unsat);
         }
@@ -327,9 +327,9 @@ mod tests {
 
     #[test]
     fn test_composite_solver_independent_constraints() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
-        let template = ConcreteSolver::new(&ctx);
-        let mut solver = CompositeSolver::new(&ctx, template);
+        let ctx = Arc::new(Context::new());
+        let template = ConcreteSolver::new(ctx.clone());
+        let mut solver = CompositeSolver::new(ctx.clone(), template);
 
         // Add concrete constraints (no variables) — should succeed
         solver.add(&ctx.true_()?)?;
@@ -341,9 +341,9 @@ mod tests {
 
     #[test]
     fn test_composite_solver_unsat_concrete() {
-        let ctx = Context::new();
-        let template = ConcreteSolver::new(&ctx);
-        let mut solver = CompositeSolver::new(&ctx, template);
+        let ctx = Arc::new(Context::new());
+        let template = ConcreteSolver::new(ctx.clone());
+        let mut solver = CompositeSolver::new(ctx.clone(), template);
 
         // Adding false succeeds (claripy does not raise from add); the unsat
         // state is reported by satisfiable().
@@ -357,9 +357,9 @@ mod tests {
 
     #[test]
     fn test_composite_solver_partitioning() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
-        let template = ConcreteSolver::new(&ctx);
-        let solver = CompositeSolver::new(&ctx, template);
+        let ctx = Arc::new(Context::new());
+        let template = ConcreteSolver::new(ctx.clone());
+        let solver = CompositeSolver::new(ctx.clone(), template);
 
         // Two independent symbolic variables should go to different children.
         // ConcreteSolver doesn't actually store constraints, but we can verify
@@ -371,9 +371,9 @@ mod tests {
 
     #[test]
     fn test_composite_solver_clear() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
-        let template = ConcreteSolver::new(&ctx);
-        let mut solver = CompositeSolver::new(&ctx, template);
+        let ctx = Arc::new(Context::new());
+        let template = ConcreteSolver::new(ctx.clone());
+        let mut solver = CompositeSolver::new(ctx.clone(), template);
         solver.clear()?;
         assert!(solver.children.is_empty());
         assert!(solver.var_to_child.is_empty());

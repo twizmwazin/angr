@@ -5,25 +5,25 @@ use crate::{reduce::Reduce, strided_interval::ComparisonResult};
 
 /// A solver that uses Value Set Analysis (VSA) for symbolic computation
 #[derive(Clone, Debug)]
-pub struct VSASolver<'c> {
-    ctx: &'c Context<'c>,
+pub struct VSASolver {
+    ctx: Arc<Context>,
 }
 
-impl<'c> VSASolver<'c> {
+impl VSASolver {
     /// Create a new VSA solver
-    pub fn new(ctx: &'c Context<'c>) -> Self {
+    pub fn new(ctx: Arc<Context>) -> Self {
         Self { ctx }
     }
 }
 
-impl<'c> HasContext<'c> for VSASolver<'c> {
-    fn context(&self) -> &'c Context<'c> {
-        self.ctx
+impl HasContext for VSASolver {
+    fn context(&self) -> Arc<Context> {
+        self.ctx.clone()
     }
 }
 
-impl<'c> Solver<'c> for VSASolver<'c> {
-    fn add(&mut self, _: &AstRef<'c>) -> Result<(), ClarirsError> {
+impl Solver for VSASolver {
+    fn add(&mut self, _: &AstRef) -> Result<(), ClarirsError> {
         Ok(())
     }
 
@@ -31,7 +31,7 @@ impl<'c> Solver<'c> for VSASolver<'c> {
         Ok(())
     }
 
-    fn constraints(&self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+    fn constraints(&self) -> Result<Vec<AstRef>, ClarirsError> {
         Ok(vec![])
     }
 
@@ -43,7 +43,7 @@ impl<'c> Solver<'c> for VSASolver<'c> {
         Ok(true)
     }
 
-    fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+    fn eval_n(&mut self, expr: &AstRef, n: u32) -> Result<Vec<AstRef>, ClarirsError> {
         match expr.ast_type() {
             AstType::Bool => expr
                 .simplify()?
@@ -76,49 +76,49 @@ impl<'c> Solver<'c> for VSASolver<'c> {
         }
     }
 
-    fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn is_true(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         Ok(matches!(
             expr.simplify()?.reduce()?.into_bool()?,
             ComparisonResult::True
         ))
     }
 
-    fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn is_false(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         Ok(matches!(
             expr.simplify()?.reduce()?.into_bool()?,
             ComparisonResult::False
         ))
     }
 
-    fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn has_true(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         Ok(matches!(
             expr.simplify()?.reduce()?.into_bool()?,
             ComparisonResult::True | ComparisonResult::Maybe
         ))
     }
 
-    fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn has_false(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         Ok(matches!(
             expr.simplify()?.reduce()?.into_bool()?,
             ComparisonResult::False | ComparisonResult::Maybe
         ))
     }
 
-    fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn min_unsigned(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         expr.simplify()?.reduce()?.into_bv().and_then(|si| {
             let (min_bound, _) = si.get_unsigned_bounds();
             expr.context().bvv(BitVec::from((min_bound, expr.size())))
         })
     }
 
-    fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn max_unsigned(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         expr.simplify()?.reduce()?.into_bv().and_then(|si| {
             let (_, max_bound) = si.get_unsigned_bounds();
             expr.context().bvv(BitVec::from((max_bound, expr.size())))
         })
     }
 
-    fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn min_signed(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         expr.simplify()?.reduce()?.into_bv().and_then(|si| {
             let (min_bound, _) = si.get_signed_bounds();
             // Convert BigInt back to unsigned representation for two's complement
@@ -134,7 +134,7 @@ impl<'c> Solver<'c> for VSASolver<'c> {
         })
     }
 
-    fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn max_signed(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         expr.simplify()?.reduce()?.into_bv().and_then(|si| {
             let (_, max_bound) = si.get_signed_bounds();
             // Convert BigInt back to unsigned representation for two's complement

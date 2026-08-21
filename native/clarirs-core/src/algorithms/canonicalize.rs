@@ -16,14 +16,14 @@ use super::collect_vars::collect_vars;
 /// use clarirs_core::prelude::*;
 /// use clarirs_core::algorithms::canonicalize::structurally_match;
 ///
-/// let ctx = Context::new();
+/// let ctx = Arc::new(Context::new());
 /// let ast1 = ctx.add(&ctx.bvs("x", 64)?, &ctx.bvs("y", 64)?)?;
 /// let ast2 = ctx.add(&ctx.bvs("a", 64)?, &ctx.bvs("b", 64)?)?;
 ///
 /// assert!(structurally_match(&ast1.clone(), &ast2.clone())?);
 /// # Ok::<(), ClarirsError>(())
 /// ```
-pub fn structurally_match<'c>(ast1: &AstRef<'c>, ast2: &AstRef<'c>) -> Result<bool, ClarirsError> {
+pub fn structurally_match(ast1: &AstRef, ast2: &AstRef) -> Result<bool, ClarirsError> {
     let (_, _, canonical1) = canonicalize(ast1)?;
     let (_, _, canonical2) = canonicalize(ast2)?;
     Ok(canonical1 == canonical2)
@@ -44,7 +44,7 @@ pub fn structurally_match<'c>(ast1: &AstRef<'c>, ast2: &AstRef<'c>) -> Result<bo
 /// use clarirs_core::prelude::*;
 /// use clarirs_core::algorithms::canonicalize::canonicalize;
 ///
-/// let ctx = Context::new();
+/// let ctx = Arc::new(Context::new());
 /// let ast1 = ctx.add(&ctx.bvs("x", 64)?, &ctx.bvs("y", 64)?)?;
 /// let ast2 = ctx.add(&ctx.bvs("a", 64)?, &ctx.bvs("b", 64)?)?;
 ///
@@ -55,9 +55,7 @@ pub fn structurally_match<'c>(ast1: &AstRef<'c>, ast2: &AstRef<'c>) -> Result<bo
 /// assert_eq!(canonical1, canonical2);
 /// # Ok::<(), ClarirsError>(())
 /// ```
-pub fn canonicalize<'c>(
-    ast: &AstRef<'c>,
-) -> Result<(HashMap<u64, AstRef<'c>>, usize, AstRef<'c>), ClarirsError> {
+pub fn canonicalize(ast: &AstRef) -> Result<(HashMap<u64, AstRef>, usize, AstRef), ClarirsError> {
     // Collect all variables in the AST
     let vars = collect_vars(ast)?;
 
@@ -83,8 +81,8 @@ pub fn canonicalize<'c>(
         .collect();
 
     // Build replacement map: original var AST -> canonical var AST
-    let mut replacements: HashMap<AstRef<'c>, AstRef<'c>> = HashMap::new();
-    let mut replacement_map: HashMap<u64, AstRef<'c>> = HashMap::new();
+    let mut replacements: HashMap<AstRef, AstRef> = HashMap::new();
+    let mut replacement_map: HashMap<u64, AstRef> = HashMap::new();
     let ctx = ast.context();
 
     for var in vars {
@@ -122,7 +120,7 @@ mod tests {
 
     #[test]
     fn test_canonicalize_bitvec() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
 
         // Create two structurally identical ASTs with different variable names
         let ast1 = ctx.add(&ctx.bvs("x", 64)?, &ctx.bvs("y", 64)?)?;
@@ -145,7 +143,7 @@ mod tests {
 
     #[test]
     fn test_canonicalize_bool() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
 
         // Create two structurally identical boolean ASTs with different variable names
         let ast1 = ctx.and2(&ctx.bools("p")?, &ctx.bools("q")?)?;
@@ -167,7 +165,7 @@ mod tests {
 
     #[test]
     fn test_canonicalize_complex() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
 
         // Create more complex ASTs with the same structure
         // Both should have the same variable names in the same positions
@@ -196,7 +194,7 @@ mod tests {
 
     #[test]
     fn test_canonicalize_no_vars() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
 
         // Create AST with no variables
         let ast = ctx.add(
@@ -217,7 +215,7 @@ mod tests {
 
     #[test]
     fn test_canonicalize_single_var() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
 
         let ast = ctx.add(&ctx.bvs("x", 64)?, &ctx.bvv(BitVec::from((5, 64)))?)?;
         let dyn_ast = ast.clone();
@@ -237,7 +235,7 @@ mod tests {
 
     #[test]
     fn test_canonicalize_order_independence() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
 
         // Test that variables are renamed in lexicographic order
         // regardless of their order in the AST
@@ -270,7 +268,7 @@ mod tests {
 
     #[test]
     fn test_structurally_match_basic() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
 
         // Create two structurally identical ASTs with different variable names
         let ast1 = ctx.add(&ctx.bvs("x", 64)?, &ctx.bvs("y", 64)?)?;
@@ -286,7 +284,7 @@ mod tests {
 
     #[test]
     fn test_structurally_match_different_ops() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
 
         // Create two ASTs with different operations
         let ast1 = ctx.add(&ctx.bvs("x", 64)?, &ctx.bvs("y", 64)?)?;
@@ -302,7 +300,7 @@ mod tests {
 
     #[test]
     fn test_structurally_match_different_sizes() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
 
         // Create two ASTs with different bitvector sizes
         let ast1 = ctx.add(&ctx.bvs("x", 64)?, &ctx.bvs("y", 64)?)?;
@@ -318,7 +316,7 @@ mod tests {
 
     #[test]
     fn test_structurally_match_complex() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
 
         // Create complex nested ASTs with different variable names
         let x1 = ctx.bvs("p", 32)?;
@@ -341,7 +339,7 @@ mod tests {
 
     #[test]
     fn test_structurally_match_boolean() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
 
         // Create two structurally identical boolean ASTs with different variable names
         let ast1 = ctx.or2(
@@ -363,7 +361,7 @@ mod tests {
 
     #[test]
     fn test_structurally_match_same_ast() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
 
         // Same AST should match with itself
         let ast = ctx.add(&ctx.bvs("x", 64)?, &ctx.bvs("y", 64)?)?;
@@ -376,7 +374,7 @@ mod tests {
 
     #[test]
     fn test_structurally_match_constants() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
 
         // ASTs with constants and variables
         let ast1 = ctx.add(&ctx.bvs("x", 64)?, &ctx.bvv(BitVec::from((5, 64)))?)?;
@@ -397,7 +395,7 @@ mod tests {
 
     #[test]
     fn test_canonicalize_cross_type() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
 
         // Create Bool ASTs that contain BitVec variables (cross-type)
         // e.g. (x + y) == 5 where x,y are BVS and the result is Bool

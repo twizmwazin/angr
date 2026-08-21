@@ -5,8 +5,8 @@ use crate::prelude::*;
 use super::dfs::{DfsResult, walk_dfs};
 
 #[allow(clippy::mutable_key_type)]
-pub fn collect_vars<'c>(ast: &AstRef<'c>) -> Result<HashSet<AstRef<'c>>, ClarirsError> {
-    let mut vars: HashSet<AstRef<'c>> = HashSet::new();
+pub fn collect_vars(ast: &AstRef) -> Result<HashSet<AstRef>, ClarirsError> {
+    let mut vars: HashSet<AstRef> = HashSet::new();
     let mut interesting: BTreeSet<InternedString> = ast.variables().clone();
 
     walk_dfs(ast, |node| {
@@ -48,7 +48,7 @@ mod tests {
     #[test]
     #[allow(clippy::mutable_key_type)]
     fn test_collect_vars() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
 
         let ast = ctx.add(
             &ctx.bvs("a", 64)?,
@@ -66,7 +66,7 @@ mod tests {
     #[test]
     #[allow(clippy::mutable_key_type)]
     fn test_collect_vars_with_repeated_vars() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
 
         let ast = ctx.add(
             &ctx.bvs("a", 64)?,

@@ -12,33 +12,29 @@ use clarirs_z3::Z3Solver;
 // `ModelCacheMixin` sits just above the Z3 backend and caches satisfiability
 // and models. `WrappedZ3CachelessSolver` omits that mixin, mirroring claripy's
 // `SolverCacheless`.
-type WrappedConcreteSolver<'c> = ConcreteSolver<'c>;
-type WrappedZ3Solver<'c> =
-    SimplificationMixin<'c, ConcreteEarlyResolutionMixin<'c, ModelCacheMixin<'c, Z3Solver<'c>>>>;
-type WrappedZ3CachelessSolver<'c> =
-    SimplificationMixin<'c, ConcreteEarlyResolutionMixin<'c, Z3Solver<'c>>>;
-type WrappedVSASolver<'c> =
-    SimplificationMixin<'c, ConcreteEarlyResolutionMixin<'c, VSASolver<'c>>>;
-type WrappedHybridSolver<'c> = SimplificationMixin<
-    'c,
-    ConcreteEarlyResolutionMixin<'c, HybridSolver<'c, WrappedVSASolver<'c>, WrappedZ3Solver<'c>>>,
+type WrappedConcreteSolver = ConcreteSolver;
+type WrappedZ3Solver = SimplificationMixin<ConcreteEarlyResolutionMixin<ModelCacheMixin<Z3Solver>>>;
+type WrappedZ3CachelessSolver = SimplificationMixin<ConcreteEarlyResolutionMixin<Z3Solver>>;
+type WrappedVSASolver = SimplificationMixin<ConcreteEarlyResolutionMixin<VSASolver>>;
+type WrappedHybridSolver = SimplificationMixin<
+    ConcreteEarlyResolutionMixin<HybridSolver<WrappedVSASolver, WrappedZ3Solver>>,
 >;
-type WrappedReplacementSolver<'c> = ReplacementSolver<'c, WrappedZ3Solver<'c>>;
-type WrappedCompositeSolver<'c> = CompositeSolver<'c, WrappedZ3Solver<'c>>;
+type WrappedReplacementSolver = ReplacementSolver<WrappedZ3Solver>;
+type WrappedCompositeSolver = CompositeSolver<WrappedZ3Solver>;
 
 #[derive(Clone, Debug)]
 pub(crate) enum DynSolver {
-    Concrete(WrappedConcreteSolver<'static>),
-    Z3(WrappedZ3Solver<'static>),
-    Z3Cacheless(WrappedZ3CachelessSolver<'static>),
-    Vsa(WrappedVSASolver<'static>),
-    Hybrid(WrappedHybridSolver<'static>),
-    Replacement(WrappedReplacementSolver<'static>),
-    Composite(WrappedCompositeSolver<'static>),
+    Concrete(WrappedConcreteSolver),
+    Z3(WrappedZ3Solver),
+    Z3Cacheless(WrappedZ3CachelessSolver),
+    Vsa(WrappedVSASolver),
+    Hybrid(WrappedHybridSolver),
+    Replacement(WrappedReplacementSolver),
+    Composite(WrappedCompositeSolver),
 }
 
-impl HasContext<'static> for DynSolver {
-    fn context(&self) -> &'static Context<'static> {
+impl HasContext for DynSolver {
+    fn context(&self) -> Arc<Context> {
         match self {
             DynSolver::Concrete(solver) => solver.context(),
             DynSolver::Z3(solver) => solver.context(),
@@ -91,11 +87,7 @@ impl DynSolver {
     }
 
     /// Add a replacement (only supported for Replacement solver)
-    pub(crate) fn add_replacement(
-        &mut self,
-        old: AstRef<'static>,
-        new: AstRef<'static>,
-    ) -> Result<(), ClarirsError> {
+    pub(crate) fn add_replacement(&mut self, old: AstRef, new: AstRef) -> Result<(), ClarirsError> {
         match self {
             DynSolver::Replacement(solver) => {
                 solver.add_replacement(old, new);
@@ -154,8 +146,8 @@ macro_rules! dispatch {
     };
 }
 
-impl Solver<'static> for DynSolver {
-    fn add(&mut self, constraint: &AstRef<'static>) -> Result<(), ClarirsError> {
+impl Solver for DynSolver {
+    fn add(&mut self, constraint: &AstRef) -> Result<(), ClarirsError> {
         dispatch!(self, add, constraint)
     }
 
@@ -163,7 +155,7 @@ impl Solver<'static> for DynSolver {
         dispatch!(self, clear)
     }
 
-    fn constraints(&self) -> Result<Vec<AstRef<'static>>, ClarirsError> {
+    fn constraints(&self) -> Result<Vec<AstRef>, ClarirsError> {
         dispatch!(self, constraints)
     }
 
@@ -175,54 +167,47 @@ impl Solver<'static> for DynSolver {
         dispatch!(self, satisfiable)
     }
 
-    fn satisfiable_with_extra(&mut self, extra: &[AstRef<'static>]) -> Result<bool, ClarirsError> {
+    fn satisfiable_with_extra(&mut self, extra: &[AstRef]) -> Result<bool, ClarirsError> {
         dispatch!(self, satisfiable_with_extra, extra)
     }
 
-    fn is_true(&mut self, expr: &AstRef<'static>) -> Result<bool, ClarirsError> {
+    fn is_true(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         dispatch!(self, is_true, expr)
     }
 
-    fn is_false(&mut self, expr: &AstRef<'static>) -> Result<bool, ClarirsError> {
+    fn is_false(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         dispatch!(self, is_false, expr)
     }
 
-    fn has_true(&mut self, expr: &AstRef<'static>) -> Result<bool, ClarirsError> {
+    fn has_true(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         dispatch!(self, has_true, expr)
     }
 
-    fn has_false(&mut self, expr: &AstRef<'static>) -> Result<bool, ClarirsError> {
+    fn has_false(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         dispatch!(self, has_false, expr)
     }
 
-    fn min_unsigned(&mut self, expr: &AstRef<'static>) -> Result<AstRef<'static>, ClarirsError> {
+    fn min_unsigned(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         dispatch!(self, min_unsigned, expr)
     }
 
-    fn max_unsigned(&mut self, expr: &AstRef<'static>) -> Result<AstRef<'static>, ClarirsError> {
+    fn max_unsigned(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         dispatch!(self, max_unsigned, expr)
     }
 
-    fn min_signed(&mut self, expr: &AstRef<'static>) -> Result<AstRef<'static>, ClarirsError> {
+    fn min_signed(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         dispatch!(self, min_signed, expr)
     }
 
-    fn max_signed(&mut self, expr: &AstRef<'static>) -> Result<AstRef<'static>, ClarirsError> {
+    fn max_signed(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         dispatch!(self, max_signed, expr)
     }
 
-    fn eval_n(
-        &mut self,
-        expr: &AstRef<'static>,
-        n: u32,
-    ) -> Result<Vec<AstRef<'static>>, ClarirsError> {
+    fn eval_n(&mut self, expr: &AstRef, n: u32) -> Result<Vec<AstRef>, ClarirsError> {
         dispatch!(self, eval_n, expr, n)
     }
 
-    fn batch_eval(
-        &mut self,
-        exprs: &[AstRef<'static>],
-    ) -> Result<Vec<AstRef<'static>>, ClarirsError> {
+    fn batch_eval(&mut self, exprs: &[AstRef]) -> Result<Vec<AstRef>, ClarirsError> {
         dispatch!(self, batch_eval, exprs)
     }
 }

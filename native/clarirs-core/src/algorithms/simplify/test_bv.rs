@@ -4,7 +4,7 @@ use smallvec::SmallVec;
 
 #[test]
 fn test_neg() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table: Vec<(u64, u64)> = vec![
         (0, 0),
@@ -35,7 +35,7 @@ fn test_neg() -> Result<()> {
 
 #[test]
 fn test_double_negation() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     // Test with concrete values
     let table: Vec<(u64, u64)> = vec![
@@ -67,7 +67,7 @@ fn test_double_negation() -> Result<()> {
 
 #[test]
 fn test_add() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table: Vec<(u64, u64, u64)> = vec![
         (0, 0, 0),
@@ -103,7 +103,7 @@ fn test_add() -> Result<()> {
 
 #[test]
 fn test_sub() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table: Vec<(u64, u64, u64)> = vec![
         (0, 0, 0),
@@ -140,7 +140,7 @@ fn test_sub() -> Result<()> {
 
 #[test]
 fn test_mul() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table: Vec<(u64, u64, u64)> = vec![
         (0, 0, 0),
@@ -178,7 +178,7 @@ fn test_mul() -> Result<()> {
 
 #[test]
 fn test_udiv() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table: Vec<(u8, u8, u8)> = vec![
         (0, 1, 0),
@@ -212,7 +212,7 @@ fn test_udiv() -> Result<()> {
 
 #[test]
 fn test_sdiv() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table: Vec<(i64, i64, i64)> = vec![
         (0, 1, 0),
@@ -270,7 +270,7 @@ fn test_sdiv() -> Result<()> {
 
 #[test]
 fn test_urem() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table: Vec<(u64, u64, u64)> = vec![
         (0, 1, 0),
@@ -313,7 +313,7 @@ fn test_urem() -> Result<()> {
 
 #[test]
 fn test_srem() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table: Vec<(i64, i64, i64)> = vec![
         (0, 1, 0),
@@ -365,7 +365,7 @@ fn test_srem() -> Result<()> {
 
 #[test]
 fn test_and() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table: Vec<(u64, u64, u64)> = vec![
         (0, 0, 0),
@@ -398,7 +398,7 @@ fn test_and() -> Result<()> {
 
 #[test]
 fn test_or() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table: Vec<(u64, u64, u64)> = vec![
         (0, 0, 0),
@@ -431,7 +431,7 @@ fn test_or() -> Result<()> {
 
 #[test]
 fn test_xor() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table: Vec<(u64, u64, u64)> = vec![
         (0, 0, 0),
@@ -464,7 +464,7 @@ fn test_xor() -> Result<()> {
 
 #[test]
 fn test_not() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table: Vec<(u64, u64)> = vec![
         (0, u64::MAX),
@@ -495,7 +495,7 @@ fn test_not() -> Result<()> {
 
 #[test]
 fn test_shl() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table: Vec<(u64, u64, u64)> = vec![
         (0, 0, 0),
@@ -536,7 +536,7 @@ fn test_shl() -> Result<()> {
 
 #[test]
 fn test_lshr() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table: Vec<(u64, u64, u64)> = vec![
         (0, 0, 0),
@@ -590,7 +590,7 @@ fn test_lshr_of_shl() -> Result<()> {
     // (lshr (shl x n) m) folds to an extract of x; check the rewrite against
     // concrete evaluation for every (n, m) pair, including n > m, n == m,
     // n < m, and shift amounts that clear the value entirely.
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
     let x = ctx.bvs("x", 8)?;
 
     for n in 0..=8u64 {
@@ -622,7 +622,7 @@ fn test_lshr_of_shl() -> Result<()> {
 
 #[test]
 fn test_ashr() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table: Vec<(u64, u64, u64)> = vec![
         (0, 0, 0),
@@ -673,7 +673,7 @@ fn test_ashr() -> Result<()> {
 
 #[test]
 fn test_zext() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table = vec![
         (
@@ -707,7 +707,7 @@ fn test_zext() -> Result<()> {
 
 #[test]
 fn test_sext() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let table = vec![
         (
@@ -771,7 +771,7 @@ fn test_sext() -> Result<()> {
 
 #[test]
 fn test_byte_reverse() -> Result<()> {
-    let context = Context::new();
+    let context = Arc::new(Context::new());
 
     let table: Vec<(u64, u64)> = vec![
         (0, 0),
@@ -826,7 +826,7 @@ fn test_byte_reverse() -> Result<()> {
 
 #[test]
 fn test_rotate_left() -> Result<()> {
-    let context = Context::new();
+    let context = Arc::new(Context::new());
 
     let table: Vec<(u64, u64, u64)> = vec![
         (0, 0, 0),
@@ -873,7 +873,7 @@ fn test_rotate_left() -> Result<()> {
 
 #[test]
 fn test_rotate_right() -> Result<()> {
-    let context = Context::new();
+    let context = Arc::new(Context::new());
 
     let table: Vec<(u64, u64, u64)> = vec![
         (0, 0, 0),
@@ -920,7 +920,7 @@ fn test_rotate_right() -> Result<()> {
 
 #[test]
 fn test_extract() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     // Whole bitvector, concrete
     let bv = ctx.bvv(BitVec::from((0x1234_5678_9ABC_DEF0, 64))).unwrap();
@@ -942,7 +942,7 @@ fn test_extract() -> Result<()> {
 
 #[test]
 fn test_extract_concat() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     // Symbolic test cases
     let x = ctx.bvs("x", 16)?;
@@ -968,7 +968,7 @@ fn test_extract_concat() -> Result<()> {
 
 #[test]
 fn test_identity_simplifications() -> anyhow::Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let x = ctx.bvs("x", 64)?;
 
@@ -1056,7 +1056,7 @@ fn test_identity_simplifications() -> anyhow::Result<()> {
 
 #[test]
 fn test_bitvec_not_identities() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let x = ctx.bvs("x", 64)?;
     let not_x = ctx.not(&x)?;
@@ -1082,7 +1082,7 @@ fn test_bitvec_not_identities() -> Result<()> {
 
 #[test]
 fn test_extract_full_width() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     // Test extracting full width of a 32-bit BVS
     let bvs = ctx.bvs("test", 32)?;
@@ -1105,7 +1105,7 @@ fn test_extract_full_width() -> Result<()> {
 
 #[test]
 fn test_extract_zeroext() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     // Test Extract(ZeroExt(x, n), high, low) where high < original_size
     let original = ctx.bvs("test", 32)?;
@@ -1121,7 +1121,7 @@ fn test_extract_zeroext() -> Result<()> {
 
 #[test]
 fn test_debug_extract_size() -> Result<()> {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     let bvs = ctx.bvs("test", 32)?;
     println!("BVS size: {}", bvs.size());

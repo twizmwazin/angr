@@ -12,9 +12,9 @@ pub enum DfsResult {
 /// `DfsResult::Continue`, the children of the node are visited. If the callback
 /// returns `DfsResult::SkipChildren`, the children of the node are not visited.
 /// If the callback returns `DfsResult::Stop`, the traversal is stopped.
-pub fn walk_dfs<'c>(
-    ast: &AstRef<'c>,
-    mut callback: impl FnMut(&AstRef<'c>) -> DfsResult,
+pub fn walk_dfs(
+    ast: &AstRef,
+    mut callback: impl FnMut(&AstRef) -> DfsResult,
 ) -> Result<(), ClarirsError> {
     let mut stack = vec![ast.clone()];
 
@@ -39,7 +39,7 @@ mod tests {
 
     #[test]
     fn test_walk_dfs() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
 
         let ast = ctx.add(
             &ctx.bvs("a", 64)?,

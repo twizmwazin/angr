@@ -4,7 +4,7 @@ pub trait ToOpString {
     fn to_opstring(&self) -> String;
 }
 
-impl ToOpString for AstRef<'static> {
+impl ToOpString for AstRef {
     fn to_opstring(&self) -> String {
         match self.op() {
             // Polymorphic ops whose name depends on whether the node is boolean

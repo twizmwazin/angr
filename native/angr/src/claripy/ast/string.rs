@@ -16,13 +16,13 @@ static PY_STRING_CACHE: LazyLock<DashMap<u64, Py<PyWeakrefReference>>> =
 
 #[pyclass(name="String", extends=Base, subclass, frozen, module="angr.rustylib.claripy.ast.strings")]
 pub struct PyAstString {
-    pub(crate) inner: AstRef<'static>,
+    pub(crate) inner: AstRef,
 }
 
 impl PyAstString {
     pub fn new<'py>(
         py: Python<'py>,
-        inner: &AstRef<'static>,
+        inner: &AstRef,
     ) -> Result<Bound<'py, PyAstString>, ClaripyError> {
         Self::new_with_name(py, inner, None)
     }
@@ -31,7 +31,7 @@ impl PyAstString {
     /// given.
     pub fn new_with_name<'py>(
         py: Python<'py>,
-        inner: &AstRef<'static>,
+        inner: &AstRef,
         name: Option<String>,
     ) -> Result<Bound<'py, PyAstString>, ClaripyError> {
         if let Some(cache_hit) = PY_STRING_CACHE.get(&inner.hash()).and_then(|cache_hit| {

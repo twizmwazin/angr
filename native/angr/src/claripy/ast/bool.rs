@@ -22,14 +22,11 @@ static PY_BOOL_CACHE: LazyLock<DashMap<u64, Py<PyWeakrefReference>>> = LazyLock:
 
 #[pyclass(extends=Base, subclass, frozen, weakref, module="angr.rustylib.claripy.ast.bool")]
 pub struct Bool {
-    pub(crate) inner: AstRef<'static>,
+    pub(crate) inner: AstRef,
 }
 
 impl Bool {
-    pub fn new<'py>(
-        py: Python<'py>,
-        inner: &AstRef<'static>,
-    ) -> Result<Bound<'py, Bool>, ClaripyError> {
+    pub fn new<'py>(py: Python<'py>, inner: &AstRef) -> Result<Bound<'py, Bool>, ClaripyError> {
         Self::new_with_name(py, inner, None)
     }
 
@@ -37,7 +34,7 @@ impl Bool {
     /// given.
     pub fn new_with_name<'py>(
         py: Python<'py>,
-        inner: &AstRef<'static>,
+        inner: &AstRef,
         name: Option<String>,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
         if let Some(cache_hit) = PY_BOOL_CACHE.get(&inner.hash()).and_then(|cache_hit| {

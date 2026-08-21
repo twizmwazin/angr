@@ -35,21 +35,21 @@ fn next_solver_id() -> u64 {
 }
 
 #[derive(Debug)]
-pub struct Z3Solver<'c> {
-    ctx: &'c Context<'c>,
-    assertions: Vec<AstRef<'c>>,
+pub struct Z3Solver {
+    ctx: Arc<Context>,
+    assertions: Vec<AstRef>,
     timeout: Option<u32>,
     unsat_core: bool,
     // Maps constraint index to tracking variable
-    tracking_vars: HashMap<usize, AstRef<'c>>,
+    tracking_vars: HashMap<usize, AstRef>,
     /// Identifies this solver's incremental z3 solver in [`SOLVER_CACHE`].
     cache_id: u64,
 }
 
-impl<'c> Clone for Z3Solver<'c> {
+impl Clone for Z3Solver {
     fn clone(&self) -> Self {
         Z3Solver {
-            ctx: self.ctx,
+            ctx: self.ctx.clone(),
             assertions: self.assertions.clone(),
             timeout: self.timeout,
             unsat_core: self.unsat_core,
@@ -59,7 +59,7 @@ impl<'c> Clone for Z3Solver<'c> {
     }
 }
 
-impl Drop for Z3Solver<'_> {
+impl Drop for Z3Solver {
     fn drop(&mut self) {
         let _ = SOLVER_CACHE.try_with(|cell| {
             if let Ok(mut map) = cell.try_borrow_mut() {
@@ -69,8 +69,8 @@ impl Drop for Z3Solver<'_> {
     }
 }
 
-impl<'c> Z3Solver<'c> {
-    pub fn new(ctx: &'c Context<'c>) -> Self {
+impl Z3Solver {
+    pub fn new(ctx: Arc<Context>) -> Self {
         Self {
             ctx,
             assertions: vec![],
@@ -81,7 +81,7 @@ impl<'c> Z3Solver<'c> {
         }
     }
 
-    pub fn new_with_timeout(ctx: &'c Context<'c>, timeout: Option<u32>) -> Self {
+    pub fn new_with_timeout(ctx: Arc<Context>, timeout: Option<u32>) -> Self {
         Self {
             ctx,
             assertions: vec![],
@@ -92,7 +92,7 @@ impl<'c> Z3Solver<'c> {
         }
     }
 
-    pub fn new_with_options(ctx: &'c Context<'c>, timeout: Option<u32>, unsat_core: bool) -> Self {
+    pub fn new_with_options(ctx: Arc<Context>, timeout: Option<u32>, unsat_core: bool) -> Self {
         Self {
             ctx,
             assertions: vec![],
@@ -141,7 +141,7 @@ impl<'c> Z3Solver<'c> {
             for i in 0..core_size {
                 let core_ast = core_vector.get(i)?;
                 // Convert the Z3 AST back to a AstRef to get its variable name
-                let bool_ast = AstRef::from_z3(self.ctx, &core_ast)?;
+                let bool_ast = AstRef::from_z3(&self.ctx, &core_ast)?;
                 if let Some(vars) = bool_ast.variables().iter().next()
                     && let Some(idx) = track_to_idx.get(&vars.to_string())
                 {
@@ -154,13 +154,13 @@ impl<'c> Z3Solver<'c> {
     }
 }
 
-impl<'c> HasContext<'c> for Z3Solver<'c> {
-    fn context(&self) -> &'c Context<'c> {
-        self.ctx
+impl HasContext for Z3Solver {
+    fn context(&self) -> Arc<Context> {
+        self.ctx.clone()
     }
 }
 
-impl<'c> Z3Solver<'c> {
+impl Z3Solver {
     /// Build a fresh z3 solver configured with this solver's params (timeout,
     /// unsat_core) but with no assertions yet.
     fn new_z3_solver(&self) -> Result<RcSolver, ClarirsError> {
@@ -292,7 +292,7 @@ impl<'c> Z3Solver<'c> {
     /// Evaluate `expr` against a single model. More efficient than the generic
     /// `eval_n(_, 1)` path, which rebuilds the solver and adds an exclusion
     /// constraint; used to back the `Solver::eval` override below.
-    fn eval_in_model(&self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn eval_in_model(&self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         let expr = expr.simplify()?.simplify_z3()?;
 
         // If the expression is concrete, we can return it directly
@@ -304,7 +304,7 @@ impl<'c> Z3Solver<'c> {
         // replace the variables with the values from the model
         let model = self.make_model()?;
 
-        AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?)
+        AstRef::from_z3(&expr.context(), model.eval(&expr.to_z3()?)?)
     }
 }
 
@@ -313,13 +313,13 @@ impl<'c> Z3Solver<'c> {
 /// Such expressions can evaluate to a non-constant term against a Z3 model
 /// (fp.to_ieee_bv stays uninterpreted), so eval binds them to an auxiliary
 /// variable instead of reading them from the model directly.
-fn contains_fp_to_ieeebv(expr: &AstRef<'_>) -> bool {
+fn contains_fp_to_ieeebv(expr: &AstRef) -> bool {
     matches!(expr.op(), AstOp::FpToIEEEBV(_))
         || expr.child_iter().any(|c| contains_fp_to_ieeebv(&c))
 }
 
-impl<'c> Solver<'c> for Z3Solver<'c> {
-    fn add(&mut self, constraint: &AstRef<'c>) -> Result<(), ClarirsError> {
+impl Solver for Z3Solver {
+    fn add(&mut self, constraint: &AstRef) -> Result<(), ClarirsError> {
         let idx = self.assertions.len();
         self.assertions.push(constraint.clone());
 
@@ -340,7 +340,7 @@ impl<'c> Solver<'c> for Z3Solver<'c> {
         Ok(())
     }
 
-    fn constraints(&self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+    fn constraints(&self) -> Result<Vec<AstRef>, ClarirsError> {
         Ok(self.assertions.clone())
     }
 
@@ -370,7 +370,7 @@ impl<'c> Solver<'c> for Z3Solver<'c> {
         })
     }
 
-    fn satisfiable_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
+    fn satisfiable_with_extra(&mut self, extra: &[AstRef]) -> Result<bool, ClarirsError> {
         // Check with the extra constraints as assumptions on the persistent
         // incremental solver: no clone, no from-scratch re-assertion. This is
         // angr's hottest solver call (every branch feasibility check).
@@ -387,11 +387,11 @@ impl<'c> Solver<'c> for Z3Solver<'c> {
         )
     }
 
-    fn eval(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn eval(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         self.eval_in_model(expr)
     }
 
-    fn batch_eval(&mut self, exprs: &[AstRef<'c>]) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+    fn batch_eval(&mut self, exprs: &[AstRef]) -> Result<Vec<AstRef>, ClarirsError> {
         if exprs.is_empty() {
             return Ok(Vec::new());
         }
@@ -405,34 +405,34 @@ impl<'c> Solver<'c> for Z3Solver<'c> {
                 if expr.concrete() {
                     return Ok(expr);
                 }
-                AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?)
+                AstRef::from_z3(&expr.context(), model.eval(&expr.to_z3()?)?)
             })
             .collect()
     }
 
-    fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn is_true(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         let expr = expr.simplify_z3()?;
         Ok(expr.concrete() && expr.is_true())
     }
 
-    fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn is_false(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         let expr = expr.simplify_z3()?;
         Ok(expr.concrete() && expr.is_false())
     }
 
-    fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn has_true(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         let mut solver = self.clone();
         solver.add(expr)?;
         solver.satisfiable()
     }
 
-    fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn has_false(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         let mut solver = self.clone();
         solver.add(&self.context().not(expr)?)?;
         solver.satisfiable()
     }
 
-    fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn min_unsigned(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         let mut optimize = self.mk_filled_optimize()?;
         optimize.minimize(&expr.to_z3()?)?;
         match optimize.check()? {
@@ -442,12 +442,12 @@ impl<'c> Solver<'c> for Z3Solver<'c> {
         }
 
         let model = optimize.get_model()?;
-        AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?)?
+        AstRef::from_z3(&expr.context(), model.eval(&expr.to_z3()?)?)?
             .into_bitvec()
             .ok_or(ClarirsError::TypeError("Expected AstRef".to_string()))
     }
 
-    fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn max_unsigned(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         let mut optimize = self.mk_filled_optimize()?;
         optimize.maximize(&expr.to_z3()?)?;
         match optimize.check()? {
@@ -457,12 +457,12 @@ impl<'c> Solver<'c> for Z3Solver<'c> {
         }
 
         let model = optimize.get_model()?;
-        AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?)?
+        AstRef::from_z3(&expr.context(), model.eval(&expr.to_z3()?)?)?
             .into_bitvec()
             .ok_or(ClarirsError::TypeError("Expected AstRef".to_string()))
     }
 
-    fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn min_signed(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         let mut optimize = self.mk_filled_optimize()?;
         // Get the size of the bitvector
         let size = expr.size();
@@ -494,12 +494,12 @@ impl<'c> Solver<'c> for Z3Solver<'c> {
         }
 
         let model = optimize.get_model()?;
-        AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?)?
+        AstRef::from_z3(&expr.context(), model.eval(&expr.to_z3()?)?)?
             .into_bitvec()
             .ok_or(ClarirsError::TypeError("Expected AstRef".to_string()))
     }
 
-    fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn max_signed(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         let mut optimize = self.mk_filled_optimize()?;
         // Get the size of the bitvector
         let size = expr.size();
@@ -531,12 +531,12 @@ impl<'c> Solver<'c> for Z3Solver<'c> {
         }
 
         let model = optimize.get_model()?;
-        AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?)?
+        AstRef::from_z3(&expr.context(), model.eval(&expr.to_z3()?)?)?
             .into_bitvec()
             .ok_or(ClarirsError::TypeError("Expected AstRef".to_string()))
     }
 
-    fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+    fn eval_n(&mut self, expr: &AstRef, n: u32) -> Result<Vec<AstRef>, ClarirsError> {
         let mut results = Vec::new();
 
         // Simplify and check if concrete
@@ -616,7 +616,7 @@ impl<'c> Solver<'c> for Z3Solver<'c> {
             let model = z3_solver.model()?;
             let eval_result = model.eval(&z3_eval_target)?;
 
-            let solution = AstRef::from_z3(ctx, eval_result)?;
+            let solution = AstRef::from_z3(&ctx, eval_result)?;
 
             // Add constraint to exclude this solution
             let neq_constraint = ctx.neq(&eval_target, &solution)?;
@@ -645,8 +645,8 @@ mod tests {
     fn solver_pins_conversion_cache_for_its_lifetime() -> Result<(), ClarirsError> {
         use clarirs_core::cache::Cache;
 
-        let ctx = Context::new();
-        let mut solver = Z3Solver::new(&ctx);
+        let ctx = Arc::new(Context::new());
+        let mut solver = Z3Solver::new(ctx.clone());
         let x = ctx.bvs("pin_x", 64)?;
         let constraint = ctx.eq_(&x, &ctx.bvv(BitVec::from((42, 64)))?)?;
         solver.add(&constraint)?;
@@ -667,9 +667,9 @@ mod tests {
 
     #[test]
     fn test_solver_simple() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
 
-        let mut solver = Z3Solver::new(&ctx);
+        let mut solver = Z3Solver::new(ctx.clone());
 
         let x = ctx.bools("x")?;
         let y = ctx.bools("y")?;
@@ -686,8 +686,8 @@ mod tests {
 
     #[test]
     fn test_batch_eval_consistent_model() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
-        let mut solver = Z3Solver::new(&ctx);
+        let ctx = Arc::new(Context::new());
+        let mut solver = Z3Solver::new(ctx.clone());
 
         let x = ctx.bvs("x", 8)?;
         let y = ctx.bvs("y", 8)?;
@@ -710,9 +710,9 @@ mod tests {
     /// Z3 solver agree on satisfiability and evaluation.
     #[test]
     fn test_model_cache_matches_cacheless() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
-        let mut cached = ModelCacheMixin::new(Z3Solver::new(&ctx));
-        let mut cacheless = Z3Solver::new(&ctx);
+        let ctx = Arc::new(Context::new());
+        let mut cached = ModelCacheMixin::new(Z3Solver::new(ctx.clone()));
+        let mut cacheless = Z3Solver::new(ctx.clone());
 
         let x = ctx.bvs("x", 32)?;
         // 10 <= x <= 20
@@ -757,8 +757,8 @@ mod tests {
 
     #[test]
     fn test_model_cache_unsat() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
-        let mut cached = ModelCacheMixin::new(Z3Solver::new(&ctx));
+        let ctx = Arc::new(Context::new());
+        let mut cached = ModelCacheMixin::new(Z3Solver::new(ctx.clone()));
 
         let x = ctx.bvs("x", 8)?;
         cached.add(&ctx.eq_(&x, &ctx.bvv(BitVec::from((1, 8)))?)?)?;
@@ -772,11 +772,11 @@ mod tests {
 
     #[test]
     fn test_fp_neq_is_ieee() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
 
         // x != x is satisfiable for floats: NaN is IEEE-unequal to itself.
         // An object-level `distinct` lowering would make this unsatisfiable.
-        let mut solver = Z3Solver::new(&ctx);
+        let mut solver = Z3Solver::new(ctx.clone());
         let x = ctx.fps("x", FSort::f64())?;
         solver.add(&ctx.neq(&x, &x)?)?;
         assert!(solver.satisfiable()?);
@@ -790,9 +790,9 @@ mod tests {
 
     #[test]
     fn test_solver_unsat() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
 
-        let mut solver = Z3Solver::new(&ctx);
+        let mut solver = Z3Solver::new(ctx.clone());
 
         let x = ctx.bools("x")?;
         let y = ctx.bools("y")?;
@@ -807,9 +807,9 @@ mod tests {
 
     #[test]
     fn test_solver_bool() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
 
-        let mut solver = Z3Solver::new(&ctx);
+        let mut solver = Z3Solver::new(ctx.clone());
 
         let x = ctx.bools("x")?;
         let y = ctx.bools("y")?;
@@ -832,8 +832,8 @@ mod tests {
 
         #[test]
         fn test_eval_bool_symbol() -> Result<(), ClarirsError> {
-            let ctx = Context::new();
-            let mut solver = Z3Solver::new(&ctx);
+            let ctx = Arc::new(Context::new());
+            let mut solver = Z3Solver::new(ctx.clone());
 
             let x = ctx.bools("x")?;
             solver.add(&ctx.eq_(&x, &ctx.true_()?)?)?;
@@ -846,8 +846,8 @@ mod tests {
 
         #[test]
         fn test_eval_bool_value() -> Result<(), ClarirsError> {
-            let ctx = Context::new();
-            let mut solver = Z3Solver::new(&ctx);
+            let ctx = Arc::new(Context::new());
+            let mut solver = Z3Solver::new(ctx.clone());
 
             let t = ctx.true_()?;
             let f = ctx.false_()?;
@@ -864,8 +864,8 @@ mod tests {
 
         #[test]
         fn test_eval_bool_not() -> Result<(), ClarirsError> {
-            let ctx = Context::new();
-            let mut solver = Z3Solver::new(&ctx);
+            let ctx = Arc::new(Context::new());
+            let mut solver = Z3Solver::new(ctx.clone());
 
             // Test with concrete value
             let t = ctx.true_()?;
@@ -885,8 +885,8 @@ mod tests {
 
         #[test]
         fn test_eval_bool_and() -> Result<(), ClarirsError> {
-            let ctx = Context::new();
-            let mut solver = Z3Solver::new(&ctx);
+            let ctx = Arc::new(Context::new());
+            let mut solver = Z3Solver::new(ctx.clone());
 
             // Test with concrete values - truth table
             let t = ctx.true_()?;
@@ -916,8 +916,8 @@ mod tests {
 
         #[test]
         fn test_eval_bool_or() -> Result<(), ClarirsError> {
-            let ctx = Context::new();
-            let mut solver = Z3Solver::new(&ctx);
+            let ctx = Arc::new(Context::new());
+            let mut solver = Z3Solver::new(ctx.clone());
 
             // Test with concrete values - truth table
             let t = ctx.true_()?;
@@ -947,8 +947,8 @@ mod tests {
 
         #[test]
         fn test_eval_bool_xor() -> Result<(), ClarirsError> {
-            let ctx = Context::new();
-            let mut solver = Z3Solver::new(&ctx);
+            let ctx = Arc::new(Context::new());
+            let mut solver = Z3Solver::new(ctx.clone());
 
             // Test with concrete values - truth table
             let t = ctx.true_()?;
@@ -978,8 +978,8 @@ mod tests {
 
         #[test]
         fn test_eval_bool_eq() -> Result<(), ClarirsError> {
-            let ctx = Context::new();
-            let mut solver = Z3Solver::new(&ctx);
+            let ctx = Arc::new(Context::new());
+            let mut solver = Z3Solver::new(ctx.clone());
 
             // Test with concrete values
             let t = ctx.true_()?;
@@ -1005,8 +1005,8 @@ mod tests {
 
         #[test]
         fn test_eval_bool_neq() -> Result<(), ClarirsError> {
-            let ctx = Context::new();
-            let mut solver = Z3Solver::new(&ctx);
+            let ctx = Arc::new(Context::new());
+            let mut solver = Z3Solver::new(ctx.clone());
 
             // Test with concrete values
             let t = ctx.true_()?;
@@ -1032,8 +1032,8 @@ mod tests {
 
         #[test]
         fn test_eval_bool_if() -> Result<(), ClarirsError> {
-            let ctx = Context::new();
-            let mut solver = Z3Solver::new(&ctx);
+            let ctx = Arc::new(Context::new());
+            let mut solver = Z3Solver::new(ctx.clone());
 
             // Test with concrete values
             let t = ctx.true_()?;
@@ -1066,8 +1066,8 @@ mod tests {
 
         #[test]
         fn test_min_unsigned_concrete() -> Result<(), ClarirsError> {
-            let ctx = Context::new();
-            let mut solver = Z3Solver::new(&ctx);
+            let ctx = Arc::new(Context::new());
+            let mut solver = Z3Solver::new(ctx.clone());
 
             // Using a concrete value should return the same value
             let bv = ctx.bvv(BitVec::from((42, 64)))?;
@@ -1080,8 +1080,8 @@ mod tests {
 
         #[test]
         fn test_max_unsigned_concrete() -> Result<(), ClarirsError> {
-            let ctx = Context::new();
-            let mut solver = Z3Solver::new(&ctx);
+            let ctx = Arc::new(Context::new());
+            let mut solver = Z3Solver::new(ctx.clone());
 
             // Using a concrete value should return the same value
             let bv = ctx.bvv(BitVec::from((42, 64)))?;
@@ -1094,8 +1094,8 @@ mod tests {
 
         #[test]
         fn test_min_unsigned_constrained() -> Result<(), ClarirsError> {
-            let ctx = Context::new();
-            let mut solver = Z3Solver::new(&ctx);
+            let ctx = Arc::new(Context::new());
+            let mut solver = Z3Solver::new(ctx.clone());
 
             // Create a variable with constraints
             let x = ctx.bvs("x", 64)?;
@@ -1116,8 +1116,8 @@ mod tests {
 
         #[test]
         fn test_max_unsigned_constrained() -> Result<(), ClarirsError> {
-            let ctx = Context::new();
-            let mut solver = Z3Solver::new(&ctx);
+            let ctx = Arc::new(Context::new());
+            let mut solver = Z3Solver::new(ctx.clone());
 
             // Create a variable with constraints
             let x = ctx.bvs("x", 64)?;
@@ -1138,8 +1138,8 @@ mod tests {
 
         #[test]
         fn test_min_unsigned_complex() -> Result<(), ClarirsError> {
-            let ctx = Context::new();
-            let mut solver = Z3Solver::new(&ctx);
+            let ctx = Arc::new(Context::new());
+            let mut solver = Z3Solver::new(ctx.clone());
 
             // Create variables
             let x = ctx.bvs("x", 8)?;
@@ -1173,8 +1173,8 @@ mod tests {
 
         #[test]
         fn test_max_unsigned_complex() -> Result<(), ClarirsError> {
-            let ctx = Context::new();
-            let mut solver = Z3Solver::new(&ctx);
+            let ctx = Arc::new(Context::new());
+            let mut solver = Z3Solver::new(ctx.clone());
 
             // Create variables
             let x = ctx.bvs("x", 8)?;
@@ -1205,8 +1205,8 @@ mod tests {
 
         #[test]
         fn test_min_signed_concrete() -> Result<(), ClarirsError> {
-            let ctx = Context::new();
-            let mut solver = Z3Solver::new(&ctx);
+            let ctx = Arc::new(Context::new());
+            let mut solver = Z3Solver::new(ctx.clone());
 
             // Using a concrete value should return the same value
             let bv = ctx.bvv(BitVec::from((42, 64)))?;
@@ -1219,8 +1219,8 @@ mod tests {
 
         #[test]
         fn test_max_signed_concrete() -> Result<(), ClarirsError> {
-            let ctx = Context::new();
-            let mut solver = Z3Solver::new(&ctx);
+            let ctx = Arc::new(Context::new());
+            let mut solver = Z3Solver::new(ctx.clone());
 
             // Using a concrete value should return the same value
             let bv = ctx.bvv(BitVec::from((42, 64)))?;
@@ -1233,8 +1233,8 @@ mod tests {
 
         #[test]
         fn test_min_signed_constrained() -> Result<(), ClarirsError> {
-            let ctx = Context::new();
-            let mut solver = Z3Solver::new(&ctx);
+            let ctx = Arc::new(Context::new());
+            let mut solver = Z3Solver::new(ctx.clone());
 
             // Create a variable with constraints
             let x = ctx.bvs("x", 64)?;
@@ -1256,8 +1256,8 @@ mod tests {
 
         #[test]
         fn test_max_signed_constrained() -> Result<(), ClarirsError> {
-            let ctx = Context::new();
-            let mut solver = Z3Solver::new(&ctx);
+            let ctx = Arc::new(Context::new());
+            let mut solver = Z3Solver::new(ctx.clone());
 
             // Create a variable with constraints
             let x = ctx.bvs("x", 64)?;
@@ -1279,8 +1279,8 @@ mod tests {
 
         #[test]
         fn test_min_signed_complex() -> Result<(), ClarirsError> {
-            let ctx = Context::new();
-            let mut solver = Z3Solver::new(&ctx);
+            let ctx = Arc::new(Context::new());
+            let mut solver = Z3Solver::new(ctx.clone());
 
             // Create variables
             let x = ctx.bvs("x", 8)?;
@@ -1316,8 +1316,8 @@ mod tests {
 
         #[test]
         fn test_max_signed_complex() -> Result<(), ClarirsError> {
-            let ctx = Context::new();
-            let mut solver = Z3Solver::new(&ctx);
+            let ctx = Arc::new(Context::new());
+            let mut solver = Z3Solver::new(ctx.clone());
 
             // Create variables
             let x = ctx.bvs("x", 8)?;
@@ -1348,8 +1348,8 @@ mod tests {
 
         #[test]
         fn test_min_signed_negative_range() -> Result<(), ClarirsError> {
-            let ctx = Context::new();
-            let mut solver = Z3Solver::new(&ctx);
+            let ctx = Arc::new(Context::new());
+            let mut solver = Z3Solver::new(ctx.clone());
 
             // Create a variable with constraints
             let x = ctx.bvs("x", 8)?;
@@ -1372,8 +1372,8 @@ mod tests {
 
         #[test]
         fn test_max_signed_negative_range() -> Result<(), ClarirsError> {
-            let ctx = Context::new();
-            let mut solver = Z3Solver::new(&ctx);
+            let ctx = Arc::new(Context::new());
+            let mut solver = Z3Solver::new(ctx.clone());
 
             // Create a variable with constraints
             let x = ctx.bvs("x", 8)?;
@@ -1397,8 +1397,8 @@ mod tests {
 
     #[test]
     fn test_unsat_core_simple() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
-        let mut solver = Z3Solver::new_with_options(&ctx, None, true);
+        let ctx = Arc::new(Context::new());
+        let mut solver = Z3Solver::new_with_options(ctx.clone(), None, true);
 
         let x = ctx.bools("x")?;
         let y = ctx.bools("y")?;
@@ -1425,8 +1425,8 @@ mod tests {
 
     #[test]
     fn test_unsat_core_minimal() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
-        let mut solver = Z3Solver::new_with_options(&ctx, None, true);
+        let ctx = Arc::new(Context::new());
+        let mut solver = Z3Solver::new_with_options(ctx.clone(), None, true);
 
         let x = ctx.bvs("x", 8)?;
 
@@ -1455,8 +1455,8 @@ mod tests {
 
     #[test]
     fn test_unsat_core_not_enabled() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
-        let mut solver = Z3Solver::new(&ctx); // unsat_core not enabled
+        let ctx = Arc::new(Context::new());
+        let mut solver = Z3Solver::new(ctx.clone()); // unsat_core not enabled
 
         let x = ctx.bools("x")?;
 
@@ -1474,8 +1474,8 @@ mod tests {
 
     #[test]
     fn test_unsat_core_on_sat() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
-        let mut solver = Z3Solver::new_with_options(&ctx, None, true);
+        let ctx = Arc::new(Context::new());
+        let mut solver = Z3Solver::new_with_options(ctx.clone(), None, true);
 
         let x = ctx.bools("x")?;
         solver.add(&x)?;

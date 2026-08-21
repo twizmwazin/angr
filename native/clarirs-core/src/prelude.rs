@@ -1,3 +1,5 @@
+pub use std::sync::Arc;
+
 pub use crate::ast::node::IntoOwned;
 pub use crate::ast::op::{AstOp, AstType};
 pub use crate::ast::{Annotation, AnnotationType, AstFactory, AstNode, AstRef};

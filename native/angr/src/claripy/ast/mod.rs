@@ -15,7 +15,7 @@ use crate::claripy::prelude::*;
 
 use super::import_submodule;
 
-pub static GLOBAL_CONTEXT: LazyLock<Context<'static>> = LazyLock::new(Context::new);
+pub static GLOBAL_CONTEXT: LazyLock<Arc<Context>> = LazyLock::new(|| Arc::new(Context::new()));
 
 #[pyfunction(name = "Not")]
 pub fn not<'py>(py: Python<'py>, b: Bound<'py, Base>) -> Result<Bound<'py, Base>, ClaripyError> {

@@ -17,7 +17,7 @@ fn fprm_to_smtlib(fprm: &FPRM) -> &'static str {
 /// Renders a single node to SMT-LIB given its already-rendered children. A
 /// single match over the unified op enum replaces the previous per-sort
 /// functions.
-fn to_smtlib_op(ast: &AstRef<'_>, children: &[String]) -> String {
+fn to_smtlib_op(ast: &AstRef, children: &[String]) -> String {
     match ast.op() {
         // Booleans
         AstOp::BoolS(s) => s.to_string(),
@@ -217,7 +217,7 @@ fn to_smtlib_op(ast: &AstRef<'_>, children: &[String]) -> String {
 
 /// Depth-limited SMT-LIB rendering. When `remaining_depth` reaches 0,
 /// children are replaced with `...` instead of being recursed into.
-fn to_smtlib_limited(ast: &AstRef<'_>, remaining_depth: usize) -> String {
+fn to_smtlib_limited(ast: &AstRef, remaining_depth: usize) -> String {
     let children: Vec<String> = if remaining_depth == 0 {
         // At depth limit: replace every child with "..."
         (0..ast.child_iter().len())
@@ -231,7 +231,7 @@ fn to_smtlib_limited(ast: &AstRef<'_>, remaining_depth: usize) -> String {
     to_smtlib_op(ast, &children)
 }
 
-impl<'c> AstNode<'c> {
+impl AstNode {
     /// Converts the AST to an SMT-LIB 2.6 string representation.
     pub fn to_smtlib(self: &Arc<Self>) -> String {
         walk_post_order(
@@ -251,7 +251,7 @@ impl<'c> AstNode<'c> {
 
 /// SMT-LIB `(name, sort)` declaration pair for a symbolic leaf, or `None` when
 /// `ast` is not a variable.
-fn var_declaration(ast: &AstRef<'_>) -> Option<(String, String)> {
+fn var_declaration(ast: &AstRef) -> Option<(String, String)> {
     match ast.op() {
         AstOp::BoolS(s) => Some((s.to_string(), "Bool".to_string())),
         AstOp::BVS(s, width) => Some((s.to_string(), format!("(_ BitVec {width})"))),
@@ -273,7 +273,7 @@ fn var_declaration(ast: &AstRef<'_>) -> Option<(String, String)> {
 /// The framing mirrors z3's `Solver.to_smt2()` (two header lines, and a
 /// `(check-sat)` + trailing newline footer) so consumers that slice the output
 /// line-wise keep working across the migration.
-pub fn constraints_to_smtlib(constraints: &[AstRef<'_>]) -> Result<String, ClarirsError> {
+pub fn constraints_to_smtlib(constraints: &[AstRef]) -> Result<String, ClarirsError> {
     use crate::algorithms::collect_vars::collect_vars;
     use std::collections::BTreeMap;
 
@@ -299,7 +299,7 @@ pub fn constraints_to_smtlib(constraints: &[AstRef<'_>]) -> Result<String, Clari
     Ok(out)
 }
 
-impl fmt::Display for SmtLibDisplay<'_, '_> {
+impl fmt::Display for SmtLibDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0.to_smtlib())
     }
@@ -313,7 +313,7 @@ impl fmt::Display for SmtLibDisplay<'_, '_> {
 /// let ast = ctx.bvs("x", 64).unwrap();
 /// println!("{}", SmtLibDisplay(&ast));
 /// ```
-pub struct SmtLibDisplay<'a, 'c>(pub &'a AstRef<'c>);
+pub struct SmtLibDisplay<'a>(pub &'a AstRef);
 
 #[cfg(test)]
 mod tests {
@@ -321,7 +321,7 @@ mod tests {
 
     #[test]
     fn test_bool_value() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let t = ctx.true_().unwrap();
         let f = ctx.false_().unwrap();
         assert_eq!(t.to_smtlib(), "true");
@@ -330,7 +330,7 @@ mod tests {
 
     #[test]
     fn test_bool_ops() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.bools("a").unwrap();
         let b = ctx.bools("b").unwrap();
 
@@ -346,7 +346,7 @@ mod tests {
 
     #[test]
     fn test_bv_symbol_and_value() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 32).unwrap();
         assert_eq!(x.to_smtlib(), "x");
 
@@ -356,7 +356,7 @@ mod tests {
 
     #[test]
     fn test_bv_arithmetic() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 64).unwrap();
         let y = ctx.bvs("y", 64).unwrap();
 
@@ -369,7 +369,7 @@ mod tests {
 
     #[test]
     fn test_bv_comparisons() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 64).unwrap();
         let y = ctx.bvs("y", 64).unwrap();
 
@@ -382,7 +382,7 @@ mod tests {
 
     #[test]
     fn test_neq_uses_distinct() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 64).unwrap();
         let y = ctx.bvs("y", 64).unwrap();
 
@@ -392,7 +392,7 @@ mod tests {
 
     #[test]
     fn test_extract_and_extend() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 32).unwrap();
 
         let ext = ctx.extract(&x, 15, 8).unwrap();
@@ -407,7 +407,7 @@ mod tests {
 
     #[test]
     fn test_ite() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let cond = ctx.bools("c").unwrap();
         let x = ctx.bvs("x", 64).unwrap();
         let y = ctx.bvs("y", 64).unwrap();
@@ -418,21 +418,21 @@ mod tests {
 
     #[test]
     fn test_string_value() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s = ctx.stringv("hello").unwrap();
         assert_eq!(s.to_smtlib(), "\"hello\"");
     }
 
     #[test]
     fn test_string_value_with_quotes() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s = ctx.stringv("say \"hi\"").unwrap();
         assert_eq!(s.to_smtlib(), "\"say \\\"hi\\\"\"");
     }
 
     #[test]
     fn test_smtlib_display_wrapper() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 64).unwrap();
         let displayed = format!("{}", SmtLibDisplay(&x));
         assert_eq!(displayed, "x");
@@ -440,7 +440,7 @@ mod tests {
 
     #[test]
     fn test_constraints_to_smtlib_benchmark() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let c0 = ctx.eq_(&x, ctx.bvv(BitVec::from((5, 8))).unwrap()).unwrap();
@@ -475,7 +475,7 @@ mod tests {
 
     #[test]
     fn test_shallow_repr_leaf() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 64).unwrap();
         // Leaf nodes are unchanged regardless of depth
         assert_eq!(x.to_smtlib_shallow(0), "x");
@@ -484,7 +484,7 @@ mod tests {
 
     #[test]
     fn test_shallow_repr_depth_limit() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 64).unwrap();
         let y = ctx.bvs("y", 64).unwrap();
         let add = ctx.add(&x, &y).unwrap();

@@ -9,14 +9,11 @@ pub trait ExtractPyArgs {
 
 /// Wraps a child AST in its corresponding Python wrapper class, based on the
 /// child's runtime type.
-fn wrap_child<'py>(
-    py: Python<'py>,
-    child: &AstRef<'static>,
-) -> Result<Bound<'py, PyAny>, ClaripyError> {
+fn wrap_child<'py>(py: Python<'py>, child: &AstRef) -> Result<Bound<'py, PyAny>, ClaripyError> {
     Ok(Base::from_ast(py, child.clone())?.into_any())
 }
 
-impl ExtractPyArgs for AstRef<'static> {
+impl ExtractPyArgs for AstRef {
     fn extract_py_args<'py>(
         &self,
         py: Python<'py>,

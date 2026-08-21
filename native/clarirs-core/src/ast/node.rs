@@ -14,13 +14,13 @@ use crate::{
 /// A node in an AST. A single node type serves every sort; the node caches its
 /// [`AstType`] so its sort can be queried in O(1) without inspecting the operation.
 #[derive(serde::Serialize)]
-pub struct AstNode<'c> {
-    op: AstOp<'c>,
+pub struct AstNode {
+    op: AstOp,
     annotations: BTreeSet<Annotation>,
     #[serde(skip)]
     ast_type: AstType,
     #[serde(skip)]
-    ctx: &'c Context<'c>,
+    ctx: Arc<Context>,
     #[serde(skip)]
     hash: u64,
     #[serde(skip)]
@@ -36,40 +36,36 @@ pub struct AstNode<'c> {
     pub(crate) simplified: AtomicU64,
 }
 
-impl Debug for AstNode<'_> {
+impl Debug for AstNode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AstNode").field("op", &self.op).finish()
     }
 }
 
-impl Hash for AstNode<'_> {
+impl Hash for AstNode {
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write_u64(self.hash);
     }
 }
 
-impl PartialEq for AstNode<'_> {
+impl PartialEq for AstNode {
     fn eq(&self, other: &Self) -> bool {
         self.op == other.op && self.annotations == other.annotations
     }
 }
 
-impl Eq for AstNode<'_> {}
+impl Eq for AstNode {}
 
-impl<'c> HasContext<'c> for AstNode<'c> {
-    fn context(&self) -> &'c Context<'c> {
-        self.ctx
+impl HasContext for AstNode {
+    fn context(&self) -> Arc<Context> {
+        self.ctx.clone()
     }
 }
 
-impl<'c> AstNode<'c> {
+impl AstNode {
     /// Build a node, deriving its cached metadata including the structural hash.
     /// The node's [`AstType`] is inferred from the operation.
-    pub(crate) fn new(
-        ctx: &'c Context<'c>,
-        op: AstOp<'c>,
-        annotations: BTreeSet<Annotation>,
-    ) -> Self {
+    pub(crate) fn new(ctx: Arc<Context>, op: AstOp, annotations: BTreeSet<Annotation>) -> Self {
         let ast_type = op.infer_type();
         let variables = op.variables();
         let depth = 1 + op.child_iter().map(|c| c.depth()).max().unwrap_or(0);
@@ -105,7 +101,7 @@ impl<'c> AstNode<'c> {
         self.simplifiable
     }
 
-    pub fn op(&self) -> &AstOp<'c> {
+    pub fn op(&self) -> &AstOp {
         &self.op
     }
 
@@ -135,7 +131,7 @@ impl<'c> AstNode<'c> {
         // Fast path: skip variable collection/allocation in new
         let new_node = Self {
             op: self.op.clone(),
-            ctx: self.ctx,
+            ctx: self.ctx.clone(),
             hash: structural_hash(self.ast_type, &self.op, &combined),
             ast_type: self.ast_type,
             variables: self.variables.clone(),
@@ -183,7 +179,7 @@ impl<'c> AstNode<'c> {
     }
 
     /// Chop a bitvector into `bits`-sized pieces, returned in little-endian order.
-    pub fn chop(self: &Arc<Self>, bits: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+    pub fn chop(self: &Arc<Self>, bits: u32) -> Result<Vec<AstRef>, ClarirsError> {
         if !self.size().is_multiple_of(bits) {
             return Err(ClarirsError::InvalidChopSize {
                 size: self.size(),
@@ -205,11 +201,11 @@ impl<'c> AstNode<'c> {
         self.depth
     }
 
-    pub fn child_iter(&self) -> AstOpChildIter<'_, 'c> {
+    pub fn child_iter(&self) -> AstOpChildIter<'_> {
         self.op.child_iter()
     }
 
-    pub fn get_child(&self, index: usize) -> Option<AstRef<'c>> {
+    pub fn get_child(&self, index: usize) -> Option<AstRef> {
         self.op.get_child(index)
     }
 
@@ -250,7 +246,7 @@ impl<'c> AstNode<'c> {
     }
 }
 
-impl Drop for AstNode<'_> {
+impl Drop for AstNode {
     fn drop(&mut self) {
         // Evict this node's (now expired) interning entry so the cache doesn't
         // accumulate dead hashes and pinned allocations. `remove_if_expired`
@@ -265,7 +261,7 @@ impl Drop for AstNode<'_> {
 /// A reference-counted handle to an [`AstNode`]. This is the single, universal
 /// AST type for every sort; the node's cached [`AstType`] distinguishes sorts
 /// at runtime.
-pub type AstRef<'c> = Arc<AstNode<'c>>;
+pub type AstRef = Arc<AstNode>;
 
 pub trait IntoOwned<T> {
     fn into_owned(self) -> T;

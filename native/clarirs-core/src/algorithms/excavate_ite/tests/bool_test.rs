@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 #[test]
 fn test_bool_not_with_ite() {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     // Create variables
     let a = ctx.bools("a").unwrap();
@@ -27,7 +27,7 @@ fn test_bool_not_with_ite() {
 
 #[test]
 fn test_bool_and_with_ite() {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     // Create variables
     let a = ctx.bools("a").unwrap();
@@ -53,7 +53,7 @@ fn test_bool_and_with_ite() {
 
 #[test]
 fn test_bool_or_with_ite() {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     // Create variables
     let a = ctx.bools("a").unwrap();
@@ -79,7 +79,7 @@ fn test_bool_or_with_ite() {
 
 #[test]
 fn test_bool_xor_with_ite() {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     // Create variables
     let a = ctx.bools("a").unwrap();
@@ -105,7 +105,7 @@ fn test_bool_xor_with_ite() {
 
 #[test]
 fn test_unrelated_conditions_are_left_alone() {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     // Create variables
     let a = ctx.bools("a").unwrap();
@@ -128,7 +128,7 @@ fn test_unrelated_conditions_are_left_alone() {
 
 #[test]
 fn test_shared_condition_is_hoisted_once() {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     // Create variables
     let a = ctx.bools("a").unwrap();
@@ -156,7 +156,7 @@ fn test_shared_condition_is_hoisted_once() {
 
 #[test]
 fn test_negated_condition_branches_are_swapped() {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     // Create variables
     let a = ctx.bools("a").unwrap();

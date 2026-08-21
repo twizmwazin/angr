@@ -15,8 +15,8 @@ use std::sync::{Arc, atomic::Ordering};
 
 use crate::{cache::Cache, prelude::*};
 
-impl<'c> AstNode<'c> {
-    pub fn simplify(self: &Arc<Self>) -> Result<AstRef<'c>, ClarirsError> {
+impl AstNode {
+    pub fn simplify(self: &Arc<Self>) -> Result<AstRef, ClarirsError> {
         self.simplify_ext(true, false)
     }
 
@@ -24,25 +24,25 @@ impl<'c> AstNode<'c> {
         self: &Arc<Self>,
         respect_annotations: bool,
         error_on_dbz: bool,
-    ) -> Result<AstRef<'c>, ClarirsError> {
+    ) -> Result<AstRef, ClarirsError> {
         simplify(self, respect_annotations, error_on_dbz)
     }
 }
 
 #[derive(thiserror::Error, Debug)]
-enum SimplifyError<'c> {
+enum SimplifyError {
     #[error("Missing child at index {0}")]
     MissingChild(usize),
     #[error("Missing {} children", .0.len())]
     MissingChildren(Vec<usize>),
     #[error("Re-run simplification")]
     #[allow(dead_code)]
-    ReRun(AstRef<'c>),
+    ReRun(AstRef),
     #[error("Clarirs error: {0}")]
     Error(ClarirsError),
 }
 
-impl<T> From<T> for SimplifyError<'_>
+impl<T> From<T> for SimplifyError
 where
     ClarirsError: From<T>,
 {
@@ -51,14 +51,14 @@ where
     }
 }
 
-struct SimplifyState<'c> {
-    expr: AstRef<'c>,
-    children: Vec<Option<AstRef<'c>>>,
+struct SimplifyState {
+    expr: AstRef,
+    children: Vec<Option<AstRef>>,
     last_missed_child: Option<usize>,
 }
 
-impl<'c> SimplifyState<'c> {
-    fn new(expr: AstRef<'c>) -> Self {
+impl SimplifyState {
+    fn new(expr: AstRef) -> Self {
         Self {
             expr: expr.clone(),
             children: vec![None; expr.child_iter().count()],
@@ -67,7 +67,7 @@ impl<'c> SimplifyState<'c> {
     }
 
     /// Get the simplified child at the given index, or return an error if it is missing.
-    fn get_child_simplified(&mut self, index: usize) -> Result<AstRef<'c>, SimplifyError<'c>> {
+    fn get_child_simplified(&mut self, index: usize) -> Result<AstRef, SimplifyError> {
         if let Some(child) = &self.children[index] {
             Ok(child.clone())
         } else {
@@ -81,7 +81,7 @@ impl<'c> SimplifyState<'c> {
     /// main simplify loop can schedule them in one batch. This is crucial for
     /// n-ary ops (like Concat) with many children: fetching them one at a
     /// time causes quadratic re-runs of simplification.
-    fn get_all_simplified(&self) -> Result<Vec<AstRef<'c>>, SimplifyError<'c>> {
+    fn get_all_simplified(&self) -> Result<Vec<AstRef>, SimplifyError> {
         let missing: Vec<usize> = self
             .children
             .iter()
@@ -96,7 +96,7 @@ impl<'c> SimplifyState<'c> {
 
     /// Get the best available child: if we have a simplified version, return that,
     /// otherwise return the original child.
-    fn get_child_available(&self, index: usize) -> AstRef<'c> {
+    fn get_child_available(&self, index: usize) -> AstRef {
         if let Some(child) = &self.children[index] {
             child.clone()
         } else {
@@ -104,18 +104,18 @@ impl<'c> SimplifyState<'c> {
         }
     }
 
-    fn rerun(&self, new_ast: AstRef<'c>) -> Result<AstRef<'c>, SimplifyError<'c>> {
+    fn rerun(&self, new_ast: AstRef) -> Result<AstRef, SimplifyError> {
         Err(SimplifyError::ReRun(new_ast))
     }
 }
 
-fn simplify<'c>(
-    ast: &AstRef<'c>,
+fn simplify(
+    ast: &AstRef,
     respect_annotations: bool,
     error_on_dbz: bool,
-) -> Result<AstRef<'c>, ClarirsError> {
-    let mut work_stack: Vec<SimplifyState<'c>> = Vec::new();
-    let mut last_result: Option<AstRef<'c>> = None;
+) -> Result<AstRef, ClarirsError> {
+    let mut work_stack: Vec<SimplifyState> = Vec::new();
+    let mut last_result: Option<AstRef> = None;
 
     work_stack.push(SimplifyState::new(ast.clone()));
 

@@ -4,7 +4,7 @@ use z3_sys::*;
 use super::AstExtZ3;
 use crate::{Z3_CONTEXT, rc::RcAst};
 
-fn round_trip<'c>(ctx: &'c Context<'c>, ast: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+fn round_trip(ctx: &Arc<Context>, ast: &AstRef) -> Result<AstRef, ClarirsError> {
     AstRef::from_z3(ctx, ast.to_z3()?)
 }
 
@@ -18,7 +18,7 @@ mod to_z3 {
 
     #[test]
     fn symbol() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let bv = ctx.bvs("x", 32).unwrap();
         let z3_ast = bv.to_z3().unwrap();
 
@@ -28,7 +28,7 @@ mod to_z3 {
 
     #[test]
     fn value_8bit() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let bv = ctx.bvv(BitVec::from((42, 8))).unwrap();
         let z3_ast = bv.to_z3().unwrap();
         assert_eq!(z3_ast.decl_kind(), DeclKind::Bnum);
@@ -36,7 +36,7 @@ mod to_z3 {
 
     #[test]
     fn value_32bit() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let bv = ctx.bvv(BitVec::from((0xDEADBEEF, 32))).unwrap();
         let z3_ast = bv.to_z3().unwrap();
         assert_eq!(z3_ast.decl_kind(), DeclKind::Bnum);
@@ -44,7 +44,7 @@ mod to_z3 {
 
     #[test]
     fn value_64bit() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let bv = ctx.bvv(BitVec::from((0x0123456789ABCDEF, 64))).unwrap();
         let z3_ast = bv.to_z3().unwrap();
         assert_eq!(z3_ast.decl_kind(), DeclKind::Bnum);
@@ -54,7 +54,7 @@ mod to_z3 {
 
     #[test]
     fn not() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let ast = ctx.not(x).unwrap();
         let z3_ast = ast.to_z3().unwrap();
@@ -65,7 +65,7 @@ mod to_z3 {
 
     #[test]
     fn neg() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let ast = ctx.neg(x).unwrap();
         let z3_ast = ast.to_z3().unwrap();
@@ -78,7 +78,7 @@ mod to_z3 {
 
     #[test]
     fn and() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.and2(x, y).unwrap();
@@ -91,7 +91,7 @@ mod to_z3 {
 
     #[test]
     fn or() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.or2(x, y).unwrap();
@@ -104,7 +104,7 @@ mod to_z3 {
 
     #[test]
     fn xor() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.xor2(x, y).unwrap();
@@ -117,7 +117,7 @@ mod to_z3 {
 
     #[test]
     fn add() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.add(x, y).unwrap();
@@ -130,7 +130,7 @@ mod to_z3 {
 
     #[test]
     fn sub() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.sub(x, y).unwrap();
@@ -143,7 +143,7 @@ mod to_z3 {
 
     #[test]
     fn mul() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.mul(x, y).unwrap();
@@ -156,7 +156,7 @@ mod to_z3 {
 
     #[test]
     fn udiv() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.udiv(x, y).unwrap();
@@ -169,7 +169,7 @@ mod to_z3 {
 
     #[test]
     fn sdiv() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.sdiv(x, y).unwrap();
@@ -182,7 +182,7 @@ mod to_z3 {
 
     #[test]
     fn urem() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.urem(x, y).unwrap();
@@ -195,7 +195,7 @@ mod to_z3 {
 
     #[test]
     fn srem() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.srem(x, y).unwrap();
@@ -210,7 +210,7 @@ mod to_z3 {
 
     #[test]
     fn shl() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.shl(x, y).unwrap();
@@ -223,7 +223,7 @@ mod to_z3 {
 
     #[test]
     fn lshr() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.lshr(x, y).unwrap();
@@ -236,7 +236,7 @@ mod to_z3 {
 
     #[test]
     fn ashr() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.ashr(x, y).unwrap();
@@ -249,7 +249,7 @@ mod to_z3 {
 
     #[test]
     fn rotate_left() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.rotate_left(x, y).unwrap();
@@ -262,7 +262,7 @@ mod to_z3 {
 
     #[test]
     fn rotate_right() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.rotate_right(x, y).unwrap();
@@ -277,7 +277,7 @@ mod to_z3 {
 
     #[test]
     fn zero_ext() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let ast = ctx.zero_ext(x, 8).unwrap();
         let z3_ast = ast.to_z3().unwrap();
@@ -288,7 +288,7 @@ mod to_z3 {
 
     #[test]
     fn sign_ext() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let ast = ctx.sign_ext(x, 8).unwrap();
         let z3_ast = ast.to_z3().unwrap();
@@ -299,7 +299,7 @@ mod to_z3 {
 
     #[test]
     fn extract() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let ast = ctx.extract(x, 6, 2).unwrap();
         let z3_ast = ast.to_z3().unwrap();
@@ -312,7 +312,7 @@ mod to_z3 {
 
     #[test]
     fn concat_2args() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.concat2(x, y).unwrap();
@@ -325,7 +325,7 @@ mod to_z3 {
 
     #[test]
     fn concat_3args() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let z = ctx.bvs("z", 8).unwrap();
@@ -342,7 +342,7 @@ mod to_z3 {
 
     #[test]
     fn ite() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let c = ctx.bools("c").unwrap();
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
@@ -359,7 +359,7 @@ mod to_z3 {
 
     #[test]
     fn fp_to_ieeebv() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let fp = ctx.fps("x", FSort::f32()).unwrap();
         let ast = ctx.fp_to_ieeebv(fp).unwrap();
         let z3_ast = ast.to_z3().unwrap();
@@ -368,7 +368,7 @@ mod to_z3 {
 
     #[test]
     fn fp_to_ubv() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let fp = ctx.fps("x", FSort::f32()).unwrap();
         let ast = ctx.fp_to_ubv(fp, 32, FPRM::TowardZero).unwrap();
         let z3_ast = ast.to_z3().unwrap();
@@ -377,7 +377,7 @@ mod to_z3 {
 
     #[test]
     fn fp_to_sbv() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let fp = ctx.fps("x", FSort::f32()).unwrap();
         let ast = ctx.fp_to_sbv(fp, 32, FPRM::TowardZero).unwrap();
         let z3_ast = ast.to_z3().unwrap();
@@ -395,7 +395,7 @@ mod from_z3 {
 
     #[test]
     fn symbol() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let z3_ast = RcAst::mk_bv("x", 32);
         let result = AstRef::from_z3(&ctx, z3_ast).unwrap();
         assert_eq!(result, ctx.bvs("x", 32).unwrap());
@@ -403,7 +403,7 @@ mod from_z3 {
 
     #[test]
     fn value_8bit() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let z3_ast = RcAst::mk_bv_val("42", 8);
         let result = AstRef::from_z3(&ctx, z3_ast).unwrap();
         assert_eq!(result, ctx.bvv(BitVec::from((42, 8))).unwrap());
@@ -411,7 +411,7 @@ mod from_z3 {
 
     #[test]
     fn value_32bit() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let z3_ast = RcAst::mk_bv_val("3735928559", 32); // 0xDEADBEEF
         let result = AstRef::from_z3(&ctx, z3_ast).unwrap();
         assert_eq!(result, ctx.bvv(BitVec::from((0xDEADBEEF, 32))).unwrap());
@@ -419,7 +419,7 @@ mod from_z3 {
 
     #[test]
     fn value_64bit() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let z3_ast = RcAst::mk_bv_val("81985529216486895", 64); // 0x0123456789ABCDEF
         let result = AstRef::from_z3(&ctx, z3_ast).unwrap();
         assert_eq!(
@@ -432,7 +432,7 @@ mod from_z3 {
 
     #[test]
     fn not() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bv("x", 8);
             let z3_ast = RcAst::try_from(Z3_mk_bvnot(*z3_ctx, *x)).unwrap();
@@ -445,7 +445,7 @@ mod from_z3 {
 
     #[test]
     fn neg() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bv("x", 8);
             let z3_ast = RcAst::try_from(Z3_mk_bvneg(*z3_ctx, *x)).unwrap();
@@ -460,7 +460,7 @@ mod from_z3 {
 
     #[test]
     fn and() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bv("x", 8);
             let y = RcAst::mk_bv("y", 8);
@@ -476,7 +476,7 @@ mod from_z3 {
 
     #[test]
     fn or() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bv("x", 8);
             let y = RcAst::mk_bv("y", 8);
@@ -492,7 +492,7 @@ mod from_z3 {
 
     #[test]
     fn xor() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bv("x", 8);
             let y = RcAst::mk_bv("y", 8);
@@ -508,7 +508,7 @@ mod from_z3 {
 
     #[test]
     fn add() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bv("x", 8);
             let y = RcAst::mk_bv("y", 8);
@@ -524,7 +524,7 @@ mod from_z3 {
 
     #[test]
     fn sub() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bv("x", 8);
             let y = RcAst::mk_bv("y", 8);
@@ -540,7 +540,7 @@ mod from_z3 {
 
     #[test]
     fn mul() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bv("x", 8);
             let y = RcAst::mk_bv("y", 8);
@@ -556,7 +556,7 @@ mod from_z3 {
 
     #[test]
     fn udiv() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bv("x", 8);
             let y = RcAst::mk_bv("y", 8);
@@ -572,7 +572,7 @@ mod from_z3 {
 
     #[test]
     fn sdiv() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bv("x", 8);
             let y = RcAst::mk_bv("y", 8);
@@ -588,7 +588,7 @@ mod from_z3 {
 
     #[test]
     fn urem() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bv("x", 8);
             let y = RcAst::mk_bv("y", 8);
@@ -604,7 +604,7 @@ mod from_z3 {
 
     #[test]
     fn srem() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bv("x", 8);
             let y = RcAst::mk_bv("y", 8);
@@ -622,7 +622,7 @@ mod from_z3 {
 
     #[test]
     fn shl() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bv("x", 8);
             let y = RcAst::mk_bv("y", 8);
@@ -638,7 +638,7 @@ mod from_z3 {
 
     #[test]
     fn lshr() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bv("x", 8);
             let y = RcAst::mk_bv("y", 8);
@@ -654,7 +654,7 @@ mod from_z3 {
 
     #[test]
     fn ashr() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bv("x", 8);
             let y = RcAst::mk_bv("y", 8);
@@ -670,7 +670,7 @@ mod from_z3 {
 
     #[test]
     fn rotate_left() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bv("x", 8);
             let y = RcAst::mk_bv("y", 8);
@@ -686,7 +686,7 @@ mod from_z3 {
 
     #[test]
     fn rotate_right() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bv("x", 8);
             let y = RcAst::mk_bv("y", 8);
@@ -704,7 +704,7 @@ mod from_z3 {
 
     #[test]
     fn zero_ext() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bv("x", 8);
             let z3_ast = RcAst::try_from(Z3_mk_zero_ext(*z3_ctx, 8, *x)).unwrap();
@@ -717,7 +717,7 @@ mod from_z3 {
 
     #[test]
     fn sign_ext() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bv("x", 8);
             let z3_ast = RcAst::try_from(Z3_mk_sign_ext(*z3_ctx, 8, *x)).unwrap();
@@ -730,7 +730,7 @@ mod from_z3 {
 
     #[test]
     fn extract() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bv("x", 8);
             let z3_ast = RcAst::try_from(Z3_mk_extract(*z3_ctx, 6, 2, *x)).unwrap();
@@ -745,7 +745,7 @@ mod from_z3 {
 
     #[test]
     fn concat_2args() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bv("x", 8);
             let y = RcAst::mk_bv("y", 8);
@@ -763,7 +763,7 @@ mod from_z3 {
 
     #[test]
     fn ite() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let c = RcAst::mk_bool("c");
             let x = RcAst::mk_bv("x", 8);
@@ -793,28 +793,28 @@ mod roundtrip {
 
     #[test]
     fn symbol() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let ast = ctx.bvs("x", 32).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
     }
 
     #[test]
     fn value_8bit() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let ast = ctx.bvv(BitVec::from((42, 8))).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
     }
 
     #[test]
     fn value_32bit() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let ast = ctx.bvv(BitVec::from((0xDEADBEEF, 32))).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
     }
 
     #[test]
     fn value_64bit() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let ast = ctx.bvv(BitVec::from((0x0123456789ABCDEF, 64))).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
     }
@@ -823,7 +823,7 @@ mod roundtrip {
 
     #[test]
     fn not() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let ast = ctx.not(x).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
@@ -831,7 +831,7 @@ mod roundtrip {
 
     #[test]
     fn neg() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let ast = ctx.neg(x).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
@@ -841,7 +841,7 @@ mod roundtrip {
 
     #[test]
     fn and() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.and2(x, y).unwrap();
@@ -850,7 +850,7 @@ mod roundtrip {
 
     #[test]
     fn or() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.or2(x, y).unwrap();
@@ -859,7 +859,7 @@ mod roundtrip {
 
     #[test]
     fn xor() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.xor2(x, y).unwrap();
@@ -868,7 +868,7 @@ mod roundtrip {
 
     #[test]
     fn add() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.add(x, y).unwrap();
@@ -877,7 +877,7 @@ mod roundtrip {
 
     #[test]
     fn sub() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.sub(x, y).unwrap();
@@ -886,7 +886,7 @@ mod roundtrip {
 
     #[test]
     fn mul() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.mul(x, y).unwrap();
@@ -895,7 +895,7 @@ mod roundtrip {
 
     #[test]
     fn udiv() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.udiv(x, y).unwrap();
@@ -904,7 +904,7 @@ mod roundtrip {
 
     #[test]
     fn sdiv() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.sdiv(x, y).unwrap();
@@ -913,7 +913,7 @@ mod roundtrip {
 
     #[test]
     fn urem() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.urem(x, y).unwrap();
@@ -922,7 +922,7 @@ mod roundtrip {
 
     #[test]
     fn srem() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.srem(x, y).unwrap();
@@ -933,7 +933,7 @@ mod roundtrip {
 
     #[test]
     fn shl() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.shl(x, y).unwrap();
@@ -942,7 +942,7 @@ mod roundtrip {
 
     #[test]
     fn lshr() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.lshr(x, y).unwrap();
@@ -951,7 +951,7 @@ mod roundtrip {
 
     #[test]
     fn ashr() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.ashr(x, y).unwrap();
@@ -960,7 +960,7 @@ mod roundtrip {
 
     #[test]
     fn rotate_left() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.rotate_left(x, y).unwrap();
@@ -969,7 +969,7 @@ mod roundtrip {
 
     #[test]
     fn rotate_right() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.rotate_right(x, y).unwrap();
@@ -980,7 +980,7 @@ mod roundtrip {
 
     #[test]
     fn zero_ext() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let ast = ctx.zero_ext(x, 8).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
@@ -988,7 +988,7 @@ mod roundtrip {
 
     #[test]
     fn sign_ext() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let ast = ctx.sign_ext(x, 8).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
@@ -996,7 +996,7 @@ mod roundtrip {
 
     #[test]
     fn extract() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let ast = ctx.extract(x, 6, 2).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
@@ -1006,7 +1006,7 @@ mod roundtrip {
 
     #[test]
     fn concat_2args() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let ast = ctx.concat2(x, y).unwrap();
@@ -1015,7 +1015,7 @@ mod roundtrip {
 
     #[test]
     fn concat_3args() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
         let z = ctx.bvs("z", 8).unwrap();
@@ -1031,7 +1031,7 @@ mod roundtrip {
 
     #[test]
     fn ite() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let c = ctx.bools("c").unwrap();
         let x = ctx.bvs("x", 8).unwrap();
         let y = ctx.bvs("y", 8).unwrap();
@@ -1043,7 +1043,7 @@ mod roundtrip {
 
     #[test]
     fn fp_to_ieeebv() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let fp = ctx.fps("x", FSort::f32()).unwrap();
         let ast = ctx.fp_to_ieeebv(fp).unwrap();
         // fp_to_ieeebv has no from_z3 handler (Z3 DeclKind::FpaToIeeeBv is
@@ -1053,7 +1053,7 @@ mod roundtrip {
 
     #[test]
     fn fp_to_ubv() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let fp = ctx.fps("x", FSort::f32()).unwrap();
         let ast = ctx.fp_to_ubv(fp, 32, FPRM::TowardZero).unwrap();
         assert!(ast.to_z3().is_ok());
@@ -1061,7 +1061,7 @@ mod roundtrip {
 
     #[test]
     fn fp_to_sbv() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let fp = ctx.fps("x", FSort::f32()).unwrap();
         let ast = ctx.fp_to_sbv(fp, 32, FPRM::TowardZero).unwrap();
         assert!(ast.to_z3().is_ok());
@@ -1071,7 +1071,7 @@ mod roundtrip {
 
     #[test]
     fn str_index_of_symbols() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s = ctx.strings("s").unwrap();
         let t = ctx.strings("t").unwrap();
         let offset = ctx.bvv(BitVec::from((0, 64))).unwrap();
@@ -1081,7 +1081,7 @@ mod roundtrip {
 
     #[test]
     fn str_index_of_values() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s = ctx.stringv("hello world").unwrap();
         let t = ctx.stringv("world").unwrap();
         let offset = ctx.bvv(BitVec::from((0, 64))).unwrap();
@@ -1091,7 +1091,7 @@ mod roundtrip {
 
     #[test]
     fn str_index_of_with_offset() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s = ctx.strings("s").unwrap();
         let t = ctx.strings("t").unwrap();
         let offset = ctx.bvv(BitVec::from((5, 64))).unwrap();
@@ -1101,7 +1101,7 @@ mod roundtrip {
 
     #[test]
     fn str_to_bv_symbol() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s = ctx.strings("s").unwrap();
         let ast = ctx.str_to_bv(s).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
@@ -1109,7 +1109,7 @@ mod roundtrip {
 
     #[test]
     fn str_to_bv_value() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s = ctx.stringv("12345").unwrap();
         let ast = ctx.str_to_bv(s).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());

@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 #[test]
 fn test_bitvec_not_with_ite() {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     // Create variables
     let a = ctx.bvs("a", 32).unwrap();
@@ -27,7 +27,7 @@ fn test_bitvec_not_with_ite() {
 
 #[test]
 fn test_bitvec_neg_with_ite() {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     // Create variables
     let a = ctx.bvs("a", 32).unwrap();
@@ -52,7 +52,7 @@ fn test_bitvec_neg_with_ite() {
 
 #[test]
 fn test_bitvec_add_with_ite() {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     // Create variables
     let a = ctx.bvs("a", 32).unwrap();
@@ -78,7 +78,7 @@ fn test_bitvec_add_with_ite() {
 
 #[test]
 fn test_bitvec_sub_with_ite() {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     // Create variables
     let a = ctx.bvs("a", 32).unwrap();
@@ -104,7 +104,7 @@ fn test_bitvec_sub_with_ite() {
 
 #[test]
 fn test_bitvec_mul_with_ite() {
-    let ctx = Context::new();
+    let ctx = Arc::new(Context::new());
 
     // Create variables
     let a = ctx.bvs("a", 32).unwrap();

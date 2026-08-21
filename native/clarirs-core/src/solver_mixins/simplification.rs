@@ -2,17 +2,13 @@ use crate::prelude::*;
 
 /// A mixin that simplifies expressions before passing them to the underlying solver.
 #[derive(Clone, Debug)]
-pub struct SimplificationMixin<'c, S: Solver<'c>> {
+pub struct SimplificationMixin<S: Solver> {
     inner: S,
-    _marker: std::marker::PhantomData<&'c ()>,
 }
 
-impl<'c, S: Solver<'c>> SimplificationMixin<'c, S> {
+impl<S: Solver> SimplificationMixin<S> {
     pub fn new(inner: S) -> Self {
-        Self {
-            inner,
-            _marker: std::marker::PhantomData,
-        }
+        Self { inner }
     }
 
     pub fn inner(&self) -> &S {
@@ -24,14 +20,14 @@ impl<'c, S: Solver<'c>> SimplificationMixin<'c, S> {
     }
 }
 
-impl<'c, S: Solver<'c>> HasContext<'c> for SimplificationMixin<'c, S> {
-    fn context(&self) -> &'c Context<'c> {
+impl<S: Solver> HasContext for SimplificationMixin<S> {
+    fn context(&self) -> Arc<Context> {
         self.inner.context()
     }
 }
 
-impl<'c, S: Solver<'c>> Solver<'c> for SimplificationMixin<'c, S> {
-    fn add(&mut self, constraint: &AstRef<'c>) -> Result<(), ClarirsError> {
+impl<S: Solver> Solver for SimplificationMixin<S> {
+    fn add(&mut self, constraint: &AstRef) -> Result<(), ClarirsError> {
         let simplified = constraint.simplify()?;
         if simplified.is_true() {
             return Ok(());
@@ -43,7 +39,7 @@ impl<'c, S: Solver<'c>> Solver<'c> for SimplificationMixin<'c, S> {
         self.inner.clear()
     }
 
-    fn constraints(&self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+    fn constraints(&self) -> Result<Vec<AstRef>, ClarirsError> {
         self.inner.constraints()
     }
 
@@ -55,7 +51,7 @@ impl<'c, S: Solver<'c>> Solver<'c> for SimplificationMixin<'c, S> {
         self.inner.satisfiable()
     }
 
-    fn satisfiable_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
+    fn satisfiable_with_extra(&mut self, extra: &[AstRef]) -> Result<bool, ClarirsError> {
         let simplified = extra
             .iter()
             .map(|c| c.simplify())
@@ -63,43 +59,43 @@ impl<'c, S: Solver<'c>> Solver<'c> for SimplificationMixin<'c, S> {
         self.inner.satisfiable_with_extra(&simplified)
     }
 
-    fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn is_true(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         self.inner.is_true(&expr.simplify()?)
     }
 
-    fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn is_false(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         self.inner.is_false(&expr.simplify()?)
     }
 
-    fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn has_true(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         self.inner.has_true(&expr.simplify()?)
     }
 
-    fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn has_false(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         self.inner.has_false(&expr.simplify()?)
     }
 
-    fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn min_unsigned(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         self.inner.min_unsigned(&expr.simplify()?)
     }
 
-    fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn max_unsigned(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         self.inner.max_unsigned(&expr.simplify()?)
     }
 
-    fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn min_signed(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         self.inner.min_signed(&expr.simplify()?)
     }
 
-    fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn max_signed(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         self.inner.max_signed(&expr.simplify()?)
     }
 
-    fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+    fn eval_n(&mut self, expr: &AstRef, n: u32) -> Result<Vec<AstRef>, ClarirsError> {
         self.inner.eval_n(&expr.simplify()?, n)
     }
 
-    fn batch_eval(&mut self, exprs: &[AstRef<'c>]) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+    fn batch_eval(&mut self, exprs: &[AstRef]) -> Result<Vec<AstRef>, ClarirsError> {
         let simplified = exprs
             .iter()
             .map(|expr| expr.simplify())
@@ -114,8 +110,8 @@ mod tests {
 
     #[test]
     fn test_simplification_mixin_simplifies_before_passing() {
-        let ctx = Context::new();
-        let base_solver = ConcreteSolver::new(&ctx);
+        let ctx = Arc::new(Context::new());
+        let base_solver = ConcreteSolver::new(ctx.clone());
         let mut solver = SimplificationMixin::new(base_solver);
 
         // Create an expression that needs simplification: 5 & 5 (should simplify to 5)
@@ -132,8 +128,8 @@ mod tests {
 
     #[test]
     fn test_simplification_mixin_is_true_with_tautology() {
-        let ctx = Context::new();
-        let base_solver = ConcreteSolver::new(&ctx);
+        let ctx = Arc::new(Context::new());
+        let base_solver = ConcreteSolver::new(ctx.clone());
         let mut solver = SimplificationMixin::new(base_solver);
 
         // Create a tautology: true OR false (should simplify to true)
@@ -147,8 +143,8 @@ mod tests {
 
     #[test]
     fn test_simplification_mixin_add_simplifies_constraint() {
-        let ctx = Context::new();
-        let base_solver = ConcreteSolver::new(&ctx);
+        let ctx = Arc::new(Context::new());
+        let base_solver = ConcreteSolver::new(ctx.clone());
         let mut solver = SimplificationMixin::new(base_solver);
 
         // Create a constraint that needs simplification: NOT(false) (should simplify to true)

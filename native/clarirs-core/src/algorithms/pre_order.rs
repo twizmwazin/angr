@@ -14,20 +14,20 @@ use crate::prelude::*;
 ///
 /// Shared subtrees (same `hash`) are only processed once; subsequent
 /// encounters reuse the cached result.
-pub fn walk_pre_order<'c>(
-    ast: AstRef<'c>,
-    mut pre_visit: impl FnMut(&AstRef<'c>) -> Result<Option<AstRef<'c>>, ClarirsError>,
-    mut post_visit: impl FnMut(AstRef<'c>, &[AstRef<'c>]) -> Result<AstRef<'c>, ClarirsError>,
-) -> Result<AstRef<'c>, ClarirsError> {
-    struct NodeState<'c> {
-        node: AstRef<'c>,
+pub fn walk_pre_order(
+    ast: AstRef,
+    mut pre_visit: impl FnMut(&AstRef) -> Result<Option<AstRef>, ClarirsError>,
+    mut post_visit: impl FnMut(AstRef, &[AstRef]) -> Result<AstRef, ClarirsError>,
+) -> Result<AstRef, ClarirsError> {
+    struct NodeState {
+        node: AstRef,
         num_children: usize,
-        child_results: Vec<AstRef<'c>>,
+        child_results: Vec<AstRef>,
     }
 
-    let mut cache: HashMap<u64, AstRef<'c>> = HashMap::default();
-    let mut stack: Vec<NodeState<'c>> = Vec::new();
-    let mut last_result: Option<AstRef<'c>> = None;
+    let mut cache: HashMap<u64, AstRef> = HashMap::default();
+    let mut stack: Vec<NodeState> = Vec::new();
+    let mut last_result: Option<AstRef> = None;
 
     let num_children = ast.child_iter().len();
     stack.push(NodeState {
@@ -106,7 +106,7 @@ mod tests {
 
     #[test]
     fn test_walk_pre_order_leaf() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 64)?;
 
         let result = walk_pre_order(x.clone(), |_| Ok(None), |node, _children| Ok(node))?;
@@ -117,7 +117,7 @@ mod tests {
 
     #[test]
     fn test_walk_pre_order_short_circuit() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 64)?;
         let y = ctx.bvs("y", 64)?;
         let add = ctx.add(&x, &y)?;
@@ -137,7 +137,7 @@ mod tests {
 
     #[test]
     fn test_walk_pre_order_children_processed() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 64)?;
         let y = ctx.bvs("y", 64)?;
         let add = ctx.add(&x, &y)?;
@@ -164,7 +164,7 @@ mod tests {
 
     #[test]
     fn test_walk_pre_order_selective_short_circuit() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 64)?;
         let y = ctx.bvs("y", 64)?;
         let z = ctx.bvs("z", 64)?;
@@ -202,7 +202,7 @@ mod tests {
 
     #[test]
     fn test_walk_pre_order_shared_subtrees_cached() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 64)?;
         let y = ctx.bvs("y", 64)?;
 

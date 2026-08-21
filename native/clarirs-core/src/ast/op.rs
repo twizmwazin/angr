@@ -39,113 +39,113 @@ impl AstType {
 /// float, string) is determined by its operation together with the types of its
 /// children, and is cached on the [`AstNode`] as an [`AstType`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
-pub enum AstOp<'c> {
+pub enum AstOp {
     // Boolean leaves and operations
     BoolS(InternedString),
     BoolV(bool),
 
     // Polymorphic boolean/bitvector operations (the child type determines the
     // result type)
-    Not(AstRef<'c>),
-    And(Vec<AstRef<'c>>),
-    Or(Vec<AstRef<'c>>),
-    ITE(AstRef<'c>, AstRef<'c>, AstRef<'c>),
+    Not(AstRef),
+    And(Vec<AstRef>),
+    Or(Vec<AstRef>),
+    ITE(AstRef, AstRef, AstRef),
 
     // Equality (any sort) and bitvector comparisons (all produce a bool).
     // `Eq`/`Neq` apply to any sort; for floats they have IEEE `fp.eq`
     // semantics, otherwise they are structural.
-    Eq(AstRef<'c>, AstRef<'c>),
-    Neq(AstRef<'c>, AstRef<'c>),
-    ULT(AstRef<'c>, AstRef<'c>),
-    ULE(AstRef<'c>, AstRef<'c>),
-    UGT(AstRef<'c>, AstRef<'c>),
-    UGE(AstRef<'c>, AstRef<'c>),
-    SLT(AstRef<'c>, AstRef<'c>),
-    SLE(AstRef<'c>, AstRef<'c>),
-    SGT(AstRef<'c>, AstRef<'c>),
-    SGE(AstRef<'c>, AstRef<'c>),
+    Eq(AstRef, AstRef),
+    Neq(AstRef, AstRef),
+    ULT(AstRef, AstRef),
+    ULE(AstRef, AstRef),
+    UGT(AstRef, AstRef),
+    UGE(AstRef, AstRef),
+    SLT(AstRef, AstRef),
+    SLE(AstRef, AstRef),
+    SGT(AstRef, AstRef),
+    SGE(AstRef, AstRef),
 
     // Float comparisons (produce a bool)
-    FpLt(AstRef<'c>, AstRef<'c>),
-    FpLeq(AstRef<'c>, AstRef<'c>),
-    FpGt(AstRef<'c>, AstRef<'c>),
-    FpGeq(AstRef<'c>, AstRef<'c>),
-    FpIsNan(AstRef<'c>),
-    FpIsInf(AstRef<'c>),
+    FpLt(AstRef, AstRef),
+    FpLeq(AstRef, AstRef),
+    FpGt(AstRef, AstRef),
+    FpGeq(AstRef, AstRef),
+    FpIsNan(AstRef),
+    FpIsInf(AstRef),
 
     // String predicates (produce a bool)
-    StrContains(AstRef<'c>, AstRef<'c>),
-    StrPrefixOf(AstRef<'c>, AstRef<'c>),
-    StrSuffixOf(AstRef<'c>, AstRef<'c>),
-    StrIsDigit(AstRef<'c>),
+    StrContains(AstRef, AstRef),
+    StrPrefixOf(AstRef, AstRef),
+    StrSuffixOf(AstRef, AstRef),
+    StrIsDigit(AstRef),
 
     // Bitvector leaves and operations
     BVS(InternedString, u32),
     BVV(BitVec),
-    Neg(AstRef<'c>),
-    Xor(Vec<AstRef<'c>>),
-    Add(Vec<AstRef<'c>>),
-    Sub(AstRef<'c>, AstRef<'c>),
-    Mul(Vec<AstRef<'c>>),
-    UDiv(AstRef<'c>, AstRef<'c>),
-    SDiv(AstRef<'c>, AstRef<'c>),
-    URem(AstRef<'c>, AstRef<'c>),
-    SRem(AstRef<'c>, AstRef<'c>),
-    ShL(AstRef<'c>, AstRef<'c>),
-    LShR(AstRef<'c>, AstRef<'c>),
-    AShR(AstRef<'c>, AstRef<'c>),
-    RotateLeft(AstRef<'c>, AstRef<'c>),
-    RotateRight(AstRef<'c>, AstRef<'c>),
-    ZeroExt(AstRef<'c>, u32),
-    SignExt(AstRef<'c>, u32),
-    Extract(AstRef<'c>, u32, u32),
-    Concat(Vec<AstRef<'c>>),
-    ByteReverse(AstRef<'c>),
-    FpToIEEEBV(AstRef<'c>),
-    FpToUBV(AstRef<'c>, u32, FPRM),
-    FpToSBV(AstRef<'c>, u32, FPRM),
-    StrLen(AstRef<'c>),
-    StrIndexOf(AstRef<'c>, AstRef<'c>, AstRef<'c>),
-    StrToBV(AstRef<'c>),
+    Neg(AstRef),
+    Xor(Vec<AstRef>),
+    Add(Vec<AstRef>),
+    Sub(AstRef, AstRef),
+    Mul(Vec<AstRef>),
+    UDiv(AstRef, AstRef),
+    SDiv(AstRef, AstRef),
+    URem(AstRef, AstRef),
+    SRem(AstRef, AstRef),
+    ShL(AstRef, AstRef),
+    LShR(AstRef, AstRef),
+    AShR(AstRef, AstRef),
+    RotateLeft(AstRef, AstRef),
+    RotateRight(AstRef, AstRef),
+    ZeroExt(AstRef, u32),
+    SignExt(AstRef, u32),
+    Extract(AstRef, u32, u32),
+    Concat(Vec<AstRef>),
+    ByteReverse(AstRef),
+    FpToIEEEBV(AstRef),
+    FpToUBV(AstRef, u32, FPRM),
+    FpToSBV(AstRef, u32, FPRM),
+    StrLen(AstRef),
+    StrIndexOf(AstRef, AstRef, AstRef),
+    StrToBV(AstRef),
 
     // VSA bitvector operations (always symbolic)
-    Union(AstRef<'c>, AstRef<'c>),
-    Intersection(AstRef<'c>, AstRef<'c>),
-    Widen(AstRef<'c>, AstRef<'c>),
+    Union(AstRef, AstRef),
+    Intersection(AstRef, AstRef),
+    Widen(AstRef, AstRef),
 
     // Float leaves and operations
     FPS(InternedString, FSort),
     FPV(Float),
-    FpNeg(AstRef<'c>),
-    FpAbs(AstRef<'c>),
-    FpAdd(AstRef<'c>, AstRef<'c>, FPRM),
-    FpSub(AstRef<'c>, AstRef<'c>, FPRM),
-    FpMul(AstRef<'c>, AstRef<'c>, FPRM),
-    FpDiv(AstRef<'c>, AstRef<'c>, FPRM),
-    FpSqrt(AstRef<'c>, FPRM),
+    FpNeg(AstRef),
+    FpAbs(AstRef),
+    FpAdd(AstRef, AstRef, FPRM),
+    FpSub(AstRef, AstRef, FPRM),
+    FpMul(AstRef, AstRef, FPRM),
+    FpDiv(AstRef, AstRef, FPRM),
+    FpSqrt(AstRef, FPRM),
     /// Transform a float to another float of a different size, preserving the value.
-    FpToFp(AstRef<'c>, FSort, FPRM),
+    FpToFp(AstRef, FSort, FPRM),
     /// Construct a float from sign, exponent, and significand bitvectors
-    FpFP(AstRef<'c>, AstRef<'c>, AstRef<'c>),
+    FpFP(AstRef, AstRef, AstRef),
     /// Transform an IEEE 754 bitvector to a float
-    BvToFp(AstRef<'c>, FSort),
+    BvToFp(AstRef, FSort),
     /// Transform a signed 2's complement bitvector to a float
-    BvToFpSigned(AstRef<'c>, FSort, FPRM),
+    BvToFpSigned(AstRef, FSort, FPRM),
     /// Transform an unsigned 2's complement bitvector to a float
-    BvToFpUnsigned(AstRef<'c>, FSort, FPRM),
+    BvToFpUnsigned(AstRef, FSort, FPRM),
 
     // String leaves and operations
     StringS(InternedString),
     StringV(String),
-    StrConcat(AstRef<'c>, AstRef<'c>),
-    StrSubstr(AstRef<'c>, AstRef<'c>, AstRef<'c>),
-    StrReplace(AstRef<'c>, AstRef<'c>, AstRef<'c>),
-    BVToStr(AstRef<'c>),
+    StrConcat(AstRef, AstRef),
+    StrSubstr(AstRef, AstRef, AstRef),
+    StrReplace(AstRef, AstRef, AstRef),
+    BVToStr(AstRef),
 }
 
-impl<'c> AstOp<'c> {
+impl AstOp {
     /// Returns the child AST at the given index, or `None` if out of range.
-    pub fn get_child(&self, index: usize) -> Option<AstRef<'c>> {
+    pub fn get_child(&self, index: usize) -> Option<AstRef> {
         match self {
             // Leaves have no children
             AstOp::BoolS(..)
@@ -330,7 +330,7 @@ impl<'c> AstOp<'c> {
         }
     }
 
-    pub fn child_iter(&self) -> AstOpChildIter<'_, 'c> {
+    pub fn child_iter(&self) -> AstOpChildIter<'_> {
         AstOpChildIter { op: self, index: 0 }
     }
 
@@ -474,7 +474,7 @@ impl<'c> AstOp<'c> {
                 Err(ClarirsError::TypeError(expected.to_string()))
             }
         }
-        fn nonempty<'a, 'c>(v: &'a [AstRef<'c>]) -> Result<&'a AstRef<'c>, ClarirsError> {
+        fn nonempty(v: &[AstRef]) -> Result<&AstRef, ClarirsError> {
             v.first().ok_or_else(|| {
                 ClarirsError::InvalidArguments(
                     "n-ary operation requires at least one operand".to_string(),
@@ -664,13 +664,13 @@ impl<'c> AstOp<'c> {
     }
 }
 
-pub struct AstOpChildIter<'a, 'c> {
-    op: &'a AstOp<'c>,
+pub struct AstOpChildIter<'a> {
+    op: &'a AstOp,
     index: usize,
 }
 
-impl<'c> Iterator for AstOpChildIter<'_, 'c> {
-    type Item = AstRef<'c>;
+impl Iterator for AstOpChildIter<'_> {
+    type Item = AstRef;
 
     fn next(&mut self) -> Option<Self::Item> {
         let result = self.op.get_child(self.index);
@@ -686,7 +686,7 @@ impl<'c> Iterator for AstOpChildIter<'_, 'c> {
     }
 }
 
-impl ExactSizeIterator for AstOpChildIter<'_, '_> {
+impl ExactSizeIterator for AstOpChildIter<'_> {
     fn len(&self) -> usize {
         self.op.num_children().saturating_sub(self.index)
     }

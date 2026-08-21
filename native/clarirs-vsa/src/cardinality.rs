@@ -8,7 +8,7 @@ pub trait Cardinality {
     fn cardinality(&self) -> Result<BigUint, ClarirsError>;
 }
 
-impl Cardinality for AstRef<'_> {
+impl Cardinality for AstRef {
     fn cardinality(&self) -> Result<BigUint, ClarirsError> {
         match self.ast_type() {
             AstType::BitVec(_) => Ok(self.reduce()?.into_bv()?.cardinality()),

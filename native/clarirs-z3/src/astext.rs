@@ -100,18 +100,18 @@ fn decode_custom_unicode(input: &str) -> String {
     .into_owned()
 }
 
-pub(crate) trait AstExtZ3<'c>: HasContext<'c> + Sized {
+pub(crate) trait AstExtZ3: HasContext + Sized {
     fn to_z3(&self) -> Result<RcAst, ClarirsError>;
-    fn from_z3(ctx: &'c Context<'c>, ast: impl Into<RcAst>) -> Result<Self, ClarirsError>;
+    fn from_z3(ctx: &Arc<Context>, ast: impl Into<RcAst>) -> Result<Self, ClarirsError>;
     fn simplify_z3(&self) -> Result<Self, ClarirsError>;
 }
 
-impl<'c> AstExtZ3<'c> for AstRef<'c> {
+impl AstExtZ3 for AstRef {
     fn simplify_z3(&self) -> Result<Self, ClarirsError> {
         let ast = self.simplify()?.to_z3()?;
         Z3_CONTEXT.with(|ctx| unsafe {
             let simplified_ast = RcAst::try_from(Z3_simplify(*ctx, *ast))?;
-            Self::from_z3(self.context(), simplified_ast)
+            Self::from_z3(&self.context(), simplified_ast)
         })
     }
 
@@ -540,7 +540,7 @@ impl<'c> AstExtZ3<'c> for AstRef<'c> {
     /// declaration kind replaces the previous per-sort `from_z3` functions; the
     /// few kinds that span sorts (`Ite`, uninterpreted constants, numerals) pick
     /// the result sort from the Z3 sort kind.
-    fn from_z3(ctx: &'c Context<'c>, ast: impl Into<RcAst>) -> Result<Self, ClarirsError> {
+    fn from_z3(ctx: &Arc<Context>, ast: impl Into<RcAst>) -> Result<Self, ClarirsError> {
         let ast = ast.into();
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let z3_ctx = *z3_ctx;
@@ -1056,7 +1056,7 @@ mod cache_tests {
 
     #[test]
     fn subterm_entries_live_while_root_is_held() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("cache_live_x", 64)?;
         let y = ctx.bvs("cache_live_y", 64)?;
         let add = ctx.add(&x, &y)?;

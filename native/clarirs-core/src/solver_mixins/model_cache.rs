@@ -12,9 +12,9 @@ const MAX_CACHED_MODELS: usize = 64;
 /// concrete value, plus bookkeeping to keep reuse cheap. This mirrors
 /// claripy's `ModelCache`.
 #[derive(Clone, Debug)]
-struct Model<'c> {
+struct Model {
     /// Variable hash -> concrete value.
-    assignments: HashMap<u64, AstRef<'c>>,
+    assignments: HashMap<u64, AstRef>,
     /// Order-independent signature of `assignments`, used to deduplicate
     /// models without comparing the whole map.
     signature: u64,
@@ -25,8 +25,8 @@ struct Model<'c> {
     verified: HashSet<u64>,
 }
 
-impl<'c> Model<'c> {
-    fn new(assignments: HashMap<u64, AstRef<'c>>) -> Self {
+impl Model {
+    fn new(assignments: HashMap<u64, AstRef>) -> Self {
         let signature = assignments
             .iter()
             .map(|(k, v)| k.wrapping_mul(31).wrapping_add(v.hash()))
@@ -41,7 +41,7 @@ impl<'c> Model<'c> {
     /// Evaluate `expr` under this assignment. The result is concrete when the
     /// assignment covers every variable in `expr`; otherwise it stays
     /// (partially) symbolic and callers must treat it as a cache miss.
-    fn eval(&self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn eval(&self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         expr.replace_many(&self.assignments)?.simplify()
     }
 
@@ -49,7 +49,7 @@ impl<'c> Model<'c> {
     /// already verified are skipped. Returns `false` on the first constraint
     /// the model fails (or cannot decide); the caller then discards the model
     /// as stale.
-    fn satisfies(&mut self, constraints: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
+    fn satisfies(&mut self, constraints: &[AstRef]) -> Result<bool, ClarirsError> {
         for c in constraints {
             if self.verified.contains(&c.hash()) {
                 continue;
@@ -66,7 +66,7 @@ impl<'c> Model<'c> {
     /// Whether this model satisfies all of `extra`. These transient
     /// constraints are never memoized, since they are not part of the solver's
     /// persistent set.
-    fn satisfies_extra(&self, extra: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
+    fn satisfies_extra(&self, extra: &[AstRef]) -> Result<bool, ClarirsError> {
         for c in extra {
             if !self.eval(c)?.is_true() {
                 return Ok(false);
@@ -95,7 +95,7 @@ impl<'c> Model<'c> {
 /// - When the cache cannot fully answer a query, the underlying solver is
 ///   consulted and remains authoritative.
 #[derive(Clone, Debug)]
-pub struct ModelCacheMixin<'c, S: Solver<'c>> {
+pub struct ModelCacheMixin<S: Solver> {
     inner: S,
     /// Cached satisfiability of the current constraints, when known. `None`
     /// means "unknown, ask the solver". Adding a constraint can only turn a
@@ -103,10 +103,10 @@ pub struct ModelCacheMixin<'c, S: Solver<'c>> {
     /// result survives `add` while a satisfiable one is invalidated.
     sat: Option<bool>,
     /// Known satisfying assignments for the current constraints.
-    models: Vec<Model<'c>>,
+    models: Vec<Model>,
 }
 
-impl<'c, S: Solver<'c>> ModelCacheMixin<'c, S> {
+impl<S: Solver> ModelCacheMixin<S> {
     pub fn new(inner: S) -> Self {
         Self {
             inner,
@@ -138,7 +138,7 @@ impl<'c, S: Solver<'c>> ModelCacheMixin<'c, S> {
         let constraints = self.inner.constraints()?;
 
         // Collect every distinct variable leaf across all constraints.
-        let mut leaves: Vec<AstRef<'c>> = Vec::new();
+        let mut leaves: Vec<AstRef> = Vec::new();
         let mut seen: HashSet<u64> = HashSet::new();
         for c in &constraints {
             for v in collect_vars(c)? {
@@ -159,7 +159,7 @@ impl<'c, S: Solver<'c>> ModelCacheMixin<'c, S> {
             Err(_) => return Ok(()),
         };
 
-        let assignments: HashMap<u64, AstRef<'c>> =
+        let assignments: HashMap<u64, AstRef> =
             leaves.iter().map(|l| l.hash()).zip(values).collect();
         let mut model = Model::new(assignments);
 
@@ -177,7 +177,7 @@ impl<'c, S: Solver<'c>> ModelCacheMixin<'c, S> {
 
     /// Return true if a cached model satisfies all `constraints`. Models found
     /// to be stale (failing a constraint) are dropped along the way.
-    fn has_witness(&mut self, constraints: &[AstRef<'c>]) -> bool {
+    fn has_witness(&mut self, constraints: &[AstRef]) -> bool {
         while let Some(model) = self.models.first_mut() {
             match model.satisfies(constraints) {
                 Ok(true) => return true,
@@ -193,7 +193,7 @@ impl<'c, S: Solver<'c>> ModelCacheMixin<'c, S> {
     /// `extra`. A model that satisfies the persistent constraints but not the
     /// transient `extra` is kept (it remains a valid witness for the persistent
     /// set); only genuinely stale models are dropped.
-    fn has_witness_with_extra(&mut self, constraints: &[AstRef<'c>], extra: &[AstRef<'c>]) -> bool {
+    fn has_witness_with_extra(&mut self, constraints: &[AstRef], extra: &[AstRef]) -> bool {
         let mut i = 0;
         while i < self.models.len() {
             match self.models[i].satisfies(constraints) {
@@ -212,14 +212,14 @@ impl<'c, S: Solver<'c>> ModelCacheMixin<'c, S> {
     }
 }
 
-impl<'c, S: Solver<'c>> HasContext<'c> for ModelCacheMixin<'c, S> {
-    fn context(&self) -> &'c Context<'c> {
+impl<S: Solver> HasContext for ModelCacheMixin<S> {
+    fn context(&self) -> Arc<Context> {
         self.inner.context()
     }
 }
 
-impl<'c, S: Solver<'c>> Solver<'c> for ModelCacheMixin<'c, S> {
-    fn add(&mut self, constraint: &AstRef<'c>) -> Result<(), ClarirsError> {
+impl<S: Solver> Solver for ModelCacheMixin<S> {
+    fn add(&mut self, constraint: &AstRef) -> Result<(), ClarirsError> {
         // Adding a constraint only tightens the set. A satisfiable result may
         // no longer hold, so drop it; an unsatisfiable result stays
         // unsatisfiable, so keep it. Cached models that the new constraint
@@ -236,7 +236,7 @@ impl<'c, S: Solver<'c>> Solver<'c> for ModelCacheMixin<'c, S> {
         self.inner.clear()
     }
 
-    fn constraints(&self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+    fn constraints(&self) -> Result<Vec<AstRef>, ClarirsError> {
         self.inner.constraints()
     }
 
@@ -262,7 +262,7 @@ impl<'c, S: Solver<'c>> Solver<'c> for ModelCacheMixin<'c, S> {
         Ok(sat)
     }
 
-    fn satisfiable_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
+    fn satisfiable_with_extra(&mut self, extra: &[AstRef]) -> Result<bool, ClarirsError> {
         if extra.is_empty() {
             return self.satisfiable();
         }
@@ -279,39 +279,39 @@ impl<'c, S: Solver<'c>> Solver<'c> for ModelCacheMixin<'c, S> {
         self.inner.satisfiable_with_extra(extra)
     }
 
-    fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn is_true(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         self.inner.is_true(expr)
     }
 
-    fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn is_false(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         self.inner.is_false(expr)
     }
 
-    fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn has_true(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         self.inner.has_true(expr)
     }
 
-    fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn has_false(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         self.inner.has_false(expr)
     }
 
-    fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn min_unsigned(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         self.inner.min_unsigned(expr)
     }
 
-    fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn max_unsigned(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         self.inner.max_unsigned(expr)
     }
 
-    fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn min_signed(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         self.inner.min_signed(expr)
     }
 
-    fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn max_signed(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         self.inner.max_signed(expr)
     }
 
-    fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+    fn eval_n(&mut self, expr: &AstRef, n: u32) -> Result<Vec<AstRef>, ClarirsError> {
         if n == 0 {
             return Ok(Vec::new());
         }
@@ -323,7 +323,7 @@ impl<'c, S: Solver<'c>> Solver<'c> for ModelCacheMixin<'c, S> {
         // model verified to satisfy the constraints, so it is a genuine,
         // distinct solution.
         let constraints = self.inner.constraints()?;
-        let mut solutions: Vec<AstRef<'c>> = Vec::new();
+        let mut solutions: Vec<AstRef> = Vec::new();
         let mut seen: HashSet<u64> = HashSet::new();
         let mut i = 0;
         while i < self.models.len() {
@@ -357,7 +357,7 @@ impl<'c, S: Solver<'c>> Solver<'c> for ModelCacheMixin<'c, S> {
         Ok(results)
     }
 
-    fn batch_eval(&mut self, exprs: &[AstRef<'c>]) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+    fn batch_eval(&mut self, exprs: &[AstRef]) -> Result<Vec<AstRef>, ClarirsError> {
         if self.sat == Some(false) {
             return Err(ClarirsError::Unsat);
         }
@@ -387,38 +387,36 @@ mod tests {
     /// Wraps a solver and counts how many times each cacheable query reaches
     /// it, so tests can assert that the cache short-circuits calls.
     #[derive(Clone, Debug)]
-    struct CountingSolver<'c, S: Solver<'c>> {
+    struct CountingSolver<S: Solver> {
         inner: S,
         satisfiable_calls: Rc<Cell<usize>>,
         eval_calls: Rc<Cell<usize>>,
-        _marker: std::marker::PhantomData<&'c ()>,
     }
 
-    impl<'c, S: Solver<'c>> CountingSolver<'c, S> {
+    impl<S: Solver> CountingSolver<S> {
         fn new(inner: S) -> Self {
             Self {
                 inner,
                 satisfiable_calls: Rc::new(Cell::new(0)),
                 eval_calls: Rc::new(Cell::new(0)),
-                _marker: std::marker::PhantomData,
             }
         }
     }
 
-    impl<'c, S: Solver<'c>> HasContext<'c> for CountingSolver<'c, S> {
-        fn context(&self) -> &'c Context<'c> {
+    impl<S: Solver> HasContext for CountingSolver<S> {
+        fn context(&self) -> Arc<Context> {
             self.inner.context()
         }
     }
 
-    impl<'c, S: Solver<'c>> Solver<'c> for CountingSolver<'c, S> {
-        fn add(&mut self, constraint: &AstRef<'c>) -> Result<(), ClarirsError> {
+    impl<S: Solver> Solver for CountingSolver<S> {
+        fn add(&mut self, constraint: &AstRef) -> Result<(), ClarirsError> {
             self.inner.add(constraint)
         }
         fn clear(&mut self) -> Result<(), ClarirsError> {
             self.inner.clear()
         }
-        fn constraints(&self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+        fn constraints(&self) -> Result<Vec<AstRef>, ClarirsError> {
             self.inner.constraints()
         }
         fn simplify(&mut self) -> Result<(), ClarirsError> {
@@ -428,31 +426,31 @@ mod tests {
             self.satisfiable_calls.set(self.satisfiable_calls.get() + 1);
             self.inner.satisfiable()
         }
-        fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+        fn is_true(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
             self.inner.is_true(expr)
         }
-        fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+        fn is_false(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
             self.inner.is_false(expr)
         }
-        fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+        fn has_true(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
             self.inner.has_true(expr)
         }
-        fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+        fn has_false(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
             self.inner.has_false(expr)
         }
-        fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+        fn min_unsigned(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
             self.inner.min_unsigned(expr)
         }
-        fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+        fn max_unsigned(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
             self.inner.max_unsigned(expr)
         }
-        fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+        fn min_signed(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
             self.inner.min_signed(expr)
         }
-        fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+        fn max_signed(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
             self.inner.max_signed(expr)
         }
-        fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+        fn eval_n(&mut self, expr: &AstRef, n: u32) -> Result<Vec<AstRef>, ClarirsError> {
             self.eval_calls.set(self.eval_calls.get() + 1);
             self.inner.eval_n(expr, n)
         }
@@ -460,7 +458,7 @@ mod tests {
 
     #[test]
     fn test_model_eval_and_satisfies() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8)?;
         let five = ctx.bvv(BitVec::from((5, 8)))?;
 
@@ -483,7 +481,7 @@ mod tests {
     /// so `satisfies` conservatively returns false.
     #[test]
     fn test_model_partial_assignment_is_conservative() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 8)?;
         let y = ctx.bvs("y", 8)?;
 
@@ -498,8 +496,8 @@ mod tests {
 
     #[test]
     fn test_satisfiable_is_cached() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
-        let inner = CountingSolver::new(ConcreteSolver::new(&ctx));
+        let ctx = Arc::new(Context::new());
+        let inner = CountingSolver::new(ConcreteSolver::new(ctx.clone()));
         let calls = inner.satisfiable_calls.clone();
         let mut solver = ModelCacheMixin::new(inner);
 
@@ -513,8 +511,8 @@ mod tests {
 
     #[test]
     fn test_eval_reuses_cached_model() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
-        let inner = CountingSolver::new(ConcreteSolver::new(&ctx));
+        let ctx = Arc::new(Context::new());
+        let inner = CountingSolver::new(ConcreteSolver::new(ctx.clone()));
         let eval_calls = inner.eval_calls.clone();
         let mut solver = ModelCacheMixin::new(inner);
 
@@ -536,8 +534,8 @@ mod tests {
 
     #[test]
     fn test_clear_resets_cache() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
-        let inner = CountingSolver::new(ConcreteSolver::new(&ctx));
+        let ctx = Arc::new(Context::new());
+        let inner = CountingSolver::new(ConcreteSolver::new(ctx.clone()));
         let calls = inner.satisfiable_calls.clone();
         let mut solver = ModelCacheMixin::new(inner);
 

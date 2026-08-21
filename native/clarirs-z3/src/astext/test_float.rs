@@ -4,7 +4,7 @@ use z3_sys::*;
 use super::AstExtZ3;
 use crate::{Z3_CONTEXT, rc::RcAst};
 
-fn round_trip<'c>(ctx: &'c Context<'c>, ast: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+fn round_trip(ctx: &Arc<Context>, ast: &AstRef) -> Result<AstRef, ClarirsError> {
     AstRef::from_z3(ctx, ast.to_z3()?)
 }
 
@@ -18,7 +18,7 @@ mod to_z3 {
 
     #[test]
     fn symbol_f32() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.fps("x", FSort::f32()).unwrap();
         let z3_ast = x.to_z3().unwrap();
 
@@ -28,7 +28,7 @@ mod to_z3 {
 
     #[test]
     fn symbol_f64() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.fps("x", FSort::f64()).unwrap();
         let z3_ast = x.to_z3().unwrap();
 
@@ -38,7 +38,7 @@ mod to_z3 {
 
     #[test]
     fn value_f32() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let f = ctx.fpv(Float::F32(std::f32::consts::PI)).unwrap();
         let z3_ast = f.to_z3().unwrap();
         // Z3 represents float numerals as FpaNum
@@ -47,7 +47,7 @@ mod to_z3 {
 
     #[test]
     fn value_f64() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let f = ctx.fpv(Float::F64(std::f64::consts::E)).unwrap();
         let z3_ast = f.to_z3().unwrap();
         assert_eq!(z3_ast.decl_kind(), DeclKind::FpaNum);
@@ -55,7 +55,7 @@ mod to_z3 {
 
     #[test]
     fn value_f32_zero() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let f = ctx.fpv(Float::F32(0.0f32)).unwrap();
         let z3_ast = f.to_z3().unwrap();
         // Z3 may represent +0.0 as FpaNum or FpaPlusZero
@@ -65,7 +65,7 @@ mod to_z3 {
 
     #[test]
     fn value_f32_neg_zero() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let f = ctx.fpv(Float::F32(-0.0f32)).unwrap();
         let z3_ast = f.to_z3().unwrap();
         let dk = z3_ast.decl_kind();
@@ -76,7 +76,7 @@ mod to_z3 {
 
     #[test]
     fn fp_neg() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.fps("x", FSort::f32()).unwrap();
         let neg = ctx.fp_neg(x).unwrap();
         let z3_ast = neg.to_z3().unwrap();
@@ -88,7 +88,7 @@ mod to_z3 {
 
     #[test]
     fn fp_abs() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.fps("x", FSort::f32()).unwrap();
         let abs = ctx.fp_abs(x).unwrap();
         let z3_ast = abs.to_z3().unwrap();
@@ -102,7 +102,7 @@ mod to_z3 {
 
     #[test]
     fn fp_add() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let add = ctx.fp_add(a, b, FPRM::NearestTiesToEven).unwrap();
@@ -121,7 +121,7 @@ mod to_z3 {
 
     #[test]
     fn fp_sub() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let sub = ctx.fp_sub(a, b, FPRM::TowardZero).unwrap();
@@ -137,7 +137,7 @@ mod to_z3 {
 
     #[test]
     fn fp_mul() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let mul = ctx.fp_mul(a, b, FPRM::TowardPositive).unwrap();
@@ -153,7 +153,7 @@ mod to_z3 {
 
     #[test]
     fn fp_div() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let div = ctx.fp_div(a, b, FPRM::TowardNegative).unwrap();
@@ -169,7 +169,7 @@ mod to_z3 {
 
     #[test]
     fn fp_sqrt() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.fps("x", FSort::f32()).unwrap();
         let sqrt = ctx.fp_sqrt(x, FPRM::NearestTiesToAway).unwrap();
         let z3_ast = sqrt.to_z3().unwrap();
@@ -188,7 +188,7 @@ mod to_z3 {
 
     #[test]
     fn fp_to_fp() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.fps("x", FSort::f32()).unwrap();
         let conv = ctx
             .fp_to_fp(x, FSort::f64(), FPRM::NearestTiesToEven)
@@ -202,7 +202,7 @@ mod to_z3 {
 
     #[test]
     fn bv_to_fp() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let bv = ctx.bvs("bits", 32).unwrap();
         let conv = ctx.bv_to_fp(bv, FSort::f32()).unwrap();
         let z3_ast = conv.to_z3().unwrap();
@@ -212,7 +212,7 @@ mod to_z3 {
 
     #[test]
     fn bv_to_fp_signed() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let bv = ctx.bvs("bits", 32).unwrap();
         let conv = ctx
             .bv_to_fp_signed(bv, FSort::f32(), FPRM::NearestTiesToEven)
@@ -225,7 +225,7 @@ mod to_z3 {
 
     #[test]
     fn bv_to_fp_unsigned() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let bv = ctx.bvs("bits", 32).unwrap();
         let conv = ctx
             .bv_to_fp_unsigned(bv, FSort::f32(), FPRM::NearestTiesToEven)
@@ -238,7 +238,7 @@ mod to_z3 {
 
     #[test]
     fn fp_fp() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let sign = ctx.bvv(BitVec::from((0, 8))).unwrap();
         let sign = ctx.extract(sign, 0, 0).unwrap(); // 1-bit
         let exp = ctx.bvs("exp", 8).unwrap();
@@ -254,7 +254,7 @@ mod to_z3 {
 
     #[test]
     fn ite() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let c = ctx.bools("c").unwrap();
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
@@ -272,7 +272,7 @@ mod to_z3 {
 
     #[test]
     fn rounding_mode_rne() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let add = ctx.fp_add(a, b, FPRM::NearestTiesToEven).unwrap();
@@ -285,7 +285,7 @@ mod to_z3 {
 
     #[test]
     fn rounding_mode_rtp() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let add = ctx.fp_add(a, b, FPRM::TowardPositive).unwrap();
@@ -298,7 +298,7 @@ mod to_z3 {
 
     #[test]
     fn rounding_mode_rtn() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let add = ctx.fp_add(a, b, FPRM::TowardNegative).unwrap();
@@ -311,7 +311,7 @@ mod to_z3 {
 
     #[test]
     fn rounding_mode_rtz() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let add = ctx.fp_add(a, b, FPRM::TowardZero).unwrap();
@@ -324,7 +324,7 @@ mod to_z3 {
 
     #[test]
     fn rounding_mode_rna() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let add = ctx.fp_add(a, b, FPRM::NearestTiesToAway).unwrap();
@@ -346,7 +346,7 @@ mod from_z3 {
 
     #[test]
     fn symbol_f32() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let z3_ast = RcAst::mk_fp("x", FSort::f32());
         let result = AstRef::from_z3(&ctx, z3_ast).unwrap();
         let expected = ctx.fps("x", FSort::f32()).unwrap();
@@ -355,7 +355,7 @@ mod from_z3 {
 
     #[test]
     fn symbol_f64() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let z3_ast = RcAst::mk_fp("x", FSort::f64());
         let result = AstRef::from_z3(&ctx, z3_ast).unwrap();
         let expected = ctx.fps("x", FSort::f64()).unwrap();
@@ -364,7 +364,7 @@ mod from_z3 {
 
     #[test]
     fn value_f32() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let z3_ast = RcAst::mk_fp_val_f32(std::f32::consts::PI);
         let result = AstRef::from_z3(&ctx, z3_ast).unwrap();
         let expected = ctx.fpv(Float::F32(std::f32::consts::PI)).unwrap();
@@ -373,7 +373,7 @@ mod from_z3 {
 
     #[test]
     fn value_f64() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let z3_ast = RcAst::mk_fp_val_f64(std::f64::consts::E);
         let result = AstRef::from_z3(&ctx, z3_ast).unwrap();
         let expected = ctx.fpv(Float::F64(std::f64::consts::E)).unwrap();
@@ -384,7 +384,7 @@ mod from_z3 {
 
     #[test]
     fn fp_neg() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = RcAst::mk_fp("x", FSort::f32());
         let z3_neg = Z3_CONTEXT
             .with(|&z3_ctx| unsafe { RcAst::try_from(Z3_mk_fpa_neg(z3_ctx, *x)).unwrap() });
@@ -395,7 +395,7 @@ mod from_z3 {
 
     #[test]
     fn fp_abs() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = RcAst::mk_fp("x", FSort::f32());
         let z3_abs = Z3_CONTEXT
             .with(|&z3_ctx| unsafe { RcAst::try_from(Z3_mk_fpa_abs(z3_ctx, *x)).unwrap() });
@@ -408,7 +408,7 @@ mod from_z3 {
 
     #[test]
     fn fp_add() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = RcAst::mk_fp("a", FSort::f32());
         let b = RcAst::mk_fp("b", FSort::f32());
         let rm = RcAst::mk_fprm(FPRM::NearestTiesToEven);
@@ -428,7 +428,7 @@ mod from_z3 {
 
     #[test]
     fn fp_sub() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = RcAst::mk_fp("a", FSort::f32());
         let b = RcAst::mk_fp("b", FSort::f32());
         let rm = RcAst::mk_fprm(FPRM::TowardZero);
@@ -448,7 +448,7 @@ mod from_z3 {
 
     #[test]
     fn fp_mul() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = RcAst::mk_fp("a", FSort::f32());
         let b = RcAst::mk_fp("b", FSort::f32());
         let rm = RcAst::mk_fprm(FPRM::TowardPositive);
@@ -468,7 +468,7 @@ mod from_z3 {
 
     #[test]
     fn fp_div() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = RcAst::mk_fp("a", FSort::f32());
         let b = RcAst::mk_fp("b", FSort::f32());
         let rm = RcAst::mk_fprm(FPRM::TowardNegative);
@@ -488,7 +488,7 @@ mod from_z3 {
 
     #[test]
     fn fp_sqrt() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = RcAst::mk_fp("x", FSort::f32());
         let rm = RcAst::mk_fprm(FPRM::NearestTiesToAway);
         let z3_sqrt = Z3_CONTEXT
@@ -504,7 +504,7 @@ mod from_z3 {
 
     #[test]
     fn fp_fp() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let sign = RcAst::mk_bv_val("0", 1);
         let exp = RcAst::mk_bv("exp", 8);
         let sig = RcAst::mk_bv("sig", 23);
@@ -522,7 +522,7 @@ mod from_z3 {
 
     #[test]
     fn ite() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let c = RcAst::mk_bool("c");
         let a = RcAst::mk_fp("a", FSort::f32());
         let b = RcAst::mk_fp("b", FSort::f32());
@@ -550,56 +550,56 @@ mod roundtrip {
 
     #[test]
     fn symbol_f32() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let ast = ctx.fps("x", FSort::f32()).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
     }
 
     #[test]
     fn symbol_f64() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let ast = ctx.fps("x", FSort::f64()).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
     }
 
     #[test]
     fn value_f32_pi() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let ast = ctx.fpv(Float::F32(std::f32::consts::PI)).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
     }
 
     #[test]
     fn value_f64_e() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let ast = ctx.fpv(Float::F64(std::f64::consts::E)).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
     }
 
     #[test]
     fn value_f32_one() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let ast = ctx.fpv(Float::F32(1.0f32)).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
     }
 
     #[test]
     fn value_f64_one() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let ast = ctx.fpv(Float::F64(1.0f64)).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
     }
 
     #[test]
     fn value_f32_negative() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let ast = ctx.fpv(Float::F32(-42.5f32)).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
     }
 
     #[test]
     fn value_f64_negative() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let ast = ctx.fpv(Float::F64(-123.456f64)).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
     }
@@ -608,7 +608,7 @@ mod roundtrip {
 
     #[test]
     fn fp_neg() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.fps("x", FSort::f32()).unwrap();
         let ast = ctx.fp_neg(x).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
@@ -616,7 +616,7 @@ mod roundtrip {
 
     #[test]
     fn fp_abs() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.fps("x", FSort::f32()).unwrap();
         let ast = ctx.fp_abs(x).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
@@ -626,7 +626,7 @@ mod roundtrip {
 
     #[test]
     fn fp_add() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let ast = ctx.fp_add(a, b, FPRM::NearestTiesToEven).unwrap();
@@ -635,7 +635,7 @@ mod roundtrip {
 
     #[test]
     fn fp_sub() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let ast = ctx.fp_sub(a, b, FPRM::NearestTiesToEven).unwrap();
@@ -644,7 +644,7 @@ mod roundtrip {
 
     #[test]
     fn fp_mul() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let ast = ctx.fp_mul(a, b, FPRM::NearestTiesToEven).unwrap();
@@ -653,7 +653,7 @@ mod roundtrip {
 
     #[test]
     fn fp_div() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let ast = ctx.fp_div(a, b, FPRM::NearestTiesToEven).unwrap();
@@ -662,7 +662,7 @@ mod roundtrip {
 
     #[test]
     fn fp_sqrt() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.fps("x", FSort::f32()).unwrap();
         let ast = ctx.fp_sqrt(x, FPRM::NearestTiesToEven).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
@@ -672,7 +672,7 @@ mod roundtrip {
 
     #[test]
     fn fp_to_fp_f32_to_f64() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.fps("x", FSort::f32()).unwrap();
         let ast = ctx
             .fp_to_fp(x, FSort::f64(), FPRM::NearestTiesToEven)
@@ -682,7 +682,7 @@ mod roundtrip {
 
     #[test]
     fn fp_to_fp_f64_to_f32() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.fps("x", FSort::f64()).unwrap();
         let ast = ctx
             .fp_to_fp(x, FSort::f32(), FPRM::NearestTiesToEven)
@@ -692,7 +692,7 @@ mod roundtrip {
 
     #[test]
     fn bv_to_fp() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let bv = ctx.bvs("bits", 32).unwrap();
         let ast = ctx.bv_to_fp(bv, FSort::f32()).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
@@ -700,7 +700,7 @@ mod roundtrip {
 
     #[test]
     fn bv_to_fp_signed() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let bv = ctx.bvs("bits", 32).unwrap();
         let ast = ctx
             .bv_to_fp_signed(bv, FSort::f32(), FPRM::NearestTiesToEven)
@@ -710,7 +710,7 @@ mod roundtrip {
 
     #[test]
     fn fp_fp() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let sign = ctx.bvv(BitVec::from((0, 8))).unwrap();
         let sign = ctx.extract(sign, 0, 0).unwrap(); // 1-bit
         let exp = ctx.bvs("exp", 8).unwrap();
@@ -723,7 +723,7 @@ mod roundtrip {
 
     #[test]
     fn ite() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let c = ctx.bools("c").unwrap();
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
@@ -735,7 +735,7 @@ mod roundtrip {
 
     #[test]
     fn fp_neg_f64() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.fps("x", FSort::f64()).unwrap();
         let ast = ctx.fp_neg(x).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
@@ -743,7 +743,7 @@ mod roundtrip {
 
     #[test]
     fn fp_abs_f64() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.fps("x", FSort::f64()).unwrap();
         let ast = ctx.fp_abs(x).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
@@ -751,7 +751,7 @@ mod roundtrip {
 
     #[test]
     fn fp_add_f64() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f64()).unwrap();
         let b = ctx.fps("b", FSort::f64()).unwrap();
         let ast = ctx.fp_add(a, b, FPRM::NearestTiesToEven).unwrap();
@@ -760,7 +760,7 @@ mod roundtrip {
 
     #[test]
     fn fp_mul_f64() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f64()).unwrap();
         let b = ctx.fps("b", FSort::f64()).unwrap();
         let ast = ctx.fp_mul(a, b, FPRM::NearestTiesToEven).unwrap();
@@ -771,7 +771,7 @@ mod roundtrip {
 
     #[test]
     fn fp_add_toward_zero() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let ast = ctx.fp_add(a, b, FPRM::TowardZero).unwrap();
@@ -780,7 +780,7 @@ mod roundtrip {
 
     #[test]
     fn fp_add_toward_positive() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let ast = ctx.fp_add(a, b, FPRM::TowardPositive).unwrap();
@@ -789,7 +789,7 @@ mod roundtrip {
 
     #[test]
     fn fp_add_toward_negative() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let ast = ctx.fp_add(a, b, FPRM::TowardNegative).unwrap();
@@ -798,7 +798,7 @@ mod roundtrip {
 
     #[test]
     fn fp_add_nearest_ties_away() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let ast = ctx.fp_add(a, b, FPRM::NearestTiesToAway).unwrap();

@@ -5,7 +5,7 @@ use crate::{ast::op::AstOp, prelude::*};
 
 /// Rebuilds `ast`'s op with `children` substituted in, without interning.
 /// Returns `None` for leaves. The structural half of [`reconstruct_node`].
-pub fn rebuild_op<'c>(ast: &AstRef<'c>, children: &[AstRef<'c>]) -> Option<AstOp<'c>> {
+pub fn rebuild_op(ast: &AstRef, children: &[AstRef]) -> Option<AstOp> {
     let c = |i: usize| children[i].clone();
     Some(match ast.op() {
         // Leaves have no children to substitute.
@@ -101,11 +101,11 @@ pub fn rebuild_op<'c>(ast: &AstRef<'c>, children: &[AstRef<'c>]) -> Option<AstOp
 /// Leaf nodes are returned as-is. Non-leaf nodes are rebuilt by replacing the
 /// op's children with the transformed ones and re-interning via the context;
 /// the node's type is re-inferred from the (same-typed) children.
-pub fn reconstruct_node<'c>(
-    ctx: &'c Context<'c>,
-    ast: &AstRef<'c>,
-    children: &[AstRef<'c>],
-) -> Result<AstRef<'c>, ClarirsError> {
+pub fn reconstruct_node(
+    ctx: &Arc<Context>,
+    ast: &AstRef,
+    children: &[AstRef],
+) -> Result<AstRef, ClarirsError> {
     match rebuild_op(ast, children) {
         Some(op) => ctx.make_ast(op),
         None => Ok(ast.clone()),

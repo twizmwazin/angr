@@ -4,7 +4,7 @@ use z3_sys::*;
 use super::AstExtZ3;
 use crate::{Z3_CONTEXT, rc::RcAst};
 
-fn round_trip<'c>(ctx: &'c Context<'c>, ast: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+fn round_trip(ctx: &Arc<Context>, ast: &AstRef) -> Result<AstRef, ClarirsError> {
     AstRef::from_z3(ctx, ast.to_z3()?)
 }
 
@@ -18,7 +18,7 @@ mod to_z3 {
 
     #[test]
     fn symbol() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let sym = ctx.bools("x").unwrap();
         let z3_ast = sym.to_z3().unwrap();
         assert_eq!(z3_ast.decl_kind(), DeclKind::Uninterpreted);
@@ -27,7 +27,7 @@ mod to_z3 {
 
     #[test]
     fn true_value() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let t = ctx.true_().unwrap();
         let z3_ast = t.to_z3().unwrap();
         assert_eq!(z3_ast.decl_kind(), DeclKind::True);
@@ -35,7 +35,7 @@ mod to_z3 {
 
     #[test]
     fn false_value() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let f = ctx.false_().unwrap();
         let z3_ast = f.to_z3().unwrap();
         assert_eq!(z3_ast.decl_kind(), DeclKind::False);
@@ -45,7 +45,7 @@ mod to_z3 {
 
     #[test]
     fn not() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bools("x").unwrap();
         let not_x = ctx.not(x).unwrap();
         let z3_ast = not_x.to_z3().unwrap();
@@ -56,7 +56,7 @@ mod to_z3 {
 
     #[test]
     fn and_2args() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bools("x").unwrap();
         let y = ctx.bools("y").unwrap();
         let and = ctx.and2(x, y).unwrap();
@@ -69,7 +69,7 @@ mod to_z3 {
 
     #[test]
     fn and_3args() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bools("x").unwrap();
         let y = ctx.bools("y").unwrap();
         let z = ctx.bools("z").unwrap();
@@ -85,7 +85,7 @@ mod to_z3 {
 
     #[test]
     fn or_2args() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bools("x").unwrap();
         let y = ctx.bools("y").unwrap();
         let or = ctx.or2(x, y).unwrap();
@@ -98,7 +98,7 @@ mod to_z3 {
 
     #[test]
     fn or_3args() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bools("x").unwrap();
         let y = ctx.bools("y").unwrap();
         let z = ctx.bools("z").unwrap();
@@ -114,7 +114,7 @@ mod to_z3 {
 
     #[test]
     fn xor() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bools("x").unwrap();
         let y = ctx.bools("y").unwrap();
         let xor = ctx.xor2(x, y).unwrap();
@@ -127,7 +127,7 @@ mod to_z3 {
 
     #[test]
     fn bool_eq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bools("x").unwrap();
         let y = ctx.bools("y").unwrap();
         let eq = ctx.eq_(x, y).unwrap();
@@ -140,7 +140,7 @@ mod to_z3 {
 
     #[test]
     fn bool_neq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bools("x").unwrap();
         let y = ctx.bools("y").unwrap();
         let neq = ctx.neq(x, y).unwrap();
@@ -153,7 +153,7 @@ mod to_z3 {
 
     #[test]
     fn ite() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let c = ctx.bools("c").unwrap();
         let t = ctx.bools("t").unwrap();
         let e = ctx.bools("e").unwrap();
@@ -170,7 +170,7 @@ mod to_z3 {
 
     #[test]
     fn bv_eq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.bvs("a", 32).unwrap();
         let b = ctx.bvs("b", 32).unwrap();
         let eq = ctx.eq_(a, b).unwrap();
@@ -180,7 +180,7 @@ mod to_z3 {
 
     #[test]
     fn bv_neq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.bvs("a", 32).unwrap();
         let b = ctx.bvs("b", 32).unwrap();
         let neq = ctx.neq(a, b).unwrap();
@@ -190,7 +190,7 @@ mod to_z3 {
 
     #[test]
     fn ult() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.bvs("a", 32).unwrap();
         let b = ctx.bvs("b", 32).unwrap();
         let r = ctx.ult(a, b).unwrap();
@@ -200,7 +200,7 @@ mod to_z3 {
 
     #[test]
     fn ule() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.bvs("a", 32).unwrap();
         let b = ctx.bvs("b", 32).unwrap();
         let r = ctx.ule(a, b).unwrap();
@@ -210,7 +210,7 @@ mod to_z3 {
 
     #[test]
     fn ugt() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.bvs("a", 32).unwrap();
         let b = ctx.bvs("b", 32).unwrap();
         let r = ctx.ugt(a, b).unwrap();
@@ -220,7 +220,7 @@ mod to_z3 {
 
     #[test]
     fn uge() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.bvs("a", 32).unwrap();
         let b = ctx.bvs("b", 32).unwrap();
         let r = ctx.uge(a, b).unwrap();
@@ -230,7 +230,7 @@ mod to_z3 {
 
     #[test]
     fn slt() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.bvs("a", 32).unwrap();
         let b = ctx.bvs("b", 32).unwrap();
         let r = ctx.slt(a, b).unwrap();
@@ -240,7 +240,7 @@ mod to_z3 {
 
     #[test]
     fn sle() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.bvs("a", 32).unwrap();
         let b = ctx.bvs("b", 32).unwrap();
         let r = ctx.sle(a, b).unwrap();
@@ -250,7 +250,7 @@ mod to_z3 {
 
     #[test]
     fn sgt() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.bvs("a", 32).unwrap();
         let b = ctx.bvs("b", 32).unwrap();
         let r = ctx.sgt(a, b).unwrap();
@@ -260,7 +260,7 @@ mod to_z3 {
 
     #[test]
     fn sge() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.bvs("a", 32).unwrap();
         let b = ctx.bvs("b", 32).unwrap();
         let r = ctx.sge(a, b).unwrap();
@@ -272,7 +272,7 @@ mod to_z3 {
 
     #[test]
     fn fp_eq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let r = ctx.fp_eq(a, b).unwrap();
@@ -282,7 +282,7 @@ mod to_z3 {
 
     #[test]
     fn fp_neq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let r = ctx.fp_neq(a, b).unwrap();
@@ -295,7 +295,7 @@ mod to_z3 {
 
     #[test]
     fn fp_lt() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let r = ctx.fp_lt(a, b).unwrap();
@@ -305,7 +305,7 @@ mod to_z3 {
 
     #[test]
     fn fp_leq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let r = ctx.fp_leq(a, b).unwrap();
@@ -315,7 +315,7 @@ mod to_z3 {
 
     #[test]
     fn fp_gt() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let r = ctx.fp_gt(a, b).unwrap();
@@ -325,7 +325,7 @@ mod to_z3 {
 
     #[test]
     fn fp_geq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let r = ctx.fp_geq(a, b).unwrap();
@@ -335,7 +335,7 @@ mod to_z3 {
 
     #[test]
     fn fp_is_nan() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let r = ctx.fp_is_nan(a).unwrap();
         let z3_ast = r.to_z3().unwrap();
@@ -344,7 +344,7 @@ mod to_z3 {
 
     #[test]
     fn fp_is_inf() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let r = ctx.fp_is_inf(a).unwrap();
         let z3_ast = r.to_z3().unwrap();
@@ -355,7 +355,7 @@ mod to_z3 {
 
     #[test]
     fn str_contains() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.strings("a").unwrap();
         let b = ctx.strings("b").unwrap();
         let r = ctx.str_contains(a, b).unwrap();
@@ -365,7 +365,7 @@ mod to_z3 {
 
     #[test]
     fn str_prefix_of() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.strings("a").unwrap();
         let b = ctx.strings("b").unwrap();
         let r = ctx.str_prefix_of(a, b).unwrap();
@@ -375,7 +375,7 @@ mod to_z3 {
 
     #[test]
     fn str_suffix_of() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.strings("a").unwrap();
         let b = ctx.strings("b").unwrap();
         let r = ctx.str_suffix_of(a, b).unwrap();
@@ -385,7 +385,7 @@ mod to_z3 {
 
     #[test]
     fn str_eq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.strings("a").unwrap();
         let b = ctx.strings("b").unwrap();
         let r = ctx.str_eq(a, b).unwrap();
@@ -395,7 +395,7 @@ mod to_z3 {
 
     #[test]
     fn str_neq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.strings("a").unwrap();
         let b = ctx.strings("b").unwrap();
         let r = ctx.str_neq(a, b).unwrap();
@@ -414,7 +414,7 @@ mod from_z3 {
 
     #[test]
     fn symbol() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let z3_ast = RcAst::mk_bool("x");
         let result = AstRef::from_z3(&ctx, z3_ast).unwrap();
         assert_eq!(result, ctx.bools("x").unwrap());
@@ -422,7 +422,7 @@ mod from_z3 {
 
     #[test]
     fn true_value() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let z3_ast = RcAst::try_from(Z3_mk_true(*z3_ctx)).unwrap();
             let result = AstRef::from_z3(&ctx, z3_ast).unwrap();
@@ -432,7 +432,7 @@ mod from_z3 {
 
     #[test]
     fn false_value() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let z3_ast = RcAst::try_from(Z3_mk_false(*z3_ctx)).unwrap();
             let result = AstRef::from_z3(&ctx, z3_ast).unwrap();
@@ -444,7 +444,7 @@ mod from_z3 {
 
     #[test]
     fn not() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bool("x");
             let not_z3 = RcAst::try_from(Z3_mk_not(*z3_ctx, *x)).unwrap();
@@ -457,7 +457,7 @@ mod from_z3 {
 
     #[test]
     fn and_2args() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bool("x");
             let y = RcAst::mk_bool("y");
@@ -474,7 +474,7 @@ mod from_z3 {
 
     #[test]
     fn or_2args() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bool("x");
             let y = RcAst::mk_bool("y");
@@ -491,7 +491,7 @@ mod from_z3 {
 
     #[test]
     fn xor() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bool("x");
             let y = RcAst::mk_bool("y");
@@ -507,7 +507,7 @@ mod from_z3 {
 
     #[test]
     fn bool_eq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bool("x");
             let y = RcAst::mk_bool("y");
@@ -523,7 +523,7 @@ mod from_z3 {
 
     #[test]
     fn bool_neq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let x = RcAst::mk_bool("x");
             let y = RcAst::mk_bool("y");
@@ -540,7 +540,7 @@ mod from_z3 {
 
     #[test]
     fn ite() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let c = RcAst::mk_bool("c");
             let t = RcAst::try_from(Z3_mk_true(*z3_ctx)).unwrap();
@@ -563,7 +563,7 @@ mod from_z3 {
 
     #[test]
     fn bv_eq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let a = RcAst::mk_bv("a", 32);
             let b = RcAst::mk_bv("b", 32);
@@ -579,7 +579,7 @@ mod from_z3 {
 
     #[test]
     fn bv_neq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let a = RcAst::mk_bv("a", 32);
             let b = RcAst::mk_bv("b", 32);
@@ -596,7 +596,7 @@ mod from_z3 {
 
     #[test]
     fn ult() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let a = RcAst::mk_bv("a", 32);
             let b = RcAst::mk_bv("b", 32);
@@ -612,7 +612,7 @@ mod from_z3 {
 
     #[test]
     fn ule() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let a = RcAst::mk_bv("a", 32);
             let b = RcAst::mk_bv("b", 32);
@@ -628,7 +628,7 @@ mod from_z3 {
 
     #[test]
     fn ugt() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let a = RcAst::mk_bv("a", 32);
             let b = RcAst::mk_bv("b", 32);
@@ -644,7 +644,7 @@ mod from_z3 {
 
     #[test]
     fn uge() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let a = RcAst::mk_bv("a", 32);
             let b = RcAst::mk_bv("b", 32);
@@ -660,7 +660,7 @@ mod from_z3 {
 
     #[test]
     fn slt() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let a = RcAst::mk_bv("a", 32);
             let b = RcAst::mk_bv("b", 32);
@@ -676,7 +676,7 @@ mod from_z3 {
 
     #[test]
     fn sle() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let a = RcAst::mk_bv("a", 32);
             let b = RcAst::mk_bv("b", 32);
@@ -692,7 +692,7 @@ mod from_z3 {
 
     #[test]
     fn sgt() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let a = RcAst::mk_bv("a", 32);
             let b = RcAst::mk_bv("b", 32);
@@ -708,7 +708,7 @@ mod from_z3 {
 
     #[test]
     fn sge() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let a = RcAst::mk_bv("a", 32);
             let b = RcAst::mk_bv("b", 32);
@@ -726,7 +726,7 @@ mod from_z3 {
 
     #[test]
     fn fp_eq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let a = RcAst::mk_fp("a", FSort::f32());
             let b = RcAst::mk_fp("b", FSort::f32());
@@ -745,7 +745,7 @@ mod from_z3 {
 
     #[test]
     fn fp_neq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let a = RcAst::mk_fp("a", FSort::f32());
             let b = RcAst::mk_fp("b", FSort::f32());
@@ -765,7 +765,7 @@ mod from_z3 {
 
     #[test]
     fn fp_lt() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let a = RcAst::mk_fp("a", FSort::f32());
             let b = RcAst::mk_fp("b", FSort::f32());
@@ -784,7 +784,7 @@ mod from_z3 {
 
     #[test]
     fn fp_leq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let a = RcAst::mk_fp("a", FSort::f32());
             let b = RcAst::mk_fp("b", FSort::f32());
@@ -803,7 +803,7 @@ mod from_z3 {
 
     #[test]
     fn fp_gt() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let a = RcAst::mk_fp("a", FSort::f32());
             let b = RcAst::mk_fp("b", FSort::f32());
@@ -822,7 +822,7 @@ mod from_z3 {
 
     #[test]
     fn fp_geq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let a = RcAst::mk_fp("a", FSort::f32());
             let b = RcAst::mk_fp("b", FSort::f32());
@@ -841,7 +841,7 @@ mod from_z3 {
 
     #[test]
     fn fp_is_nan() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let a = RcAst::mk_fp("a", FSort::f32());
             let z3_ast = RcAst::try_from(Z3_mk_fpa_is_nan(*z3_ctx, *a)).unwrap();
@@ -854,7 +854,7 @@ mod from_z3 {
 
     #[test]
     fn fp_is_inf() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let a = RcAst::mk_fp("a", FSort::f32());
             let z3_ast = RcAst::try_from(Z3_mk_fpa_is_infinite(*z3_ctx, *a)).unwrap();
@@ -869,7 +869,7 @@ mod from_z3 {
 
     #[test]
     fn str_contains() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let a = RcAst::mk_string("a");
             let b = RcAst::mk_string("b");
@@ -885,7 +885,7 @@ mod from_z3 {
 
     #[test]
     fn str_prefix_of() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let a = RcAst::mk_string("a");
             let b = RcAst::mk_string("b");
@@ -901,7 +901,7 @@ mod from_z3 {
 
     #[test]
     fn str_suffix_of() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let a = RcAst::mk_string("a");
             let b = RcAst::mk_string("b");
@@ -917,7 +917,7 @@ mod from_z3 {
 
     #[test]
     fn str_eq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let a = RcAst::mk_string("a");
             let b = RcAst::mk_string("b");
@@ -933,7 +933,7 @@ mod from_z3 {
 
     #[test]
     fn str_neq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         Z3_CONTEXT.with(|z3_ctx| unsafe {
             let a = RcAst::mk_string("a");
             let b = RcAst::mk_string("b");
@@ -959,21 +959,21 @@ mod roundtrip {
 
     #[test]
     fn symbol() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let ast = ctx.bools("x").unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
     }
 
     #[test]
     fn true_value() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let ast = ctx.true_().unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
     }
 
     #[test]
     fn false_value() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let ast = ctx.false_().unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
     }
@@ -982,7 +982,7 @@ mod roundtrip {
 
     #[test]
     fn not() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bools("x").unwrap();
         let ast = ctx.not(x).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
@@ -990,7 +990,7 @@ mod roundtrip {
 
     #[test]
     fn and_2args() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bools("x").unwrap();
         let y = ctx.bools("y").unwrap();
         let ast = ctx.and2(x, y).unwrap();
@@ -999,7 +999,7 @@ mod roundtrip {
 
     #[test]
     fn and_3args() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bools("x").unwrap();
         let y = ctx.bools("y").unwrap();
         let z = ctx.bools("z").unwrap();
@@ -1010,7 +1010,7 @@ mod roundtrip {
 
     #[test]
     fn or_2args() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bools("x").unwrap();
         let y = ctx.bools("y").unwrap();
         let ast = ctx.or2(x, y).unwrap();
@@ -1019,7 +1019,7 @@ mod roundtrip {
 
     #[test]
     fn or_3args() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bools("x").unwrap();
         let y = ctx.bools("y").unwrap();
         let z = ctx.bools("z").unwrap();
@@ -1030,7 +1030,7 @@ mod roundtrip {
 
     #[test]
     fn xor() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bools("x").unwrap();
         let y = ctx.bools("y").unwrap();
         let ast = ctx.xor2(x, y).unwrap();
@@ -1039,7 +1039,7 @@ mod roundtrip {
 
     #[test]
     fn bool_eq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bools("x").unwrap();
         let y = ctx.bools("y").unwrap();
         let ast = ctx.eq_(x, y).unwrap();
@@ -1048,7 +1048,7 @@ mod roundtrip {
 
     #[test]
     fn bool_neq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bools("x").unwrap();
         let y = ctx.bools("y").unwrap();
         let ast = ctx.neq(x, y).unwrap();
@@ -1057,7 +1057,7 @@ mod roundtrip {
 
     #[test]
     fn ite() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let c = ctx.bools("c").unwrap();
         let t = ctx.bools("t").unwrap();
         let e = ctx.bools("e").unwrap();
@@ -1069,7 +1069,7 @@ mod roundtrip {
 
     #[test]
     fn bv_eq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.bvs("a", 32).unwrap();
         let b = ctx.bvs("b", 32).unwrap();
         let ast = ctx.eq_(a, b).unwrap();
@@ -1078,7 +1078,7 @@ mod roundtrip {
 
     #[test]
     fn bv_neq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.bvs("a", 32).unwrap();
         let b = ctx.bvs("b", 32).unwrap();
         let ast = ctx.neq(a, b).unwrap();
@@ -1087,7 +1087,7 @@ mod roundtrip {
 
     #[test]
     fn ult() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.bvs("a", 32).unwrap();
         let b = ctx.bvs("b", 32).unwrap();
         let ast = ctx.ult(a, b).unwrap();
@@ -1096,7 +1096,7 @@ mod roundtrip {
 
     #[test]
     fn ule() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.bvs("a", 32).unwrap();
         let b = ctx.bvs("b", 32).unwrap();
         let ast = ctx.ule(a, b).unwrap();
@@ -1105,7 +1105,7 @@ mod roundtrip {
 
     #[test]
     fn ugt() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.bvs("a", 32).unwrap();
         let b = ctx.bvs("b", 32).unwrap();
         let ast = ctx.ugt(a, b).unwrap();
@@ -1114,7 +1114,7 @@ mod roundtrip {
 
     #[test]
     fn uge() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.bvs("a", 32).unwrap();
         let b = ctx.bvs("b", 32).unwrap();
         let ast = ctx.uge(a, b).unwrap();
@@ -1123,7 +1123,7 @@ mod roundtrip {
 
     #[test]
     fn slt() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.bvs("a", 32).unwrap();
         let b = ctx.bvs("b", 32).unwrap();
         let ast = ctx.slt(a, b).unwrap();
@@ -1132,7 +1132,7 @@ mod roundtrip {
 
     #[test]
     fn sle() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.bvs("a", 32).unwrap();
         let b = ctx.bvs("b", 32).unwrap();
         let ast = ctx.sle(a, b).unwrap();
@@ -1141,7 +1141,7 @@ mod roundtrip {
 
     #[test]
     fn sgt() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.bvs("a", 32).unwrap();
         let b = ctx.bvs("b", 32).unwrap();
         let ast = ctx.sgt(a, b).unwrap();
@@ -1150,7 +1150,7 @@ mod roundtrip {
 
     #[test]
     fn sge() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.bvs("a", 32).unwrap();
         let b = ctx.bvs("b", 32).unwrap();
         let ast = ctx.sge(a, b).unwrap();
@@ -1161,7 +1161,7 @@ mod roundtrip {
 
     #[test]
     fn fp_eq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let ast = ctx.fp_eq(a, b).unwrap();
@@ -1170,7 +1170,7 @@ mod roundtrip {
 
     #[test]
     fn fp_neq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let ast = ctx.fp_neq(a, b).unwrap();
@@ -1179,7 +1179,7 @@ mod roundtrip {
 
     #[test]
     fn fp_lt() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let ast = ctx.fp_lt(a, b).unwrap();
@@ -1188,7 +1188,7 @@ mod roundtrip {
 
     #[test]
     fn fp_leq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let ast = ctx.fp_leq(a, b).unwrap();
@@ -1197,7 +1197,7 @@ mod roundtrip {
 
     #[test]
     fn fp_gt() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let ast = ctx.fp_gt(a, b).unwrap();
@@ -1206,7 +1206,7 @@ mod roundtrip {
 
     #[test]
     fn fp_geq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let b = ctx.fps("b", FSort::f32()).unwrap();
         let ast = ctx.fp_geq(a, b).unwrap();
@@ -1215,7 +1215,7 @@ mod roundtrip {
 
     #[test]
     fn fp_is_nan() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let ast = ctx.fp_is_nan(a).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
@@ -1223,7 +1223,7 @@ mod roundtrip {
 
     #[test]
     fn fp_is_inf() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.fps("a", FSort::f32()).unwrap();
         let ast = ctx.fp_is_inf(a).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
@@ -1233,7 +1233,7 @@ mod roundtrip {
 
     #[test]
     fn str_contains() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.strings("a").unwrap();
         let b = ctx.strings("b").unwrap();
         let ast = ctx.str_contains(a, b).unwrap();
@@ -1242,7 +1242,7 @@ mod roundtrip {
 
     #[test]
     fn str_prefix_of() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.strings("a").unwrap();
         let b = ctx.strings("b").unwrap();
         let ast = ctx.str_prefix_of(a, b).unwrap();
@@ -1251,7 +1251,7 @@ mod roundtrip {
 
     #[test]
     fn str_suffix_of() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.strings("a").unwrap();
         let b = ctx.strings("b").unwrap();
         let ast = ctx.str_suffix_of(a, b).unwrap();
@@ -1260,7 +1260,7 @@ mod roundtrip {
 
     #[test]
     fn str_eq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.strings("a").unwrap();
         let b = ctx.strings("b").unwrap();
         let ast = ctx.str_eq(a, b).unwrap();
@@ -1269,7 +1269,7 @@ mod roundtrip {
 
     #[test]
     fn str_neq() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let a = ctx.strings("a").unwrap();
         let b = ctx.strings("b").unwrap();
         let ast = ctx.str_neq(a, b).unwrap();
@@ -1282,7 +1282,7 @@ mod roundtrip {
 
     #[test]
     fn str_is_digit_symbol() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s = ctx.strings("s").unwrap();
         let ast = ctx.str_is_digit(s).unwrap();
         assert!(ast.to_z3().is_ok());
@@ -1290,7 +1290,7 @@ mod roundtrip {
 
     #[test]
     fn str_is_digit_value() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s = ctx.stringv("123").unwrap();
         let ast = ctx.str_is_digit(s).unwrap();
         assert!(ast.to_z3().is_ok());

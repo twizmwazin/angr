@@ -4,24 +4,24 @@ use crate::prelude::*;
 /// context. It does not support adding constraints. It is a glorified
 /// simplifier.
 #[derive(Clone, Debug)]
-pub struct ConcreteSolver<'c> {
-    ctx: &'c Context<'c>,
+pub struct ConcreteSolver {
+    ctx: Arc<Context>,
 }
 
-impl<'c> HasContext<'c> for ConcreteSolver<'c> {
-    fn context(&self) -> &'c Context<'c> {
-        self.ctx
+impl HasContext for ConcreteSolver {
+    fn context(&self) -> Arc<Context> {
+        self.ctx.clone()
     }
 }
 
-impl<'c> ConcreteSolver<'c> {
-    pub fn new(ctx: &'c Context<'c>) -> Self {
+impl ConcreteSolver {
+    pub fn new(ctx: Arc<Context>) -> Self {
         Self { ctx }
     }
 }
 
-impl<'c> Solver<'c> for ConcreteSolver<'c> {
-    fn add(&mut self, _: &AstRef<'c>) -> Result<(), ClarirsError> {
+impl Solver for ConcreteSolver {
+    fn add(&mut self, _: &AstRef) -> Result<(), ClarirsError> {
         Ok(())
     }
 
@@ -29,7 +29,7 @@ impl<'c> Solver<'c> for ConcreteSolver<'c> {
         Ok(())
     }
 
-    fn constraints(&self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+    fn constraints(&self) -> Result<Vec<AstRef>, ClarirsError> {
         Ok(Vec::new())
     }
 
@@ -42,39 +42,39 @@ impl<'c> Solver<'c> for ConcreteSolver<'c> {
         Ok(true)
     }
 
-    fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn is_true(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         Ok(expr.simplify()?.is_true())
     }
 
-    fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn is_false(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         Ok(expr.simplify()?.is_false())
     }
 
-    fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn has_true(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         Ok(expr.simplify()?.is_true())
     }
 
-    fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn has_false(&mut self, expr: &AstRef) -> Result<bool, ClarirsError> {
         Ok(expr.simplify()?.is_false())
     }
 
-    fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn min_unsigned(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         self.eval(expr)
     }
 
-    fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn max_unsigned(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         self.eval(expr)
     }
 
-    fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn min_signed(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         self.eval(expr)
     }
 
-    fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn max_signed(&mut self, expr: &AstRef) -> Result<AstRef, ClarirsError> {
         self.eval(expr)
     }
 
-    fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+    fn eval_n(&mut self, expr: &AstRef, n: u32) -> Result<Vec<AstRef>, ClarirsError> {
         if n == 0 {
             return Ok(Vec::new());
         }
@@ -94,8 +94,8 @@ mod tests {
 
     #[test]
     fn test_concrete_solver() -> Result<(), ClarirsError> {
-        let context = Context::new();
-        let mut solver = ConcreteSolver::new(&context);
+        let context = Arc::new(Context::new());
+        let mut solver = ConcreteSolver::new(context.clone());
 
         // Bool tests
         solver.eval(&context.true_()?)?;

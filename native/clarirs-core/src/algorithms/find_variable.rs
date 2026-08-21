@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-pub fn find_variable<'c>(ast: AstRef<'c>, name: &InternedString) -> Option<AstRef<'c>> {
+pub fn find_variable(ast: AstRef, name: &InternedString) -> Option<AstRef> {
     if !ast.variables().contains(name) {
         return None;
     }
@@ -17,7 +17,7 @@ mod tests {
 
     #[test]
     fn test_find_variable_not_present() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 32)?;
         let y_name = ctx.intern_string("y");
         let result = find_variable(x, &y_name);
@@ -27,7 +27,7 @@ mod tests {
 
     #[test]
     fn test_find_variable_at_root() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 32)?;
         let x_name = ctx.intern_string("x");
         let result = find_variable(x.clone(), &x_name);
@@ -38,7 +38,7 @@ mod tests {
 
     #[test]
     fn test_find_variable_in_child() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 32)?;
         let y = ctx.bvs("y", 32)?;
         let expr = ctx.add(&x, &y)?;
@@ -53,7 +53,7 @@ mod tests {
 
     #[test]
     fn test_find_variable_deeply_nested() -> Result<(), ClarirsError> {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let x = ctx.bvs("x", 32)?;
         let y = ctx.bvs("y", 32)?;
         let z = ctx.bvs("z", 32)?;

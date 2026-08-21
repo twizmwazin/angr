@@ -61,9 +61,9 @@ impl<K: Hash + Eq, V: Clone> Cache<K, V> for GenericCache<K, V> {
 /// this cache stores weak references to the AST nodes; the value is a
 /// `Weak<AstNode>`.
 #[derive(Debug, Default)]
-pub struct AstCache<'c>(RwLock<HashMap<u64, Weak<AstNode<'c>>>>);
+pub struct AstCache(RwLock<HashMap<u64, Weak<AstNode>>>);
 
-impl AstCache<'_> {
+impl AstCache {
     /// Remove `key` if its entry is expired (no strong refs left). Called from
     /// `AstNode::drop` so dead nodes don't leave entries (and their pinned
     /// `ArcInner` allocations) behind.
@@ -104,12 +104,12 @@ impl AstCache<'_> {
     }
 }
 
-impl<'c> Cache<u64, AstRef<'c>> for AstCache<'c> {
-    fn get(&self, key: &u64) -> Option<AstRef<'c>> {
+impl Cache<u64, AstRef> for AstCache {
+    fn get(&self, key: &u64) -> Option<AstRef> {
         self.0.read().unwrap().get(key).and_then(Weak::upgrade)
     }
 
-    fn insert(&self, key: u64, value: &AstRef<'c>) {
+    fn insert(&self, key: u64, value: &AstRef) {
         let mut inner = self.0.write().unwrap();
 
         // A different live value under this hash means two distinct ASTs collide.
@@ -129,8 +129,8 @@ impl<'c> Cache<u64, AstRef<'c>> for AstCache<'c> {
     fn get_or_insert<E>(
         &self,
         key: u64,
-        value_cv: impl FnOnce() -> Result<AstRef<'c>, E>,
-    ) -> Result<AstRef<'c>, E> {
+        value_cv: impl FnOnce() -> Result<AstRef, E>,
+    ) -> Result<AstRef, E> {
         let arc = value_cv()?;
         self.insert(key, &arc);
         Ok(arc)
@@ -144,7 +144,7 @@ mod tests {
     #[test]
     #[cfg(not(feature = "panic-on-hash-collision"))]
     fn test_ast_cache_basic() -> Result<(), ClarirsError> {
-        let ctx = crate::context::Context::new();
+        let ctx = Arc::new(crate::context::Context::new());
         let cache = AstCache::default();
 
         // Create a simple AST
@@ -165,7 +165,7 @@ mod tests {
     #[test]
     #[cfg(feature = "panic-on-hash-collision")]
     fn test_ast_cache_basic_collision_mode() -> Result<(), ClarirsError> {
-        let ctx = crate::context::Context::new();
+        let ctx = Arc::new(crate::context::Context::new());
         let cache = AstCache::default();
 
         // Create a simple AST
@@ -184,7 +184,7 @@ mod tests {
 
     #[test]
     fn test_ast_cache_different_hashes() -> Result<(), ClarirsError> {
-        let ctx = crate::context::Context::new();
+        let ctx = Arc::new(crate::context::Context::new());
         let cache = AstCache::default();
 
         let ast1 = ctx.bvv(BitVec::from((42, 64)))?;
@@ -201,7 +201,7 @@ mod tests {
     #[test]
     #[cfg(not(feature = "panic-on-hash-collision"))]
     fn test_ast_cache_weak_reference_cleanup() -> Result<(), ClarirsError> {
-        let ctx = crate::context::Context::new();
+        let ctx = Arc::new(crate::context::Context::new());
         let cache = AstCache::default();
         let hash = 999u64;
 
@@ -232,7 +232,7 @@ mod tests {
     #[cfg(feature = "panic-on-hash-collision")]
     #[should_panic(expected = "Hash collision detected")]
     fn test_hash_collision_detection_panics() {
-        let ctx = crate::context::Context::new();
+        let ctx = Arc::new(crate::context::Context::new());
         let cache = AstCache::default();
         let hash = 777u64;
 
@@ -252,7 +252,7 @@ mod tests {
     #[test]
     #[cfg(feature = "panic-on-hash-collision")]
     fn test_hash_collision_same_value_ok() -> Result<(), ClarirsError> {
-        let ctx = crate::context::Context::new();
+        let ctx = Arc::new(crate::context::Context::new());
         let cache = AstCache::default();
         let hash = 888u64;
 
@@ -271,7 +271,7 @@ mod tests {
     #[test]
     #[cfg(feature = "panic-on-hash-collision")]
     fn test_always_computes_in_collision_mode() {
-        let ctx = crate::context::Context::new();
+        let ctx = Arc::new(crate::context::Context::new());
         let cache = AstCache::default();
         let hash = 999u64;
 
@@ -299,7 +299,7 @@ mod tests {
 
     #[test]
     fn test_ast_cache_entry_removed_on_drop() -> Result<(), ClarirsError> {
-        let ctx = crate::context::Context::new();
+        let ctx = Arc::new(crate::context::Context::new());
         let baseline = ctx.ast_cache.len();
         {
             let _ast = ctx.bvv(BitVec::from((0xdead, 64)))?;
@@ -312,7 +312,7 @@ mod tests {
 
     #[test]
     fn test_ast_cache_hit_duplicate_drop_keeps_entry() -> Result<(), ClarirsError> {
-        let ctx = crate::context::Context::new();
+        let ctx = Arc::new(crate::context::Context::new());
         let a = ctx.bvv(BitVec::from((7, 64)))?;
         let n = ctx.ast_cache.len();
         // Cache hit: intern_ast constructs and drops a throwaway duplicate
@@ -328,7 +328,7 @@ mod tests {
         // Hammer the same small set of hashes from several threads so drops
         // race with re-interns; the liveness check in remove_if_expired must
         // never evict a just-re-created live entry or corrupt the map.
-        let ctx = crate::context::Context::new();
+        let ctx = Arc::new(crate::context::Context::new());
         std::thread::scope(|s| {
             for _ in 0..4 {
                 s.spawn(|| {

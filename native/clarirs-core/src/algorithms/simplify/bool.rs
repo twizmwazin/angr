@@ -3,9 +3,7 @@ use std::collections::{HashMap, HashSet};
 use super::SimplifyError;
 use crate::prelude::*;
 
-pub(crate) fn simplify_bool<'c>(
-    state: &mut super::SimplifyState<'c>,
-) -> Result<AstRef<'c>, SimplifyError<'c>> {
+pub(crate) fn simplify_bool(state: &mut super::SimplifyState) -> Result<AstRef, SimplifyError> {
     let ctx = state.expr.context();
     let bool_ast = state.expr.clone();
 

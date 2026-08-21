@@ -29,7 +29,7 @@ fn child_si(children: &[ReduceResult], index: usize) -> Result<StridedInterval, 
 }
 
 pub(crate) fn reduce_bool(
-    ast: &AstRef<'_>,
+    ast: &AstRef,
     children: &[ReduceResult],
 ) -> Result<ComparisonResult, ClarirsError> {
     Ok(match ast.op() {

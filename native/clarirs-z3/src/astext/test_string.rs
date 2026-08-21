@@ -4,7 +4,7 @@ use z3_sys::*;
 use super::AstExtZ3;
 use crate::{Z3_CONTEXT, rc::RcAst};
 
-fn round_trip<'c>(ctx: &'c Context<'c>, ast: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+fn round_trip(ctx: &Arc<Context>, ast: &AstRef) -> Result<AstRef, ClarirsError> {
     AstRef::from_z3(ctx, ast.to_z3()?)
 }
 
@@ -28,7 +28,7 @@ mod to_z3 {
 
     #[test]
     fn symbol() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s = ctx.strings("x").unwrap();
         let z3_ast = s.to_z3().unwrap();
 
@@ -38,7 +38,7 @@ mod to_z3 {
 
     #[test]
     fn value_simple() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s = ctx.stringv("hello").unwrap();
         let z3_ast = s.to_z3().unwrap();
 
@@ -50,7 +50,7 @@ mod to_z3 {
 
     #[test]
     fn value_empty() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s = ctx.stringv("").unwrap();
         let z3_ast = s.to_z3().unwrap();
 
@@ -62,7 +62,7 @@ mod to_z3 {
 
     #[test]
     fn value_with_spaces() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s = ctx.stringv("hello world").unwrap();
         let z3_ast = s.to_z3().unwrap();
         assert_z3_string_value(&z3_ast, "hello world");
@@ -72,7 +72,7 @@ mod to_z3 {
 
     #[test]
     fn concat() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s1 = ctx.stringv("hello").unwrap();
         let s2 = ctx.stringv(" world").unwrap();
         let cat = ctx.str_concat(s1, s2).unwrap();
@@ -86,7 +86,7 @@ mod to_z3 {
 
     #[test]
     fn concat_symbols() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s1 = ctx.strings("a").unwrap();
         let s2 = ctx.strings("b").unwrap();
         let cat = ctx.str_concat(s1, s2).unwrap();
@@ -102,7 +102,7 @@ mod to_z3 {
 
     #[test]
     fn substr() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s = ctx.stringv("hello world").unwrap();
         let start = ctx.bvv(BitVec::from((6, 32))).unwrap();
         let length = ctx.bvv(BitVec::from((5, 32))).unwrap();
@@ -118,7 +118,7 @@ mod to_z3 {
 
     #[test]
     fn replace() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s = ctx.stringv("hello world").unwrap();
         let pat = ctx.stringv("world").unwrap();
         let rep = ctx.stringv("there").unwrap();
@@ -136,7 +136,7 @@ mod to_z3 {
 
     #[test]
     fn ite() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let c = ctx.bools("c").unwrap();
         let then = ctx.stringv("then").unwrap();
         let else_ = ctx.stringv("else").unwrap();
@@ -152,7 +152,7 @@ mod to_z3 {
 
     #[test]
     fn ite_symbols() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let c = ctx.bools("c").unwrap();
         let a = ctx.strings("a").unwrap();
         let b = ctx.strings("b").unwrap();
@@ -176,7 +176,7 @@ mod from_z3 {
 
     #[test]
     fn symbol() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let z3_ast = RcAst::mk_string("x");
         let result = AstRef::from_z3(&ctx, z3_ast).unwrap();
         let expected = ctx.strings("x").unwrap();
@@ -185,7 +185,7 @@ mod from_z3 {
 
     #[test]
     fn value_simple() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let z3_ast = RcAst::mk_string_val("hello");
         let result = AstRef::from_z3(&ctx, z3_ast).unwrap();
         let expected = ctx.stringv("hello").unwrap();
@@ -194,7 +194,7 @@ mod from_z3 {
 
     #[test]
     fn value_empty() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let z3_ast = RcAst::mk_string_val("");
         let result = AstRef::from_z3(&ctx, z3_ast).unwrap();
         let expected = ctx.stringv("").unwrap();
@@ -205,7 +205,7 @@ mod from_z3 {
 
     #[test]
     fn concat() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s1 = RcAst::mk_string_val("hello");
         let s2 = RcAst::mk_string_val(" world");
         let z3_cat = Z3_CONTEXT.with(|&z3_ctx| unsafe {
@@ -224,7 +224,7 @@ mod from_z3 {
 
     #[test]
     fn concat_symbols() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s1 = RcAst::mk_string("a");
         let s2 = RcAst::mk_string("b");
         let z3_cat = Z3_CONTEXT.with(|&z3_ctx| unsafe {
@@ -242,7 +242,7 @@ mod from_z3 {
 
     #[test]
     fn substr() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s = RcAst::mk_string_val("hello world");
         let z3_sub = Z3_CONTEXT.with(|&z3_ctx| unsafe {
             let int_sort = Z3_mk_int_sort(z3_ctx).unwrap();
@@ -267,7 +267,7 @@ mod from_z3 {
 
     #[test]
     fn replace() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s = RcAst::mk_string_val("hello world");
         let pat = RcAst::mk_string_val("world");
         let rep = RcAst::mk_string_val("there");
@@ -289,7 +289,7 @@ mod from_z3 {
 
     #[test]
     fn ite() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let c = RcAst::mk_bool("c");
         let then = RcAst::mk_string_val("then");
         let else_ = RcAst::mk_string_val("else");
@@ -309,7 +309,7 @@ mod from_z3 {
 
     #[test]
     fn ite_symbols() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let c = RcAst::mk_bool("c");
         let a = RcAst::mk_string("a");
         let b = RcAst::mk_string("b");
@@ -337,56 +337,56 @@ mod roundtrip {
 
     #[test]
     fn symbol() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let ast = ctx.strings("x").unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
     }
 
     #[test]
     fn symbol_long_name() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let ast = ctx.strings("my_string_variable").unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
     }
 
     #[test]
     fn value_simple() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let ast = ctx.stringv("hello").unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
     }
 
     #[test]
     fn value_empty() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let ast = ctx.stringv("").unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
     }
 
     #[test]
     fn value_with_spaces() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let ast = ctx.stringv("hello world").unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
     }
 
     #[test]
     fn value_single_char() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let ast = ctx.stringv("a").unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
     }
 
     #[test]
     fn value_digits() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let ast = ctx.stringv("12345").unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
     }
 
     #[test]
     fn value_special_chars() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let ast = ctx.stringv("hello\tworld\n").unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
     }
@@ -395,7 +395,7 @@ mod roundtrip {
 
     #[test]
     fn concat_values() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s1 = ctx.stringv("hello").unwrap();
         let s2 = ctx.stringv(" world").unwrap();
         let ast = ctx.str_concat(s1, s2).unwrap();
@@ -404,7 +404,7 @@ mod roundtrip {
 
     #[test]
     fn concat_symbols() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s1 = ctx.strings("a").unwrap();
         let s2 = ctx.strings("b").unwrap();
         let ast = ctx.str_concat(s1, s2).unwrap();
@@ -413,7 +413,7 @@ mod roundtrip {
 
     #[test]
     fn concat_mixed() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s1 = ctx.strings("x").unwrap();
         let s2 = ctx.stringv("_suffix").unwrap();
         let ast = ctx.str_concat(s1, s2).unwrap();
@@ -422,7 +422,7 @@ mod roundtrip {
 
     #[test]
     fn concat_empty() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s1 = ctx.stringv("hello").unwrap();
         let s2 = ctx.stringv("").unwrap();
         let ast = ctx.str_concat(s1, s2).unwrap();
@@ -433,7 +433,7 @@ mod roundtrip {
 
     #[test]
     fn substr_value() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s = ctx.stringv("hello world").unwrap();
         let start = ctx.bvv(BitVec::from((6, 64))).unwrap();
         let length = ctx.bvv(BitVec::from((5, 64))).unwrap();
@@ -443,7 +443,7 @@ mod roundtrip {
 
     #[test]
     fn substr_symbol() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s = ctx.strings("s").unwrap();
         let start = ctx.bvv(BitVec::from((0, 64))).unwrap();
         let length = ctx.bvv(BitVec::from((3, 64))).unwrap();
@@ -453,7 +453,7 @@ mod roundtrip {
 
     #[test]
     fn substr_from_start() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s = ctx.stringv("abcdef").unwrap();
         let start = ctx.bvv(BitVec::from((0, 64))).unwrap();
         let length = ctx.bvv(BitVec::from((3, 64))).unwrap();
@@ -465,7 +465,7 @@ mod roundtrip {
 
     #[test]
     fn replace_values() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s = ctx.stringv("hello world").unwrap();
         let pat = ctx.stringv("world").unwrap();
         let rep = ctx.stringv("there").unwrap();
@@ -475,7 +475,7 @@ mod roundtrip {
 
     #[test]
     fn replace_symbols() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s = ctx.strings("s").unwrap();
         let pat = ctx.strings("p").unwrap();
         let rep = ctx.strings("r").unwrap();
@@ -485,7 +485,7 @@ mod roundtrip {
 
     #[test]
     fn replace_with_empty() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let s = ctx.stringv("hello world").unwrap();
         let pat = ctx.stringv("world").unwrap();
         let rep = ctx.stringv("").unwrap();
@@ -497,7 +497,7 @@ mod roundtrip {
 
     #[test]
     fn ite_values() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let c = ctx.bools("c").unwrap();
         let then = ctx.stringv("then").unwrap();
         let else_ = ctx.stringv("else").unwrap();
@@ -507,7 +507,7 @@ mod roundtrip {
 
     #[test]
     fn ite_symbols() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let c = ctx.bools("c").unwrap();
         let a = ctx.strings("a").unwrap();
         let b = ctx.strings("b").unwrap();
@@ -517,7 +517,7 @@ mod roundtrip {
 
     #[test]
     fn ite_mixed() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let c = ctx.bools("c").unwrap();
         let a = ctx.strings("x").unwrap();
         let b = ctx.stringv("default").unwrap();
@@ -529,7 +529,7 @@ mod roundtrip {
 
     #[test]
     fn bv_to_str_symbol() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let bv = ctx.bvs("x", 64).unwrap();
         let ast = ctx.bv_to_str(bv).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
@@ -537,7 +537,7 @@ mod roundtrip {
 
     #[test]
     fn bv_to_str_value() {
-        let ctx = Context::new();
+        let ctx = Arc::new(Context::new());
         let bv = ctx.bvv(BitVec::from((42, 64))).unwrap();
         let ast = ctx.bv_to_str(bv).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
