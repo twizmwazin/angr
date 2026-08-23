@@ -386,9 +386,19 @@ amd64g_dirtyhelper_FINIT = x86g_dirtyhelper_FINIT
 
 
 def x86g_dirtyhelper_write_cr0(state, value):
-    # make a deep copy of the arch before modifying it so we don't accidentally modify it for all other states
-    state.arch = state.arch.copy()
-    state.arch.vex_archinfo["x86_cr0"] = state.solver.eval_one(value)
+    cr0 = state.solver.eval_one(value)
+    if state.arch.vex_archinfo["x86_cr0"] == cr0:
+        return None, []
+
+    # CR0 (specifically the PE bit) changes how pyvex decodes subsequent blocks, and pyvex reads it from
+    # arch.vex_archinfo, so the new value must be carried by the arch of this state. Rebind this state to a
+    # private copy of the arch and only ever modify that private copy, never an Arch object shared with the
+    # project or with other states.
+    # TODO: replace this with an immutable-friendly API once archinfo can derive an Arch with different
+    # vex_archinfo contents (or pyvex accepts a vex_archinfo override at lift time)
+    new_arch = state.arch.copy()
+    new_arch.vex_archinfo["x86_cr0"] = cr0
+    state.arch = new_arch
     return None, []
 
 
