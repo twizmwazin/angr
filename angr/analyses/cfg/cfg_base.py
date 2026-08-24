@@ -243,6 +243,8 @@ class CFGBase(Analysis):
 
         if model is not None:
             self._model = model
+            if model.cfg_manager is None:
+                model.cfg_manager = self.kb.cfgs
         else:
             self._model: CFGModel = self.kb.cfgs.new_model(self.tag, self.addr_type)
 

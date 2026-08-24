@@ -132,6 +132,8 @@ class Decompiler(Analysis):
         if cfg is None:
             cfg = self.func._function_manager._kb.cfgs.get_most_accurate()
         self._cfg = cfg.model if isinstance(cfg, CFGFast) else cfg
+        if self._cfg is not None and self._cfg.cfg_manager is None:
+            self._cfg.cfg_manager = self.kb.cfgs
         self._options = self._parse_options(options) if options else []
 
         if preset is None and optimization_passes:

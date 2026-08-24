@@ -10,6 +10,7 @@ import unittest
 
 import angr
 from angr.analyses import CFGFast
+from angr.knowledge_plugins.cfg import CFGModel
 from tests.common import bin_location
 
 log = logging.getLogger(__name__)
@@ -108,6 +109,21 @@ class TestCfgModel(unittest.TestCase):
         # section as the only bound in hand for it
         cfg.model.tidy_data_references(memory_data_addrs=[unmapped_addr])
         assert cfg.model.memory_data[unmapped_addr].max_size == 0
+
+    def test_cfgfast_accepts_a_model_created_without_a_cfg_manager(self):
+        """Test that CFGFast attaches a caller-created CFGModel to the knowledge base it writes to."""
+        proj = angr.Project(FAUXWARE_PATH, auto_load_libs=False)
+        model = CFGModel("CFGFast")
+        assert model.cfg_manager is None
+
+        cfg = proj.analyses[CFGFast].prep(fail_fast=True)(model=model)
+
+        assert cfg.model is model
+        assert model.project is proj
+
+        reference = proj.analyses[CFGFast].prep(fail_fast=True)()
+        assert {node.addr for node in model.graph.nodes()} == {node.addr for node in reference.model.graph.nodes()}
+        assert set(model.memory_data) == set(reference.model.memory_data)
 
 
 if __name__ == "__main__":

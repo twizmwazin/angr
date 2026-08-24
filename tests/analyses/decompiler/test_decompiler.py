@@ -6,6 +6,7 @@ __package__ = __package__ or "tests.analyses.decompiler"  # pylint:disable=redef
 
 import logging
 import os
+import pickle
 import re
 import time
 import unittest
@@ -6143,6 +6144,21 @@ class TestDecompiler(unittest.TestCase):
         assert re.search(r"do\s*\{\s*\}\s*while", text) is None
         # the pread call addresses the recovered buffer by name (earlier args may contain parens)
         assert re.search(rf"pread\(.*?\b{name}\b", text) is not None
+
+    def test_decompiling_with_a_cfg_model_without_a_cfg_manager(self):
+        bin_path = os.path.join(test_location, "x86_64", "fauxware")
+        p = angr.Project(bin_path, auto_load_libs=False)
+        cfg = p.analyses[CFGFast].prep()(data_references=True, normalize=True)
+
+        # pickling a model drops its CFGManager, leaving it with no way of reaching the project
+        detached = pickle.loads(pickle.dumps(cfg.model))
+        assert detached.cfg_manager is None
+
+        dec = p.analyses[Decompiler].prep(fail_fast=True)(p.kb.functions["main"], cfg=detached, use_cache=False)
+
+        assert detached.project is p
+        assert dec.codegen is not None
+        assert dec.codegen.text is not None
 
 
 if __name__ == "__main__":

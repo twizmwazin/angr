@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from angr.knowledge_plugins.xrefs import XRef, XRefManager
     from angr.rustylib import SegmentList
 
+    from .cfg_manager import CFGManager
     from .types import CFG_ADDR_TYPES
 
 l = logging.getLogger(name=__name__)
@@ -145,6 +146,14 @@ class CFGModel(Serializable):
         self._addr_type = value
         if self.graph is not None:
             self.graph.addr_type = value
+
+    @property
+    def cfg_manager(self) -> CFGManager | None:
+        return self._cfg_manager
+
+    @cfg_manager.setter
+    def cfg_manager(self, value: CFGManager | None) -> None:
+        self._cfg_manager = value
 
     @property
     def project(self):
