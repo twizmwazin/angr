@@ -17,6 +17,8 @@ from angr.storage.file import SimFile
 from angr.storage.memory_mixins import (
     AddressConcretizationMixin,
     DataNormalizationMixin,
+    DefaultListPagesMemory,
+    DefaultMemory,
     ListPagesMixin,
     MultiValuedMemory,
     MVListPagesMixin,
@@ -753,6 +755,43 @@ class TestMemory(unittest.TestCase):
 
             state.memory.store(0xFFFFFFFF, symbol)
             assert state.memory.load(0, 1) is symbol[64 - 8 - 1 : 64 - 16]
+
+    def test_address_overflow_issue_1012(self):
+        # Regression test for https://github.com/angr/angr/issues/1012
+        # A symbolic pointer pinned near the top of the 32-bit address space is used as the base of a multi-byte
+        # store that overflows (wraps) into low addresses. Reading the wrapped bytes back must stay consistent
+        # with the pointer's concretization; the old memory model dropped the constraints on the wrapped
+        # (low-address) portion and returned inconsistent values.
+        data = b"WXYZ"  # W=0x57 X=0x58 Y=0x59 Z=0x5a
+        for memcls in [DefaultMemory, DefaultListPagesMemory]:
+            # SYMBOLIC_WRITE_ADDRESSES keeps the base pointer multivalued, so the overflowing store genuinely
+            # forks across the address-space boundary instead of being concretized to a single address.
+            state = SimState(
+                arch="x86",
+                mode="symbolic",
+                plugins={"memory": memcls(memory_id="mem")},
+                add_options={o.SYMBOLIC_WRITE_ADDRESSES, o.ZERO_FILL_UNCONSTRAINED_MEMORY},
+            )
+            p = claripy.BVS("p", 32)
+            state.solver.add(p >= 0xFFFFFFFE)  # p in {0xFFFFFFFE, 0xFFFFFFFF}
+            state.memory.store(p, data, endness="Iend_BE")
+
+            for pv in (0xFFFFFFFE, 0xFFFFFFFF):
+                # Both concretizations must remain satisfiable after the overflowing store.
+                assert state.solver.satisfiable(extra_constraints=[p == pv])
+                # Oracle: the identical store performed through a concrete pointer.
+                oracle = SimState(
+                    arch="x86",
+                    mode="symbolic",
+                    plugins={"memory": memcls(memory_id="mem")},
+                    add_options={o.ZERO_FILL_UNCONSTRAINED_MEMORY},
+                )
+                oracle.memory.store(pv, data, endness="Iend_BE")
+                for i in range(len(data)):
+                    a = (pv + i) & 0xFFFFFFFF
+                    want = oracle.solver.eval(oracle.memory.load(a, 1))
+                    got = state.solver.eval(state.memory.load(a, 1), extra_constraints=[p == pv])
+                    assert got == want, (memcls.__name__, hex(pv), hex(a), hex(got), hex(want))
 
     def test_allocate_stack_pages_stops_at_address_zero(self):
         state = SimState(arch=ArchAMD64(), stack_end=0x1000)
