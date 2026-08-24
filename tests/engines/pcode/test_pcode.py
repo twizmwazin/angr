@@ -5,6 +5,7 @@ import os
 from unittest import TestCase, main
 
 import archinfo
+import claripy
 
 import angr
 
@@ -144,6 +145,124 @@ class TestPcodeEngine(TestCase):
                 continue
             func_out = func.graph.out_degree(func_node)
             assert func_out > 0
+
+
+class TestPcodeArmThumb(TestCase):
+    """
+    Test automatic ARM Thumb mode support in the P-Code engine. Following the convention shared with the VEX lifter,
+    Thumb mode is indicated by the low bit of a code address.
+    """
+
+    @staticmethod
+    def _load(code: bytes, addr: int = 0x1000):
+        arch = archinfo.ArchPcode("ARM:LE:32:v7")
+        return angr.load_shellcode(code, arch=arch, load_address=addr, engine=angr.engines.UberEnginePcode)
+
+    def test_thumb_lifting_at_odd_address(self):
+        # movs r0, #42 ; bx lr (Thumb)
+        p = self._load(bytes.fromhex("2a207047"))
+
+        block = p.factory.block(0x1001)
+        assert block.thumb
+        assert block.size == 4
+        assert list(block.instruction_addrs) == [0x1001, 0x1003]
+        assert [insn.mnemonic for insn in block.disassembly.insns] == ["movs", "bx"]
+        assert block.vex.jumpkind == "Ijk_Ret"
+
+        # The same bytes at an even address must still decode as ARM
+        arm_block = p.factory.block(0x1000)
+        assert not arm_block.thumb
+        assert [insn.mnemonic for insn in arm_block.disassembly.insns] != ["movs", "bx"]
+
+    def test_thumb_lifting_with_thumb_flag(self):
+        # movs r0, #42 ; bx lr (Thumb)
+        p = self._load(bytes.fromhex("2a207047"))
+
+        block = p.factory.block(0x1000, thumb=True)
+        assert block.thumb
+        assert block.addr == 0x1001
+        assert [insn.mnemonic for insn in block.disassembly.insns] == ["movs", "bx"]
+
+    def test_thumb_branch_targets_keep_thumb_bit(self):
+        # b 0x1008 (Thumb)
+        p = self._load(bytes.fromhex("02e0"))
+        irsb = p.factory.block(0x1001).vex
+        assert irsb.jumpkind == "Ijk_Boring"
+        assert irsb.next.con.value == 0x1009
+
+        # beq 0x1008 ; nop (Thumb)
+        p = self._load(bytes.fromhex("02d000bf"))
+        irsb = p.factory.block(0x1001).vex
+        assert [(src, stmt.dst) for src, _, stmt in irsb.exit_statements] == [(0x1001, 0x1009)]
+
+        # bl 0x1008 (Thumb)
+        p = self._load(bytes.fromhex("00f002f8"))
+        irsb = p.factory.block(0x1001).vex
+        assert irsb.jumpkind == "Ijk_Call"
+        assert irsb.next.con.value == 0x1009
+
+    def test_interworking_branch_targets(self):
+        # blx 0x1010 (Thumb -> ARM: target must stay even)
+        p = self._load(bytes.fromhex("00f006e8"))
+        irsb = p.factory.block(0x1001).vex
+        assert irsb.jumpkind == "Ijk_Call"
+        assert irsb.next.con.value == 0x1010
+
+        # blx 0x1010 (ARM -> Thumb: target must become odd)
+        p = self._load(bytes.fromhex("020000fa"))
+        irsb = p.factory.block(0x1000).vex
+        assert irsb.jumpkind == "Ijk_Call"
+        assert irsb.next.con.value == 0x1011
+
+        # bl 0x1010 (ARM -> ARM: target must stay even)
+        p = self._load(bytes.fromhex("020000eb"))
+        irsb = p.factory.block(0x1000).vex
+        assert irsb.jumpkind == "Ijk_Call"
+        assert irsb.next.con.value == 0x1010
+
+    def test_thumb_execution(self):
+        # 0x1000: bl 0x1008    (Thumb)
+        # 0x1004: nop
+        # 0x1006: nop
+        # 0x1008: movs r0, #42
+        # 0x100a: bx lr
+        p = self._load(bytes.fromhex("00f002f800bf00bf2a207047"))
+
+        state = p.factory.blank_state(addr=0x1001)
+        simgr = p.factory.simulation_manager(state)
+        simgr.step()
+        assert len(simgr.active) == 1
+        assert simgr.active[0].addr == 0x1009  # bl target, still Thumb
+        assert simgr.active[0].solver.eval(simgr.active[0].regs.lr) == 0x1005  # return address with Thumb bit
+
+        simgr.step()
+        assert len(simgr.active) == 1
+        assert simgr.active[0].addr == 0x1005  # bx lr returned to Thumb code
+        assert simgr.active[0].solver.eval(simgr.active[0].regs.r0) == 42
+
+    def test_interworking_execution(self):
+        # bx lr (ARM) with lr holding a Thumb address: successor must keep the Thumb bit
+        p = self._load(bytes.fromhex("1eff2fe1"))
+        state = p.factory.blank_state(addr=0x1000)
+        state.regs.lr = claripy.BVV(0x3001, 32)
+        simgr = p.factory.simulation_manager(state)
+        simgr.step()
+        assert len(simgr.active) == 1
+        assert simgr.active[0].addr == 0x3001
+
+        # blx 0x1010 (Thumb -> ARM): successor must be even
+        p = self._load(bytes.fromhex("00f006e8"))
+        simgr = p.factory.simulation_manager(p.factory.blank_state(addr=0x1001))
+        simgr.step()
+        assert len(simgr.active) == 1
+        assert simgr.active[0].addr == 0x1010
+
+        # blx 0x1010 (ARM -> Thumb): successor must be odd
+        p = self._load(bytes.fromhex("020000fa"))
+        simgr = p.factory.simulation_manager(p.factory.blank_state(addr=0x1000))
+        simgr.step()
+        assert len(simgr.active) == 1
+        assert simgr.active[0].addr == 0x1011
 
 
 if __name__ == "__main__":

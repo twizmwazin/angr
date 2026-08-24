@@ -234,7 +234,7 @@ class Block(Serializable):
         if project is not None and backup_state is None and project.kb.patches.values():
             backup_state = project.kb.patches.patched_entry_state
 
-        if isinstance(self.arch, ArchARM):
+        if isinstance(self.arch, ArchARM) or (pcode is not None and pcode.lifter.is_thumb_capable_arch(self.arch)):
             if addr & 1 == 1:
                 thumb = True
             elif thumb:
@@ -473,7 +473,9 @@ class Block(Serializable):
         if self.size is not None:
             block_bytes = block_bytes[: self.size]  # type: ignore
         lifter = pcode.lifter.PcodeLifter.get_lifter(self.arch)  # type: ignore
-        for cs_insn in lifter.context.disassemble(block_bytes, self.addr).instructions:
+        context = lifter.thumb_context if self.thumb else lifter.context
+        disasm_addr = self.addr & ~1 if self.thumb else self.addr
+        for cs_insn in context.disassemble(block_bytes, disasm_addr).instructions:
             insns.append(PCodeInsn(cs_insn))
         block = PCodeBlock(self.addr, insns, self.thumb, self.arch)
 

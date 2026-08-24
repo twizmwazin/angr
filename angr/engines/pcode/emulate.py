@@ -12,7 +12,7 @@ from angr.state_plugins.inspect import BP_AFTER, BP_BEFORE
 from angr.utils.constants import DEFAULT_STATEMENT
 
 from .behavior import OpBehavior
-from .lifter import IRSB
+from .lifter import IRSB, is_thumb_capable_arch
 
 l = logging.getLogger(__name__)
 
@@ -30,6 +30,9 @@ class PcodeEmulatorMixin(SimEngine):
         super().__init__(*args, **kwargs)
         self._current_op = None
         self._current_behavior = None
+        self._thumb_bit = 0
+        self._isa_mode_reg = None
+        self._isa_mode = None
 
     def handle_pcode_block(self, irsb: IRSB) -> None:
         """
@@ -44,6 +47,11 @@ class PcodeEmulatorMixin(SimEngine):
         # do here. For now, handle it this way.
         self.state.scratch.exit_handled = False
         self._pcode_tmps = {}
+
+        arm = is_thumb_capable_arch(self.irsb.arch)
+        self._thumb_bit = self.irsb.addr & 1 if arm else 0
+        self._isa_mode_reg = self.irsb.arch.registers.get("tb") if arm else None
+        self._isa_mode = None
 
         fallthru_addr = self.irsb.addr
         self.state.scratch.ins_addr = self.irsb.addr
@@ -62,18 +70,19 @@ class PcodeEmulatorMixin(SimEngine):
                     # Trigger BP for previous instruction once we reach next IMARK
                     self.state._inspect("instruction", BP_AFTER)
 
-                decode_addr = op.inputs[0].offset
+                decode_addr = op.inputs[0].offset | self._thumb_bit
                 last_imark_op_idx = op_idx
 
                 # Note: instruction BP will not be triggered on p-code-relative jumps
                 l.debug("Executing machine instruction @ %#x", decode_addr)
                 for vn in op.inputs:
-                    self.state._inspect("instruction", BP_BEFORE, instruction=vn.offset)
+                    self.state._inspect("instruction", BP_BEFORE, instruction=vn.offset | self._thumb_bit)
 
                 # FIXME: Hacking this on here but ideally should use "scratch".
                 self._pcode_tmps = {}  # FIXME: Consider alignment requirements
+                self._isa_mode = None
                 self.state.scratch.ins_addr = decode_addr
-                fallthru_addr = op.inputs[-1].offset + op.inputs[-1].size
+                fallthru_addr = (op.inputs[-1].offset + op.inputs[-1].size) | self._thumb_bit
                 continue
 
             self._current_op = op
@@ -176,6 +185,8 @@ class PcodeEmulatorMixin(SimEngine):
         space = varnode.space
         l.debug("Storing %s %x %s %d", space.name, varnode.offset, value, varnode.size)
         if space.name == "register":
+            if self._isa_mode_reg is not None and (varnode.offset, varnode.size) == self._isa_mode_reg:
+                self._isa_mode = value
             self.state.registers.store(
                 self._map_register_name(varnode), value, size=varnode.size, endness=self.project.arch.register_endness
             )
@@ -306,6 +317,26 @@ class PcodeEmulatorMixin(SimEngine):
         else:
             raise AngrError("Store to unhandled address space")
 
+    def _direct_branch_target_mode_bit(self) -> int:
+        """
+        ISA mode bit for a direct branch target: selected by a preceding TB write (ARM interworking branches like
+        blx), or the current block's mode.
+        """
+        if self._isa_mode is not None and self._isa_mode.concrete:
+            return self._isa_mode.concrete_value & 1
+        return self._thumb_bit
+
+    def _indirect_branch_target(self) -> BV:
+        """
+        Compute an indirect branch target, re-applying the ISA mode bit that SLEIGH masks off ARM interworking
+        branch targets and communicates through the TB register instead.
+        """
+        target = self._get_value(self._current_op.inputs[0])
+        if self._isa_mode is not None or self._thumb_bit:
+            mode = self._isa_mode if self._isa_mode is not None else claripy.BVV(self._thumb_bit, 8)
+            target = target | self._adjust_value_size(target.size(), mode)
+        return target
+
     def _execute_branch(self) -> None:
         """
         Execute a p-code branch operation.
@@ -316,7 +347,7 @@ class PcodeEmulatorMixin(SimEngine):
             expr = self.state.scratch.ins_addr
             self.state.scratch.statement_offset = self._current_op_idx + dest.offset
         else:
-            expr = dest.offset
+            expr = dest.offset | self._direct_branch_target_mode_bit()
 
         self.successors.add_successor(
             self.state,
@@ -342,7 +373,7 @@ class PcodeEmulatorMixin(SimEngine):
             expr = exit_state.scratch.ins_addr
             exit_state.scratch.statement_offset = self._current_op_idx + dest.offset
         else:
-            expr = dest.offset
+            expr = dest.offset | self._direct_branch_target_mode_bit()
 
         self.successors.add_successor(
             exit_state,
@@ -364,7 +395,7 @@ class PcodeEmulatorMixin(SimEngine):
         """
         self.successors.add_successor(
             self.state,
-            self._get_value(self._current_op.inputs[0]),
+            self._indirect_branch_target(),
             self.state.scratch.guard,
             "Ijk_Ret",
             exit_stmt_idx=DEFAULT_STATEMENT,
@@ -379,7 +410,7 @@ class PcodeEmulatorMixin(SimEngine):
         """
         self.successors.add_successor(
             self.state,
-            self._get_value(self._current_op.inputs[0]),
+            self._indirect_branch_target(),
             self.state.scratch.guard,
             "Ijk_Boring",
             exit_stmt_idx=DEFAULT_STATEMENT,
@@ -398,7 +429,7 @@ class PcodeEmulatorMixin(SimEngine):
 
         self.successors.add_successor(
             self.state.copy(),  # FIXME: Check extra processing after call
-            self._current_op.inputs[0].offset,
+            self._current_op.inputs[0].offset | self._direct_branch_target_mode_bit(),
             self.state.scratch.guard,
             "Ijk_Call",
             exit_stmt_idx=DEFAULT_STATEMENT,
@@ -413,7 +444,7 @@ class PcodeEmulatorMixin(SimEngine):
         """
         self.successors.add_successor(
             self.state,
-            self._get_value(self._current_op.inputs[0]),
+            self._indirect_branch_target(),
             self.state.scratch.guard,
             "Ijk_Call",
             exit_stmt_idx=DEFAULT_STATEMENT,
@@ -422,8 +453,12 @@ class PcodeEmulatorMixin(SimEngine):
 
         self.state.scratch.exit_handled = True
 
-    def _execute_callother(self) -> None:  # pylint:disable=no-self-use
-        raise AngrError("CALLOTHER emulation not currently supported")
+    def _execute_callother(self) -> None:
+        userop_name = self._current_op.inputs[0].getUserDefinedOpName()
+        if userop_name == "setISAMode":
+            # The ISA mode switch is already tracked through the TB register write
+            return
+        raise AngrError(f"CALLOTHER emulation not currently supported (userop {userop_name!r})")
 
     def _execute_multiequal(self) -> None:  # pylint:disable=no-self-use
         raise AngrError("MULTIEQUAL appearing in unheritaged code?")

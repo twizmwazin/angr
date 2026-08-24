@@ -5,6 +5,7 @@ import operator
 import unittest
 from dataclasses import dataclass
 
+import archinfo
 import claripy
 from pypcode import OpCode
 
@@ -76,6 +77,7 @@ class MockIRSB:
     addr: int = 0
     behaviors: BehaviorFactory = BEHAVIORS
     jumpkind: str = "Ijk_Boring"
+    arch: archinfo.Arch | None = None
 
 
 OP = MockPcodeOp

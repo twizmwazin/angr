@@ -33,7 +33,7 @@ class HeavyPcodeMixin(
     - irsb:        The P-Code IRSB object to use for execution. If not provided one will be lifted.
     - skip_stmts:  The number of statements to skip in processing
     - last_stmt:   Do not execute any statements after this statement
-    - thumb:       Whether the block should be force to be lifted in ARM's THUMB mode. (FIXME)
+    - thumb:       Whether the block should be forced to be lifted in ARM's THUMB mode.
     - extra_stop_points:
                    An extra set of points at which to break basic blocks
     - insn_bytes:  A string of bytes to use for the block instead of the project.

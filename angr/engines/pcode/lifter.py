@@ -43,6 +43,13 @@ MAX_INSTRUCTIONS = 99999
 MAX_BYTES = 5000
 
 
+def is_thumb_capable_arch(arch: archinfo.Arch) -> bool:
+    """
+    Whether `arch` is 32-bit ARM, where Thumb mode is indicated by the low bit of a code address.
+    """
+    return isinstance(arch, ArchARM) or (isinstance(arch, ArchPcode) and arch.name.startswith("ARM:"))
+
+
 class ExitStatement:
     """
     This class exists to ease compatibility with CFGFast's processing of
@@ -71,8 +78,9 @@ class PcodeDisassemblerInsn(DisassemblerInsn):
     Helper class to represent a disassembled target architecture instruction
     """
 
-    def __init__(self, pcode_insn):
+    def __init__(self, pcode_insn, thumb: bool = False):
         self.insn = pcode_insn
+        self.thumb = thumb
 
     @property
     def size(self) -> int:
@@ -80,7 +88,7 @@ class PcodeDisassemblerInsn(DisassemblerInsn):
 
     @property
     def address(self) -> int:
-        return self.insn.addr.offset
+        return self.insn.addr.offset | (1 if self.thumb else 0)
 
     @property
     def mnemonic(self) -> str:
@@ -350,11 +358,12 @@ class IRSB:
         Addresses of instructions in this block.
         """
         if self._instruction_addresses is None:
+            thumb_bit = self.addr & 1 if is_thumb_capable_arch(self.arch) else 0
             self._instruction_addresses = []
             for op in self._ops:
                 if op.opcode == pypcode.OpCode.IMARK:
                     for vn in op.inputs:
-                        self._instruction_addresses.append(vn.offset)
+                        self._instruction_addresses.append(vn.offset | thumb_bit)
         return self._instruction_addresses
 
     @property
@@ -837,8 +846,23 @@ class PcodeBasicBlockLifter:
                 raise NotImplementedError
             langid = archinfo_to_lang_map[arch.name]
 
+        self.langid = langid
         self.context = pypcode.Context(langid)
+        self.supports_thumb = langid.startswith("ARM:")
+        self.isa_mode_register = self.context.registers.get("TB") if self.supports_thumb else None
+        self._thumb_context: Context | None = None
         self.behaviors = BehaviorFactory()
+
+    @property
+    def thumb_context(self) -> Context:
+        """
+        Decoder context with the TMode context variable set to decode instructions as Thumb.
+        """
+        assert self.supports_thumb
+        if self._thumb_context is None:
+            self._thumb_context = pypcode.Context(self.langid)
+            self._thumb_context.setVariableDefault("TMode", 1)
+        return self._thumb_context
 
     def lift(
         self,
@@ -852,6 +876,16 @@ class PcodeBasicBlockLifter:
         is_sparc32: bool = False,
     ) -> None:
         assert irsb.addr == baseaddr
+
+        # Thumb mode is indicated by the low bit of the block address and bytes_offset (pyvex convention); SLEIGH
+        # selects Thumb decoding through the TMode context variable and decodes at the real (even) address.
+        thumb = self.supports_thumb and baseaddr & 1 == 1
+        thumb_bit = 1 if thumb else 0
+        if thumb:
+            baseaddr &= ~1
+            bytes_offset = max(bytes_offset - 1, 0)
+        context = self.thumb_context if thumb else self.context
+
         assert bytes_offset < len(data)
 
         if max_bytes is None or max_bytes > MAX_BYTES:
@@ -886,12 +920,12 @@ class PcodeBasicBlockLifter:
         # Post-process block to mark exits and next block
         next_block = None
         irsb._instruction_addresses = []
-        fallthru_addr = irsb.addr
+        fallthru_addr = baseaddr
 
         try:
-            translation = self.context.translate(
+            translation = context.translate(
                 sliced_data,
-                irsb.addr,
+                baseaddr,
                 max_instructions=max_inst,
                 max_bytes=max_bytes,
                 flags=pypcode.TranslateFlags.BB_TERMINATING,
@@ -900,12 +934,27 @@ class PcodeBasicBlockLifter:
 
             last_decode_addr = irsb.addr
             last_imark_idx = 0
+            target_mode_bit = thumb_bit
+            reg = self.isa_mode_register
             for op_idx, op in enumerate(irsb._ops):
                 if op.opcode == pypcode.OpCode.IMARK:
-                    irsb._instruction_addresses.extend([vn.offset for vn in op.inputs])
-                    last_decode_addr = op.inputs[0].offset
+                    irsb._instruction_addresses.extend([vn.offset | thumb_bit for vn in op.inputs])
+                    last_decode_addr = op.inputs[0].offset | thumb_bit
                     fallthru_addr = op.inputs[-1].offset + op.inputs[-1].size
                     last_imark_idx = op_idx
+                    target_mode_bit = thumb_bit
+                    continue
+
+                if (
+                    reg is not None
+                    and op.opcode == pypcode.OpCode.COPY
+                    and op.output is not None
+                    and op.output.space.name == "register"
+                    and (op.output.offset, op.output.size) == (reg.offset, reg.size)
+                    and op.inputs[0].space.name == "const"
+                ):
+                    # Interworking branches (e.g. blx) select the ISA mode of their target through the TB register
+                    target_mode_bit = op.inputs[0].offset & 1
                     continue
 
                 if op.opcode in {pypcode.OpCode.BRANCH, pypcode.OpCode.CBRANCH} and op.inputs[0].space.name == "const":
@@ -915,17 +964,21 @@ class PcodeBasicBlockLifter:
 
                 if op.opcode == pypcode.OpCode.CBRANCH:
                     irsb._exit_statements.append(
-                        (last_decode_addr, op_idx - last_imark_idx, ExitStatement(op.inputs[0].offset, "Ijk_Boring"))
+                        (
+                            last_decode_addr,
+                            op_idx - last_imark_idx,
+                            ExitStatement(op.inputs[0].offset | target_mode_bit, "Ijk_Boring"),
+                        )
                     )
                 elif op.opcode == pypcode.OpCode.BRANCH:
                     if next_block is None:
-                        next_block = (op.inputs[0].offset, "Ijk_Boring")
+                        next_block = (op.inputs[0].offset | target_mode_bit, "Ijk_Boring")
                 elif op.opcode == pypcode.OpCode.BRANCHIND:
                     if next_block is None:
                         next_block = (None, "Ijk_Boring")
                 elif op.opcode == pypcode.OpCode.CALL:
                     if next_block is None:
-                        next_block = (op.inputs[0].offset, "Ijk_Call")
+                        next_block = (op.inputs[0].offset | target_mode_bit, "Ijk_Call")
                 elif op.opcode == pypcode.OpCode.CALLIND:
                     if next_block is None:
                         next_block = (None, "Ijk_Call")
@@ -933,21 +986,21 @@ class PcodeBasicBlockLifter:
                     next_block = (None, "Ijk_Ret")
 
             # FIXME: Do this lazily
-            disasm = self.context.disassemble(
+            disasm = context.disassemble(
                 sliced_data,
-                irsb.addr,
+                baseaddr,
                 max_instructions=max_inst,
-                max_bytes=fallthru_addr - irsb.addr,
+                max_bytes=fallthru_addr - baseaddr,
             )
             irsb._disassembly = PcodeDisassemblerBlock(
                 addr=irsb.addr,
-                insns=[PcodeDisassemblerInsn(ins) for ins in disasm.instructions],
-                thumb=False,
+                insns=[PcodeDisassemblerInsn(ins, thumb=thumb) for ins in disasm.instructions],
+                thumb=thumb,
                 arch=irsb.arch,
             )
 
         except (pypcode.BadDataError, pypcode.UnimplError):
-            next_block = (fallthru_addr, "Ijk_NoDecode")
+            next_block = (fallthru_addr | thumb_bit, "Ijk_NoDecode")
         except (pypcode.LowlevelError, IndexError):
             # FIXME:
             # - IndexError: Give more data
@@ -955,9 +1008,9 @@ class PcodeBasicBlockLifter:
             next_block = (irsb.addr, "Ijk_NoDecode")
 
         if next_block is None:
-            next_block = (fallthru_addr, "Ijk_Boring")
+            next_block = (fallthru_addr | thumb_bit, "Ijk_Boring")
 
-        irsb._size = fallthru_addr - irsb.addr
+        irsb._size = fallthru_addr - baseaddr
         const_cls = {8: U8, 16: U16, 32: U32, 64: U64}[irsb.arch.bits]
         irsb.next = Const(const_cls(next_block[0])) if next_block[0] is not None else None
         irsb.jumpkind = next_block[1]
@@ -1188,7 +1241,7 @@ class PcodeLifterEngineMixin(SimEngine):
 
         # phase 2: thumb normalization
         thumb = int(thumb)
-        if isinstance(arch, ArchARM):
+        if is_thumb_capable_arch(arch):
             if addr % 2 == 1:
                 thumb = 1
             if thumb:
