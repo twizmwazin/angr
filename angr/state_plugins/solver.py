@@ -691,6 +691,8 @@ class SimSolver(SimStatePlugin):
             self.state._inspect("constraints", BP_BEFORE, added_constraints=constraints)
             constraints = self.state._inspect_getattr("added_constraints", constraints)
             added = self._solver.add(constraints)
+            if len(added) != len(constraints) and self.state.has_plugin("preconstrainer"):
+                self.state.get_plugin("preconstrainer").track_deduplicated_constraints(constraints, added)
             self.state._inspect("constraints", BP_AFTER)
 
             # add actions for the added constraints

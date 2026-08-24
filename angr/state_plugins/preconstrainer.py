@@ -29,6 +29,8 @@ class SimStatePreconstrainer(SimStatePlugin):
         self.preconstraints = []
         self._constrained_addrs = [] if constrained_addrs is None else constrained_addrs
         self.address_concretization = []
+        self._precon_plain_hashes = set()
+        self._program_asserted = {}
 
     def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
         l.warning("Merging is not implemented for preconstrainer!")
@@ -41,6 +43,8 @@ class SimStatePreconstrainer(SimStatePlugin):
         c.variable_map = dict(self.variable_map)
         c.preconstraints = list(self.preconstraints)
         c.address_concretization = list(self.address_concretization)
+        c._precon_plain_hashes = set(self._precon_plain_hashes)
+        c._program_asserted = dict(self._program_asserted)
 
         return c
 
@@ -76,6 +80,7 @@ class SimStatePreconstrainer(SimStatePlugin):
             l.warning("%s is already preconstrained. Are you misusing preconstrainer?", next(iter(variable.variables)))
         self.variable_map[next(iter(variable.variables))] = constraint
         self.preconstraints.append(constraint)
+        self._precon_plain_hashes.add(constraint.clear_annotations().hash())
         if o.REPLACEMENT_SOLVER in self.state.options:
             self.state.solver._solver.add_replacement(variable, value, invalidate_cache=False)
         else:
@@ -128,6 +133,23 @@ class SimStatePreconstrainer(SimStatePlugin):
         for m, v in zip(magic_content, self.state.cgc.flag_bytes):
             self.preconstrain(m, v)
 
+    def track_deduplicated_constraints(self, requested, added):
+        """
+        Record program constraints that the solver deduplicated against a preconstraint, so that
+        :meth:`remove_preconstraints` keeps them.
+        """
+        if not self._precon_plain_hashes:
+            return
+        added_hashes = {c.hash() for c in added}
+        for con in requested:
+            if (
+                isinstance(con, claripy.ast.Base)
+                and not con.annotations
+                and con.hash() not in added_hashes
+                and con.hash() in self._precon_plain_hashes
+            ):
+                self._program_asserted[con.hash()] = con
+
     def remove_preconstraints(self, to_composite_solver=True, simplify=True):
         """
         Remove the preconstraints from the state.
@@ -152,6 +174,7 @@ class SimStatePreconstrainer(SimStatePlugin):
             new_constraints = self.state.solver.constraints
         else:
             new_constraints = [x for x in self.state.solver.constraints if x.hash() not in precon_cache_keys]
+            new_constraints += self._program_asserted.values()
 
         if self.state.has_plugin("zen_plugin"):
             new_constraints = self.state.get_plugin("zen_plugin").filter_constraints(new_constraints)
