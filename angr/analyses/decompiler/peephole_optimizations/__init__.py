@@ -20,6 +20,7 @@ from .bswap import Bswap
 from .cas_intrinsics import CASIntrinsics
 from .cmp_masked_shift import CmpMaskedShift
 from .cmp_sub_const import CmpSubConst
+from .cmp_sub_zero import CmpSubZero
 from .cmpord_rewriter import CmpORDRewriter
 from .coalesce_adjacent_shrs import CoalesceAdjacentShiftRights
 from .coalesce_same_cascading_ifs import CoalesceSameCascadingIfs
@@ -112,6 +113,7 @@ ALL_PEEPHOLE_OPTS: list[Any] = [
     CmpORDRewriter,
     CmpMaskedShift,
     CmpSubConst,
+    CmpSubZero,
     CoalesceAdjacentShiftRights,
     ShlToMul,
     RewriteCxxOperatorCalls,

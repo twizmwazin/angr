@@ -32,6 +32,7 @@ from angr.analyses.decompiler.peephole_optimizations import (
     Bswap,
     CmpMaskedShift,
     CmpSubConst,
+    CmpSubZero,
     ConcatSimplifier,
     ConstantDereferences,
     EagerEvaluation,
@@ -328,6 +329,63 @@ class TestPeepholeOptimizations(unittest.TestCase):
         assert isinstance(out, BinaryOp) and out.op == "CmpEQ"
         assert out.operands[0] == x, f"expected bare register on lhs, got {out.operands[0]}"
         assert isinstance(out.operands[1], Const) and out.operands[1].value == 52, f"expected x == 52, got {out}"
+
+    def test_cmp_sub_zero(self):
+        proj = angr.load_shellcode(b"\x90", "AMD64")
+        manager = Manager()
+        opt = CmpSubZero(proj, proj.kb, manager)
+
+        x = ailment.Expr.Register(manager.next_atom(), 0, 32)
+        y = ailment.Expr.Register(manager.next_atom(), 8, 32)
+
+        # (x - y) != 0  ==>  x != y
+        sub = BinaryOp(manager.next_atom(), "Sub", [x, y], False, bits=32)
+        expr = BinaryOp(
+            manager.next_atom(), "CmpNE", [sub, Const(manager.next_atom(), 0, 32)], False, bits=1, ins_addr=0x400100
+        )
+        out = opt.optimize(expr)
+        assert isinstance(out, BinaryOp) and out.op == "CmpNE"
+        assert out.operands[0] == x
+        assert out.operands[1] == y
+        assert out.tags.get("ins_addr", None) == 0x400100, "Peephole optimizer lost tags."
+
+        # the zero on the left is handled too: 0 == (x - y)  ==>  x == y
+        sub = BinaryOp(manager.next_atom(), "Sub", [x, y], False, bits=32)
+        expr = BinaryOp(manager.next_atom(), "CmpEQ", [Const(manager.next_atom(), 0, 32), sub], False, bits=1)
+        out = opt.optimize(expr)
+        assert isinstance(out, BinaryOp) and out.op == "CmpEQ"
+        assert out.operands[0] == x
+        assert out.operands[1] == y
+
+        # a constant operand belongs to CmpSubConst
+        sub = BinaryOp(manager.next_atom(), "Sub", [x, Const(manager.next_atom(), 50, 32)], False, bits=32)
+        expr = BinaryOp(manager.next_atom(), "CmpEQ", [sub, Const(manager.next_atom(), 0, 32)], False, bits=1)
+        assert opt.optimize(expr) is None
+
+        # ordered comparisons must NOT be folded (unsound under wraparound)
+        sub = BinaryOp(manager.next_atom(), "Sub", [x, y], True, bits=32)
+        expr = BinaryOp(manager.next_atom(), "CmpLTs", [sub, Const(manager.next_atom(), 0, 32)], True, bits=1)
+        assert opt.optimize(expr) is None
+
+        # floating-point subtraction must NOT be folded: inf - inf is NaN
+        fsub = BinaryOp(manager.next_atom(), "Sub", [x, y], False, bits=32, floating_point=True)
+        expr = BinaryOp(manager.next_atom(), "CmpEQ", [fsub, Const(manager.next_atom(), 0, 32)], False, bits=1)
+        assert opt.optimize(expr) is None
+
+        # a narrowing Sub must NOT be folded: it only compares the low 32 bits
+        wx = ailment.Expr.Register(manager.next_atom(), 16, 64)
+        wy = ailment.Expr.Register(manager.next_atom(), 24, 64)
+        wsub = BinaryOp(manager.next_atom(), "Sub", [wx, wy], False, bits=32)
+        expr = BinaryOp(manager.next_atom(), "CmpEQ", [wsub, Const(manager.next_atom(), 0, 32)], False, bits=1)
+        assert opt.optimize(expr) is None
+
+        # the optimization is registered, so the full expression pipeline reaches it too
+        opts = [cls(proj, proj.kb, manager) for cls in EXPR_OPTS]
+        sub = BinaryOp(manager.next_atom(), "Sub", [x, y], False, bits=32)
+        expr = BinaryOp(manager.next_atom(), "CmpNE", [sub, Const(manager.next_atom(), 0, 32)], False, bits=1)
+        out = peephole_optimize_expr(expr, opts)
+        assert isinstance(out, BinaryOp) and out.op == "CmpNE", f"expected a CmpNE, got {out}"
+        assert out.operands[0] == x and out.operands[1] == y, f"expected x != y, got {out}"
 
     def test_optimized_division_simplifier_keeps_width(self):
         # gcc's `x / k` / `x % k` magic-multiply quotients; the rewritten 64-bit Div must keep the 32-bit width
