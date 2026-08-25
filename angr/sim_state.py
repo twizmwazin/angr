@@ -607,9 +607,10 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
             merge_values = range(len(others) + 1)
             merge_conditions = [merge_flag == b for b in merge_values]
         else:
+            # each entry is one condition, or a collection of constraints to conjoin into one
             merge_conditions = [
-                (claripy.true() if len(mc) == 0 else claripy.And(*[c.to_claripy() for c in mc]))
-                for mc in merge_conditions
+                mc if isinstance(mc, claripy.ast.Bool) else (claripy.true() if len(mc) == 0 else claripy.And(*mc))
+                for mc in angr.state_plugins.sim_action_object._raw_ast(merge_conditions)
             ]
 
         if len({o.arch.name for o in others}) != 1:

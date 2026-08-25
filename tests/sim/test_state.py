@@ -116,6 +116,23 @@ class TestState(unittest.TestCase):
         a.posix.open(b"/tmp/idk", 1)
         self.assertRaises(angr.errors.SimMergeError, lambda: a.copy().merge(b.copy()))
 
+    def test_state_merge_with_explicit_merge_conditions(self):
+        x = claripy.BVS("x", 32)
+
+        def make_states():
+            a, b = SimState(arch="AMD64"), SimState(arch="AMD64")
+            a.add_constraints(x > 10)
+            b.add_constraints(x < 5)
+            a.memory.store(0x10, x)
+            b.memory.store(0x10, claripy.BVV(1, 32))
+            return a, b
+
+        for conditions in ([x > 10, x < 5], [[x > 10], [x < 5]]):
+            a, b = make_states()
+            merged, _, merging_occurred = a.merge(b, merge_conditions=conditions)
+            assert merging_occurred
+            assert merged.solver.eval(merged.memory.load(0x10, 4), extra_constraints=[x < 5]) == 1
+
     def test_state_merge_static(self):
         # With abstract memory
         # Aligned memory merging
