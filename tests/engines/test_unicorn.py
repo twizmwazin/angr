@@ -679,6 +679,35 @@ class TestUnicornThumb(unittest.TestCase):
         assert results[0][3] == 5
         assert results[1] == results[0]
 
+    def test_thumb_it_block(self):
+        """A state in the middle of a THUMB IT block cannot be executed by unicorn."""
+        arch = archinfo.ArchARMEL()
+        thumb_code = arch.asm(
+            "cmp r0, #0; itt ne; movne r1, #1; movne r2, #2; b .", addr=self.THUMB_BASE, thumb=True, as_bytes=True
+        )
+        project = self._project(thumb_code=thumb_code)
+
+        results = []
+        for unicorn in (False, True):
+            add_options = {so.ZERO_FILL_UNCONSTRAINED_MEMORY, so.ZERO_FILL_UNCONSTRAINED_REGISTERS}
+            if unicorn:
+                add_options |= so.unicorn
+
+            state = project.factory.blank_state(addr=self.THUMB_BASE | 1, add_options=add_options)
+            state.regs.r0 = 0
+            state.regs.r1 = 0xAA
+            state.regs.r2 = 0xBB
+            # stop after "cmp" and "itt", leaving the state in the middle of the IT block
+            state = project.factory.successors(state, num_inst=2).successors[0]
+            assert state.solver.eval(state.regs.itstate) != 0
+
+            state = project.factory.successors(state).successors[0]
+            results.append((state.solver.eval(state.regs.r1), state.solver.eval(state.regs.r2)))
+
+        # the condition is false, so neither instruction of the IT block may be executed
+        assert results[0] == (0xAA, 0xBB)
+        assert results[1] == results[0]
+
     def test_thumb_symbolic_memory_read(self):
         """A symbolic value read from memory inside a THUMB block, which is lifted to a guarded load."""
         arch = archinfo.ArchARMEL()

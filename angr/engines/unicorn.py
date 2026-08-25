@@ -103,6 +103,10 @@ class SimEngineUnicorn(SuccessorsEngine):
         if state.scratch.is_ail or state.regs.ip.symbolic:
             l.debug("symbolic IP!")
             return False
+        if state.arch.qemu_name == "arm" and not state.solver.is_true(state.regs.itstate == 0):
+            # unicorn ignores writes to UC_ARM_REG_ITSTATE and would run the rest of the IT block unconditionally
+            l.debug("in the middle of an IT block!")
+            return False
         if unicorn.countdown_symbolic_stop > 0:
             l.info("not enough blocks since symbolic stop (%d more)", unicorn.countdown_symbolic_stop)
             return False
