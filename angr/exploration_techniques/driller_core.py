@@ -2,10 +2,17 @@ from __future__ import annotations
 
 import logging
 from itertools import islice
+from typing import TYPE_CHECKING
 
 import claripy
 
 from .base import ExplorationTechnique
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from angr.sim_manager import SimulationManager
+    from angr.sim_state import SimState
 
 l = logging.getLogger(name=__name__)
 
@@ -19,7 +26,7 @@ class DrillerCore(ExplorationTechnique):
     'diverted' stash.
     """
 
-    def __init__(self, trace, fuzz_bitmap=None):
+    def __init__(self, trace: Sequence[int], fuzz_bitmap: bytes | None = None):
         """
         :param trace      : The basic block trace.
         :param fuzz_bitmap: AFL's bitmap of state transitions. Defaults to saying every transition is worth satisfying.
@@ -30,15 +37,15 @@ class DrillerCore(ExplorationTechnique):
         self.fuzz_bitmap = fuzz_bitmap or b"\xff" * 65536
 
         # Set of encountered basic block transitions.
-        self.encounters = set()
+        self.encounters: set[tuple[int, int]] = set()
 
-    def setup(self, simgr):
+    def setup(self, simgr: SimulationManager) -> None:
         self.project = simgr._project
 
         # Update encounters with known state transitions.
         self.encounters.update(zip(self.trace, islice(self.trace, 1, None)))
 
-    def step(self, simgr, stash="active", **kwargs):
+    def step(self, simgr: SimulationManager, stash: str = "active", **kwargs) -> SimulationManager:
         simgr.step(stash=stash, **kwargs)
 
         # Mimic AFL's indexing scheme.
@@ -58,7 +65,8 @@ class DrillerCore(ExplorationTechnique):
                 hit = bool(self.fuzz_bitmap[cur_loc ^ prev_loc] ^ 0xFF)
 
                 transition = (prev_addr, state.addr)
-                mapped_to = self.project.loader.find_object_containing(state.addr).binary
+                mapped_obj = self.project.loader.find_object_containing(state.addr)
+                mapped_to = mapped_obj.binary if mapped_obj is not None else None
 
                 l.debug("Found %#x -> %#x transition.", transition[0], transition[1])
 
@@ -92,7 +100,7 @@ class DrillerCore(ExplorationTechnique):
     #
 
     @staticmethod
-    def _has_false(state):
+    def _has_false(state: SimState) -> bool:
         # Check if the state is unsat even if we remove preconstraints.
         if claripy.is_false(state.scratch.guard):
             return True

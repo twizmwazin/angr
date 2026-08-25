@@ -6,6 +6,7 @@ import sys
 import types
 from collections import defaultdict
 from types import TracebackType
+from typing import TYPE_CHECKING, Any, Literal
 
 import claripy
 import mulpyplexer
@@ -19,6 +20,13 @@ from .sim_options import LAZY_SOLVES
 from .sim_state import SimState
 from .state_hierarchy import StateHierarchy
 from .state_plugins.sim_event import resource_event
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
+
+    from .analyses.cfg.cfg_base import CFGBase
+    from .engines.successors import SimSuccessors
+    from .project import Project
 
 l = logging.getLogger(name=__name__)
 
@@ -67,40 +75,49 @@ class SimulationManager:
     ALL = "_ALL"
     DROP = "_DROP"
 
-    _integral_stashes: tuple[str] = ("active", "stashed", "pruned", "unsat", "errored", "deadended", "unconstrained")
+    _integral_stashes: tuple[str, ...] = (
+        "active",
+        "stashed",
+        "pruned",
+        "unsat",
+        "errored",
+        "deadended",
+        "unconstrained",
+    )
 
     def __init__(
         self,
-        project,
-        active_states=None,
-        stashes=None,
-        hierarchy=None,
-        resilience=None,
-        save_unsat=False,
-        auto_drop=None,
-        errored=None,
-        completion_mode=any,
-        techniques=None,
-        suggestions=True,
+        project: Project,
+        active_states: Iterable[SimState] | None = None,
+        stashes: dict[str, list[SimState]] | None = None,
+        hierarchy: StateHierarchy | Literal[False] | None = None,
+        resilience: Iterable[type[Exception]] | bool | None = None,
+        save_unsat: bool = False,
+        auto_drop: Iterable[str] | None = None,
+        errored: Iterable[ErrorRecord] | None = None,
+        completion_mode: Callable[[Iterable[bool]], bool] = any,
+        techniques: Iterable[ExplorationTechnique] | None = None,
+        suggestions: bool = True,
         **kwargs,
     ):
         super().__init__()
 
         self._project = project
         self.completion_mode = completion_mode
-        self._errored = []
+        self._errored: list[ErrorRecord] = []
         self._lock = PicklableLock()
 
         if stashes is None:
             stashes = self._create_integral_stashes()
-        self._stashes: defaultdict[str, list[SimState]] = stashes
-        self._hierarchy = StateHierarchy() if hierarchy is None else hierarchy
+        self._stashes: dict[str, list[SimState]] = stashes
+        self._hierarchy: StateHierarchy | Literal[False] | None = StateHierarchy() if hierarchy is None else hierarchy
         self._save_unsat = save_unsat
         self._auto_drop = {
             SimulationManager.DROP,
         }
-        self._techniques = []
+        self._techniques: list[ExplorationTechnique] = []
 
+        self._resilience: tuple[type[Exception], ...]
         if resilience is None:
             self._resilience = (AngrError, SimError, claripy.ClaripyError)
         elif resilience is True:
@@ -160,11 +177,22 @@ class SimulationManager:
         errored_repr = f" ({len(self.errored)} errored)" if self.errored else ""
         return f"<SimulationManager with {stashes_repr}{errored_repr}>"
 
-    def __getattr__(self, item):
+    def __getattr__(self, item: str) -> Any:
         try:
             return object.__getattribute__(self, item)
         except AttributeError:
+            pass
+        try:
             return SimulationManager._fetch_states(self, stash=item)
+        except AttributeError:
+            pass
+        if item == "mp_" + SimulationManager.ALL:
+            return mulpyplexer.MP(SimulationManager._fetch_states(self, stash=SimulationManager.ALL))
+        if item.startswith("mp_"):
+            return mulpyplexer.MP(self._stashes.get(item[3:], []))
+        if item.startswith("one_"):
+            return self._stashes.get(item[4:], [None])[0]
+        raise AttributeError(f"No such stash: {item}")
 
     active: list[SimState]
     stashed: list[SimState]
@@ -195,10 +223,10 @@ class SimulationManager:
         return self._errored
 
     @property
-    def stashes(self) -> defaultdict[str, list[SimState]]:
+    def stashes(self) -> dict[str, list[SimState]]:
         return self._stashes
 
-    def mulpyplex(self, *stashes):
+    def mulpyplex(self, *stashes: str) -> mulpyplexer.MP:
         """
         Mulpyplex across several stashes.
 
@@ -208,7 +236,7 @@ class SimulationManager:
 
         return mulpyplexer.MP(list(itertools.chain.from_iterable(self._stashes[s] for s in stashes)))
 
-    def copy(self, deep=False):  # pylint: disable=arguments-differ
+    def copy(self, deep: bool = False) -> SimulationManager:  # pylint: disable=arguments-differ
         """
         Make a copy of this simulation manager. Pass ``deep=True`` to copy all the states in it as well.
 
@@ -231,7 +259,7 @@ class SimulationManager:
     #   ...
     #
 
-    def use_technique(self, tech):
+    def use_technique[T: ExplorationTechnique](self, tech: T) -> T:
         """
         Use an exploration technique with this SimulationManager.
 
@@ -253,7 +281,7 @@ class SimulationManager:
         self._techniques.append(tech)
         return tech
 
-    def remove_technique(self, tech):
+    def remove_technique(self, tech: ExplorationTechnique) -> ExplorationTechnique:
         """
         Remove an exploration technique from a list of active techniques.
 
@@ -263,7 +291,7 @@ class SimulationManager:
         if not isinstance(tech, ExplorationTechnique):
             raise SimulationManagerError
 
-        def _is_overridden(name):
+        def _is_overridden(name: str) -> bool:
             return getattr(tech, name).__code__ is not getattr(ExplorationTechnique, name).__code__
 
         overridden = filter(_is_overridden, ("step", "filter", "selector", "step_state", "successors"))
@@ -279,17 +307,17 @@ class SimulationManager:
 
     def explore(
         self,
-        stash="active",
-        n=None,
-        find=None,
-        avoid=None,
-        find_stash="found",
-        avoid_stash="avoid",
-        cfg=None,
-        num_find=1,
-        avoid_priority=False,
+        stash: str = "active",
+        n: int | None = None,
+        find: int | Iterable[int] | Callable[[SimState], Any] | None = None,
+        avoid: int | Iterable[int] | Callable[[SimState], Any] | None = None,
+        find_stash: str = "found",
+        avoid_stash: str = "avoid",
+        cfg: CFGBase | None = None,
+        num_find: int = 1,
+        avoid_priority: bool = False,
         **kwargs,
-    ):
+    ) -> SimulationManager:
         """
         Tick stash "stash" forward (up to "n" times or until "num_find" states are found), looking for condition "find",
         avoiding condition "avoid". Stores found states into "find_stash' and avoided states into "avoid_stash".
@@ -345,7 +373,13 @@ class SimulationManager:
 
         return self
 
-    def run(self, stash="active", n=None, until=None, **kwargs):
+    def run(
+        self,
+        stash: str = "active",
+        n: int | None = None,
+        until: Callable[[SimulationManager], bool] | None = None,
+        **kwargs,
+    ) -> SimulationManager:
         """
         Run until the SimulationManager has reached a completed state, according to
         the current exploration techniques. If no exploration techniques that define a completion
@@ -367,7 +401,7 @@ class SimulationManager:
             break
         return self
 
-    def complete(self):
+    def complete(self) -> bool:
         """
         Returns whether or not this manager has reached a "completed" state.
         """
@@ -379,17 +413,17 @@ class SimulationManager:
 
     def step(
         self,
-        stash="active",
-        target_stash=None,
-        n=None,
-        selector_func=None,
-        step_func=None,
-        error_list=None,
-        successor_func=None,
-        until=None,
-        filter_func=None,
+        stash: str = "active",
+        target_stash: str | None = None,
+        n: int | None = None,
+        selector_func: Callable[[SimState], bool] | None = None,
+        step_func: Callable[[SimulationManager], SimulationManager] | None = None,
+        error_list: list[ErrorRecord] | None = None,
+        successor_func: Callable[..., SimSuccessors] | None = None,
+        until: Callable[[SimulationManager], bool] | None = None,
+        filter_func: Callable[[SimState], str | tuple[str, SimState] | None] | None = None,
         **run_args,
-    ):
+    ) -> SimulationManager:
         """
         Step a stash of states forward and categorize the successors appropriately.
 
@@ -451,7 +485,7 @@ class SimulationManager:
                 **run_args,
             )
         # ------------------ Compatibility layer ---------------->8
-        bucket = defaultdict(list)
+        bucket: defaultdict[str, list[SimState]] = defaultdict(list)
         target_stash = target_stash or stash
         error_list = error_list if error_list is not None else self._errored
 
@@ -460,7 +494,7 @@ class SimulationManager:
             if isinstance(goto, tuple):
                 goto, state = goto
 
-            if goto not in (None, stash):
+            if goto is not None and goto != stash:
                 bucket[goto].append(state)
                 continue
 
@@ -505,14 +539,20 @@ class SimulationManager:
             return step_func(self)
         return self
 
-    def step_state(self, state, successor_func=None, error_list=None, **run_args):
+    def step_state(
+        self,
+        state: SimState,
+        successor_func: Callable[..., SimSuccessors] | None = None,
+        error_list: list[ErrorRecord] | None = None,
+        **run_args,
+    ) -> dict[str | None, list[SimState]]:
         """
         Don't use this function manually - it is meant to interface with exploration techniques.
         """
         error_list = error_list if error_list is not None else self._errored
         try:
             successors = self.successors(state, successor_func=successor_func, **run_args)
-            stashes = {
+            stashes: dict[str | None, list[SimState]] = {
                 None: successors.flat_successors,
                 "unsat": successors.unsat_successors,
                 "unconstrained": successors.unconstrained_successors,
@@ -539,7 +579,11 @@ class SimulationManager:
 
         return stashes
 
-    def filter(self, state, filter_func=None):  # pylint:disable=no-self-use
+    def filter(
+        self,
+        state: SimState,
+        filter_func: Callable[[SimState], str | tuple[str, SimState] | None] | None = None,
+    ) -> str | tuple[str, SimState] | None:  # pylint:disable=no-self-use
         """
         Don't use this function manually - it is meant to interface with exploration techniques.
         """
@@ -547,7 +591,7 @@ class SimulationManager:
             return filter_func(state)
         return None
 
-    def selector(self, state, selector_func=None):  # pylint:disable=no-self-use
+    def selector(self, state: SimState, selector_func: Callable[[SimState], bool] | None = None) -> bool:  # pylint:disable=no-self-use
         """
         Don't use this function manually - it is meant to interface with exploration techniques.
         """
@@ -555,7 +599,9 @@ class SimulationManager:
             return selector_func(state)
         return True
 
-    def successors(self, state, successor_func=None, **run_args):
+    def successors(
+        self, state: SimState, successor_func: Callable[..., SimSuccessors] | None = None, **run_args
+    ) -> SimSuccessors:
         """
         Don't use this function manually - it is meant to interface with exploration techniques.
         """
@@ -567,7 +613,12 @@ class SimulationManager:
     #   ...
     #
 
-    def prune(self, filter_func=None, from_stash="active", to_stash="pruned"):
+    def prune(
+        self,
+        filter_func: Callable[[SimState], bool] | None = None,
+        from_stash: str = "active",
+        to_stash: str = "pruned",
+    ) -> SimulationManager:
         """
         Prune unsatisfiable states from a stash.
 
@@ -581,7 +632,7 @@ class SimulationManager:
         :rtype:             SimulationManager
         """
 
-        def _prune_filter(state):
+        def _prune_filter(state: SimState) -> bool:
             to_prune = not filter_func or filter_func(state)
             if to_prune and not state.satisfiable():
                 if self._hierarchy:
@@ -593,7 +644,7 @@ class SimulationManager:
         self.move(from_stash, to_stash, _prune_filter)
         return self
 
-    def populate(self, stash, states):
+    def populate(self, stash: str, states: Iterable[SimState]) -> SimulationManager:
         """
         Populate a stash with a collection of states.
 
@@ -603,7 +654,7 @@ class SimulationManager:
         self._store_states(stash, states)
         return self
 
-    def absorb(self, simgr):
+    def absorb(self, simgr: SimulationManager) -> None:
         """
         Collect all the states from ``simgr`` and put them in their corresponding stashes in this manager.
         This will not modify ``simgr``.
@@ -612,7 +663,9 @@ class SimulationManager:
             self._store_states(stash, simgr.stashes[stash])
         self._errored.extend(simgr._errored)
 
-    def move(self, from_stash, to_stash, filter_func=None):
+    def move(
+        self, from_stash: str, to_stash: str, filter_func: Callable[[SimState], bool] | None = None
+    ) -> SimulationManager:
         """
         Move states from one stash to another.
 
@@ -626,12 +679,18 @@ class SimulationManager:
         """
         filter_func = filter_func or (lambda s: True)
 
-        def stash_splitter(states):
-            return reversed(self._filter_states(filter_func, states))
+        def stash_splitter(states: list[SimState]) -> tuple[list[SimState], list[SimState]]:
+            match, nomatch = self._filter_states(filter_func, states)
+            return nomatch, match
 
         return self.split(stash_splitter, from_stash=from_stash, to_stash=to_stash)
 
-    def stash(self, filter_func=None, from_stash="active", to_stash="stashed"):
+    def stash(
+        self,
+        filter_func: Callable[[SimState], bool] | None = None,
+        from_stash: str = "active",
+        to_stash: str = "stashed",
+    ) -> SimulationManager:
         """
         Stash some states. This is an alias for move(), with defaults for the stashes.
 
@@ -645,7 +704,12 @@ class SimulationManager:
         """
         return self.move(from_stash, to_stash, filter_func=filter_func)
 
-    def unstash(self, filter_func=None, to_stash="active", from_stash="stashed"):
+    def unstash(
+        self,
+        filter_func: Callable[[SimState], bool] | None = None,
+        to_stash: str = "active",
+        from_stash: str = "stashed",
+    ) -> SimulationManager:
         """
         Unstash some states. This is an alias for move(), with defaults for the stashes.
 
@@ -659,7 +723,7 @@ class SimulationManager:
         """
         return self.move(from_stash, to_stash, filter_func=filter_func)
 
-    def drop(self, filter_func=None, stash="active"):
+    def drop(self, filter_func: Callable[[SimState], bool] | None = None, stash: str = "active") -> SimulationManager:
         """
         Drops states from a stash. This is an alias for move(), with defaults for the stashes.
 
@@ -672,7 +736,13 @@ class SimulationManager:
         """
         return self.move(stash, self.DROP, filter_func=filter_func)
 
-    def apply(self, state_func=None, stash_func=None, stash="active", to_stash=None):
+    def apply(
+        self,
+        state_func: Callable[[SimState], Any] | None = None,
+        stash_func: Callable[[list[SimState]], list[SimState]] | None = None,
+        stash: str = "active",
+        to_stash: str | None = None,
+    ) -> SimulationManager:
         """
         Applies a given function to a given stash.
 
@@ -692,8 +762,9 @@ class SimulationManager:
         """
         to_stash = to_stash or stash
 
-        def _stash_splitter(states):
-            keep, split = [], []
+        def _stash_splitter(states: list[SimState]) -> tuple[list[SimState], list[SimState]]:
+            keep: list[SimState] = []
+            split: list[SimState] = []
             if state_func is not None:
                 for s in states:
                     ns = state_func(s)
@@ -713,13 +784,13 @@ class SimulationManager:
 
     def split(
         self,
-        stash_splitter=None,
-        stash_ranker=None,
-        state_ranker=None,
-        limit=8,
-        from_stash="active",
-        to_stash="stashed",
-    ):
+        stash_splitter: Callable[[list[SimState]], tuple[list[SimState], list[SimState]]] | None = None,
+        stash_ranker: Callable[[list[SimState]], list[SimState]] | None = None,
+        state_ranker: Callable[[SimState], Any] | None = None,
+        limit: int = 8,
+        from_stash: str = "active",
+        to_stash: str = "stashed",
+    ) -> SimulationManager:
         """
         Split a stash of states into two stashes depending on the specified options.
 
@@ -758,7 +829,7 @@ class SimulationManager:
         else:
             keep, split = states[:limit], states[limit:]
 
-        keep, split = map(list, (keep, split))
+        keep, split = list(keep), list(split)
 
         self._clear_states(from_stash)
         self._store_states(from_stash, keep)
@@ -766,14 +837,20 @@ class SimulationManager:
         return self
 
     @staticmethod
-    def _merge_key(state):
+    def _merge_key(state: SimState) -> Any:
         return (
             state.addr if not state.regs._ip.symbolic else "SYMBOLIC",
             [x.func_addr for x in state.callstack],
             set(state.posix.fd) if state.has_plugin("posix") else None,
         )
 
-    def merge(self, merge_func=None, merge_key=None, stash="active", prune=True):
+    def merge(
+        self,
+        merge_func: Callable[..., SimState] | None = None,
+        merge_key: Callable[[SimState], Any] | None = None,
+        stash: str = "active",
+        prune: bool = True,
+    ) -> SimulationManager:
         """
         Merge the states in a given stash.
 
@@ -791,11 +868,11 @@ class SimulationManager:
         if prune:
             self.prune(from_stash=stash)
         to_merge = self._fetch_states(stash=stash)
-        not_to_merge = []
+        not_to_merge: list[SimState] = []
         if merge_key is None:
             merge_key = self._merge_key
 
-        merge_groups = []
+        merge_groups: list[list[SimState]] = []
         while to_merge:
             base_key = merge_key(to_merge[0])
             g, to_merge = self._filter_states(lambda s, base_key=base_key: base_key == merge_key(s), to_merge)
@@ -820,37 +897,34 @@ class SimulationManager:
     #   ...
     #
 
-    def _store_states(self, stash, states):
+    def _store_states(self, stash: str, states: Iterable[SimState]) -> None:
         if stash not in self._auto_drop:
             with self._lock:
                 if stash not in self._stashes:
                     self._stashes[stash] = []
                 self._stashes[stash].extend(states)
 
-    def _clear_states(self, stash):
+    def _clear_states(self, stash: str) -> None:
         for _stash in list(self._stashes) if stash == self.ALL else [stash]:
             del self._stashes[_stash][:]
 
-    def _fetch_states(self, stash):
+    def _fetch_states(self, stash: str) -> list[SimState]:
         if stash in self._stashes:
             return self._stashes[stash]
         if stash == SimulationManager.ALL:
             return list(itertools.chain.from_iterable(self._stashes.values()))
-        if stash == "mp_" + SimulationManager.ALL:
-            return mulpyplexer.MP(self._fetch_states(stash=SimulationManager.ALL))
-        if stash.startswith("mp_"):
-            return mulpyplexer.MP(self._stashes.get(stash[3:], []))
-        if stash.startswith("one_"):
-            return self._stashes.get(stash[4:], [None])[0]
         raise AttributeError(f"No such stash: {stash}")
 
-    def _filter_states(self, filter_func, states):  # pylint:disable=no-self-use
-        match, nomatch = [], []
+    def _filter_states(
+        self, filter_func: Callable[[SimState], bool], states: list[SimState]
+    ) -> tuple[list[SimState], list[SimState]]:  # pylint:disable=no-self-use
+        match: list[SimState] = []
+        nomatch: list[SimState] = []
         for state in states:
             (match if filter_func(state) else nomatch).append(state)
         return match, nomatch
 
-    def _merge_states(self, states):
+    def _merge_states(self, states: list[SimState]) -> SimState:
         """
         Merges a list of states.
 
@@ -867,6 +941,7 @@ class SimulationManager:
             # We found optimal states (states that share a common ancestor) to merge.
             # Compute constraints for each state starting from the common ancestor,
             # and use them as merge conditions.
+            assert common_history is not None
             constraints = [s.history.constraints_since(common_history) for s in optimal]
 
             o = optimal[0]
@@ -897,12 +972,12 @@ class SimulationManager:
     #
 
     def _create_integral_stashes(self) -> defaultdict[str, list[SimState]]:
-        stashes = defaultdict(list)
+        stashes: defaultdict[str, list[SimState]] = defaultdict(list)
         stashes.update({name: [] for name in self._integral_stashes})
         return stashes
 
-    def _copy_stashes(self, deep=False):
-        stashes = defaultdict(list)
+    def _copy_stashes(self, deep: bool = False) -> defaultdict[str, list[SimState]]:
+        stashes: defaultdict[str, list[SimState]] = defaultdict(list)
 
         if not deep:
             # shallow copy
@@ -946,12 +1021,12 @@ class ErrorRecord:
     :ivar traceback:    The traceback for the error that was thrown.
     """
 
-    def __init__(self, state, error, traceback):
+    def __init__(self, state: SimState, error: Exception, traceback: TracebackType | None):
         self.state: SimState = state
         self.error: Exception = error
-        self.traceback: TracebackType = traceback
+        self.traceback: TracebackType | None = traceback
 
-    def debug(self):
+    def debug(self) -> None:
         """
         Launch a postmortem debug shell at the site of the error.
         """

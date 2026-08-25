@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from angr.sim_state import SimState
 
@@ -10,9 +11,9 @@ l = logging.getLogger(name=__name__)
 
 
 class SimStateGlobals(SimStatePlugin):
-    def __init__(self, backer=None):
+    def __init__(self, backer: dict[Any, Any] | None = None):
         super().__init__()
-        self._backer = backer if backer is not None else {}
+        self._backer: dict[Any, Any] = backer if backer is not None else {}
 
     def set_state(self, state):
         pass
@@ -28,16 +29,16 @@ class SimStateGlobals(SimStatePlugin):
     def __iter__(self):
         return iter(self._backer)
 
-    def __getitem__(self, k):
+    def __getitem__(self, k) -> Any:
         return self._backer[k]
 
-    def __setitem__(self, k, v):
+    def __setitem__(self, k, v) -> None:
         self._backer[k] = v
 
-    def __delitem__(self, k):
+    def __delitem__(self, k) -> None:
         del self._backer[k]
 
-    def __contains__(self, k):
+    def __contains__(self, k) -> bool:
         return k in self._backer
 
     def keys(self):
@@ -49,10 +50,10 @@ class SimStateGlobals(SimStatePlugin):
     def items(self):
         return self._backer.items()
 
-    def get(self, k, alt=None):
+    def get(self, k, alt: Any = None) -> Any:
         return self._backer.get(k, alt)
 
-    def pop(self, k, alt=None):
+    def pop(self, k, alt: Any = None) -> Any:
         return self._backer.pop(k, alt)
 
     @SimStatePlugin.memo

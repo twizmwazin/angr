@@ -2,8 +2,15 @@ from __future__ import annotations
 
 from collections import Counter
 from difflib import SequenceMatcher
+from typing import TYPE_CHECKING
 
 from .base import ExplorationTechnique
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from angr.sim_manager import SimulationManager
+    from angr.sim_state import SimState
 
 
 class UniqueSearch(ExplorationTechnique):
@@ -17,7 +24,11 @@ class UniqueSearch(ExplorationTechnique):
     The (L2) distance between the counts of the state addresses in the history of the path.
     """
 
-    def __init__(self, similarity_func=None, deferred_stash="deferred"):
+    def __init__(
+        self,
+        similarity_func: Callable[[SimState, SimState], float] | None = None,
+        deferred_stash: str = "deferred",
+    ):
         """
         :param similarity_func: How to calculate similarity between two states.
         :param deferred_stash:  Where to store the deferred states.
@@ -25,21 +36,21 @@ class UniqueSearch(ExplorationTechnique):
         super().__init__()
         self.similarity_func = similarity_func or UniqueSearch.similarity
         self.deferred_stash = deferred_stash
-        self.uniqueness = {}
+        self.uniqueness: dict[SimState, tuple[float, int]] = {}
         self.num_deadended = 0
 
-    def setup(self, simgr):
+    def setup(self, simgr: SimulationManager) -> None:
         if self.deferred_stash not in simgr.stashes:
             simgr.stashes[self.deferred_stash] = []
 
-    def step(self, simgr, stash="active", **kwargs):
+    def step(self, simgr: SimulationManager, stash: str = "active", **kwargs) -> SimulationManager:
         simgr = simgr.step(stash=stash, **kwargs)
 
         old_states = simgr.stashes[self.deferred_stash][:]
         new_states = simgr.stashes[stash][:]
         simgr.move(from_stash=stash, to_stash=self.deferred_stash)
 
-        def update_average(state, new, mem=1.0):
+        def update_average(state: SimState, new: float, mem: float = 1.0) -> None:
             """
             param state: The state to update the average for.
             param new:   The new value to be accumulated into the average.
@@ -77,7 +88,7 @@ class UniqueSearch(ExplorationTechnique):
         return simgr
 
     @staticmethod
-    def similarity(state_a, state_b):
+    def similarity(state_a: SimState, state_b: SimState) -> float:
         """
         The (L2) distance between the counts of the state addresses in the history of the path.
         :param state_a: The first state to compare
@@ -95,7 +106,7 @@ class UniqueSearch(ExplorationTechnique):
         return 1.0 / (1 + normal_distance)
 
     @staticmethod
-    def sequence_matcher_similarity(state_a, state_b):
+    def sequence_matcher_similarity(state_a: SimState, state_b: SimState) -> float:
         """
         The `difflib.SequenceMatcher` ratio between the state addresses in the history of the path.
         :param state_a: The first state to compare

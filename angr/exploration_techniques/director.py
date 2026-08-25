@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from typing import TYPE_CHECKING
 
 import claripy
 import networkx
@@ -12,6 +13,10 @@ from angr.knowledge_base import KnowledgeBase
 from angr.sim_type import SimType, SimTypeChar, SimTypePointer, SimTypeReg, SimTypeString
 
 from .base import ExplorationTechnique
+
+if TYPE_CHECKING:
+    from angr.analyses.cfg.cfg_emulated import CFGEmulated
+    from angr.sim_manager import SimulationManager
 
 l = logging.getLogger(name=__name__)
 
@@ -87,7 +92,7 @@ class BaseGoal:
         """
 
         if max_steps is None:
-            yield networkx.dfs_edges(graph.to_networkx(), source)
+            yield from networkx.dfs_edges(graph.to_networkx(), source)
 
         else:
             steps_map = defaultdict(int)
@@ -270,7 +275,14 @@ class CallFunctionGoal(BaseGoal):
         # TODO: add calling convention detection to individual functions, and use that instead of the
         # TODO: default calling convention of the platform
 
-        cc = default_cc(arch.name, platform=state.project.simos.name if state.project.simos is not None else None)(arch)
+        cc_cls = default_cc(
+            arch.name,
+            platform=state.project.simos.name
+            if state.project is not None and state.project.simos is not None
+            else None,
+        )
+        assert cc_cls is not None, f"Unable to determine a default calling convention for arch {arch.name}"
+        cc = cc_cls(arch)
         real_args = cc.get_args(state, cc.guess_prototype([0] * len(self.arguments)))
 
         for _i, (expected_arg, real_arg) in enumerate(zip(self.arguments, real_args)):
@@ -330,7 +342,7 @@ class CallFunctionGoal(BaseGoal):
     def _compare_pointer_content(state, ptr, expected):
         if isinstance(expected, str):
             # convert it to an AST
-            expected = claripy.BVV(expected)
+            expected = claripy.BVV(expected.encode())
         length = expected.size() // 8
         real_string = state.memory.load(ptr, length, endness="Iend_BE")
 
@@ -389,10 +401,10 @@ class Director(ExplorationTechnique):
         self._goal_satisfied_callback = goal_satisfied_callback
         self._num_fallback_states = num_fallback_states
 
-        self._cfg = None
-        self._cfg_kb = None
+        self._cfg: CFGEmulated | None = None
+        self._cfg_kb: KnowledgeBase | None = None
 
-    def step(self, simgr, stash="active", **kwargs):
+    def step(self, simgr: SimulationManager, stash: str = "active", **kwargs) -> SimulationManager:
         """
 
         :param simgr:
@@ -443,12 +455,14 @@ class Director(ExplorationTechnique):
         :return:
         """
 
+        from angr.analyses.cfg.cfg_emulated import CFGEmulated  # pylint:disable=import-outside-toplevel
+
         if self._cfg is None:
             starts = list(simgr.active)
             self._cfg_kb = KnowledgeBase(self.project)
 
-            self._cfg = self.project.analyses.CFGEmulated(
-                kb=self._cfg_kb, starts=starts, max_steps=self._peek_blocks, keep_state=self._cfg_keep_states
+            self._cfg = self.project.analyses[CFGEmulated].prep(kb=self._cfg_kb)(
+                starts=starts, max_steps=self._peek_blocks, keep_state=self._cfg_keep_states
             )
 
         else:

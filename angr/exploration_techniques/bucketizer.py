@@ -3,10 +3,15 @@ from __future__ import annotations
 import logging
 import math
 from collections import defaultdict
+from typing import TYPE_CHECKING
 
 from angr.engines.successors import SimSuccessors
 
 from .base import ExplorationTechnique
+
+if TYPE_CHECKING:
+    from angr.sim_manager import SimulationManager
+    from angr.sim_state import SimState
 
 _l = logging.getLogger(__name__)
 
@@ -16,7 +21,7 @@ class Bucketizer(ExplorationTechnique):
     Loop bucketization: Pick log(n) paths out of n possible paths, and stash (or drop) everything else.
     """
 
-    def successors(self, simgr, state, **kwargs):
+    def successors(self, simgr: SimulationManager, state: SimState, **kwargs) -> SimSuccessors:
         # step first
         successors: SimSuccessors = super().successors(simgr, state, **kwargs)
 
@@ -49,7 +54,7 @@ class Bucketizer(ExplorationTechnique):
         return successors
 
     @staticmethod
-    def _get_transition_dict(state):
+    def _get_transition_dict(state: SimState):
         """
 
         :param SimState state:
@@ -64,7 +69,7 @@ class Bucketizer(ExplorationTechnique):
         return t
 
     @staticmethod
-    def _record_transition(state, transition):
+    def _record_transition(state: SimState, transition) -> None:
         """
 
         :param SimState state:
@@ -78,7 +83,7 @@ class Bucketizer(ExplorationTechnique):
         state.globals["transition"] = t
 
     @staticmethod
-    def _accept_transition(state, transition):
+    def _accept_transition(state: SimState, transition) -> bool:
         """
 
         :param SimState state:

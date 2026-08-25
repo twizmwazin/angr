@@ -1,10 +1,16 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from angr.errors import AngrExitError
 
 from .base import ExplorationTechnique
+
+if TYPE_CHECKING:
+    from angr.engines.successors import SimSuccessors
+    from angr.sim_manager import SimulationManager
+    from angr.sim_state import SimState
 
 l = logging.getLogger(name=__name__)
 
@@ -14,7 +20,7 @@ class Slicecutor(ExplorationTechnique):
     The Slicecutor is an exploration that executes provided code slices.
     """
 
-    def __init__(self, annotated_cfg, force_taking_exit=False, force_sat: bool = False):
+    def __init__(self, annotated_cfg, force_taking_exit: bool = False, force_sat: bool = False):
         """
         All parameters except `annotated_cfg` are optional.
 
@@ -30,15 +36,15 @@ class Slicecutor(ExplorationTechnique):
         self._force_taking_exit = force_taking_exit
         self._force_sat = force_sat
 
-    def setup(self, simgr):
+    def setup(self, simgr: SimulationManager) -> None:
         for stash in ("cut", "mysteries"):
             simgr.populate(stash, [])
 
-    def filter(self, simgr, state, **kwargs):
+    def filter(self, simgr: SimulationManager, state: SimState, **kwargs) -> str | tuple[str, SimState] | None:
         l.debug("Checking state %s for filtering...", state)
         return simgr.filter(state, **kwargs)
 
-    def step_state(self, simgr, state, **kwargs):
+    def step_state(self, simgr: SimulationManager, state: SimState, **kwargs) -> dict[str | None, list[SimState]]:
         l.debug("%s ticking state %s at address %#x.", self, state, state.addr)
         stashes = simgr.step_state(state, **kwargs)
 
@@ -98,21 +104,21 @@ class Slicecutor(ExplorationTechnique):
                 # drop all constraints
                 if suc.mode == "fastpath":
                     # dropping constraints and making the state satisfiable again under fastpath mode is easy
-                    suc.solver._solver.constraints = []
+                    suc.solver._solver.constraints = []  # pyright: ignore[reportAttributeAccessIssue]
                     suc._satisfiable = True
                     new_active.append(suc)
                     l.debug("Forced unsat at %#x to be sat again.", suc.addr)
                 else:
                     # with multiple possible solver frontends, dropping states in other state modes is not
                     # straightforward. I'll leave it to the next person who uses this feature
-                    l.warning("force_sat is not implemented for solver mode %s.", suc.moe)
+                    l.warning("force_sat is not implemented for solver mode %s.", suc.mode)
 
         stashes[None] = new_active
         stashes["mystery"] = new_mystery
         stashes["cut"] = new_cut
         return stashes
 
-    def successors(self, simgr, state, **kwargs):
+    def successors(self, simgr: SimulationManager, state: SimState, **kwargs) -> SimSuccessors:
         kwargs["whitelist"] = self._annotated_cfg.get_whitelisted_statements(state.addr)
         kwargs["last_stmt"] = self._annotated_cfg.get_last_statement_index(state.addr)
         return simgr.successors(state, **kwargs)

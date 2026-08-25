@@ -26,13 +26,18 @@ if TYPE_CHECKING:
     from angr.simos.javavm import SimJavaVM
 
     from .state_plugins.callstack import CallStack
+    from .state_plugins.globals import SimStateGlobals
     from .state_plugins.heap.heap_base import SimHeapBase
     from .state_plugins.history import SimStateHistory
     from .state_plugins.inspect import SimInspector
     from .state_plugins.jni_references import SimStateJNIReferences
+    from .state_plugins.libc import SimStateLibc
+    from .state_plugins.loop_data import SimStateLoopData
     from .state_plugins.posix import SimSystemPosix
+    from .state_plugins.preconstrainer import SimStatePreconstrainer
     from .state_plugins.scratch import SimStateScratch
     from .state_plugins.solver import SimSolver
+    from .state_plugins.unicorn_engine import Unicorn
     from .state_plugins.view import SimMemView, SimRegNameView
     from .storage import DefaultMemory
 
@@ -92,6 +97,11 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
     jni_references: SimStateJNIReferences
     scratch: SimStateScratch
     heap: SimHeapBase
+    globals: SimStateGlobals
+    libc: SimStateLibc
+    loop_data: SimStateLoopData
+    preconstrainer: SimStatePreconstrainer
+    unicorn: Unicorn
 
     def __init__(
         self,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools
 import logging
+from typing import TYPE_CHECKING
 
 import claripy
 
@@ -10,6 +11,10 @@ from angr.engines.successors import SimSuccessors
 from angr.errors import AngrError, SimCCallError, SimError, SimUnsupportedError
 
 from .base import ExplorationTechnique
+
+if TYPE_CHECKING:
+    from angr.sim_manager import SimulationManager
+    from angr.sim_state import SimState
 
 l = logging.getLogger(name=__name__)
 
@@ -25,12 +30,12 @@ class Oppologist(ExplorationTechnique):
         ExplorationTechnique.__init__(self)
 
     @staticmethod
-    def _restore_state(old, new):
+    def _restore_state(old: SimState, new: SimState) -> None:
         new.release_plugin("unicorn")
         new.register_plugin("unicorn", old.unicorn.copy())
         new.options = old.options.copy()
 
-    def _oppologize(self, simgr, state, pn, **kwargs):
+    def _oppologize(self, simgr: SimulationManager, state: SimState, pn: SimState, **kwargs) -> SimSuccessors:
         l.debug("... pn: %s", pn)
 
         pn.options.add(sim_options.UNICORN)
@@ -51,7 +56,7 @@ class Oppologist(ExplorationTechnique):
         return ss
 
     @staticmethod
-    def _combine_results(*results):
+    def _combine_results(*results: SimSuccessors) -> SimSuccessors:
         final = SimSuccessors(results[0].addr, results[0].initial_state)
         final.description = "Oppology"
         final.sort = "Oppologist"
@@ -75,7 +80,7 @@ class Oppologist(ExplorationTechnique):
         results.extend(map(functools.partial(self._oppologize, simgr, state, **kwargs), need_oppologizing))
         return self._combine_results(*results)
 
-    def successors(self, simgr, state, **kwargs):
+    def successors(self, simgr: SimulationManager, state: SimState, **kwargs) -> SimSuccessors:
         try:
             kwargs.pop("throw", None)
             return simgr.successors(state, **kwargs)

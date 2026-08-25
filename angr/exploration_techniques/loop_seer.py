@@ -1,12 +1,21 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING, Any
 
 from angr.analyses.loopfinder import Loop
 from angr.knowledge_base import KnowledgeBase
 from angr.knowledge_plugins.functions import Function
 
 from .base import ExplorationTechnique
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
+
+    from angr.analyses.cfg.cfg_base import CFGBase
+    from angr.engines.successors import SimSuccessors
+    from angr.sim_manager import SimulationManager
+    from angr.sim_state import SimState
 
 l = logging.getLogger(name=__name__)
 
@@ -20,14 +29,14 @@ class LoopSeer(ExplorationTechnique):
 
     def __init__(
         self,
-        cfg=None,
-        functions=None,
-        loops=None,
-        use_header=False,
-        bound=None,
-        bound_reached=None,
-        discard_stash="spinning",
-        limit_concrete_loops=True,
+        cfg: CFGBase | None = None,
+        functions: str | int | Function | Iterable[str | int | Function] | None = None,
+        loops: Loop | Iterable[Loop] | None = None,
+        use_header: bool = False,
+        bound: int | None = None,
+        bound_reached: Callable[[LoopSeer, SimState], Any] | None = None,
+        discard_stash: str = "spinning",
+        limit_concrete_loops: bool = True,
     ):
         """
         :param cfg:                   Normalized CFG is required.
@@ -52,33 +61,37 @@ class LoopSeer(ExplorationTechnique):
         self.discard_stash = discard_stash
         self.use_header = use_header
         self.limit_concrete_loops = limit_concrete_loops
-        self.loops = {}
-        self.cut_succs = []
+        self.loops: dict[int, Loop] = {}
+        self.cut_succs: list[SimState] = []
 
-        if type(loops) is Loop:
+        if isinstance(loops, Loop):
             loops = [loops]
 
-        if type(loops) in (list, tuple) and all(type(l) is Loop for l in loops):
+        if loops is not None:
+            if not isinstance(loops, (list, tuple)) or any(not isinstance(loop, Loop) for loop in loops):
+                raise TypeError("Invalid type for 'loops' parameter!")
             for loop in loops:
                 if loop.entry_edges:
                     self.loops[loop.entry_edges[0][1].addr] = loop
 
-        elif loops is not None:
-            raise TypeError("Invalid type for 'loops' parameter!")
+    def setup(self, simgr: SimulationManager) -> None:
+        from angr.analyses.cfg.cfg_fast import CFGFast  # pylint:disable=import-outside-toplevel
+        from angr.analyses.loopfinder import LoopFinder  # pylint:disable=import-outside-toplevel
 
-    def setup(self, simgr):
         if self.cfg is None:
             cfg_kb = KnowledgeBase(self.project)
-            self.cfg = self.project.analyses.CFGFast(kb=cfg_kb, normalize=True)
+            self.cfg = self.project.analyses[CFGFast].prep(kb=cfg_kb)(normalize=True)
         elif not self.cfg.normalized:
             l.warning("LoopSeer must use a normalized CFG. Normalizing the provided CFG...")
             self.cfg.normalize()
 
-        funcs = None
-        if type(self.functions) in (str, int, Function):
+        funcs: list[Function | None] | None = None
+        if isinstance(self.functions, (str, int, Function)):
             funcs = [self._get_function(self.functions)]
 
-        elif type(self.functions) in (list, tuple) and all(type(f) in (str, int, Function) for f in self.functions):
+        elif isinstance(self.functions, (list, tuple)):
+            if any(not isinstance(f, (str, int, Function)) for f in self.functions):
+                raise TypeError("Invalid type for 'functions' parameter!")
             funcs = []
             for f in self.functions:
                 func = self._get_function(f)
@@ -90,20 +103,21 @@ class LoopSeer(ExplorationTechnique):
             raise TypeError("Invalid type for 'functions' parameter!")
 
         if not self.loops:
-            loop_finder = self.project.analyses.LoopFinder(kb=self.cfg.kb, normalize=True, functions=funcs)
+            loop_finder = self.project.analyses[LoopFinder].prep(kb=self.cfg.kb)(normalize=True, functions=funcs)
 
             for loop in loop_finder.loops:
                 if loop.entry_edges:
                     entry = loop.entry_edges[0][1]
                     self.loops[entry.addr] = loop
 
-    def filter(self, simgr, state, **kwargs):
+    def filter(self, simgr: SimulationManager, state: SimState, **kwargs) -> str | tuple[str, SimState] | None:
         if state in self.cut_succs:
             self.cut_succs.remove(state)
             return self.discard_stash
         return simgr.filter(state, **kwargs)
 
-    def successors(self, simgr, state, **kwargs):
+    def successors(self, simgr: SimulationManager, state: SimState, **kwargs) -> SimSuccessors:
+        assert self.cfg is not None, "LoopSeer must be set up before stepping"
         node = self.cfg.model.get_any_node(state.addr)
         if node is not None:
             kwargs["num_inst"] = min(kwargs.get("num_inst", float("inf")), len(node.instruction_addrs))
@@ -116,8 +130,8 @@ class LoopSeer(ExplorationTechnique):
         for succ_state in succs.successors:
             if succ_state.loop_data.current_loop and succ_state.addr in succ_state.loop_data.current_loop[-1][1]:
                 l.debug(
-                    "One of the successors: %s is at the exit of the current loop %s",
-                    hex(succ_state.addr),
+                    "One of the successors: %#x is at the exit of the current loop %s",
+                    succ_state.addr,
                     succ_state.loop_data.current_loop[-1][0],
                 )
                 at_loop_exit = True
@@ -141,15 +155,15 @@ class LoopSeer(ExplorationTechnique):
                         # traversed the continue edge" we did an iteration over the back edge.
                         if succ_state.history.addr in continue_addrs:
                             l.debug(
-                                "Continue edge traversed, incrementing back_edge_trip_counts for addr at %s",
-                                hex(succ_state.addr),
+                                "Continue edge traversed, incrementing back_edge_trip_counts for addr at %#x",
+                                succ_state.addr,
                             )
                             # This is an iteration on the back edge.
                             succ_state.loop_data.back_edge_trip_counts[succ_state.addr][-1] += 1
 
                         l.debug(
-                            "Continue edge traversed, incrementing header_trip_counts for addr at %s",
-                            hex(succ_state.addr),
+                            "Continue edge traversed, incrementing header_trip_counts for addr at %#x",
+                            succ_state.addr,
                         )
                         # This is also an iteration over the loop's header
                         succ_state.loop_data.header_trip_counts[succ_state.addr][-1] += 1
@@ -157,14 +171,14 @@ class LoopSeer(ExplorationTechnique):
                 # current_loop[-1][1] is the exit node of the current loop.
                 elif succ_state.addr in succ_state.loop_data.current_loop[-1][1]:
                     # We have terminated the loop, so let's pop it out from the current active.
-                    l.debug("Deactivating loop at %s because hits the exit node", hex(succ_state.addr))
+                    l.debug("Deactivating loop at %#x because hits the exit node", succ_state.addr)
                     succ_state.loop_data.current_loop.pop()
 
                 elif at_loop_exit:
                     # We're not at the header, but we're where we exit the loop
                     # NOTE: this only matters if you want to not limit concrete loops
                     if not self.limit_concrete_loops and len(succs.successors) > 1:
-                        l.debug("At loop exit, incrementing back_edge_trip_counts for addr at %s", hex(succ_state.addr))
+                        l.debug("At loop exit, incrementing back_edge_trip_counts for addr at %#x", succ_state.addr)
                         succ_state.loop_data.back_edge_trip_counts[succ_state.addr][-1] += 1
 
                 # If we have set a bound for symbolic/concrete loops we want to handle it here
@@ -190,15 +204,16 @@ class LoopSeer(ExplorationTechnique):
                 l.debug("%s back edge based trip counts %s", state, state.loop_data.back_edge_trip_counts)
                 l.debug("%s header based trip counts %s", state, state.loop_data.header_trip_counts)
             else:
-                l.debug("No loop are currently active at %s", hex(succ_state.addr))
+                l.debug("No loop are currently active at %#x", succ_state.addr)
 
             # Loop entry detected. This test is put here because in case of
             # nested loops, we want to handle the outer loop before proceeding
             # the inner loop.
-            if succ_state.addr in self.loops and not self._inside_current_loops(succ_state):
-                loop = self.loops[succ_state.addr]
+            succ_addr = succ_state.addr
+            if isinstance(succ_addr, int) and succ_addr in self.loops and not self._inside_current_loops(succ_state):
+                loop = self.loops[succ_addr]
                 header = loop.entry.addr
-                l.debug("Activating loop %s for state at %s", loop, hex(succ_state.addr))
+                l.debug("Activating loop %s for state at %#x", loop, succ_addr)
                 exits = [e[1].addr for e in loop.break_edges]
 
                 succ_state.loop_data.back_edge_trip_counts[header].append(0)
@@ -218,19 +233,20 @@ class LoopSeer(ExplorationTechnique):
         current_loops_addrs = [x[0].entry.addr for x in succ_state.loop_data.current_loop]
         return succ_state.addr in current_loops_addrs
 
-    def _get_function(self, func):
+    def _get_function(self, func: str | int | Function) -> Function | None:
         f = None
-        if type(func) is str:
+        assert self.cfg is not None
+        if isinstance(func, str):
             f = self.cfg.kb.functions.function(name=func)
             if f is None:
                 l.warning("Function '%s' doesn't exist in the CFG. Skipping...", func)
 
-        elif type(func) is int:
+        elif isinstance(func, int):
             f = self.cfg.kb.functions.function(addr=func)
             if f is None:
                 l.warning("Function at 0x%x doesn't exist in the CFG. Skipping...", func)
 
-        elif type(func) is Function:
+        elif isinstance(func, Function):
             f = func
 
         return f

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     import angr
+    from angr.engines.successors import SimSuccessors
+    from angr.sim_manager import SimulationManager
+    from angr.sim_state import SimState
 
 
 class ExplorationTechnique:
@@ -22,22 +25,24 @@ class ExplorationTechnique:
     def _get_hooks(self):
         return {name: getattr(self, name) for name in self._hook_list if self._is_overridden(name)}
 
-    def _is_overridden(self, name):
+    def _is_overridden(self, name: str) -> bool:
         return getattr(self, name).__code__ is not getattr(ExplorationTechnique, name).__code__
 
     def __init__(self):
         # this attribute will be set from above by the manager
         if not hasattr(self, "project"):
-            self.project: angr.Project = None
+            self.project: angr.Project = cast("angr.Project", None)
 
-    def setup(self, simgr):
+    def setup(self, simgr: SimulationManager) -> None:
         """
         Perform any initialization on this manager you might need to do.
 
         :param angr.SimulationManager simgr:    The simulation manager to which you have just been added
         """
 
-    def step(self, simgr, stash="active", **kwargs):  # pylint:disable=no-self-use
+    def step(  # pylint:disable=no-self-use
+        self, simgr: SimulationManager, stash: str = "active", **kwargs
+    ) -> SimulationManager:
         """
         Hook the process of stepping a stash forward. Should call ``simgr.step(stash, **kwargs)`` in order to do the
         actual processing.
@@ -45,9 +50,11 @@ class ExplorationTechnique:
         :param angr.SimulationManager simgr:
         :param str stash:
         """
-        simgr.step(stash=stash, **kwargs)
+        return simgr.step(stash=stash, **kwargs)
 
-    def filter(self, simgr, state, **kwargs):  # pylint:disable=no-self-use
+    def filter(  # pylint:disable=no-self-use
+        self, simgr: SimulationManager, state: SimState, **kwargs
+    ) -> str | tuple[str, SimState] | None:
         """
         Perform filtering on which stash a state should be inserted into.
 
@@ -63,7 +70,7 @@ class ExplorationTechnique:
         """
         return simgr.filter(state, **kwargs)
 
-    def selector(self, simgr, state, **kwargs):  # pylint:disable=no-self-use
+    def selector(self, simgr: SimulationManager, state: SimState, **kwargs) -> bool:  # pylint:disable=no-self-use
         """
         Determine if a state should participate in the current round of stepping.
         Return True if the state should be stepped, and False if the state should not be stepped.
@@ -76,7 +83,9 @@ class ExplorationTechnique:
         """
         return simgr.selector(state, **kwargs)
 
-    def step_state(self, simgr, state, **kwargs):  # pylint:disable=no-self-use
+    def step_state(  # pylint:disable=no-self-use
+        self, simgr: SimulationManager, state: SimState, **kwargs
+    ) -> dict[str | None, list[SimState]]:
         """
         Determine the categorization of state successors into stashes. The result should be a dict mapping stash names
         to the list of successor states that fall into that stash, or None as a stash name to use the original stash
@@ -95,7 +104,9 @@ class ExplorationTechnique:
         """
         return simgr.step_state(state, **kwargs)
 
-    def successors(self, simgr, state, **kwargs):  # pylint:disable=no-self-use
+    def successors(  # pylint:disable=no-self-use
+        self, simgr: SimulationManager, state: SimState, **kwargs
+    ) -> SimSuccessors:
         """
         Perform the process of stepping a state forward, returning a SimSuccessors object.
 
@@ -111,7 +122,7 @@ class ExplorationTechnique:
         """
         return simgr.successors(state, **kwargs)
 
-    def complete(self, simgr):  # pylint:disable=no-self-use,unused-argument
+    def complete(self, simgr: SimulationManager) -> bool:  # pylint:disable=no-self-use,unused-argument
         """
         Return whether or not this manager has reached a "completed" state, i.e. ``SimulationManager.run()`` should
         halt.

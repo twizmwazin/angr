@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import psutil
 
 from .base import ExplorationTechnique
+
+if TYPE_CHECKING:
+    from angr.sim_manager import SimulationManager
 
 
 class MemoryWatcher(ExplorationTechnique):
@@ -18,7 +23,7 @@ class MemoryWatcher(ExplorationTechnique):
     off states to effectively stop execution if we're below a given threshold.
     """
 
-    def __init__(self, min_memory=512, memory_stash="lowmem"):
+    def __init__(self, min_memory: int | None = 512, memory_stash: str = "lowmem"):
         super().__init__()
 
         if min_memory is not None:
@@ -29,11 +34,11 @@ class MemoryWatcher(ExplorationTechnique):
 
         self.memory_stash = memory_stash
 
-    def setup(self, simgr):
+    def setup(self, simgr: SimulationManager) -> None:
         if self.memory_stash not in simgr.stashes:
             simgr.stashes[self.memory_stash] = []
 
-    def step(self, simgr, stash="active", **kwargs):
+    def step(self, simgr: SimulationManager, stash: str = "active", **kwargs) -> SimulationManager:
         if psutil.virtual_memory().available <= self.min_memory:
             simgr.move(from_stash="active", to_stash=self.memory_stash)
 

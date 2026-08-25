@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from .base import ExplorationTechnique
+
+if TYPE_CHECKING:
+    from angr.sim_manager import SimulationManager
 
 l = logging.getLogger(name=__name__)
 
 
 class ManualMergepoint(ExplorationTechnique):
-    def __init__(self, address, wait_counter=10, prune=True):
+    def __init__(self, address: int, wait_counter: int = 10, prune: bool = True):
         super().__init__()
         self.address = address
         self.wait_counter_limit = wait_counter
@@ -17,18 +21,18 @@ class ManualMergepoint(ExplorationTechnique):
         self.stash = f"merge_waiting_{self.address:#x}_{id(self):x}"
         self.filter_marker = f"skip_next_filter_{self.address:#x}"
 
-    def setup(self, simgr):
+    def setup(self, simgr: SimulationManager) -> None:
         simgr.stashes[self.stash] = []
 
-    def mark_nofilter(self, simgr, stash):
+    def mark_nofilter(self, simgr: SimulationManager, stash: str) -> None:
         for state in simgr.stashes[stash]:
             state.globals[self.filter_marker] = True
 
-    def mark_okfilter(self, simgr, stash):
+    def mark_okfilter(self, simgr: SimulationManager, stash: str) -> None:
         for state in simgr.stashes[stash]:
             state.globals.pop(self.filter_marker)
 
-    def step(self, simgr, stash="active", **kwargs):
+    def step(self, simgr: SimulationManager, stash: str = "active", **kwargs) -> SimulationManager:
         # ha ha, very funny, if this is being run on a single-step basis our filter probably misfired
         if len(simgr.stashes[self.stash]) == 1 and len(simgr.stashes[stash]) == 0:
             simgr = simgr.move(self.stash, stash)

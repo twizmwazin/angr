@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, Self, cast
 
 import angr
 from angr.misc.ux import once
@@ -15,10 +15,20 @@ if TYPE_CHECKING:
 l = logging.getLogger(name=__name__)
 
 
+class _BoundCopyFunc[S_co](Protocol):
+    """
+    A ``copy`` method that has been bound to its plugin instance.
+    """
+
+    def __call__(self, memo: dict[int, Any] | None = None) -> S_co: ...
+
+
 class _CopyFunc[S_co](Protocol):
     """
-    Function wrapping copy method for memo tracking.
+    Function wrapping copy method for memo tracking. Accessing it on a plugin instance binds it, like any method.
     """
+
+    def __get__(self, instance: Any, owner: type | None = None, /) -> _BoundCopyFunc[S_co]: ...
 
     def __call__(self, _self: Any, memo: dict[int, Any] | None = None) -> S_co: ...
 
@@ -63,7 +73,7 @@ class SimStatePlugin:
         return cast(_CopyFunc[S_co], inner)
 
     @memo
-    def copy(self, _memo: dict[int, Any]) -> SimStatePlugin:
+    def copy(self, _memo: dict[int, Any]) -> Self:
         """
         Should return a copy of the plugin without any state attached. Should check the memo first, and add itself to
         memo if it ends up making a new copy.

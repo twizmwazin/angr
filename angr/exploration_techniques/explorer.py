@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING, Any
 
 import claripy
 
@@ -9,6 +10,13 @@ from angr.state_plugins.sim_event import resource_event
 
 from .base import ExplorationTechnique
 from .common import condition_to_lambda
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
+
+    from angr.analyses.cfg.cfg_base import CFGBase
+    from angr.sim_manager import SimulationManager
+    from angr.sim_state import SimState
 
 l = logging.getLogger(name=__name__)
 
@@ -33,15 +41,22 @@ class Explorer(ExplorationTechnique):
     """
 
     def __init__(
-        self, find=None, avoid=None, find_stash="found", avoid_stash="avoid", cfg=None, num_find=1, avoid_priority=False
+        self,
+        find: int | Iterable[int] | Callable[[SimState], Any] | None = None,
+        avoid: int | Iterable[int] | Callable[[SimState], Any] | None = None,
+        find_stash: str = "found",
+        avoid_stash: str = "avoid",
+        cfg: CFGBase | None = None,
+        num_find: int = 1,
+        avoid_priority: bool = False,
     ):
         super().__init__()
         self.find, static_find = condition_to_lambda(find)
         self.avoid, static_avoid = condition_to_lambda(avoid)
         self.find_stash = find_stash
         self.avoid_stash = avoid_stash
-        self.cfg = cfg
-        self.ok_blocks = set()
+        self.cfg: CFGBase | None = cfg
+        self.ok_blocks: set[int] = set()
         self.num_find = num_find
         self.avoid_priority = avoid_priority
 
@@ -57,8 +72,9 @@ class Explorer(ExplorationTechnique):
             l.error("Usage of the CFG has been disabled for this explorer.")
             self.cfg = None
 
-        if self.cfg is not None:
-            avoid = static_avoid or set()
+        cfg = self.cfg
+        if cfg is not None:
+            static_avoid_addrs = static_avoid or set()
 
             # we need the find addresses to be determined statically
             if not static_find:
@@ -67,7 +83,7 @@ class Explorer(ExplorationTechnique):
                 self.cfg = None
                 return
 
-            for a in avoid:
+            for a in static_avoid_addrs:
                 if cfg.model.get_any_node(a) is None:
                     l.warning("'Avoid' address %#x not present in CFG...", a)
 
@@ -85,7 +101,7 @@ class Explorer(ExplorationTechnique):
                 n = queue.pop()
                 if id(n) in seen_nodes:
                     continue
-                if n.addr in avoid:
+                if n.addr in static_avoid_addrs:
                     continue
                 self.ok_blocks.add(n.addr)
                 seen_nodes.add(id(n))
@@ -100,24 +116,24 @@ class Explorer(ExplorationTechnique):
             l.warning("Please be sure that the CFG you have passed in is complete.")
             l.warning("Providing an incomplete CFG can cause viable paths to be discarded!")
 
-    def setup(self, simgr):
+    def setup(self, simgr: SimulationManager) -> None:
         if self.find_stash not in simgr.stashes:
             simgr.stashes[self.find_stash] = []
         if self.avoid_stash not in simgr.stashes:
             simgr.stashes[self.avoid_stash] = []
 
-    def step(self, simgr, stash="active", **kwargs):
+    def step(self, simgr: SimulationManager, stash: str = "active", **kwargs) -> SimulationManager:
         base_extra_stop_points = set(kwargs.pop("extra_stop_points", []))
         return simgr.step(stash=stash, extra_stop_points=base_extra_stop_points | self._extra_stop_points, **kwargs)
 
     # make it more natural to deal with the intended dataflow
-    def filter(self, simgr, state, **kwargs):
+    def filter(self, simgr: SimulationManager, state: SimState, **kwargs) -> str | tuple[str, SimState] | None:
         stash = self._filter_inner(state)
         if stash is None:
             return simgr.filter(state, **kwargs)
         return stash
 
-    def _filter_inner(self, state):
+    def _filter_inner(self, state: SimState) -> str | None:
         if self._unknown_stop_points and sim_options.UNICORN in state.options and not self._warned_unicorn:
             l.warning("Using unicorn with find/avoid conditions that are a lambda (not a number, set, tuple or list)")
             l.warning("Unicorn may step over states that match the condition (find or avoid) without stopping.")
@@ -135,7 +151,7 @@ class Explorer(ExplorationTechnique):
                 avoidable = self.avoid(state)
                 if avoidable and (avoidable is True or state.addr in avoidable):
                     return self.avoid_stash
-        except claripy.errors.ClaripySolverInterruptError as e:
+        except claripy.ClaripySolverInterruptError as e:
             resource_event(state, e)
             return "interrupted"
 
@@ -148,5 +164,5 @@ class Explorer(ExplorationTechnique):
 
         return None
 
-    def complete(self, simgr):
+    def complete(self, simgr: SimulationManager) -> bool:
         return len(simgr.stashes[self.find_stash]) >= self.num_find

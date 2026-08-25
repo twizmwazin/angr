@@ -2,8 +2,16 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from typing import TYPE_CHECKING, Any
 
 from .base import ExplorationTechnique
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from angr.engines.successors import SimSuccessors
+    from angr.sim_manager import SimulationManager
+    from angr.sim_state import SimState
 
 l = logging.getLogger(name=__name__)
 
@@ -13,7 +21,12 @@ class LocalLoopSeer(ExplorationTechnique):
     LocalLoopSeer monitors exploration and maintains all loop-related data without relying on a control flow graph.
     """
 
-    def __init__(self, bound=None, bound_reached=None, discard_stash="spinning"):
+    def __init__(
+        self,
+        bound: int | None = None,
+        bound_reached: Callable[[LocalLoopSeer, SimState], Any] | None = None,
+        discard_stash: str = "spinning",
+    ):
         """
         :param bound:                 Limit the number of iterations a loop may be executed.
         :param bound_reached:         If provided, should be a function that takes the LoopSeer and the succ_state.
@@ -26,19 +39,19 @@ class LocalLoopSeer(ExplorationTechnique):
         self.bound = bound
         self.bound_reached = bound_reached
         self.discard_stash = discard_stash
-        self.block_counters = defaultdict(int)
-        self.cut_succs = []
+        self.block_counters: defaultdict[int, int] = defaultdict(int)
+        self.cut_succs: list[SimState] = []
 
-    def setup(self, simgr):
+    def setup(self, simgr: SimulationManager) -> None:
         pass
 
-    def filter(self, simgr, state, **kwargs):
+    def filter(self, simgr: SimulationManager, state: SimState, **kwargs) -> str | tuple[str, SimState] | None:
         if state in self.cut_succs:
             self.cut_succs.remove(state)
             return self.discard_stash
         return simgr.filter(state, **kwargs)
 
-    def successors(self, simgr, state, **kwargs):
+    def successors(self, simgr: SimulationManager, state: SimState, **kwargs) -> SimSuccessors:
         succs = simgr.successors(state, **kwargs)
 
         for succ_state in succs.successors:

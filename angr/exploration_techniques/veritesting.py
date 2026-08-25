@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from angr.sim_options import EFFICIENT_STATE_MERGING
 
 from .base import ExplorationTechnique
+
+if TYPE_CHECKING:
+    from angr.sim_manager import SimulationManager
+    from angr.sim_state import SimState
 
 
 class Veritesting(ExplorationTechnique):
@@ -17,7 +23,9 @@ class Veritesting(ExplorationTechnique):
         super().__init__()
         self.options = options
 
-    def step_state(self, simgr, state, successor_func=None, **kwargs):
+    def step_state(
+        self, simgr: SimulationManager, state: SimState, successor_func=None, **kwargs
+    ) -> dict[str | None, list[SimState]]:
         if EFFICIENT_STATE_MERGING not in state.options:
             state.options.add(EFFICIENT_STATE_MERGING)
 
@@ -32,7 +40,8 @@ class Veritesting(ExplorationTechnique):
                 "unconstrained": simgr2.stashes.get("unconstrained", []),
                 "unsat": simgr2.stashes.get("unsat", []),
                 "pruned": simgr2.stashes.get("pruned", []),
-                "errored": simgr2.errored,
+                # the ErrorRecords are intentionally stored into the "errored" stash as-is
+                "errored": simgr2.errored,  # pyright: ignore[reportReturnType]
             }
 
         return simgr.step_state(state, successor_func=successor_func, **kwargs)

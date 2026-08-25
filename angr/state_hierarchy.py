@@ -5,11 +5,16 @@ import itertools
 import logging
 import weakref
 from contextlib import contextmanager
+from typing import TYPE_CHECKING
 
 import claripy
 import networkx
 
 from .misc.picklable_lock import PicklableRLock
+
+if TYPE_CHECKING:
+    from .sim_state import SimState
+    from .state_plugins.history import SimStateHistory
 
 l = logging.getLogger(name=__name__)
 
@@ -239,7 +244,7 @@ class StateHierarchy:
     # Smart merging support
     #
 
-    def most_mergeable(self, states):
+    def most_mergeable(self, states: list[SimState]) -> tuple[list[SimState], SimStateHistory | None, list[SimState]]:
         """
         Find the "most mergeable" set of states from those provided.
 
@@ -260,4 +265,4 @@ class StateHierarchy:
                     )
 
             # didn't find any?
-            return set(), None, states
+            return [], None, states

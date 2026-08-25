@@ -331,7 +331,7 @@ class Veritesting(Analysis):
             manager.stash(
                 filter_func=lambda state: (
                     state.history.jumpkind not in ("Ijk_Boring", "Ijk_Call", "Ijk_Ret", "Ijk_NoHook")
-                    and not state.history.jumpkind.startswith("Ijk_Sys")
+                    and not (state.history.jumpkind or "").startswith("Ijk_Sys")
                 ),
                 to_stash="deadended",
             )

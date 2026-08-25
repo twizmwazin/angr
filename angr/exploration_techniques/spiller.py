@@ -3,10 +3,15 @@ from __future__ import annotations
 
 import contextlib
 import logging
+from typing import TYPE_CHECKING
 
 from angr import vaults
 
 from .base import ExplorationTechnique
+
+if TYPE_CHECKING:
+    from angr.sim_manager import SimulationManager
+    from angr.sim_state import SimState
 
 l = logging.getLogger(name=__name__)
 
@@ -16,14 +21,14 @@ class PickledStatesBase:
     The base class of pickled states
     """
 
-    def sort(self):
+    def sort(self) -> None:
         """
         Sort pickled states.
         """
 
         raise NotImplementedError
 
-    def add(self, prio, sid):
+    def add(self, prio: int, sid: str) -> None:
         """
         Add a newly pickled state.
 
@@ -33,7 +38,7 @@ class PickledStatesBase:
         """
         raise NotImplementedError
 
-    def pop_n(self, n):
+    def pop_n(self, n: int) -> list[tuple[int, str]]:
         """
         Pop the top N states.
 
@@ -49,15 +54,15 @@ class PickledStatesList(PickledStatesBase):
     """
 
     def __init__(self):
-        self._picked_states = []
+        self._picked_states: list[tuple[int, str]] = []
 
-    def sort(self):
+    def sort(self) -> None:
         self._picked_states.sort()
 
-    def add(self, prio, sid):
+    def add(self, prio: int, sid: str) -> None:
         self._picked_states.append((prio, sid))
 
-    def pop_n(self, n):
+    def pop_n(self, n: int) -> list[tuple[int, str]]:
         ss = self._picked_states[:n]
         self._picked_states[:n] = []
         return ss
@@ -88,7 +93,7 @@ class PickledStatesDb(PickledStatesBase):
     def sort(self):
         pass
 
-    def add(self, prio, sid, taken=False, stash="spilled"):  # pylint:disable=arguments-differ
+    def add(self, prio: int, sid: str, taken: bool = False, stash: str = "spilled") -> None:  # pylint:disable=arguments-differ
         from .spiller_db import PickledState
 
         record = PickledState(id=sid, priority=prio, taken=taken, stash=stash)
@@ -97,7 +102,7 @@ class PickledStatesDb(PickledStatesBase):
         session.commit()
         session.close()
 
-    def pop_n(self, n, stash="spilled"):  # pylint:disable=arguments-differ
+    def pop_n(self, n: int, stash: str = "spilled") -> list[tuple[int, str]]:  # pylint:disable=arguments-differ
         from .spiller_db import PickledState
 
         session = self.Session()
@@ -112,13 +117,13 @@ class PickledStatesDb(PickledStatesBase):
 
         ss = []
         for r in q:
-            r.taken = True
+            r.taken = True  # pyright: ignore[reportAttributeAccessIssue]
             ss.append((r.priority, r.id))
         session.commit()
         session.close()
         return ss
 
-    def get_recent_n(self, n, stash="spilled"):
+    def get_recent_n(self, n: int, stash: str = "spilled"):
         from .spiller_db import PickledState
 
         session = self.Session()
@@ -130,7 +135,7 @@ class PickledStatesDb(PickledStatesBase):
         session.close()
         return ss
 
-    def count(self):
+    def count(self) -> int:
         from .spiller_db import PickledState
 
         session = self.Session()
@@ -231,7 +236,7 @@ class Spiller(ExplorationTechnique):
     def _load_state(self, sid):
         return self._vault.load(sid)
 
-    def step(self, simgr, stash="active", **kwargs):
+    def step(self, simgr: SimulationManager, stash: str = "active", **kwargs) -> SimulationManager:
         simgr = simgr.step(stash=stash, **kwargs)
 
         l.debug(
@@ -276,5 +281,5 @@ class Spiller(ExplorationTechnique):
         return simgr
 
     @staticmethod
-    def state_priority(state):
+    def state_priority(state: SimState) -> int:
         return id(state)

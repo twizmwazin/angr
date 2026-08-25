@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 import claripy
 
@@ -10,6 +11,11 @@ from angr.state_plugins.sim_action import SimActionConstraint
 from angr.state_plugins.sim_action_object import SimActionObject
 
 from .base import ExplorationTechnique
+
+if TYPE_CHECKING:
+    from angr.sim_manager import SimulationManager
+    from angr.sim_state import SimState
+    from angr.state_plugins.sim_event import SimEvent
 
 l = logging.getLogger(__name__)
 
@@ -40,10 +46,10 @@ class Suggestions(ExplorationTechnique):
 
     def __init__(self):
         super().__init__()
-        self.suggested = set()
+        self.suggested: set[int] = set()
         self.lock = PicklableLock()
 
-    def step(self, simgr, stash="active", **kwargs):
+    def step(self, simgr: SimulationManager, stash: str = "active", **kwargs) -> SimulationManager:
         simgr.step(stash=stash, **kwargs)
 
         for state in simgr.stashes.get("interrupted", []):
@@ -64,18 +70,18 @@ class Suggestions(ExplorationTechnique):
         return simgr
 
     @staticmethod
-    def report(state, event):
+    def report(state: SimState, event: SimEvent) -> None:
         if once("suggestion_technique"):
             l.warning("Some of your states hit a resource limit. set logger %s to INFO for suggestions.", __name__)
             l.info("Create your simulation manager with `suggestions=False` to disable this.")
 
-        if event.objects["type"] is claripy.errors.ClaripySolverInterruptError:
+        if event.objects["type"] is claripy.ClaripySolverInterruptError:
             if event.objects["reason"][0] == "timeout":
-                limit_number = state.solver._solver.timeout
+                limit_number = getattr(state.solver._solver, "timeout", None)
                 limit_kind = f"hit a solver timeout of {limit_number} ms."
                 limit_minimum = 60 * 1000
             elif event.objects["reason"][0] == "max. memory exceeded":
-                limit_number = state.solver._solver.max_memory
+                limit_number = getattr(state.solver._solver, "max_memory", None)
                 limit_kind = f"hit a solver memory limit of {limit_number} MB."
                 limit_minimum = 1024
             else:
@@ -90,6 +96,7 @@ class Suggestions(ExplorationTechnique):
             for history in state.history.lineage:
                 for constraint_event in history.recent_events:
                     if isinstance(constraint_event, SimActionConstraint):
+                        assert constraint_event.constraint is not None
                         constraint = constraint_event.constraint.ast
                         if constraint is history.jump_guard:
                             src_addr = history.jump_source
@@ -126,14 +133,16 @@ class Suggestions(ExplorationTechnique):
                 l.info(
                     "%d constraint%s abnormally complex.", max_delta_idx + 1, "s are" if max_delta_idx > 0 else " is"
                 )
+                project = state.project
+                assert project is not None
                 descriptions = []
                 for t in sorted(log[: max_delta_idx + 1], key=lambda t: t[5]):
                     if max_delta_idx < 10:
                         l.info(
                             "...generated %s from %s to %s",
                             t[4],
-                            state.project.loader.describe_addr(t[2]),
-                            state.project.loader.describe_addr(t[3].args[0]) if t[3].op == "BVV" else "<symbol>",
+                            project.loader.describe_addr(t[2]),
+                            project.loader.describe_addr(t[3].args[0]) if t[3].op == "BVV" else "<symbol>",
                         )
                     descriptions.extend(state.solver.describe_variables(t[0]))
                 descriptions = set(descriptions)

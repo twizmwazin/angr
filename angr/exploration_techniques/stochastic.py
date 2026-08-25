@@ -2,8 +2,13 @@ from __future__ import annotations
 
 import random
 from collections import defaultdict
+from typing import TYPE_CHECKING
 
 from .base import ExplorationTechnique
+
+if TYPE_CHECKING:
+    from angr.sim_manager import SimulationManager
+    from angr.sim_state import SimState
 
 
 class StochasticSearch(ExplorationTechnique):
@@ -16,7 +21,7 @@ class StochasticSearch(ExplorationTechnique):
     When we run out of active paths to step, we start again from the start state.
     """
 
-    def __init__(self, start_state, restart_prob=0.0001):
+    def __init__(self, start_state: SimState, restart_prob: float = 0.0001):
         """
         :param start_state:  The initial state from which exploration stems.
         :param restart_prob: The probability of randomly restarting the search (default 0.0001).
@@ -28,7 +33,7 @@ class StochasticSearch(ExplorationTechnique):
         self._random.seed(42)
         self.affinity = defaultdict(self._random.random)
 
-    def step(self, simgr, stash="active", **kwargs):
+    def step(self, simgr: SimulationManager, stash: str = "active", **kwargs) -> SimulationManager:
         simgr = simgr.step(stash=stash, **kwargs)
 
         if not simgr.stashes[stash] or self._random.random() < self.restart_prob:

@@ -175,5 +175,6 @@ class Callable:
         if self._concrete_only and len(pg2.active) > 1:
             raise AngrCallableMultistateError("Execution split on symbolic condition!")
         if self._step_limit:
-            pg2.stash(filter_func=lambda p: p.history.depth >= self._step_limit, to_stash="step_limited")
+            step_limit = self._step_limit
+            pg2.stash(filter_func=lambda p: p.history.depth >= step_limit, to_stash="step_limited")
         return pg2

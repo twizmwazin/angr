@@ -4,7 +4,7 @@ import contextlib
 import itertools
 import logging
 import operator
-from collections.abc import Reversible
+from collections.abc import Iterator
 
 import claripy
 
@@ -362,19 +362,19 @@ class SimStateHistory(SimStatePlugin):
             yield from self.parent.lineage
 
     @property
-    def events(self) -> Reversible[SimEvent]:
+    def events(self) -> TreeIter[SimEvent]:
         return LambdaIterIter(self, operator.attrgetter("recent_events"))
 
     @property
-    def actions(self) -> Reversible[SimAction]:
+    def actions(self) -> TreeIter[SimAction]:
         return LambdaIterIter(self, operator.attrgetter("recent_actions"))
 
     @property
-    def jumpkinds(self) -> Reversible[str]:
+    def jumpkinds(self) -> TreeIter[str]:
         return LambdaAttrIter(self, operator.attrgetter("jumpkind"))
 
     @property
-    def jump_guards(self) -> Reversible[claripy.ast.Bool]:
+    def jump_guards(self) -> TreeIter[claripy.ast.Bool]:
         return LambdaAttrIter(self, operator.attrgetter("jump_guard"))
 
     @property
@@ -386,15 +386,15 @@ class SimStateHistory(SimStatePlugin):
         return LambdaAttrIter(self, operator.attrgetter("jump_source"))
 
     @property
-    def descriptions(self) -> Reversible[str]:
+    def descriptions(self) -> TreeIter[str]:
         return LambdaAttrIter(self, operator.attrgetter("recent_description"))
 
     @property
-    def bbl_addrs(self) -> Reversible[int]:
+    def bbl_addrs(self) -> TreeIter[int]:
         return LambdaIterIter(self, operator.attrgetter("recent_bbl_addrs"))
 
     @property
-    def ins_addrs(self) -> Reversible[int]:
+    def ins_addrs(self) -> TreeIter[int]:
         return LambdaIterIter(self, operator.attrgetter("recent_ins_addrs"))
 
     @property
@@ -476,33 +476,34 @@ class SimStateHistory(SimStatePlugin):
         return SimStateHistory(parent=self)
 
 
-class TreeIter:
-    def __init__(self, start, end=None):
+class TreeIter[T]:
+    def __init__(self, start: SimStateHistory, end: SimStateHistory | None = None):
         self._start = start
         self._end = end
 
-    def _iter_nodes(self):
+    def _iter_nodes(self) -> Iterator[SimStateHistory]:
         n = self._start
         while n is not self._end:
+            assert n is not None, "iteration walked past the root of the history tree without reaching its end node"
             yield n
             n = n.parent
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[T]:
         yield from self.hardcopy
 
-    def __reversed__(self):
+    def __reversed__(self) -> Iterator[T]:
         raise NotImplementedError("Why are you using this class")
 
     @property
-    def hardcopy(self):
+    def hardcopy(self) -> list[T]:
         # lmao
         return list(reversed(tuple(reversed(self))))
 
-    def __len__(self):
+    def __len__(self) -> int:
         # TODO: this is wrong
         return self._start.depth
 
-    def __getitem__(self, k):
+    def __getitem__(self, k: int) -> T:
         if isinstance(k, slice):
             raise TypeError("Please use .hardcopy to use slices")
         if k >= 0:
@@ -514,7 +515,7 @@ class TreeIter:
                 return item
         raise IndexError(k)
 
-    def count(self, v):
+    def count(self, v) -> int:
         """
         Count occurrences of value v in the entire history. Note that the subclass must implement the __reversed__
         method, otherwise an exception will be thrown.
@@ -529,12 +530,12 @@ class TreeIter:
         return ctr
 
 
-class HistoryIter(TreeIter):
+class HistoryIter(TreeIter[SimStateHistory]):
     def __reversed__(self):
         yield from self._iter_nodes()
 
 
-class LambdaAttrIter(TreeIter):
+class LambdaAttrIter[T](TreeIter[T]):
     def __init__(self, start, f, **kwargs):
         TreeIter.__init__(self, start, **kwargs)
         self._f = f
@@ -546,7 +547,7 @@ class LambdaAttrIter(TreeIter):
                 yield a
 
 
-class LambdaIterIter(LambdaAttrIter):
+class LambdaIterIter[T](LambdaAttrIter[T]):
     def __init__(self, start, f, reverse=True, **kwargs):
         LambdaAttrIter.__init__(self, start, f, **kwargs)
         self._f = f

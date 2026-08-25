@@ -1,10 +1,19 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 from angr import engines
 from angr.errors import AngrError, AngrExplorationTechniqueError, SimError
 
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
 
-def condition_to_lambda(condition, default=False):
+    from angr.sim_state import SimState
+
+
+def condition_to_lambda(
+    condition: int | Iterable[int] | Callable[[SimState], Any] | None, default: bool = False
+) -> tuple[Callable[[SimState], Any], set[int] | None]:
     """
     Translates an integer, set, list or function into a lambda that checks if state's current basic block matches
     some condition.
@@ -16,25 +25,30 @@ def condition_to_lambda(condition, default=False):
                         matched from the condition, and a set that contains the normalized set of addresses to stop
                         at, or None if no addresses were provided statically.
     """
+    condition_function: Callable[[SimState], Any]
+    static_addrs: set[int] | None
+
     if condition is None:
 
-        def condition_function(state):
+        def condition_default(state: SimState) -> bool:
             return default
 
+        condition_function = condition_default
         static_addrs = set()
 
     elif isinstance(condition, int):
         return condition_to_lambda((condition,))
 
     elif isinstance(condition, (tuple, set, list)):
-        static_addrs = set(condition)
+        addrs = set(condition)
 
-        def condition_function(state):
-            if state.addr in static_addrs:
+        def condition_static(state: SimState) -> set[int] | bool:
+            if state.addr in addrs:
                 # returning {state.addr} instead of True to properly handle find/avoid conflicts
                 return {state.addr}
 
-            if not isinstance(state.project.factory.default_engine, engines.vex.VEXLifter):
+            project = state.project
+            if project is None or not isinstance(project.factory.default_engine, engines.vex.VEXLifter):
                 return False
             if isinstance(state.callstack, engines.ail.callstack.AILCallStack):
                 return False
@@ -44,9 +58,12 @@ def condition_to_lambda(condition, default=False):
                 # not at the top of a block), check directly in the blocks
                 # (Blocks are repeatedly created for every check, but with
                 # the IRSB cache in angr lifter it should be OK.)
-                return static_addrs.intersection(set(state.block().instruction_addrs))
+                return addrs.intersection(set(state.block().instruction_addrs))
             except (AngrError, SimError):
                 return False
+
+        condition_function = condition_static
+        static_addrs = addrs
 
     elif callable(condition):
         condition_function = condition
