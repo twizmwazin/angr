@@ -1968,6 +1968,12 @@ void State::propagate_taint_of_mem_read_instr_and_continue(address_t read_addres
 	else {
 		// Symbolic taint is being introduced by this memory read so we cannot rely on taint engine to find current
 		// instruction address
+		if (block_taint_entry.has_unsupported_stmt_or_expr_type) {
+			// The read could be performed by one of the unsupported statements: THUMB blocks use guarded loads.
+			stop(block_taint_entry.unsupported_stmt_stop_reason);
+			return;
+		}
+
 		auto vex_stmt_taint_entry_it = block_taint_entry.block_stmts_taint_data.begin();
 		if (block_mem_reads_data.size() > 0) {
 			// There are previous reads that need to be insert into block's memory reads map

@@ -679,6 +679,56 @@ class TestUnicornThumb(unittest.TestCase):
         assert results[0][3] == 5
         assert results[1] == results[0]
 
+    def test_thumb_symbolic_memory_read(self):
+        """A symbolic value read from memory inside a THUMB block, which is lifted to a guarded load."""
+        arch = archinfo.ArchARMEL()
+        data_addr = 0x9000
+        thumb_code = arch.asm(
+            """
+            movs r0, #1
+            b    second
+            second:
+            ldr  r1, [r2]
+            adds r3, r1, #1
+            cmp  r3, #0x10
+            bhi  big
+            movs r4, #1
+            b    .
+            big:
+            movs r4, #2
+            b    .
+            """,
+            addr=self.THUMB_BASE,
+            thumb=True,
+            as_bytes=True,
+        )
+        project = self._project(thumb_code=thumb_code)
+
+        results = []
+        for unicorn in (False, True):
+            add_options = {so.ZERO_FILL_UNCONSTRAINED_MEMORY}
+            if unicorn:
+                add_options |= so.unicorn
+
+            state = project.factory.blank_state(addr=self.THUMB_BASE | 1, add_options=add_options)
+            state.regs.r2 = data_addr
+            state.memory.store(data_addr, claripy.BVS("input", 32), endness=arch.memory_endness)
+            simgr = project.factory.simulation_manager(state)
+            for _ in range(4):
+                simgr.step()
+
+            assert not simgr.errored
+            results.append(
+                sorted(
+                    (succ.addr, succ.solver.eval(succ.regs.r4), succ.solver.eval(succ.regs.r3 - succ.regs.r1))
+                    for succ in simgr.active
+                )
+            )
+
+        assert sorted(r4 for _, r4, _ in results[0]) == [1, 2]
+        assert all(r3_minus_r1 == 1 for _, _, r3_minus_r1 in results[0])
+        assert results[1] == results[0]
+
     def test_fauxware_thumb(self):
         """A THUMB binary executed in unicorn, stopping often enough that unicorn returns in THUMB mode."""
         project = angr.Project(os.path.join(test_location, "armhf", "fauxware"), auto_load_libs=False)
