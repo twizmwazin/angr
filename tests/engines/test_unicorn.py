@@ -9,8 +9,11 @@ import os
 import pickle
 import re
 import unittest
+from io import BytesIO
 
+import archinfo
 import claripy
+import cle
 
 import angr
 from angr import options as so
@@ -502,6 +505,199 @@ class TestUnicorn(unittest.TestCase):
                 break
 
         assert result == b"FLAG{l00ps_4r3_t00_34sy_r1gh7??}"
+
+
+class TestUnicornThumb(unittest.TestCase):
+    """
+    Tests for ARM code that runs in, or switches to, THUMB mode. angr encodes the execution mode in the least
+    significant bit of an address, unicorn in the CPSR T bit.
+    """
+
+    ARM_BASE = 0x1000
+    THUMB_BASE = 0x2000
+
+    @staticmethod
+    def _project(arm_code=b"", thumb_code=b""):
+        arch = archinfo.ArchARMEL()
+        segments = []
+        if arm_code:
+            segments.append((0, TestUnicornThumb.ARM_BASE, len(arm_code)))
+        if thumb_code:
+            segments.append((len(arm_code), TestUnicornThumb.THUMB_BASE, len(thumb_code)))
+
+        blob = cle.Blob(
+            None,
+            BytesIO(arm_code + thumb_code),
+            arch=arch,
+            segments=segments,
+            base_addr=0,
+            entry_point=TestUnicornThumb.ARM_BASE if arm_code else TestUnicornThumb.THUMB_BASE | 1,
+        )
+        return angr.Project(blob)
+
+    @staticmethod
+    def _trace(project, entry, blocks, unicorn, registers=("r0", "r1", "r2", "r3", "r4")):
+        """
+        Execute `blocks` basic blocks one at a time. unicorn is limited to a single block per step so that its trace
+        can be compared against the one produced by VEX.
+        """
+        add_options = {so.ZERO_FILL_UNCONSTRAINED_MEMORY, so.ZERO_FILL_UNCONSTRAINED_REGISTERS}
+        if unicorn:
+            add_options |= so.unicorn
+
+        state = project.factory.blank_state(addr=entry, add_options=add_options)
+        state.regs.sp = 0x7FFF0000
+        simgr = project.factory.simulation_manager(state)
+        trace = []
+        for _ in range(blocks):
+            if unicorn:
+                for active in simgr.active:
+                    active.unicorn.max_steps = 1
+
+            simgr.step()
+            assert len(simgr.active) == 1, f"expected a single successor, got {simgr.active}"
+            state = simgr.active[0]
+            if unicorn:
+                assert "Unicorn" in state.history.recent_description
+            trace.append(
+                (
+                    state.addr,
+                    tuple(state.solver.eval(getattr(state.regs, reg)) for reg in registers),
+                    tuple(state.history.recent_bbl_addrs),
+                )
+            )
+
+        return trace
+
+    def test_thumb(self):
+        """THUMB code executed across multiple unicorn runs stays in THUMB mode."""
+        arch = archinfo.ArchARMEL()
+        thumb_code = arch.asm(
+            "movs r0, #1; b second; second: movs r1, #2; b third; third: adds r2, r0, r1; b .",
+            addr=self.THUMB_BASE,
+            thumb=True,
+            as_bytes=True,
+        )
+        project = self._project(thumb_code=thumb_code)
+
+        unicorn_trace = self._trace(project, self.THUMB_BASE | 1, 4, unicorn=True)
+        assert unicorn_trace == self._trace(project, self.THUMB_BASE | 1, 4, unicorn=False)
+        assert all(addr & 1 for addr, _, _ in unicorn_trace)
+        assert all(bbl_addr & 1 for _, _, bbl_addrs in unicorn_trace for bbl_addr in bbl_addrs)
+        assert unicorn_trace[-1][1][2] == 3
+
+    def test_arm_to_thumb(self):
+        """Switching from ARM to THUMB mode and back while executing in unicorn."""
+        arch = archinfo.ArchARMEL()
+        arm_prologue = arch.asm(
+            f"mov r0, #1; mov r1, #2; movw r3, #{self.THUMB_BASE | 1:#x}; bx r3",
+            addr=self.ARM_BASE,
+            as_bytes=True,
+        )
+        arm_epilogue_addr = self.ARM_BASE + len(arm_prologue)
+        thumb_code = arch.asm(
+            f"adds r2, r0, r1; movw r3, #{arm_epilogue_addr:#x}; bx r3",
+            addr=self.THUMB_BASE,
+            thumb=True,
+            as_bytes=True,
+        )
+        arm_epilogue = arch.asm("adds r4, r2, #1; b .", addr=arm_epilogue_addr, as_bytes=True)
+        project = self._project(arm_code=arm_prologue + arm_epilogue, thumb_code=thumb_code)
+
+        unicorn_trace = self._trace(project, self.ARM_BASE, 4, unicorn=True)
+        assert unicorn_trace == self._trace(project, self.ARM_BASE, 4, unicorn=False)
+        assert [addr for addr, _, _ in unicorn_trace][:2] == [self.THUMB_BASE | 1, arm_epilogue_addr]
+        assert unicorn_trace[-1][1][2] == 3
+        assert unicorn_trace[-1][1][4] == 4
+
+    def test_thumb_to_arm(self):
+        """Switching from THUMB to ARM mode and back while executing in unicorn."""
+        arch = archinfo.ArchARMEL()
+        thumb_prologue = arch.asm(
+            f"movs r0, #1; movs r1, #2; movw r3, #{self.ARM_BASE:#x}; bx r3",
+            addr=self.THUMB_BASE,
+            thumb=True,
+            as_bytes=True,
+        )
+        thumb_epilogue_addr = self.THUMB_BASE + len(thumb_prologue)
+        arm_code = arch.asm(
+            f"add r2, r0, r1; movw r3, #{thumb_epilogue_addr | 1:#x}; bx r3",
+            addr=self.ARM_BASE,
+            as_bytes=True,
+        )
+        thumb_epilogue = arch.asm("adds r4, r2, #1; b .", addr=thumb_epilogue_addr, thumb=True, as_bytes=True)
+        project = self._project(arm_code=arm_code, thumb_code=thumb_prologue + thumb_epilogue)
+
+        unicorn_trace = self._trace(project, self.THUMB_BASE | 1, 4, unicorn=True)
+        assert unicorn_trace == self._trace(project, self.THUMB_BASE | 1, 4, unicorn=False)
+        assert [addr for addr, _, _ in unicorn_trace][:2] == [self.ARM_BASE, thumb_epilogue_addr | 1]
+        assert unicorn_trace[-1][1][2] == 3
+        assert unicorn_trace[-1][1][4] == 4
+
+    def test_thumb_hook(self):
+        """Unicorn stops at a hook on a THUMB function and hands the state over with the THUMB bit set."""
+        arch = archinfo.ArchARMEL()
+        thumb_code = arch.asm(
+            "movs r0, #1; bl target; movs r2, #5; b .; target: movs r1, #0x11; bx lr",
+            addr=self.THUMB_BASE,
+            thumb=True,
+            as_bytes=True,
+        )
+        assert len(thumb_code) == 14
+        target = self.THUMB_BASE + 10
+        project = self._project(thumb_code=thumb_code)
+
+        results = []
+        for unicorn in (False, True):
+            hits = []
+
+            def hook(state, hits=hits):
+                hits.append(state.addr)
+                state.regs.r1 = 0x99
+                state.regs.pc = state.regs.lr
+
+            project.unhook(target | 1)
+            project.hook(target | 1, hook, length=0)
+
+            add_options = {so.ZERO_FILL_UNCONSTRAINED_MEMORY, so.ZERO_FILL_UNCONSTRAINED_REGISTERS}
+            if unicorn:
+                add_options |= so.unicorn
+
+            state = project.factory.blank_state(addr=self.THUMB_BASE | 1, add_options=add_options)
+            state.regs.sp = 0x7FFF0000
+            simgr = project.factory.simulation_manager(state)
+            for _ in range(4):
+                simgr.step()
+
+            assert not simgr.errored
+            assert len(simgr.active) == 1
+            succ = simgr.active[0]
+            results.append((hits, succ.addr, succ.solver.eval(succ.regs.r1), succ.solver.eval(succ.regs.r2)))
+
+        assert results[0][0] == [target | 1]
+        assert results[0][2] == 0x99
+        assert results[0][3] == 5
+        assert results[1] == results[0]
+
+    def test_fauxware_thumb(self):
+        """A THUMB binary executed in unicorn, stopping often enough that unicorn returns in THUMB mode."""
+        project = angr.Project(os.path.join(test_location, "armhf", "fauxware"), auto_load_libs=False)
+        assert project.arch.is_thumb(project.entry)
+
+        state = project.factory.entry_state(add_options=so.unicorn)
+        state.unicorn.max_steps = 2
+        simgr = project.factory.simulation_manager(state)
+        simgr.run()
+
+        assert not simgr.errored
+        assert all("Unicorn" in "".join(s.history.descriptions.hardcopy) for s in simgr.deadended)
+        assert sorted(simgr.mp_deadended.posix.dumps(1).mp_items) == sorted(
+            (
+                b"Username: \nPassword: \nWelcome to the admin console, trusted user!\n",
+                b"Username: \nPassword: \nGo away!",
+                b"Username: \nPassword: \nWelcome to the admin console, trusted user!\n",
+            )
+        )
 
 
 if __name__ == "__main__":

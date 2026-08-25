@@ -28,6 +28,8 @@ from .plugin import SimStatePlugin
 l = logging.getLogger(name=__name__)
 ffi = cffi.FFI()
 
+ARM_CPSR_THUMB_BIT = 1 << 5
+
 try:
     import unicorn
     from unicorn.unicorn_py3.unicorn import HOOK_MEM_INVALID_CFUNC
@@ -1885,6 +1887,11 @@ class Unicorn(SimStatePlugin):
                 vex_offset += 8
                 tag_word >>= 2
                 vex_tag_offset -= 1
+
+        elif state.arch.qemu_name == "arm":
+            # unicorn keeps the execution mode in the CPSR T bit, angr in the least significant bit of the PC
+            if self.uc.reg_read(self._uc_const.UC_ARM_REG_CPSR) & ARM_CPSR_THUMB_BIT:
+                state.regs.pc = state.regs.pc | 1
 
         # TODO: ARM hardfloat
 

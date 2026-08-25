@@ -787,6 +787,22 @@ class State {
 		return ((cpsr_reg_val & 32) != 0);
 	}
 
+	// angr encodes the execution mode in the least significant bit of a code address, unicorn reports the address
+	// the code is stored at.
+	inline address_t to_angr_addr(address_t address) const {
+		if ((arch == UC_ARCH_ARM) && is_thumb_mode()) {
+			return address | 1;
+		}
+		return address;
+	}
+
+	inline address_t to_unicorn_addr(address_t address) const {
+		if (arch == UC_ARCH_ARM) {
+			return address & ~(address_t)1;
+		}
+		return address;
+	}
+
 	public:
 		uc_engine *uc;
 
