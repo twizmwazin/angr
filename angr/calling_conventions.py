@@ -341,6 +341,12 @@ class SimRegArg(SimFunctionArgument):
     def check_offset(self, arch) -> int:
         return arch.registers[self.reg_name][0] + self.reg_offset
 
+    def is_static_register(self, arch) -> bool:
+        """
+        Whether this argument lives at a fixed offset in ``arch``'s register file.
+        """
+        return self.reg_name in arch.registers
+
     def set_value(self, state, value, **kwargs):  # pylint: disable=unused-argument,arguments-differ
         value = self.check_value_set(value, state.arch)
         offset = self.check_offset(state.arch)
@@ -1325,6 +1331,10 @@ class SimLyingRegArg(SimRegArg):
 
     def refine(self, size, arch=None, offset=None, is_fp=None):
         return SimLyingRegArg(self.reg_name, size)
+
+    def is_static_register(self, arch) -> bool:
+        # x87 stack slots are addressed relative to ftop, so they have no fixed offset in the register file
+        return False
 
 
 class SimCCUsercall(SimCC):

@@ -245,7 +245,7 @@ class SimEngineVRVEX(
                 ret_reg = cc.return_val(proto.returnty)
             else:
                 ret_reg = cc.RETURN_VAL
-            if isinstance(ret_reg, SimRegArg):
+            if isinstance(ret_reg, SimRegArg) and ret_reg.is_static_register(self.arch):
                 reg_offset, reg_size = self.arch.registers[ret_reg.reg_name]
                 data = self._top(reg_size * self.arch.byte_width)
                 self._assign_to_register(reg_offset, data, reg_size, create_variable=False)

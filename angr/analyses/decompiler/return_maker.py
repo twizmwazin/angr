@@ -44,7 +44,7 @@ class ReturnMaker(AILGraphWalker):
                 else self.function.prototype.returnty
             )
             ret_val = self.function.calling_convention.return_val(returnty)
-            if isinstance(ret_val, SimRegArg):
+            if isinstance(ret_val, SimRegArg) and ret_val.is_static_register(self.arch):
                 reg = self.arch.registers[ret_val.reg_name]
                 new_ret_exprs.append(
                     ailment.Expr.Register(
@@ -70,7 +70,7 @@ class ReturnMaker(AILGraphWalker):
                 #     )
                 # )
                 for ret_val_loc in ret_val.locations:
-                    if isinstance(ret_val_loc, SimRegArg):
+                    if isinstance(ret_val_loc, SimRegArg) and ret_val_loc.is_static_register(self.arch):
                         reg = self.arch.registers[ret_val_loc.reg_name]
                         new_ret_exprs.append(
                             ailment.Expr.Register(
