@@ -9,6 +9,7 @@ import os
 import unittest
 
 import angr
+from angr.utils.arch import get_sp_offset
 from tests.common import bin_location
 
 test_location = os.path.join(bin_location, "tests")
@@ -18,7 +19,7 @@ def run_tracker(track_mem, use_bp):
     p = angr.Project(os.path.join(test_location, "x86_64", "fauxware"), auto_load_libs=False)
     p.analyses.CFGFast()
     main = p.kb.functions["main"]
-    sp = p.arch.sp_offset
+    sp = get_sp_offset(p.arch)
     regs = {sp}
     if use_bp:
         bp = p.arch.bp_offset
@@ -34,7 +35,7 @@ def run_tracker(track_mem, use_bp):
 def init_tracker(p, func_addr: str | int, track_mem, cross_insn_opt: bool = True):
     p.analyses.CFGFast()
     main = p.kb.functions[func_addr]
-    sp = p.arch.sp_offset
+    sp = get_sp_offset(p.arch)
     regs = {sp}
     sptracker = p.analyses.StackPointerTracker(main, regs, track_memory=track_mem, cross_insn_opt=cross_insn_opt)
     return sptracker, sp

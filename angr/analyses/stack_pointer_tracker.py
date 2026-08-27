@@ -20,6 +20,7 @@ from angr.codenode import FuncNode
 from angr.engines import pcode
 from angr.errors import SimTranslationError
 from angr.knowledge_plugins import Function
+from angr.utils.arch import get_sp_offset
 from angr.utils.constants import is_alignment_mask
 from angr.utils.types import dereference_simtype_by_lib
 
@@ -756,7 +757,7 @@ class StackPointerTracker(Analysis, ForwardAnalysis):
             elif self.track_mem and type(stmt) is pyvex.IRStmt.Store:
                 state.store(resolve_expr(stmt.addr), resolve_expr(stmt.data))
             elif type(stmt) is pyvex.IRStmt.Put:
-                if exit_observed and stmt.offset == self.project.arch.sp_offset:
+                if exit_observed and stmt.offset == get_sp_offset(self.project.arch):
                     return
                 state.put(stmt.offset, resolve_expr(stmt.data))
             else:
@@ -784,7 +785,7 @@ class StackPointerTracker(Analysis, ForwardAnalysis):
                     guard = tmps[stmt.guard.tmp]
                     if isinstance(guard, Eq):
                         for reg, val in state.regs.items():
-                            if reg in {self.project.arch.sp_offset, self.project.arch.bp_offset}:
+                            if reg in {get_sp_offset(self.project.arch), self.project.arch.bp_offset}:
                                 cond = None
                                 if val == guard.val0:
                                     cond = guard.val1
@@ -797,13 +798,13 @@ class StackPointerTracker(Analysis, ForwardAnalysis):
                     resolve_stmt(stmt)
 
         # stack pointer adjustment
-        if self.project.arch.sp_offset in self.reg_offsets and vex_block.jumpkind == "Ijk_Call":
+        if get_sp_offset(self.project.arch) in self.reg_offsets and vex_block.jumpkind == "Ijk_Call":
             if self.project.arch.call_pushes_ret:
                 # pop the return address on the stack
                 try:
-                    v = state.get(self.project.arch.sp_offset)
+                    v = state.get(get_sp_offset(self.project.arch))
                     incremented = BOTTOM if v is BOTTOM else v + Constant(self.project.arch.bytes)
-                    state.put(self.project.arch.sp_offset, incremented)
+                    state.put(get_sp_offset(self.project.arch), incremented)
                 except CouldNotResolveException:
                     pass
             # who are we calling?
@@ -845,13 +846,13 @@ class StackPointerTracker(Analysis, ForwardAnalysis):
                                     isinstance(stmt, pyvex.IRStmt.Put)
                                     and stmt.offset == self.project.arch.registers[chkstk_stack_rax_regname][0]
                                     and isinstance(stmt.data, pyvex.IRExpr.Const)
-                                    and self.project.arch.sp_offset in state.regs
+                                    and get_sp_offset(self.project.arch) in state.regs
                                 ):
                                     sp_adjusted = True
-                                    sp_v = state.regs[self.project.arch.sp_offset]
+                                    sp_v = state.regs[get_sp_offset(self.project.arch)]
                                     if sp_v is not None:
                                         sp_v -= Constant(stmt.data.con.value)
-                                        state.put(self.project.arch.sp_offset, sp_v, force=True)  # sp -= OFFSET
+                                        state.put(get_sp_offset(self.project.arch), sp_v, force=True)  # sp -= OFFSET
                                         state.put(stmt.offset, Constant(0), force=True)  # rax = 0
                                     break
 
@@ -867,7 +868,7 @@ class StackPointerTracker(Analysis, ForwardAnalysis):
                     callee = callee_cleanups[0]
                     assert callee.calling_convention is not None  # just to make pyright happy
                     try:
-                        v = state.get(self.project.arch.sp_offset)
+                        v = state.get(get_sp_offset(self.project.arch))
                         incremented = None
                         if v is BOTTOM:
                             incremented = BOTTOM
@@ -887,7 +888,7 @@ class StackPointerTracker(Analysis, ForwardAnalysis):
                             if num_stack_args > 0:
                                 incremented = v + Constant(self.project.arch.bytes * num_stack_args)
                         if incremented is not None:
-                            state.put(self.project.arch.sp_offset, incremented)
+                            state.put(get_sp_offset(self.project.arch), incremented)
                     except CouldNotResolveException:
                         pass
 
@@ -954,13 +955,13 @@ class StackPointerTracker(Analysis, ForwardAnalysis):
                 is_call |= op.opcode == pypcode.OpCode.CALL
 
         # stack pointer adjustment
-        if self.project.arch.sp_offset in self.reg_offsets and is_call:
+        if get_sp_offset(self.project.arch) in self.reg_offsets and is_call:
             if self.project.arch.call_pushes_ret:
                 # pop the return address on the stack
                 try:
-                    v = state.get(self.project.arch.sp_offset)
+                    v = state.get(get_sp_offset(self.project.arch))
                     incremented = BOTTOM if v is BOTTOM else v + Constant(self.project.arch.bytes)
-                    state.put(self.project.arch.sp_offset, incremented)
+                    state.put(get_sp_offset(self.project.arch), incremented)
                 except CouldNotResolveException:
                     pass
             # who are we calling?
@@ -974,7 +975,7 @@ class StackPointerTracker(Analysis, ForwardAnalysis):
                 if callee_cleanups:
                     # found callee clean-up cases...
                     try:
-                        v = state.get(self.project.arch.sp_offset)
+                        v = state.get(get_sp_offset(self.project.arch))
                         incremented = None
                         if v is BOTTOM:
                             incremented = BOTTOM
@@ -982,7 +983,7 @@ class StackPointerTracker(Analysis, ForwardAnalysis):
                             num_args = len(callee_cleanups[0].prototype.args)
                             incremented = v + Constant(self.project.arch.bytes * num_args)
                         if incremented is not None:
-                            state.put(self.project.arch.sp_offset, incremented)
+                            state.put(get_sp_offset(self.project.arch), incremented)
                     except CouldNotResolveException:
                         pass
 

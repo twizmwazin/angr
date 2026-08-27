@@ -16,6 +16,7 @@ from angr.knowledge_plugins.key_definitions.atoms import MemoryLocation, Registe
 from angr.knowledge_plugins.key_definitions.definition import Definition
 from angr.knowledge_plugins.key_definitions.tag import InitialValueTag, ParameterTag
 from angr.sim_type import SimType, SimTypeFunction
+from angr.utils.arch import get_sp_offset
 
 l = logging.getLogger(name=__name__)
 
@@ -126,10 +127,11 @@ class RDAStateInitializer:
         self, state: ReachingDefinitionsState, _func_addr: int, ex_loc: ExternalCodeLocation
     ) -> None:
         # initialize stack pointer
-        sp_atom = Register(self.arch.sp_offset, self.arch.bytes)
+        sp_offset = get_sp_offset(self.arch)
+        sp_atom = Register(sp_offset, self.arch.bytes)
         sp_def = Definition(sp_atom, ex_loc, tags={InitialValueTag()})
         sp = state.annotate_with_def(state._initial_stack_pointer(), sp_def)
-        state.registers.store(self.arch.sp_offset, sp)
+        state.registers.store(sp_offset, sp)
 
     def initialize_architectural_state(
         self,

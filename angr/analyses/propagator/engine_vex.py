@@ -13,6 +13,7 @@ from angr.calling_conventions import DEFAULT_CC, SYSCALL_CC, SimRegArg, default_
 from angr.engines.light import SimEngineNostmtVEX
 from angr.engines.vex.claripy.datalayer import value
 from angr.knowledge_plugins.propagations.states import RegisterAnnotation, RegisterComparisonAnnotation
+from angr.utils.arch import get_sp_offset
 
 from .engine_base import SimEnginePropagatorBaseMixin
 from .top_checker_mixin import ClaripyDataVEXEngineMixin
@@ -50,7 +51,7 @@ class SimEnginePropagatorVEX(
         result = super()._process_block(whitelist)
         if self.block.vex.jumpkind == "Ijk_Call" and self.arch.call_pushes_ret:
             # pop ret from the stack
-            sp_offset = self.arch.sp_offset
+            sp_offset = get_sp_offset(self.arch)
             sp_value = self.state.load_register(sp_offset, self.arch.bytes)
             if sp_value is not None:
                 self.state.store_register(sp_offset, self.arch.bytes, sp_value + self.arch.bytes)
@@ -236,7 +237,7 @@ class SimEnginePropagatorVEX(
         size = expr.result_size(self.tyenv) // self.arch.byte_width
         result = self.state.load_register(expr.offset, size)
         if not self._is_top(result) and expr.offset not in (
-            self.arch.sp_offset,
+            get_sp_offset(self.arch),
             self.arch.ip_offset,
         ):
             # Record the replacement

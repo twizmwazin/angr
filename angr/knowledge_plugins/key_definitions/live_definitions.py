@@ -17,6 +17,7 @@ from angr.errors import SimMemoryError, SimMemoryMissingError
 from angr.knowledge_plugins.key_definitions.definition import A
 from angr.storage.memory_mixins import MultiValuedMemory
 from angr.storage.memory_mixins.paged_memory.pages.multi_values import MultiValues, MVType
+from angr.utils.arch import get_sp_offset
 from angr.utils.constants import is_alignment_mask
 
 from .atoms import Atom, ConstantSrc, MemoryLocation, Register, Tmp
@@ -408,8 +409,9 @@ class LiveDefinitions:
         """
         Return the concrete value contained by the stack pointer.
         """
-        assert self.arch.sp_offset is not None
-        sp_values: MultiValues = self.registers.load(self.arch.sp_offset, size=self.arch.bytes)
+        sp_offset = get_sp_offset(self.arch)
+        assert sp_offset is not None
+        sp_values: MultiValues = self.registers.load(sp_offset, size=self.arch.bytes)
         sp_v = sp_values.one_value()
         if sp_v is None:
             # multiple values of sp exists. still return a value if there is only one value (maybe with different
@@ -428,8 +430,9 @@ class LiveDefinitions:
         """
         Return the offset of the stack pointer.
         """
-        assert self.arch.sp_offset is not None
-        sp_values: MultiValues = self.registers.load(self.arch.sp_offset, size=self.arch.bytes)
+        sp_offset = get_sp_offset(self.arch)
+        assert sp_offset is not None
+        sp_values: MultiValues = self.registers.load(sp_offset, size=self.arch.bytes)
         sp_v = sp_values.one_value()
         if sp_v is None:
             values = [v for v in next(iter(sp_values.values())) if self.get_stack_offset(v) is not None]
@@ -584,7 +587,7 @@ class LiveDefinitions:
         # set_object() replaces kill (not implemented) and add (add) in one step
         if isinstance(atom, Register):
             # Tolerate simple stack pointer alignments
-            if atom.reg_offset == self.arch.sp_offset:
+            if atom.reg_offset == get_sp_offset(self.arch):
                 d = self._simplify_sp_alignment(d)
 
             try:

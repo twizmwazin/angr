@@ -26,6 +26,7 @@ from angr.ailment.statement import Assignment, ConditionalJump, Jump, Return, St
 from angr.analyses.analysis import Analysis, register_analysis
 from angr.code_location import AILCodeLocation
 from angr.knowledge_plugins.functions import Function
+from angr.utils.arch import get_sp_offset
 from angr.utils.ssa import (
     CONST_VVAR_LOAD_DIRTY_WHITELIST,
     CONST_VVAR_LOAD_WHITELIST,
@@ -456,14 +457,15 @@ class SPropagator:
             vvar_uselocs_set = set(uselocs)  # deduplicate
 
             if self._sp_tracker is not None and vvar.category == VirtualVariableCategory.REGISTER:
-                if vvar.oident == self.project.arch.sp_offset:
+                sp_offset = get_sp_offset(self.project.arch)
+                if vvar.oident == sp_offset:
                     sp_bits = (
                         (self.project.arch.registers["sp"][1] * self.project.arch.byte_width)
                         if "sp" in self.project.arch.registers
                         else None
                     )
                     for vvar_at_use, useloc in vvar_uselocs_set:
-                        sb_offset = self._sp_tracker.offset_before(useloc.ins_addr, self.project.arch.sp_offset)
+                        sb_offset = self._sp_tracker.offset_before(useloc.ins_addr, sp_offset)
                         if sb_offset is not None:
                             v = StackBaseOffset(self._ail_manager.next_atom(), self.project.arch.bits, sb_offset)
                             if sp_bits is not None and vvar.bits < sp_bits:

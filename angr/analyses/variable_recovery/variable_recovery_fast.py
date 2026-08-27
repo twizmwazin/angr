@@ -40,6 +40,7 @@ from angr.sim_variable import (
     SimVariable,
 )
 from angr.storage.memory_mixins.paged_memory.pages.multi_values import MultiValues
+from angr.utils.arch import get_sp_offset
 
 from .engine_ail import SimEngineVRAIL
 from .engine_vex import SimEngineVRVEX
@@ -300,7 +301,7 @@ class VariableRecoveryFast(ForwardAnalysis, VariableRecoveryBase):  # pylint:dis
 
         self._low_priority = low_priority
         self._job_ctr = 0
-        self._track_sp = track_sp and self.project.arch.sp_offset is not None
+        self._track_sp = track_sp and get_sp_offset(self.project.arch) is not None
         self._func_args = func_args
         self._func_arg_vvars = func_arg_vvars
         self._func_ret_var = func_ret_var
@@ -401,8 +402,9 @@ class VariableRecoveryFast(ForwardAnalysis, VariableRecoveryBase):  # pylint:dis
             stack_offset_typevars=self.stack_offset_typevars,
         )
         initial_sp = state.stack_address(self.project.arch.bytes if self.project.arch.call_pushes_ret else 0)
-        if self.project.arch.sp_offset is not None:
-            state.register_region.store(self.project.arch.sp_offset, initial_sp)
+        sp_offset = get_sp_offset(self.project.arch)
+        if sp_offset is not None:
+            state.register_region.store(sp_offset, initial_sp)
         # give it enough stack space, but only when bp is used as a frame pointer; when bp is a general-purpose
         # register, seeding it with a stack address would misclassify bp-based memory accesses as stack accesses
         # and suppress the creation of a register variable for the initial value of bp.
@@ -678,7 +680,7 @@ class VariableRecoveryFast(ForwardAnalysis, VariableRecoveryBase):  # pylint:dis
 
         if self._track_sp and block.addr in self._node_to_cc:
             # readjusting sp at the end for blocks that end in a call
-            sp: MultiValues = state.register_region.load(self.project.arch.sp_offset, size=self.project.arch.bytes)
+            sp: MultiValues = state.register_region.load(get_sp_offset(self.project.arch), size=self.project.arch.bytes)
             sp_v = sp.one_value()
             if sp_v is None:
                 l.warning("Unexpected stack pointer value at the end of the function. Pick the first one.")
@@ -693,7 +695,7 @@ class VariableRecoveryFast(ForwardAnalysis, VariableRecoveryBase):  # pylint:dis
                 adjusted = True
 
             if adjusted:
-                state.register_region.store(self.project.arch.sp_offset, sp_v)
+                state.register_region.store(get_sp_offset(self.project.arch), sp_v)
 
     def _parse_type_hints(self, type_hints: list[tuple[atoms.VirtualVariable | atoms.MemoryLocation, str]]) -> None:
         self.vvar_type_hints = {}

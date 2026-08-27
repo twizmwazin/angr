@@ -13,6 +13,7 @@ from angr.calling_conventions import SimRegArg, default_cc
 from angr.code_location import AILCodeLocation
 from angr.knowledge_plugins.functions import Function
 from angr.knowledge_plugins.key_definitions.constants import ObservationPointType
+from angr.utils.arch import get_sp_offset
 
 from .s_rda_model import SRDAModel, populate_model
 from .s_rda_view import SRDAView
@@ -189,7 +190,7 @@ class SReachingDefinitions:
                     if block.addr in endpoint_addrs:
                         ob_points.append(("node", (block.addr, block.idx), ObservationPointType.OP_AFTER))
                 func_end_observations = srda_view.observe(ob_points, entry=entry_block)
-                ignore_reg_offsets = {arch.sp_offset, arch.ip_offset}
+                ignore_reg_offsets = {get_sp_offset(arch), arch.ip_offset}
                 if not self._bp_as_gpr:
                     ignore_reg_offsets.add(arch.bp_offset)
                 for key, reg_to_vvarids in func_end_observations.items():

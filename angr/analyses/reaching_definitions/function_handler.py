@@ -19,6 +19,7 @@ from angr.knowledge_plugins.key_definitions.definition import Definition
 from angr.knowledge_plugins.key_definitions.tag import Tag
 from angr.sim_type import SimTypeBottom, SimTypeFunction
 from angr.storage.memory_mixins.paged_memory.pages.multi_values import MultiValues
+from angr.utils.arch import get_sp_offset
 from angr.utils.types import dereference_simtype_by_lib
 
 if TYPE_CHECKING:
@@ -595,7 +596,9 @@ class FunctionHandler:
     @staticmethod
     def c_args_as_atoms(state: ReachingDefinitionsState, cc: SimCC, prototype: SimTypeFunction) -> list[set[Atom]]:
         if not prototype.variadic:
-            sp_value = state.get_one_value(Register(state.arch.sp_offset, state.arch.bytes), strip_annotations=True)
+            sp_value = state.get_one_value(
+                Register(get_sp_offset(state.arch), state.arch.bytes), strip_annotations=True
+            )
             sp = state.get_stack_offset(sp_value) if sp_value is not None else None
             atoms = []
             for arg in cc.arg_locs(prototype):
@@ -644,4 +647,4 @@ class FunctionHandler:
 
     @staticmethod
     def stack_pointer_as_atom(state) -> Register:
-        return Register(state.arch.sp_offset, state.arch.bytes, state.arch)
+        return Register(get_sp_offset(state.arch), state.arch.bytes, state.arch)

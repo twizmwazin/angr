@@ -15,6 +15,7 @@ from angr.calling_conventions import SimStackArg
 from angr.codenode import BlockNode, CodeNode, FuncNode, HookNode
 from angr.engines.light import RegisterOffset, SimEngineLight, SimEngineNostmtVEX, SpOffset
 from angr.knowledge_plugins.functions import Function
+from angr.utils.arch import get_sp_offset
 from angr.utils.bits import s2u
 
 
@@ -146,7 +147,7 @@ class SimEngineFCPVEX(
 
     def _handle_stmt_Put(self, stmt):
         v = self._expr(stmt.data)
-        if stmt.offset == self.arch.sp_offset and isinstance(v, SpOffset):
+        if stmt.offset == get_sp_offset(self.arch) and isinstance(v, SpOffset):
             self.state.sp_value = v.offset
         elif stmt.offset == self.arch.bp_offset and not self.bp_as_gpr and isinstance(v, SpOffset):
             self.state.bp_value = v.offset
@@ -190,7 +191,7 @@ class SimEngineFCPVEX(
         return None
 
     def _handle_expr_Get(self, expr) -> SpOffset | None:
-        if expr.offset == self.arch.sp_offset:
+        if expr.offset == get_sp_offset(self.arch):
             return SpOffset(self.arch.bits, self.state.sp_value, is_base=False)
         if expr.offset == self.arch.bp_offset and not self.bp_as_gpr:
             return SpOffset(self.arch.bits, self.state.bp_value, is_base=False)

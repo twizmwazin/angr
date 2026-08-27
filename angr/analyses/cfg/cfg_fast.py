@@ -49,6 +49,7 @@ from angr.knowledge_plugins.xrefs import XRef, XRefType
 from angr.misc.ux import once
 from angr.rustylib import SegmentList
 from angr.simos import SimWindows
+from angr.utils.arch import get_sp_offset
 from angr.utils.constants import DEFAULT_STATEMENT
 from angr.utils.funcid import (
     is_function_likely_security_init_cookie,
@@ -5229,7 +5230,7 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
 
         # if it does, we log it down to the Function object.
         lr_offset = self.project.arch.registers["lr"][0]
-        sp_offset = self.project.arch.sp_offset
+        sp_offset = get_sp_offset(self.project.arch)
         initial_sp = 0x7FFF0000
         initial_lr = 0xABCDEF
         tmps = {}
@@ -5287,7 +5288,7 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
         if "lr_saved_on_stack" not in function.info or not function.info["lr_saved_on_stack"]:
             return
 
-        sp_offset = self.project.arch.sp_offset
+        sp_offset = get_sp_offset(self.project.arch)
         initial_sp = 0x7FFF0000
         last_sp = None
         tmps = {}

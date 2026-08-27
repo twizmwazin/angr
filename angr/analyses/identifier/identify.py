@@ -11,6 +11,7 @@ from networkx import NetworkXError
 from angr import sim_options as options
 from angr.analyses.analysis import AnalysesHub, Analysis
 from angr.errors import AngrError, SimEngineError, SimError, SimMemoryError, SimSegfaultError
+from angr.utils.arch import get_sp_offset
 
 from .errors import IdentifierException
 from .functions import Functions
@@ -57,7 +58,7 @@ class Identifier(Analysis):
 
         # reg list
         a = self.project.arch
-        self._sp_reg = a.register_names[a.sp_offset]
+        self._sp_reg = a.register_names[get_sp_offset(a)]
         self._bp_reg = a.register_names[a.bp_offset]
         self._ip_reg = a.register_names[a.ip_offset]
         self._reg_list = a.default_symbolic_registers
@@ -582,7 +583,7 @@ class Identifier(Analysis):
                         if found_end:
                             all_end_addrs.add(cur_addr)
                     elif not found_end and stmt.tag == "Ist_Put":
-                        if stmt.offset == self.project.arch.sp_offset:
+                        if stmt.offset == get_sp_offset(self.project.arch):
                             found_end = True
                             ends.add(cur_addr)
                             all_end_addrs.add(cur_addr)
@@ -801,7 +802,7 @@ class Identifier(Analysis):
         )
         symbolic_stack = claripy.BVS("symbolic_stack", project.arch.bits * stack_length)
         initial_state.memory.store(initial_state.regs.sp, symbolic_stack)
-        if initial_state.arch.bp_offset != initial_state.arch.sp_offset:
+        if initial_state.arch.bp_offset != get_sp_offset(initial_state.arch):
             initial_state.regs.bp = initial_state.regs.sp + 20 * initial_state.arch.bytes
         initial_state.solver._solver.timeout = 500  # only solve for half a second at most
         return initial_state

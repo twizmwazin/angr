@@ -17,6 +17,7 @@ from angr.sim_variable import (
     SimStackVariable,
     SimTemporaryVariable,
 )
+from angr.utils.arch import get_sp_offset
 
 l = logging.getLogger(name=__name__)
 
@@ -1134,7 +1135,7 @@ class DDG(Analysis):
             # make sure to put it into the killing set
             self._kill(variable, location)
 
-        if reg_offset == self.project.arch.sp_offset:
+        if reg_offset == get_sp_offset(self.project.arch):
             self._custom_data_per_statement = ("sp", 0)
         elif reg_offset == self.project.arch.bp_offset:
             self._custom_data_per_statement = ("bp", 0)

@@ -47,6 +47,7 @@ from angr.knowledge_plugins.cfg.spilling_cfg import block_key_to_addr, block_key
 from angr.knowledge_plugins.functions.function_manager import FunctionManager
 from angr.procedures.procedure_dict import SIM_PROCEDURES
 from angr.procedures.stubs.UnresolvableJumpTarget import UnresolvableJumpTarget
+from angr.utils.arch import get_sp_offset
 from angr.utils.constants import DEFAULT_STATEMENT
 from angr.utils.orderedset import OrderedSet
 
@@ -2461,13 +2462,14 @@ class CFGBase(Analysis):
                 # stack pointer changes or not; for large functions, we simply detect how far away we jump as well as
                 # if there are any other functions identified between the source and the destination.
                 if len(src_function.block_addrs_set) <= 10:
-                    regs = {self.project.arch.sp_offset}
+                    sp_offset = get_sp_offset(self.project.arch)
+                    regs = {sp_offset}
                     if hasattr(self.project.arch, "bp_offset") and self.project.arch.bp_offset is not None:
                         regs.add(self.project.arch.bp_offset)
                     sptracker = self.project.analyses[StackPointerTracker].prep()(
                         src_function, regs, track_memory=self._sp_tracking_track_memory
                     )
-                    sp_delta = sptracker.offset_after_block(src_addr, self.project.arch.sp_offset)
+                    sp_delta = sptracker.offset_after_block(src_addr, sp_offset)
                     if sp_delta == 0:
                         return True
                 else:

@@ -28,6 +28,7 @@ from angr.exploration_techniques.slicecutor import Slicecutor
 from angr.knowledge_plugins.cfg import IndirectJump, IndirectJumpType
 from angr.misc.ux import once
 from angr.state_plugins.inspect import BP, BP_AFTER, BP_BEFORE
+from angr.utils.arch import get_sp_offset
 from angr.utils.constants import DEFAULT_STATEMENT
 
 from .constant_value_manager import ConstantValueManager
@@ -369,7 +370,7 @@ class JumpTableProcessor(
     def _handle_expr_Get(self, expr):
         if expr.offset == self.arch.bp_offset:
             v = self._get_spoffset_expr(SpOffset(self.arch.bits, self._bp_sp_diff))
-        elif expr.offset == self.arch.sp_offset:
+        elif expr.offset == get_sp_offset(self.arch):
             v = self._get_spoffset_expr(SpOffset(self.arch.bits, 0))
         else:
             if expr.offset in self.state._registers:
@@ -2456,10 +2457,9 @@ class JumpTableResolver(IndirectJumpResolver):
         Examine if the stack pointer moves up (if any values are popped out of the stack) within a single block.
         """
 
-        spt = self.project.analyses.StackPointerTracker(
-            None, {self.project.arch.sp_offset}, block=block, track_memory=False
-        )
-        offset_after = spt.offset_after(block.addr, self.project.arch.sp_offset)
+        sp_offset = get_sp_offset(self.project.arch)
+        spt = self.project.analyses.StackPointerTracker(None, {sp_offset}, block=block, track_memory=False)
+        offset_after = spt.offset_after(block.addr, sp_offset)
         return offset_after is not None and offset_after > 0
 
     def _is_jumptarget_legal(self, target):

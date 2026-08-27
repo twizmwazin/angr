@@ -19,6 +19,7 @@ from angr.knowledge_plugins.key_definitions.heap_address import HeapAddress
 from angr.knowledge_plugins.key_definitions.live_definitions import LiveDefinitions
 from angr.knowledge_plugins.key_definitions.tag import LocalVariableTag, ParameterTag, Tag
 from angr.storage.memory_mixins.paged_memory.pages.multi_values import MultiValues, mv_is_bv
+from angr.utils.arch import get_sp_offset
 from angr.utils.constants import DEFAULT_STATEMENT
 
 from .function_handler import FunctionCallData
@@ -209,7 +210,7 @@ class SimEngineRDVEX(
                     if stack_offset is not None:
                         self.state.add_stack_use(stack_offset, 1)
 
-        if self.state.exit_observed and stmt.offset == self.arch.sp_offset:
+        if self.state.exit_observed and stmt.offset == get_sp_offset(self.arch):
             return
         self.state.kill_and_add_definition(reg, data)
 

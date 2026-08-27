@@ -28,6 +28,7 @@ from angr.sim_type import (
     SimTypeFunction,
     SimTypePointer,
 )
+from angr.utils.arch import get_sp_offset
 from angr.utils.types import dereference_simtype_by_lib
 
 from .stackarg_offset_manager import StackArgOffsetManager
@@ -328,7 +329,7 @@ class CallSiteMaker:
         if stack_arg_locs:
             assert self._stack_pointer_tracker is not None
             sp_offset = self._stack_pointer_tracker.offset_before(
-                call_expr.tags["ins_addr"], self.project.arch.sp_offset
+                call_expr.tags["ins_addr"], get_sp_offset(self.project.arch)
             )
             if sp_offset is None:
                 l.warning(
@@ -478,7 +479,7 @@ class CallSiteMaker:
 
         call_addr = call_stmt.tags.get("ins_addr", None)
         assert call_addr is not None
-        sp_base = self._stack_pointer_tracker.offset_before(call_addr, self.project.arch.sp_offset)
+        sp_base = self._stack_pointer_tracker.offset_before(call_addr, get_sp_offset(self.project.arch))
         if sp_base is not None:
             sp_offset = sp_base + offset
             if sp_offset >= (1 << (self.project.arch.bits - 1)):

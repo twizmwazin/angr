@@ -15,6 +15,7 @@ from angr.engines.light.engine import SimEngineLight
 from angr.errors import SimMemoryMissingError
 from angr.storage.memory_mixins import LabeledMemory
 from angr.storage.memory_object import SimLabeledMemoryObject, SimMemoryObject
+from angr.utils.arch import get_sp_offset
 
 if TYPE_CHECKING:
     from archinfo import Arch
@@ -436,7 +437,7 @@ class PropagatorVEXState(PropagatorState):
         )
         spoffset_var = SimEngineLight.sp_offset(project.arch.bits, 0)
         state.store_register(
-            project.arch.sp_offset,
+            get_sp_offset(project.arch),
             project.arch.bytes,
             spoffset_var,
         )

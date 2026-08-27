@@ -23,6 +23,7 @@ from angr.sim_variable import (
     SimVariable,
 )
 from angr.storage.memory_mixins.paged_memory.pages.multi_values import MultiValues
+from angr.utils.arch import get_sp_offset
 from angr.utils.constants import MAX_ACCESS_SIZE, MAX_POINTSTO_BITS
 
 #
@@ -312,7 +313,7 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
         """
 
         if (
-            offset in (self.project.arch.ip_offset, self.project.arch.sp_offset, self.project.arch.lr_offset)
+            offset in (self.project.arch.ip_offset, get_sp_offset(self.project.arch), self.project.arch.lr_offset)
             or not create_variable
         ):
             # only store the value. don't worry about variables.
@@ -398,7 +399,8 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
 
         if (
             vvar.category == ailment.expression.VirtualVariableCategory.REGISTER
-            and vvar.oident in (self.project.arch.ip_offset, self.project.arch.sp_offset, self.project.arch.lr_offset)
+            and vvar.oident
+            in (self.project.arch.ip_offset, get_sp_offset(self.project.arch), self.project.arch.lr_offset)
         ) or not create_variable:
             # only store the value. don't worry about variables.
             self.vvar_region[vvar_id] = richr.data
@@ -1044,7 +1046,7 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
         except SimMemoryMissingError:
             values = None
 
-        if offset in (self.project.arch.sp_offset, self.project.arch.ip_offset):
+        if offset in (get_sp_offset(self.project.arch), self.project.arch.ip_offset):
             # load values. don't worry about variables
             if values is None:
                 r_value = self.state.top(size * self.project.arch.byte_width)
@@ -1090,7 +1092,7 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
                     )
                     variable_set.add(var)
 
-        if offset == self.project.arch.sp_offset:
+        if offset == get_sp_offset(self.project.arch):
             # ignore sp
             typevar = None
             var = None
@@ -1143,7 +1145,7 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
             return self._read_from_register(vvar.reg_offset, vvar.size, expr=vvar, create_variable=True)
 
         if vvar.category == ailment.Expr.VirtualVariableCategory.REGISTER and vvar.oident in (
-            self.project.arch.sp_offset,
+            get_sp_offset(self.project.arch),
             self.project.arch.ip_offset,
         ):
             # load values. don't worry about variables
@@ -1234,9 +1236,8 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
             self.state.variable_manager[self.func_addr].read_from(var, None, codeloc, atom=expr, overwrite=False)
             variable_set.add(var)
 
-        if (
-            vvar.category == ailment.Expr.VirtualVariableCategory.REGISTER
-            and vvar.oident == self.project.arch.sp_offset
+        if vvar.category == ailment.Expr.VirtualVariableCategory.REGISTER and vvar.oident == get_sp_offset(
+            self.project.arch
         ):
             # ignore sp
             typevar = None

@@ -26,6 +26,7 @@ from angr.knowledge_plugins.key_definitions.constants import OP_AFTER, OP_BEFORE
 from angr.knowledge_plugins.key_definitions.live_definitions import LiveDefinitions
 from angr.storage.memory_mixins import MultiValuedMemory
 from angr.storage.memory_object import SimMemoryObject
+from angr.utils.arch import get_sp_offset
 from angr.utils.constants import DEFAULT_STATEMENT
 
 
@@ -469,12 +470,12 @@ class TestReachingDefinitions(TestCase):
         cfg = project.analyses[CFGFast].prep()(normalize=True)
         rda = project.analyses[ReachingDefinitionsAnalysis].prep()(subject=cfg.kb.functions[0x93E0], observe_all=True)
         sp_0 = rda.model.observed_results[("insn", 0x9410, OP_BEFORE)].registers.load(
-            project.arch.sp_offset,
+            get_sp_offset(project.arch),
             size=4,
             endness=project.arch.register_endness,
         )
         sp_1 = rda.model.observed_results[("insn", 0x9410, OP_AFTER)].registers.load(
-            project.arch.sp_offset,
+            get_sp_offset(project.arch),
             size=4,
             endness=project.arch.register_endness,
         )

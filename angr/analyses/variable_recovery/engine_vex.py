@@ -16,6 +16,7 @@ from angr.errors import SimMemoryMissingError
 from angr.knowledge_plugins import Function
 from angr.sim_type import SimTypeBottom, SimTypeRef
 from angr.storage.memory_mixins.paged_memory.pages.multi_values import MultiValues
+from angr.utils.arch import get_sp_offset
 
 from .engine_base import RichR, SimEngineVRBase
 from .irsb_scanner import VEXIRSBScanner
@@ -206,7 +207,7 @@ class SimEngineVRVEX(
                     self._read_from_register(self.arch.registers[loc.reg_name][0] + loc.reg_offset, loc.size)
                 elif isinstance(loc, SimStackArg):
                     try:
-                        sp: MultiValues = self.state.register_region.load(self.arch.sp_offset, self.arch.bytes)
+                        sp: MultiValues = self.state.register_region.load(get_sp_offset(self.arch), self.arch.bytes)
                     except SimMemoryMissingError:
                         pass
                     else:

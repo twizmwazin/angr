@@ -40,9 +40,6 @@ class NameResolutionMixin(MemoryMixin):
                 self.store("cc_op", 0)
                 return self.state.arch.registers["cc_dep1"]
 
-            if name == "sp" and "sp" not in self.state.arch.registers:
-                sp_reg_name = self.state.arch.register_names[self.state.arch.sp_offset]
-                return self.state.arch.registers[sp_reg_name]
             if name == "lr" and "lr" not in self.state.arch.registers:
                 lr_reg_name = self.state.arch.register_names[self.state.arch.lr_offset]
                 return self.state.arch.registers[lr_reg_name]

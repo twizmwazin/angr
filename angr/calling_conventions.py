@@ -42,6 +42,7 @@ from .sim_type import (
     parse_signature,
 )
 from .state_plugins.sim_action_object import SimActionObject
+from .utils.arch import get_sp_offset
 
 if TYPE_CHECKING:
     from angr.knowledge_plugins.functions import Function
@@ -1026,7 +1027,7 @@ class SimCC:
 
         ret_addr = self.return_addr.get_value(state) if self.return_addr is not None else None
 
-        if state.arch.sp_offset is not None and prototype is not None:
+        if get_sp_offset(state.arch) is not None and prototype is not None:
             if force_callee_cleanup or self.CALLEE_CLEANUP:
                 session = self.arg_session(prototype.returnty)
                 if self.return_in_implicit_outparam(prototype.returnty):

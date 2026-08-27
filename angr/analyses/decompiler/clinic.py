@@ -83,6 +83,7 @@ from angr.utils.ail_serialization import (
     simvar_from_bytes_polymorphic,
     simvar_to_bytes_polymorphic,
 )
+from angr.utils.arch import get_sp_offset
 from angr.utils.graph import GraphUtils
 from angr.utils.ssa import is_phi_assignment
 from angr.utils.types import dereference_simtype_by_lib
@@ -744,14 +745,14 @@ class Clinic(Analysis, Serializable):
     def calculate_stack_depth(self):
         # we need to reserve space for our own stack
         spt = self._track_stack_pointers()
-        stack_offsets = spt.offsets_for(self.project.arch.sp_offset)
+        stack_offsets = spt.offsets_for(get_sp_offset(self.project.arch))
         if max(stack_offsets) > 2 ** (self.project.arch.bits - 1):
             # why is this unsigned...
             depth = min(s for s in stack_offsets if s > 2 ** (self.project.arch.bits - 1)) - 2**self.project.arch.bits
         else:
             depth = min(stack_offsets)
 
-        if spt.inconsistent_for(self.project.arch.sp_offset):
+        if spt.inconsistent_for(get_sp_offset(self.project.arch)):
             l.warning("Inconsistency found during stack pointer tracking. Stack depth may be incorrect.")
             depth -= 0x1000
 
@@ -1427,12 +1428,9 @@ class Clinic(Analysis, Serializable):
         :return: None
         """
 
-        regs = {self.project.arch.sp_offset}
-        initial_reg_values = {
-            self.project.arch.sp_offset: OffsetVal(
-                Register(self.project.arch.sp_offset, self.project.arch.bits), self._sp_shift
-            )
-        }
+        sp_offset = get_sp_offset(self.project.arch)
+        regs = {sp_offset}
+        initial_reg_values = {sp_offset: OffsetVal(Register(sp_offset, self.project.arch.bits), self._sp_shift)}
         if hasattr(self.project.arch, "bp_offset") and self.project.arch.bp_offset is not None:
             regs.add(self.project.arch.bp_offset)
             initial_reg_values[self.project.arch.bp_offset] = OffsetVal(
@@ -1451,7 +1449,7 @@ class Clinic(Analysis, Serializable):
             initial_reg_values=initial_reg_values,
         )
 
-        if spt.inconsistent_for(self.project.arch.sp_offset):
+        if spt.inconsistent_for(get_sp_offset(self.project.arch)):
             l.warning("Inconsistency found during stack pointer tracking. Decompilation results might be incorrect.")
         return spt
 
@@ -4172,7 +4170,8 @@ class Clinic(Analysis, Serializable):
                         )
                     ):
                         # found it!
-                        assert self.project.arch.sp_offset is not None
+                        sp_offset = get_sp_offset(self.project.arch)
+                        assert sp_offset is not None
                         alloca_node = node
                         sp_equal_to = ailment.Expr.BinaryOp(
                             self._ail_manager.next_atom(),
@@ -4180,7 +4179,7 @@ class Clinic(Analysis, Serializable):
                             [
                                 ailment.Expr.Register(
                                     self._ail_manager.next_atom(),
-                                    self.project.arch.sp_offset,
+                                    sp_offset,
                                     self.project.arch.bits,
                                 ),
                                 last_stmt.condition.operands[1],
@@ -4260,7 +4259,9 @@ class Clinic(Analysis, Serializable):
 
     def _is_sp_vvar(self, vv) -> TypeGuard[ailment.Expr.VirtualVariable]:
         return (
-            isinstance(vv, ailment.Expr.VirtualVariable) and vv.was_reg and vv.reg_offset == self.project.arch.sp_offset
+            isinstance(vv, ailment.Expr.VirtualVariable)
+            and vv.was_reg
+            and vv.reg_offset == get_sp_offset(self.project.arch)
         )
 
     def _excise_vla(self, ail_graph) -> None:

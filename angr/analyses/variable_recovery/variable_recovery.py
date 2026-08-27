@@ -16,6 +16,7 @@ from angr.knowledge_plugins.functions.function import Function
 from angr.sim_variable import SimRegisterVariable, SimStackVariable
 from angr.state_plugins.inspect import BP, BP_AFTER
 from angr.storage.memory_mixins.paged_memory.pages.multi_values import MultiValues
+from angr.utils.arch import get_sp_offset
 
 from .annotations import StackLocationAnnotation
 from .variable_recovery_base import VariableRecoveryBase, VariableRecoveryStateBase
@@ -190,7 +191,7 @@ class VariableRecoveryState(VariableRecoveryStateBase):
         reg_read_length = state.inspect.attrs.reg_read_length
         reg_read_expr = state.inspect.attrs.reg_read_expr
 
-        if reg_read_offset == state.arch.sp_offset and reg_read_length == state.arch.bytes:
+        if reg_read_offset == get_sp_offset(state.arch) and reg_read_length == state.arch.bytes:
             # TODO: make sure the sp is not overwritten by something that we are not tracking
             return
 
@@ -220,7 +221,7 @@ class VariableRecoveryState(VariableRecoveryStateBase):
                 return
             reg_write_offset = state.solver.eval(reg_write_offset)
 
-        if reg_write_offset == state.arch.sp_offset:
+        if reg_write_offset == get_sp_offset(state.arch):
             # it's updating stack pointer. skip
             return
 

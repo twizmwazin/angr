@@ -11,6 +11,7 @@ from angr import errors
 from angr.errors import AngrError, SimEmptyCallStackError, SimSolverError
 from angr.sim_state import SimState
 from angr.state_plugins.inspect import BP_AFTER, BP_BEFORE
+from angr.utils.arch import get_sp_offset
 
 from .plugin import SimStatePlugin
 
@@ -374,7 +375,7 @@ class CallStack(SimStatePlugin):
                 return
         except SimSolverError:
             return
-        if self.state.arch.sp_offset is None:
+        if get_sp_offset(self.state.arch) is None:
             return
 
         # condition for call = Ijk_Call

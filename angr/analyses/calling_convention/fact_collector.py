@@ -14,6 +14,7 @@ from angr.codenode import BlockNode, FuncNode, HookNode
 from angr.engines.light import SimEngineLight, SimEngineNostmtVEX
 from angr.knowledge_plugins.functions import Function
 from angr.sim_type import SimTypeBottom, SimTypeFunction
+from angr.utils.arch import get_sp_offset
 from angr.utils.bits import u2s
 from angr.utils.types import dereference_simtype_by_lib
 
@@ -202,7 +203,7 @@ class SimEngineFactCollectorVEX(
                     self.state.register_read_undo(stmt.offset)
                 return
 
-        if stmt.offset == self.arch.sp_offset and v is not None and v[0] == KIND_SP:
+        if stmt.offset == get_sp_offset(self.arch) and v is not None and v[0] == KIND_SP:
             self.state.sp_value = v[2]
         elif stmt.offset == self.arch.bp_offset and v is not None and v[1] == KIND_SP:
             self.state.bp_value = v[2]
@@ -236,7 +237,7 @@ class SimEngineFactCollectorVEX(
         return (KIND_CONST, 0, 0)
 
     def _handle_expr_Get(self, expr):
-        if expr.offset == self.arch.sp_offset:
+        if expr.offset == get_sp_offset(self.arch):
             return (KIND_SP, 0, self.state.sp_value)
         if expr.offset == self.arch.bp_offset and not self.bp_as_gpr:
             return (KIND_SP, 0, self.state.bp_value)
@@ -576,7 +577,7 @@ class FactCollector(Analysis):
             return False
 
         tls_reg_offset, canary_offset = tls_location
-        stack_reg_offsets = {self.project.arch.sp_offset, self.project.arch.bp_offset}
+        stack_reg_offsets = {get_sp_offset(self.project.arch), self.project.arch.bp_offset}
         op0, op1 = expr.args
         if not (
             (
@@ -833,7 +834,7 @@ class FactCollector(Analysis):
                     if isinstance(stmt, pyvex.IRStmt.WrTmp):
                         if isinstance(stmt.data, pyvex.IRExpr.Get) and stmt.data.offset in {
                             self.project.arch.bp_offset,
-                            self.project.arch.sp_offset,
+                            get_sp_offset(self.project.arch),
                         }:
                             tmps[stmt.tmp] = "sp"
                         elif (
@@ -920,7 +921,7 @@ class FactCollector(Analysis):
         if not self.project.arch.call_pushes_ret:
             return 0
 
-        sp_offset = self.project.arch.sp_offset
+        sp_offset = get_sp_offset(self.project.arch)
         sp_diffs = set()  # should all be positive
 
         for endpoint in self.function.endpoints:
@@ -933,7 +934,7 @@ class FactCollector(Analysis):
             last_ins_addr = block.instruction_addrs[-1]
             last_ins_block = self.project.factory.block(last_ins_addr, size=block.addr + block.size - last_ins_addr)
             spt = self.project.analyses.StackPointerTracker(
-                None, reg_offsets={self.project.arch.sp_offset}, block=last_ins_block, track_memory=False
+                None, reg_offsets={sp_offset}, block=last_ins_block, track_memory=False
             )
             sp_off_after = spt.offset_after(last_ins_addr, sp_offset)
             sp_off_before = spt.offset_before(last_ins_addr, sp_offset)

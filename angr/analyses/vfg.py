@@ -31,6 +31,7 @@ from angr.knowledge_plugins.cfg import BlockID
 from angr.procedures import SIM_PROCEDURES
 from angr.sim_state import SimState
 from angr.state_plugins.callstack import CallStack
+from angr.utils.arch import get_sp_offset
 from angr.utils.graph import GraphUtils
 
 from .cfg.cfg_job_base import CFGJobBase, FunctionKey
@@ -1476,12 +1477,12 @@ class VFG(ForwardAnalysis[SimState, VFGNode, VFGJob, BlockID, SimState], Analysi
                 current_function = self.kb.functions.function(job.call_target)
                 sp_difference = current_function.sp_delta if current_function is not None else 0
                 arch = successor_state.arch
-                reg_sp_offset = arch.sp_offset
+                reg_sp_offset = get_sp_offset(arch)
                 reg_sp_expr = (
                     successor_state.registers.load(reg_sp_offset, size=arch.bytes, endness=arch.register_endness)
                     + sp_difference
                 )  # type: ignore
-                successor_state.registers.store(arch.sp_offset, reg_sp_expr)
+                successor_state.registers.store(reg_sp_offset, reg_sp_expr)
 
                 # Clear the return value with a TOP
                 top_si = claripy.BVS("unnamed", arch.bits)
@@ -1658,7 +1659,7 @@ class VFG(ForwardAnalysis[SimState, VFGNode, VFGJob, BlockID, SimState], Analysi
     @staticmethod
     def _create_stack_region(successor_state: SimState, successor_ip: int) -> claripy.ast.BV:
         arch = successor_state.arch
-        reg_sp_offset = arch.sp_offset
+        reg_sp_offset = get_sp_offset(arch)
         reg_sp_expr = successor_state.registers.load(reg_sp_offset, size=arch.bytes, endness=arch.register_endness)
 
         reg_sp_val = successor_state.solver.min(reg_sp_expr)

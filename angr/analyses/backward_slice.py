@@ -10,6 +10,7 @@ from angr.analyses.analysis import AnalysesHub, Analysis
 from angr.annocfg import AnnotatedCFG
 from angr.code_location import CodeLocation
 from angr.errors import AngrBackwardSlicingError
+from angr.utils.arch import get_sp_offset
 from angr.utils.constants import DEFAULT_STATEMENT
 
 l = logging.getLogger(name=__name__)
@@ -279,7 +280,7 @@ class BackwardSlice(Analysis):
 
         for descendant in bfs_tree.nodes():
             if descendant.type == "reg" and (
-                descendant.reg in (self.project.arch.sp_offset, self.project.arch.bp_offset)
+                descendant.reg in (get_sp_offset(self.project.arch), self.project.arch.bp_offset)
             ):
                 return True
 

@@ -17,6 +17,7 @@ from angr.knowledge_plugins.key_definitions.heap_address import HeapAddress
 from angr.knowledge_plugins.key_definitions.tag import Tag
 from angr.storage.memory_mixins import MultiValuedMemory
 from angr.storage.memory_mixins.paged_memory.pages.multi_values import MultiValues, MVType
+from angr.utils.arch import get_sp_offset
 
 from .heap_allocator import HeapAllocator
 from .rd_initializer import RDAStateInitializer
@@ -375,7 +376,7 @@ class ReachingDefinitionsState:
             if self._dep_graph is not None:
                 stack_use = {u for u in self.codeloc_uses if isinstance(u.atom, MemoryLocation) and u.atom.is_on_stack}
 
-                sp_offset = self.arch.sp_offset
+                sp_offset = get_sp_offset(self.arch)
                 bp_offset = self.arch.bp_offset
 
                 values = set()

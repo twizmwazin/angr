@@ -4,6 +4,7 @@ from __future__ import annotations
 import pyvex
 
 from .errors import SimSlicerError
+from .utils.arch import get_sp_offset
 
 
 class SimLightState:
@@ -94,7 +95,7 @@ class SimSlicer:
 
         state = SimLightState(
             regs={
-                self._arch.sp_offset: self._arch.initial_sp,
+                get_sp_offset(self._arch): self._arch.initial_sp,
                 # TODO: take care of the relation between sp and bp
                 self._arch.bp_offset: self._arch.initial_sp + 0x2000,
             },
@@ -156,7 +157,7 @@ class SimSlicer:
     def _forward_handler_expr_Get(self, expr, state):
         reg = expr.offset
 
-        if (state.options["mock_sp"] and reg == self._arch.sp_offset) or (
+        if (state.options["mock_sp"] and reg == get_sp_offset(self._arch)) or (
             state.options["mock_bp"] and reg == self._arch.bp_offset
         ):
             return state.regs[reg]

@@ -9,6 +9,7 @@ import claripy
 
 from angr.errors import SimStateError
 from angr.sim_state import SimState
+from angr.utils.arch import get_sp_offset
 
 from .plugin import SimStatePlugin
 
@@ -121,7 +122,7 @@ class GDB(SimStatePlugin):
             return
 
         bp = self.state.arch.register_names[self.state.arch.bp_offset]
-        sp = self.state.arch.register_names[self.state.arch.sp_offset]
+        sp = self.state.arch.register_names[get_sp_offset(self.state.arch)]
 
         stack_shift = self.state.arch.initial_sp - self.real_stack_top
         self.state.registers.store(sp, self.state.regs.sp + stack_shift)

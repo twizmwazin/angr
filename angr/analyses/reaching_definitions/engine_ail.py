@@ -21,6 +21,7 @@ from angr.knowledge_plugins.key_definitions.atoms import Atom, MemoryLocation, R
 from angr.knowledge_plugins.key_definitions.constants import OP_AFTER, OP_BEFORE
 from angr.knowledge_plugins.key_definitions.live_definitions import Definition, LiveDefinitions
 from angr.storage.memory_mixins.paged_memory.pages.multi_values import MultiValues, mv_is_bv
+from angr.utils.arch import get_sp_offset
 
 from .function_handler import FunctionCallData, FunctionHandler
 from .rd_state import ReachingDefinitionsState
@@ -142,7 +143,7 @@ class SimEngineRDAIL(
             reg = Register(RegisterOffset(dst.reg_offset), dst.size)
             self.state.kill_and_add_definition(reg, src)
 
-            if dst.reg_offset == self.arch.sp_offset:
+            if dst.reg_offset == get_sp_offset(self.arch):
                 self.state._sp_adjusted = True
                 # TODO: Special logic that frees all definitions above the current stack pointer
         else:
@@ -332,7 +333,7 @@ class SimEngineRDAIL(
                     and reg.name not in cc.ARG_REGS
                     and reg.vex_offset
                     not in {
-                        self.arch.sp_offset,
+                        get_sp_offset(self.arch),
                         self.arch.bp_offset,
                         self.arch.ip_offset,
                     }
@@ -371,7 +372,7 @@ class SimEngineRDAIL(
         # TODO: Check if the stack base pointer is used as a stack base pointer in this function or not
         self.state.add_register_use(self.project.arch.bp_offset, self.project.arch.bytes)
         # We don't add sp since stack pointers are supposed to be get rid of in AIL. this is definitely a hack though
-        # self.state.add_use(Register(self.project.arch.sp_offset, self.project.arch.bits // 8))
+        # self.state.add_use(Register(get_sp_offset(self.project.arch), self.project.arch.bits // 8))
 
     def _handle_stmt_DirtyStatement(self, stmt: ailment.Stmt.DirtyStatement):
         self._expr(stmt.dirty)
@@ -432,8 +433,9 @@ class SimEngineRDAIL(
 
         # Special handling for SP and BP
         if self._stack_pointer_tracker is not None:
-            if reg_offset == self.arch.sp_offset:
-                sb_offset = self._stack_pointer_tracker.offset_before(self.ins_addr, self.arch.sp_offset)
+            sp_offset = get_sp_offset(self.arch)
+            if reg_offset == sp_offset:
+                sb_offset = self._stack_pointer_tracker.offset_before(self.ins_addr, sp_offset)
                 if sb_offset is not None:
                     return MultiValues(v=self.state._initial_stack_pointer() + sb_offset)
             elif reg_offset == self.arch.bp_offset and not self.bp_as_gpr:

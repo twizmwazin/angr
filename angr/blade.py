@@ -8,6 +8,7 @@ import pyvex
 from .errors import AngrBladeError, SimTranslationError
 from .knowledge_plugins.cfg import CFGNode
 from .slicer import SimSlicer
+from .utils.arch import get_sp_offset
 from .utils.constants import DEFAULT_STATEMENT
 
 
@@ -306,8 +307,9 @@ class Blade:
             include_imarks=self._include_imarks,
         )
         regs = slicer.final_regs
-        if self._ignore_sp and self.project.arch.sp_offset in regs:
-            regs.remove(self.project.arch.sp_offset)
+        sp_offset = get_sp_offset(self.project.arch)
+        if self._ignore_sp and sp_offset in regs:
+            regs.remove(sp_offset)
         if self._ignore_bp and self.project.arch.bp_offset in regs:
             regs.remove(self.project.arch.bp_offset)
         for offset in self._ignored_regs:
@@ -400,8 +402,9 @@ class Blade:
 
         regs = slicer.final_regs
 
-        if self._ignore_sp and self.project.arch.sp_offset in regs:
-            regs.remove(self.project.arch.sp_offset)
+        sp_offset = get_sp_offset(self.project.arch)
+        if self._ignore_sp and sp_offset in regs:
+            regs.remove(sp_offset)
         if self._ignore_bp and self.project.arch.bp_offset in regs:
             regs.remove(self.project.arch.bp_offset)
 

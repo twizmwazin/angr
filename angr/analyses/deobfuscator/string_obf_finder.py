@@ -16,6 +16,7 @@ from angr.errors import AngrAnalysisError, AngrCallableError, AngrCallableMultis
 from angr.sim_options import TRACK_MEMORY_ACTIONS, ZERO_FILL_UNCONSTRAINED_MEMORY, ZERO_FILL_UNCONSTRAINED_REGISTERS
 from angr.sim_type import SimTypeBottom, SimTypeFunction, SimTypePointer
 from angr.state_plugins.sim_action import SimActionData
+from angr.utils.arch import get_sp_offset
 from angr.utils.graph import GraphUtils
 
 from .irsb_reg_collector import IRSBRegisterCollector
@@ -853,7 +854,7 @@ class StringObfuscationFinder(Analysis):
         prop_state = prop.model.input_states.get(call_site_addr, None)
         if prop_state is not None:
             for reg_offset, reg_width in reg_reads:
-                if reg_offset == state.arch.sp_offset:
+                if reg_offset == get_sp_offset(state.arch):
                     continue
                 if reg_width < 8:
                     # at least a byte

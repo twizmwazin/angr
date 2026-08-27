@@ -15,6 +15,7 @@ from angr.procedures import SIM_PROCEDURES as P
 from angr.sim_state import SimState
 from angr.state_plugins.posix import SimSystemPosix
 from angr.storage.file import SimFileBase, SimFileStream
+from angr.utils.arch import get_sp_offset
 
 if TYPE_CHECKING:
     from angr.sim_procedure import SimProcedure
@@ -178,7 +179,8 @@ class SimOS:
                     ),
                 )
 
-        if state.arch.sp_offset is not None:
+        sp_offset = get_sp_offset(state.arch)
+        if sp_offset is not None:
             state.regs.sp = stack_end
 
         for reg, val, is_addr, mem_region in state.arch.default_register_values:
@@ -195,7 +197,7 @@ class SimOS:
                     raise AngrSimOSError(f'You must specify the base address for memory region "{mem_region}". ')
 
             # special case for stack_end overriding sp default
-            if actual_stack_end is not None and state.arch.registers[reg][0] == state.arch.sp_offset:
+            if actual_stack_end is not None and state.arch.registers[reg][0] == sp_offset:
                 continue
 
             if o.ABSTRACT_MEMORY in state.options and is_addr:
