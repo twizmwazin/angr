@@ -15,13 +15,19 @@ test_location = os.path.join(bin_location, "tests")
 
 
 class TestStateCustomization(unittest.TestCase):
+    def test_initial_sp(self):
+        for fn in glob.glob(os.path.join(test_location, "*", "fauxware")):
+            p = angr.Project(fn, auto_load_libs=False)
+            s = p.factory.blank_state()
+            assert s.solver.eval_one(s.regs.sp) == p.simos.initial_sp
+
     def test_stack_end(self):
         for fn in glob.glob(os.path.join(test_location, "*", "fauxware")):
             p = angr.Project(fn, auto_load_libs=False)
 
             # normal state
             s = p.factory.full_init_state()
-            offset = s.solver.eval(p.arch.initial_sp - s.regs.sp)
+            offset = s.solver.eval(p.simos.initial_sp - s.regs.sp)
 
             # different stack ends
             for n in [0x1337000, 0xBAAAAA00, 0x100, 0xFFFFFF00, 0x13371337000, 0xBAAAAAAA0000, 0xFFFFFFFFFFFFFF00]:

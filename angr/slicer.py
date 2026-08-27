@@ -93,11 +93,16 @@ class SimSlicer:
         :return: None
         """
 
+        # a mocked value for the initial stack pointer. stack addresses derived from it are only ever compared
+        # against each other, so the concrete value is arbitrary as long as it fits the architecture's word size
+        # and stays clear of constants that real code computes with.
+        mock_sp_value = (1 << (self._arch.bits - 1)) - 0x10000
+
         state = SimLightState(
             regs={
-                get_sp_offset(self._arch): self._arch.initial_sp,
+                get_sp_offset(self._arch): mock_sp_value,
                 # TODO: take care of the relation between sp and bp
-                self._arch.bp_offset: self._arch.initial_sp + 0x2000,
+                self._arch.bp_offset: mock_sp_value + 0x2000,
             },
             temps={},
             options={

@@ -40,6 +40,14 @@ class SimOS:
         self.unresolvable_call_target = None
         self.function_initial_registers = None
 
+    @property
+    def initial_sp(self) -> int:
+        """
+        The initial value of the stack pointer: where this OS places the top of the stack when creating blank states.
+        Subclasses may override this property to match their platform's stack placement.
+        """
+        return self.arch.initial_sp
+
     def configure_project(self):
         """
         Configure the project to set up global settings (like SimProcedures).
@@ -127,7 +135,7 @@ class SimOS:
             kwargs["os_name"] = self.name
         actual_stack_end = stack_end
         if stack_end is None:
-            stack_end = self.arch.initial_sp
+            stack_end = self.initial_sp
 
         if kwargs.get("permissions_map") is None:
             # just a dict of address ranges to permission bits

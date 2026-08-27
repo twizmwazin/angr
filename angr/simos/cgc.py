@@ -22,15 +22,21 @@ class SimCGC(SimUserland):
     def __init__(self, project, **kwargs):
         super().__init__(project, syscall_library=L["cgcabi"][0], syscall_addr_alignment=1, name="CGC", **kwargs)
 
+    @property
+    def initial_sp(self) -> int:
+        # default stack as specified in the cgc abi
+        return 0xBAAAB000
+
     # pylint: disable=arguments-differ
     def state_blank(self, flag_page=None, allocate_stack_page_count=0x100, **kwargs):
         """
         :param flag_page:                   Flag page content, either a string or a list of BV8s
         :param allocate_stack_page_count:   Number of pages to pre-allocate for stack
         """
-        # default stack as specified in the cgc abi
+        # pass the stack end explicitly: it must win over the SP default value that
+        # state.arch.default_register_values carries
         if kwargs.get("stack_end") is None:
-            kwargs["stack_end"] = 0xBAAAB000
+            kwargs["stack_end"] = self.initial_sp
         if kwargs.get("stack_size") is None:
             kwargs["stack_size"] = 1024 * 1024 * 8
 

@@ -124,7 +124,7 @@ class GDB(SimStatePlugin):
         bp = self.state.arch.register_names[self.state.arch.bp_offset]
         sp = self.state.arch.register_names[get_sp_offset(self.state.arch)]
 
-        stack_shift = self.state.arch.initial_sp - self.real_stack_top
+        stack_shift = self.state.project.simos.initial_sp - self.real_stack_top
         self.state.registers.store(sp, self.state.regs.sp + stack_shift)
 
         if not self.omit_fp:
