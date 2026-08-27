@@ -24,12 +24,16 @@ class StructBuilder(Analysis):
         self.strict = strict
 
     def _resolve_field(self, struct_ty, offset):
-        offsets = struct_ty.offsets
+        arch = self.project.arch
+        offsets = struct_ty.offsets(arch)
         for name, field_ty in struct_ty.fields.items():
             field_offset = offsets[name]
-            if offset == field_offset and field_ty.size > 0:
+            if offset == field_offset and field_ty.size(arch) > 0:
                 return name, field_ty
-            if isinstance(field_ty, RustSimStruct) and offsets[name] < offset < offsets[name] + field_ty.size // 8:
+            if (
+                isinstance(field_ty, RustSimStruct)
+                and offsets[name] < offset < offsets[name] + field_ty.size(arch) // 8
+            ):
                 return self._resolve_field(field_ty, offset - field_offset)
         return None, None
 
@@ -72,12 +76,12 @@ class StructBuilder(Analysis):
         for offset in field_exprs:
             expr = field_exprs[offset]
             _, field_ty = self._resolve_field(struct_ty, offset)
-            if field_ty and expr.size > field_ty.size // 8:
-                new_expr, leftover = self._truncate(expr, field_ty.size)
+            if field_ty and expr.size > field_ty.size(self.project.arch) // 8:
+                new_expr, leftover = self._truncate(expr, field_ty.size(self.project.arch))
                 if new_expr is None:
                     return field_exprs
                 fixed_field_exprs[offset] = new_expr
-                fixed_field_exprs[offset + field_ty.size // 8] = leftover
+                fixed_field_exprs[offset + field_ty.size(self.project.arch) // 8] = leftover
             else:
                 fixed_field_exprs[offset] = expr
         return fixed_field_exprs
@@ -91,8 +95,10 @@ class StructBuilder(Analysis):
         return rebased_field_exprs
 
     def _build_array(self, field_exprs, struct_ty) -> Array | None:
-        ptr_offset = struct_ty.offsets.get("ptr", None) or struct_ty.offsets.get("data_ptr", None)
-        len_offset = struct_ty.offsets.get("len", None) or struct_ty.offsets.get("length", None)
+        arch = self.project.arch
+        struct_ty_offsets = struct_ty.offsets(arch)
+        ptr_offset = struct_ty_offsets.get("ptr", None) or struct_ty_offsets.get("data_ptr", None)
+        len_offset = struct_ty_offsets.get("len", None) or struct_ty_offsets.get("length", None)
         if ptr_offset is None or len_offset is None or ptr_offset not in field_exprs or len_offset not in field_exprs:
             return None
         elements = []
@@ -107,13 +113,13 @@ class StructBuilder(Analysis):
             if isinstance(ptr_expr, Const):
                 for i in range(len_expr.value_int):
                     ele_expr = ptr_expr.copy()
-                    ele_expr.value = ptr_expr.value + ele_ty.size // 8 * i
+                    ele_expr.value = ptr_expr.value + ele_ty.size(arch) // 8 * i
                     ele_expr.tags["type"] = ele_ty
                     elements.append(ele_expr)
             elif vvar := unwrap_stack_vvar_reference(ptr_expr):
                 for i in range(len_expr.value_int):
                     ele_expr = self.context.new_stack_vvar(  # type:ignore
-                        vvar.stack_offset + i * (ele_ty.size // 8), ele_ty.size, vvar.tags, record=False
+                        vvar.stack_offset + i * (ele_ty.size(arch) // 8), ele_ty.size(arch), vvar.tags, record=False
                     )
                     # Looking for nested structs or struct references
                     if isinstance(ele_ty, RustSimTypeReference) and isinstance(ele_ty.pts_to, RustSimStruct):
@@ -123,7 +129,7 @@ class StructBuilder(Analysis):
                     elements.append(ele_expr)
             else:
                 return None
-            return Array(0, elements, struct_ty.size)
+            return Array(0, elements, struct_ty.size(arch))
         return None
 
     def build(self, field_exprs, struct_ty) -> Struct | Array | None:
@@ -138,8 +144,9 @@ class StructBuilder(Analysis):
             if self.strict:
                 return None
         fields = {}
+        struct_ty_offsets = struct_ty.offsets(self.project.arch)
         for field_name, field_ty in struct_ty.fields.items():
-            field_offset = struct_ty.offsets[field_name]
+            field_offset = struct_ty_offsets[field_name]
             if isinstance(field_ty, RustSimStruct):
                 field_struct = self.build(self._rebase_field_exprs(field_exprs, field_offset), field_ty)
                 if field_struct is None:
@@ -151,7 +158,7 @@ class StructBuilder(Analysis):
                 elif self.strict:
                     return None
         fields = OrderedDict(sorted(fields.items(), key=lambda t: t[0]))
-        return Struct(0, struct_ty.name, fields, struct_ty.offsets, struct_ty.size)
+        return Struct(0, struct_ty.name, fields, struct_ty_offsets, struct_ty.size(self.project.arch))
 
 
 AnalysesHub.register_default("StructBuilder", StructBuilder)

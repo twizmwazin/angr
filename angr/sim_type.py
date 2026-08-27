@@ -43,7 +43,6 @@ class SimType:
 
     _fields: tuple[str, ...] = ()
     _args: tuple[str, ...] = ("label", "qualifier")
-    _arch: Arch | None
     _size: int | None = None
     _can_refine_int: bool = False
     _base_name: str
@@ -55,7 +54,6 @@ class SimType:
         :param label: the type label.
         """
         self.label = label
-        self._arch = None
         self.qualifier = qualifier
 
     @staticmethod
@@ -71,8 +69,6 @@ class SimType:
             return False
 
         for attr in self._fields:
-            if attr == "size" and self._arch is None and other._arch is None:
-                continue
             attr_self = getattr(self, attr)
             attr_other = getattr(other, attr)
             if isinstance(attr_self, SimType):
@@ -111,37 +107,21 @@ class SimType:
     def _refine(self, view, k):  # pylint: disable=unused-argument,no-self-use
         raise KeyError(f"{k} is not a valid refinement")
 
-    @property
-    def size(self) -> int | None:
+    def size(self, arch: Arch) -> int | None:  # pylint: disable=unused-argument
         """
         The size of the type in bits, or None if no size is computable.
         """
         return self._size
 
-    @property
-    def alignment(self):
+    def alignment(self, arch: Arch) -> int:
         """
         The alignment of the type in bytes.
         """
-        if self._arch is None:
-            raise ValueError("Can't tell my alignment without an arch!")
-        if self.size is None:
+        size = self.size(arch)
+        if size is None:
             l.debug("The size of the type %r is unknown; assuming word size of the arch.", self)
-            return self._arch.bytes
-        return self.size // self._arch.byte_width
-
-    def with_arch(self, arch: Arch | None, memo: dict[str, SimType] | None = None) -> SimType:
-        if arch is None:
-            return self
-        if self._arch is not None and self._arch == arch:
-            return self
-        memo = memo if memo is not None else {}
-        return self._with_arch(arch, memo=memo)
-
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):  # pylint: disable=unused-argument
-        cp = copy.copy(self)
-        cp._arch = arch
-        return cp
+            return arch.bytes
+        return size // arch.byte_width
 
     def _init_str(self):
         return f"NotImplemented({self.__class__.__name__})"
@@ -163,15 +143,6 @@ class SimType:
     def store(self, state: SimState, addr, value: Any):
         raise NotImplementedError
 
-    def extract_claripy(self, bits) -> Any:
-        """
-        Given a bitvector `bits` which was loaded from memory in a big-endian fashion, return a more appropriate or
-        structured representation of the data.
-
-        A type must have an arch associated in order to use this method.
-        """
-        raise NotImplementedError(f"extract_claripy is not implemented for {self}")
-
     def to_json(self, fields: Iterable[str] | None = None, memo: dict[str, SimTypeRef] | None = None) -> dict[str, Any]:
         """
         Serialize the type class to a JSON-compatible dictionary.
@@ -186,7 +157,7 @@ class SimType:
 
         d: dict[str, Any] = {"_t": self._ident}
         for field in fields:
-            value = getattr(self, field)
+            value = self._size if field == "size" else getattr(self, field)
             if field == "qualifier" and value is None:
                 continue
             field = "q" if field == "qualifier" else field
@@ -281,7 +252,6 @@ class TypeRef(SimType):
     @type.setter
     def type(self, val):
         self._type = val
-        self._arch = val._arch
 
     @property
     def name(self):
@@ -300,18 +270,11 @@ class TypeRef(SimType):
     def __repr__(self):
         return self.name
 
-    @property
-    def size(self):
-        return self.type.size
+    def size(self, arch: Arch):
+        return self.type.size(arch)
 
-    @property
-    def alignment(self):
-        return self.type.alignment
-
-    def with_arch(self, arch, memo: dict[str, SimType] | None = None):
-        self.type = self.type.with_arch(arch, memo=memo)
-        self._arch = arch
-        return self
+    def alignment(self, arch: Arch):
+        return self.type.alignment(arch)
 
     def c_repr(self, name=None, full=0, memo=None, indent=0, name_parens: bool = True):  # pylint: disable=unused-argument
         if not full:
@@ -389,7 +352,7 @@ class SimTypeTop(SimType):
     SimTypeTop represents any type (mostly used with a pointer for void*).
     """
 
-    _fields = ("size",)
+    _fields = ("_size",)
     _args = ("size", "label", "qualifier")
     _ident = "top"
 
@@ -402,7 +365,7 @@ class SimTypeTop(SimType):
         return "TOP"
 
     def copy(self):
-        return SimTypeTop(size=self.size, label=self.label)
+        return SimTypeTop(size=self._size, label=self.label)
 
 
 class SimTypeReg(SimType):
@@ -410,7 +373,7 @@ class SimTypeReg(SimType):
     SimTypeReg is the base type for all types that are register-sized.
     """
 
-    _fields = ("size",)
+    _fields = ("_size",)
     _args = ("size", "label", "qualifier")
     _ident = "reg"
 
@@ -423,19 +386,20 @@ class SimTypeReg(SimType):
         self._size = size
 
     def __repr__(self):
-        return f"reg{self.size}_t"
+        return f"reg{self._size}_t"
 
     def store(self, state, addr, value: StoreType):
-        if self.size is None:
+        size = self.size(state.arch)
+        if size is None:
             raise TypeError("Need a size to store")
         store_endness = state.arch.memory_endness
         with contextlib.suppress(AttributeError):
             value = value.ast  # type: ignore
         if isinstance(value, claripy.ast.Bits):  # pylint:disable=isinstance-second-argument-not-valid-type
-            if value.size() != self.size:  # type: ignore
+            if value.size() != size:  # type: ignore
                 raise ValueError("size of expression is wrong size for type")
         elif isinstance(value, int):
-            value = claripy.BVV(value, self.size)
+            value = claripy.BVV(value, size)
         elif isinstance(value, bytes):
             store_endness = "Iend_BE"
         else:
@@ -444,7 +408,7 @@ class SimTypeReg(SimType):
         state.memory.store(addr, value, endness=store_endness)
 
     def copy(self):
-        return self.__class__(self.size, label=self.label)
+        return self.__class__(self._size, label=self.label)
 
 
 class SimTypeNum(SimType):
@@ -452,7 +416,7 @@ class SimTypeNum(SimType):
     SimTypeNum is a numeric type of arbitrary length
     """
 
-    _fields = (*SimType._fields, "signed", "size")
+    _fields = (*SimType._fields, "signed", "_size")
     _args = ("size", "signed", "label", "qualifier")
     _ident = "num"
 
@@ -467,13 +431,12 @@ class SimTypeNum(SimType):
         self.signed = signed
         self.qualifier = qualifier
 
-    @property
-    def size(self) -> int:
+    def size(self, arch: Arch) -> int:  # pylint: disable=unused-argument
         assert self._size is not None
         return self._size
 
     def __repr__(self):
-        return "{}int{}_t".format("" if self.signed else "u", self.size)
+        return "{}int{}_t".format("" if self.signed else "u", self._size)
 
     @overload
     def extract(self, state, addr, concrete: Literal[False] = ...) -> claripy.ast.BV: ...
@@ -482,22 +445,23 @@ class SimTypeNum(SimType):
     def extract(self, state, addr, concrete: Literal[True]) -> int: ...
 
     def extract(self, state, addr, concrete=False):
-        out = state.memory.load(addr, self.size // state.arch.byte_width, endness=state.arch.memory_endness)
+        size = self.size(state.arch)
+        out = state.memory.load(addr, size // state.arch.byte_width, endness=state.arch.memory_endness)
         if not concrete:
             return out
         n = state.solver.eval(out)
-        if self.signed and n >= 1 << (self.size - 1):
-            n -= 1 << (self.size)
+        if self.signed and n >= 1 << (size - 1):
+            n -= 1 << (size)
         return n
 
     def store(self, state, addr, value: StoreType):
         store_endness = state.arch.memory_endness
 
         if isinstance(value, claripy.ast.Bits):  # pylint:disable=isinstance-second-argument-not-valid-type
-            if value.size() != self.size:  # type: ignore
+            if value.size() != self.size(state.arch):  # type: ignore
                 raise ValueError("size of expression is wrong size for type")
-        elif isinstance(value, int) and self.size is not None:
-            value = claripy.BVV(value, self.size)
+        elif isinstance(value, int) and self._size is not None:
+            value = claripy.BVV(value, self._size)
         elif isinstance(value, bytes):
             store_endness = "Iend_BE"
         else:
@@ -506,7 +470,7 @@ class SimTypeNum(SimType):
         state.memory.store(addr, value, endness=store_endness)
 
     def copy(self):
-        return SimTypeNum(self.size, signed=self.signed, label=self.label)
+        return SimTypeNum(self._size, signed=self.signed, label=self.label)
 
 
 class SimTypeInt(SimTypeReg):
@@ -514,7 +478,7 @@ class SimTypeInt(SimTypeReg):
     SimTypeInt is a type that specifies a signed or unsigned C integer.
     """
 
-    _fields = (*tuple(x for x in SimTypeReg._fields if x != "size"), "signed")
+    _fields = (*tuple(x for x in SimTypeReg._fields if x != "_size"), "signed")
     _args = ("signed", "label", "qualifier")
     _base_name = "int"
     _ident = "int"
@@ -551,20 +515,13 @@ class SimTypeInt(SimTypeReg):
         name = self._base_name
         if not self.signed:
             name = "unsigned " + name
+        return name
 
+    def size(self, arch: Arch) -> int:
         try:
-            return f"{name} ({self.size} bits)"
-        except ValueError:
-            return name
-
-    @property
-    def size(self):
-        if self._arch is None:
-            raise ValueError("Can't tell my size without an arch!")
-        try:
-            return self._arch.sizeof[self._base_name]
+            return arch.sizeof[self._base_name]
         except KeyError as e:
-            raise ValueError(f"Arch {self._arch.name} doesn't have its {self._base_name} type defined!") from e
+            raise ValueError(f"Arch {arch.name} doesn't have its {self._base_name} type defined!") from e
 
     @overload
     def extract(self, state, addr, concrete: Literal[False] = ...) -> claripy.ast.BV: ...
@@ -573,12 +530,13 @@ class SimTypeInt(SimTypeReg):
     def extract(self, state, addr, concrete: Literal[True]) -> int: ...
 
     def extract(self, state, addr, concrete=False):
-        out = state.memory.load(addr, self.size // state.arch.byte_width, endness=state.arch.memory_endness)
+        size = self.size(state.arch)
+        out = state.memory.load(addr, size // state.arch.byte_width, endness=state.arch.memory_endness)
         if not concrete:
             return out
         n = state.solver.eval(out)
-        if self.signed and n >= 1 << (self.size - 1):
-            n -= 1 << self.size
+        if self.signed and n >= 1 << (size - 1):
+            n -= 1 << size
         return n
 
     def _init_str(self):
@@ -651,14 +609,9 @@ class SimTypeFixedSizeInt(SimTypeInt):
         name = self._base_name
         if not self.signed:
             name = "u" + name
+        return f"{name} ({self._fixed_size} bits)"
 
-        try:
-            return f"{name} ({self.size} bits)"
-        except ValueError:
-            return name
-
-    @property
-    def size(self) -> int:
+    def size(self, arch: Arch) -> int:  # pylint: disable=unused-argument
         return self._fixed_size
 
 
@@ -694,16 +647,17 @@ class SimTypeChar(SimTypeReg):
         """
         :param label: the type label.
         """
-        # FIXME: Now the size of a char is state-dependent.
         super().__init__(8, label=label, qualifier=qualifier)
         self.signed = signed
+
+    def size(self, arch: Arch) -> int:
+        # the size of a char depends on the byte width of the arch
+        return arch.byte_width
 
     def __repr__(self) -> str:
         return "char"
 
     def store(self, state, addr, value: StoreType):
-        # FIXME: This is a hack.
-        self._size = state.arch.byte_width
         try:
             super().store(state, addr, value)
         except TypeError:
@@ -720,9 +674,6 @@ class SimTypeChar(SimTypeReg):
     def extract(self, state, addr, concrete: Literal[True]) -> bytes: ...
 
     def extract(self, state, addr, concrete: bool = False) -> claripy.ast.BV | bytes:
-        # FIXME: This is a hack.
-        self._size = state.arch.byte_width
-
         out = state.memory.load(addr, 1, endness=state.arch.memory_endness)
         if concrete:
             return bytes(cast(list[int], [state.solver.eval(out)]))
@@ -851,8 +802,7 @@ class SimTypeFd(SimTypeReg):
         # TODO: That's so closed-minded!
         super().__init__(32, label=label, qualifier=qualifier)
 
-    @property
-    def size(self):
+    def size(self, arch: Arch) -> int:  # pylint: disable=unused-argument
         return 32
 
     def __repr__(self):
@@ -875,9 +825,10 @@ class SimTypeFd(SimTypeReg):
 
     def extract(self, state, addr, concrete=False):
         # TODO: EDG says this looks dangerously closed-minded. Just in case...
-        assert self.size % state.arch.byte_width == 0
+        size = self.size(state.arch)
+        assert size % state.arch.byte_width == 0
 
-        out = state.memory.load(addr, self.size // state.arch.byte_width, endness=state.arch.memory_endness)
+        out = state.memory.load(addr, size // state.arch.byte_width, endness=state.arch.memory_endness)
         if not concrete:
             return out
         return state.solver.eval(out)
@@ -899,7 +850,7 @@ class SimTypePointer(SimTypeReg):
     SimTypePointer is a type that specifies a pointer to some other type.
     """
 
-    _fields = (*(x for x in SimTypeReg._fields if x != "size"), "pts_to")
+    _fields = (*(x for x in SimTypeReg._fields if x != "_size"), "pts_to")
     _args = ("pts_to", "label", "offset", "qualifier", "disposition")
     _ident = "ptr"
 
@@ -960,26 +911,10 @@ class SimTypePointer(SimTypeReg):
         return self.pts_to.c_repr(name_with_deref, full, memo, indent)
 
     def make(self, pts_to):
-        new = type(self)(pts_to)
-        new._arch = self._arch
-        return new
+        return type(self)(pts_to)
 
-    @property
-    def size(self):
-        if self._arch is None:
-            raise ValueError("Can't tell my size without an arch!")
-        return self._arch.bits
-
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):
-        out = SimTypePointer(
-            self.pts_to.with_arch(arch, memo=memo),
-            self.label,
-            self.offset,
-            qualifier=self.qualifier,
-            disposition=self.disposition,
-        )
-        out._arch = arch
-        return out
+    def size(self, arch: Arch) -> int:
+        return arch.bits
 
     def _init_str(self):
         label_str = f', label="{self.label}"' if self.label is not None else ""
@@ -999,9 +934,10 @@ class SimTypePointer(SimTypeReg):
 
     def extract(self, state, addr, concrete=False):
         # TODO: EDG says this looks dangerously closed-minded. Just in case...
-        assert self.size % state.arch.byte_width == 0
+        size = self.size(state.arch)
+        assert size % state.arch.byte_width == 0
 
-        out = state.memory.load(addr, self.size // state.arch.byte_width, endness=state.arch.memory_endness)
+        out = state.memory.load(addr, size // state.arch.byte_width, endness=state.arch.memory_endness)
         if not concrete:
             return out
         return state.solver.eval(out)
@@ -1030,20 +966,10 @@ class SimTypeReference(SimTypeReg):
         return out
 
     def make(self, refs):
-        new = type(self)(refs)
-        new._arch = self._arch
-        return new
+        return type(self)(refs)
 
-    @property
-    def size(self):
-        if self._arch is None:
-            raise ValueError("Can't tell my size without an arch!")
-        return self._arch.bits
-
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):
-        out = SimTypeReference(self.refs.with_arch(arch, memo=memo), label=self.label)
-        out._arch = arch
-        return out
+    def size(self, arch: Arch) -> int:
+        return arch.bits
 
     def _init_str(self):
         return "{}({}{})".format(
@@ -1063,9 +989,10 @@ class SimTypeReference(SimTypeReg):
 
     def extract(self, state, addr, concrete=False):
         # TODO: EDG says this looks dangerously closed-minded. Just in case...
-        assert self.size % state.arch.byte_width == 0
+        size = self.size(state.arch)
+        assert size % state.arch.byte_width == 0
 
-        out = state.memory.load(addr, self.size // state.arch.byte_width, endness=state.arch.memory_endness)
+        out = state.memory.load(addr, size // state.arch.byte_width, endness=state.arch.memory_endness)
         if not concrete:
             return out
         return state.solver.eval(out)
@@ -1104,22 +1031,16 @@ class SimTypeArray(SimType):
             out = f"{' '.join(sorted(self.qualifier))} {out}"
         return out
 
-    @property
-    def size(self):
+    def size(self, arch: Arch) -> int | None:
         if self.length is None:
             return 0
-        if self.elem_type.size is None:
+        elem_size = self.elem_type.size(arch)
+        if elem_size is None:
             return None
-        return self.elem_type.size * self.length
+        return elem_size * self.length
 
-    @property
-    def alignment(self):
-        return self.elem_type.alignment
-
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):
-        out = SimTypeArray(self.elem_type.with_arch(arch, memo=memo), self.length, self.label, qualifier=self.qualifier)
-        out._arch = arch
-        return out
+    def alignment(self, arch: Arch):
+        return self.elem_type.alignment(arch)
 
     def copy(self):
         return SimTypeArray(self.elem_type, length=self.length, label=self.label)
@@ -1128,7 +1049,8 @@ class SimTypeArray(SimType):
 
     def _refine(self, view, k):
         return view._deeper(
-            addr=view._addr + k * (self.elem_type.size // view.state.arch.byte_width), ty=self.elem_type
+            addr=view._addr + k * (self.elem_type.size(view.state.arch) // view.state.arch.byte_width),
+            ty=self.elem_type,
         )
 
     @overload
@@ -1141,18 +1063,20 @@ class SimTypeArray(SimType):
     def extract(self, state, addr, concrete=False):
         if self.length is None:
             return []
-        if self.elem_type.size is None:
+        elem_size = self.elem_type.size(state.arch)
+        if elem_size is None:
             return None
         return [
-            self.elem_type.extract(state, addr + i * (self.elem_type.size // state.arch.byte_width), concrete)
+            self.elem_type.extract(state, addr + i * (elem_size // state.arch.byte_width), concrete)
             for i in range(self.length)
         ]
 
     def store(self, state, addr, value: list[StoreType]):
-        if self.elem_type.size is None:
+        elem_size = self.elem_type.size(state.arch)
+        if elem_size is None:
             raise AngrTypeError("Cannot call store on an array of unsized types")
         for i, val in enumerate(value):
-            self.elem_type.store(state, addr + i * (self.elem_type.size // state.arch.byte_width), val)
+            self.elem_type.store(state, addr + i * (elem_size // state.arch.byte_width), val)
 
     def _init_str(self):
         return "{}({}, {}{})".format(
@@ -1230,18 +1154,13 @@ class SimTypeString(NamedTypeMixin, SimType):
     def _refine(self, view, k):
         return view._deeper(addr=view._addr + k, ty=SimTypeChar())
 
-    @property
-    def size(self):
+    def size(self, arch: Arch) -> int:  # pylint: disable=unused-argument
         if self.length is None:
             return 4096  # :/
         return (self.length + 1) * 8
 
-    @property
-    def alignment(self):
+    def alignment(self, arch: Arch) -> int:  # pylint: disable=unused-argument
         return 1
-
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):  # pylint: disable=unused-argument
-        return self
 
     def copy(self):
         return SimTypeString(length=self.length, label=self.label, name=self.name)
@@ -1315,18 +1234,13 @@ class SimTypeWString(NamedTypeMixin, SimType):
     def _refine(self, view, k):
         return view._deeper(addr=view._addr + k * 2, ty=SimTypeNum(16, False))
 
-    @property
-    def size(self):
+    def size(self, arch: Arch) -> int:  # pylint: disable=unused-argument
         if self.length is None:
             return 4096
         return (self.length * 2 + 2) * 8
 
-    @property
-    def alignment(self):
+    def alignment(self, arch: Arch) -> int:  # pylint: disable=unused-argument
         return 2
-
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):  # pylint: disable=unused-argument
-        return self
 
     def copy(self):
         return SimTypeWString(length=self.length, label=self.label, name=self.name)
@@ -1400,20 +1314,8 @@ class SimTypeFunction(SimType):
         proto = f"{name_str}({args_str})"
         return f"void {proto}" if self.returnty is None else self.returnty.c_repr(proto, full, memo, indent)
 
-    @property
-    def size(self):
+    def size(self, arch: Arch) -> int:  # pylint: disable=unused-argument
         return 4096  # ???????????
-
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):
-        out = SimTypeFunction(
-            [a.with_arch(arch, memo=memo) for a in self.args],
-            self.returnty.with_arch(arch, memo=memo) if self.returnty is not None else None,
-            label=self.label,
-            arg_names=self.arg_names,
-            variadic=self.variadic,
-        )
-        out._arch = arch
-        return out
 
     def _arg_names_str(self, show_variadic=True):
         argnames = list(self.arg_names)
@@ -1480,19 +1382,6 @@ class SimTypeCppFunction(SimTypeFunction):
             ", variadic=True" if self.variadic else "",
         )
 
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):
-        out = SimTypeCppFunction(
-            [a.with_arch(arch, memo=memo) for a in self.args],
-            self.returnty.with_arch(arch, memo=memo) if self.returnty is not None else None,
-            label=self.label,
-            arg_names=self.arg_names,
-            ctor=self.ctor,
-            dtor=self.dtor,
-            convention=self.convention,
-        )
-        out._arch = arch
-        return out
-
     def copy(self):
         return SimTypeCppFunction(
             self.args,
@@ -1512,7 +1401,7 @@ class SimTypeLength(SimTypeLong):
     ...I'm not really sure what the original design of this class was going for
     """
 
-    _fields = (*(x for x in SimTypeReg._fields if x != "size"), "addr", "length")  # ?
+    _fields = (*(x for x in SimTypeReg._fields if x != "_size"), "addr", "length")  # ?
     _args = ("signed", "addr", "length", "label")
     _ident = "len"
 
@@ -1530,14 +1419,11 @@ class SimTypeLength(SimTypeLong):
     def __repr__(self):
         return "size_t"
 
-    @property
-    def size(self):
-        if self._arch is None:
-            raise ValueError("I can't tell my size without an arch!")
-        return self._arch.bits
+    def size(self, arch: Arch) -> int:
+        return arch.bits
 
     def _init_str(self):
-        return f"{self.__class__.__name__}(size={self.size})"
+        return f"{self.__class__.__name__}(signed={self.signed})"
 
     def copy(self):
         return SimTypeLength(signed=self.signed, addr=self.addr, length=self.length, label=self.label)
@@ -1558,13 +1444,13 @@ class SimTypeFloat(SimTypeReg):
     sort = claripy.FSORT_FLOAT
     signed = True
 
-    @property
-    def size(self) -> int:
+    def size(self, arch: Arch) -> int:  # pylint: disable=unused-argument
         return 32
 
     def extract(self, state, addr, concrete=False):
         itype = claripy.fpToFP(
-            state.memory.load(addr, self.size // state.arch.byte_width, endness=state.arch.memory_endness), self.sort
+            state.memory.load(addr, self.size(state.arch) // state.arch.byte_width, endness=state.arch.memory_endness),
+            self.sort,
         )
         if concrete:
             return state.solver.eval(itype)
@@ -1579,10 +1465,10 @@ class SimTypeFloat(SimTypeReg):
         return "float"
 
     def _init_str(self):
-        return f"{self.__class__.__name__}(size={self.size})"
+        return f"{self.__class__.__name__}(size={self._size})"
 
     def copy(self):
-        return SimTypeFloat(self.size)
+        return SimTypeFloat(self._size)
 
 
 class SimTypeDouble(SimTypeFloat):
@@ -1601,15 +1487,13 @@ class SimTypeDouble(SimTypeFloat):
 
     sort = claripy.FSORT_DOUBLE
 
-    @property
-    def size(self) -> int:
+    def size(self, arch: Arch) -> int:  # pylint: disable=unused-argument
         return 64
 
     def __repr__(self):
         return "double"
 
-    @property
-    def alignment(self):
+    def alignment(self, arch: Arch) -> int:  # pylint: disable=unused-argument
         return 8 if self.align_double else 4
 
     def _init_str(self):
@@ -1680,15 +1564,21 @@ class SimStruct(NamedTypeMixin, SimType):
     def packed(self):
         return self._pack
 
-    @property
-    def offsets(self) -> dict[str, int]:
-        if self._arch is None:
-            raise ValueError("Need an arch to calculate offsets")
+    def offsets(self, arch: Arch) -> dict[str, int]:
+        # Fix up the offsets to byte-aligned addresses for all SimTypeNumOffset (bitfield) members. This used to
+        # happen when a struct was bound to an arch; layout is now computed on each query instead.
+        pack = self._pack
+        bit_distance = 0
+        for ty in self.fields.values():
+            if isinstance(ty, SimTypeNumOffset):
+                pack = True
+                ty.offset = bit_distance % arch.byte_width
+                bit_distance += ty.size(arch)
 
         offsets = {}  # field name -> offset in bytes
         bitoffset_so_far = 0  # offset in *bits*
         for name, ty in self.fields.items():
-            ty_size = ty.size
+            ty_size = ty.size(arch)
             if ty_size is None:
                 l.debug(
                     "Found a bottom field in struct %s. Ignore and increment the offset using the default "
@@ -1696,17 +1586,17 @@ class SimStruct(NamedTypeMixin, SimType):
                     self.name,
                 )
                 continue
-            if not self._pack and ty_size > 0:
-                align = ty.alignment * self._arch.byte_width
+            if not pack and ty_size > 0:
+                align = ty.alignment(arch) * arch.byte_width
                 if align is NotImplemented:
                     # hack!
                     align = 1
                 if bitoffset_so_far % align != 0:
                     bitoffset_so_far += align - bitoffset_so_far % align
-                offsets[name] = bitoffset_so_far // self._arch.byte_width
+                offsets[name] = bitoffset_so_far // arch.byte_width
                 bitoffset_so_far += ty_size
             else:
-                offsets[name] = bitoffset_so_far // self._arch.byte_width
+                offsets[name] = bitoffset_so_far // arch.byte_width
                 bitoffset_so_far += ty_size
 
         return offsets
@@ -1733,7 +1623,7 @@ class SimStruct(NamedTypeMixin, SimType):
 
     def extract(self, state, addr, concrete=False) -> SimStructValue:
         values = {}
-        for name, offset in self.offsets.items():
+        for name, offset in self.offsets(state.arch).items():
             ty = self.fields[name]
             v = angr.state_plugins.view.SimMemView(ty=ty, addr=addr + offset, state=state)
             if concrete:
@@ -1742,26 +1632,6 @@ class SimStruct(NamedTypeMixin, SimType):
                 values[name] = v.resolved
 
         return SimStructValue(self, values=values)
-
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):
-        if self.name in memo:
-            return cast(SimStruct, memo[self.name])
-
-        out = SimStruct({}, name=self.name, pack=self._pack, align=self._align)
-        out._arch = arch
-        out._def_order = self._def_order
-        memo[self.name] = out
-
-        out.fields = OrderedDict((k, v.with_arch(arch, memo=memo)) for k, v in self.fields.items())
-
-        # Fixup the offsets to byte aligned addresses for all SimTypeNumOffset types
-        offset_so_far = 0
-        for ty in out.fields.values():
-            if isinstance(ty, SimTypeNumOffset):
-                out._pack = True
-                ty.offset = offset_so_far % arch.byte_width
-                offset_so_far += ty.size
-        return out
 
     def __repr__(self):
         return f"struct {self.name}"
@@ -1786,34 +1656,31 @@ class SimStruct(NamedTypeMixin, SimType):
     def __hash__(self):
         return hash((SimStruct, self._name, self._align, self._pack, tuple(self.fields.keys())))
 
-    @property
-    def size(self):
-        if not self.offsets:
+    def size(self, arch: Arch) -> int:
+        if not self.offsets(arch):
             return 0
         if self._size_memo is None:
             self._size_memo = set()
         if id(self) in self._size_memo:
             return 0  # bad bad bad
         self._size_memo.add(id(self))
-        if self._arch is None:
-            raise ValueError("Need an arch to compute size")
 
-        last_name, last_off = list(self.offsets.items())[-1]
+        last_name, last_off = list(self.offsets(arch).items())[-1]
         last_type = self.fields[last_name]
         if isinstance(last_type, SimTypeNumOffset):
             self._size_memo.remove(id(self))
             if not self._size_memo:
                 self._size_memo = None
-            return last_off * self._arch.byte_width + (last_type.size + last_type.offset)
-        if last_type.size is None:
+            return last_off * arch.byte_width + (last_type.size(arch) + last_type.offset)
+        last_type_size = last_type.size(arch)
+        if last_type_size is None:
             raise AngrTypeError("Cannot compute the size of a struct with elements with no size")
         self._size_memo.remove(id(self))
         if not self._size_memo:
             self._size_memo = None
-        return last_off * self._arch.byte_width + last_type.size
+        return last_off * arch.byte_width + last_type_size
 
-    @property
-    def alignment(self):
+    def alignment(self, arch: Arch):
         if self._align is not None:
             return self._align
         if self._size_memo is None:
@@ -1821,12 +1688,14 @@ class SimStruct(NamedTypeMixin, SimType):
         if id(self) in self._size_memo:
             return 1  # bad bad bad
         self._size_memo.add(id(self))
-        if all(val.alignment is NotImplemented for val in self.fields.values()):
+        if all(val.alignment(arch) is NotImplemented for val in self.fields.values()):
             self._size_memo.remove(id(self))
             if not self._size_memo:
                 self._size_memo = None
             return NotImplemented
-        max_alignment = max(val.alignment if val.alignment is not NotImplemented else 1 for val in self.fields.values())
+        max_alignment = max(
+            val.alignment(arch) if val.alignment(arch) is not NotImplemented else 1 for val in self.fields.values()
+        )
         self._size_memo.remove(id(self))
         if not self._size_memo:
             self._size_memo = None
@@ -1836,7 +1705,7 @@ class SimStruct(NamedTypeMixin, SimType):
         return list(self.fields.keys())
 
     def _refine(self, view, k):
-        offset = self.offsets[k]
+        offset = self.offsets(view.state.arch)[k]
         ty = self.fields[k]
         return view._deeper(ty=ty, addr=view._addr + offset)
 
@@ -1849,10 +1718,11 @@ class SimStruct(NamedTypeMixin, SimType):
             raise TypeError(f"Can't store struct of type {type(value)}")
 
         assert isinstance(value, dict)
+        offsets = self.offsets(state.arch)
         if len(value) != len(self.fields):
-            raise ValueError(f"Passed bad values for {self}; expected {len(self.offsets)}, got {len(value)}")
+            raise ValueError(f"Passed bad values for {self}; expected {len(offsets)}, got {len(value)}")
 
-        for field, offset in self.offsets.items():
+        for field, offset in offsets.items():
             ty = self.fields[field]
             ty.store(state, addr + offset, value[field])
 
@@ -1880,7 +1750,6 @@ class SimStruct(NamedTypeMixin, SimType):
             and self._align == other._align
             and self.label == other.label
             and self._name == other._name
-            and self._arch == other._arch
         ):
             return False
         # fields comparison that accounts for self references
@@ -1981,24 +1850,18 @@ class SimUnion(NamedTypeMixin, SimType):
         # contains itself not via pointers.
         self._size_memo: set[int] | None = None
 
-        # cached alignment
-        self._alignment: int | None = None
-
-    @property
-    def size(self):
-        if self._arch is None:
-            raise ValueError("Can't tell my size without an arch!")
+    def size(self, arch: Arch) -> int:
         if self._size_memo is None:
             self._size_memo = set()
         if id(self) in self._size_memo:
             return 0  # bad bad bad
         self._size_memo.add(id(self))
         all_member_sizes: list[int | None] = [
-            ty.size for ty in self.members.values() if not isinstance(ty, (SimTypeBottom, SimTypeRef))
+            ty.size(arch) for ty in self.members.values() if not isinstance(ty, (SimTypeBottom, SimTypeRef))
         ]
         member_sizes: list[int] = [s for s in all_member_sizes if s is not None]
         # fall back to word size in case all members are SimTypeBottom
-        max_size = max(member_sizes) if member_sizes else self._arch.bytes
+        max_size = max(member_sizes) if member_sizes else arch.bytes
 
         self._size_memo.remove(id(self))
         if not self._size_memo:
@@ -2006,26 +1869,23 @@ class SimUnion(NamedTypeMixin, SimType):
 
         return max_size
 
-    @property
-    def alignment(self):
-        if self._alignment is not None:
-            return self._alignment
-
+    def alignment(self, arch: Arch):
         if self._size_memo is None:
             self._size_memo = set()
         if id(self) in self._size_memo:
             return 1  # bad bad bad
         self._size_memo.add(id(self))
-        if all(val.alignment is NotImplemented for val in self.members.values()):
+        if all(val.alignment(arch) is NotImplemented for val in self.members.values()):
             r = NotImplemented
         else:
-            r = max(val.alignment if val.alignment is not NotImplemented else 1 for val in self.members.values())
+            r = max(
+                val.alignment(arch) if val.alignment(arch) is not NotImplemented else 1 for val in self.members.values()
+            )
 
         self._size_memo.remove(id(self))
         if not self._size_memo:
             self._size_memo = None
 
-        self._alignment = r
         return r
 
     def _refine_dir(self):
@@ -2084,11 +1944,6 @@ class SimUnion(NamedTypeMixin, SimType):
 
     def __str__(self):
         return f"union {self.name}"
-
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):
-        out = SimUnion({name: ty.with_arch(arch, memo=memo) for name, ty in self.members.items()}, self.label)
-        out._arch = arch
-        return out
 
     def copy(self):
         return SimUnion(dict(self.members), name=self.name, label=self.label)
@@ -2165,13 +2020,11 @@ class SimTypeEnum(NamedTypeMixin, SimType):
     def base_type(self) -> SimType:
         return self._base_type
 
-    @property
-    def size(self) -> int | None:
-        return self._base_type.size
+    def size(self, arch: Arch) -> int | None:
+        return self._base_type.size(arch)
 
-    @property
-    def alignment(self):
-        return self._base_type.alignment
+    def alignment(self, arch: Arch):
+        return self._base_type.alignment(arch)
 
     def resolve(self, value: int) -> str | None:
         """
@@ -2181,16 +2034,6 @@ class SimTypeEnum(NamedTypeMixin, SimType):
         :return: The member name if found, None otherwise.
         """
         return self._reverse_members.get(value)
-
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):
-        out = SimTypeEnum(
-            members=self.members,
-            base_type=self._base_type.with_arch(arch, memo=memo),
-            name=self._name,
-            qualifier=self.qualifier,
-        )
-        out._arch = arch
-        return out
 
     def __repr__(self):
         return f"enum {self._name}"
@@ -2275,13 +2118,11 @@ class SimTypeBitfield(NamedTypeMixin, SimType):
     def base_type(self) -> SimType:
         return self._base_type
 
-    @property
-    def size(self) -> int | None:
-        return self._base_type.size
+    def size(self, arch: Arch) -> int | None:
+        return self._base_type.size(arch)
 
-    @property
-    def alignment(self):
-        return self._base_type.alignment
+    def alignment(self, arch: Arch):
+        return self._base_type.alignment(arch)
 
     def resolve(self, value: int) -> tuple[list[str], int]:
         """
@@ -2344,16 +2185,6 @@ class SimTypeBitfield(NamedTypeMixin, SimType):
         :return: True if all bits match known flags, False otherwise.
         """
         return not self.has_unknown_bits(value)
-
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):
-        out = SimTypeBitfield(
-            flags=self.flags,
-            base_type=self._base_type.with_arch(arch, memo=memo),
-            name=self._name,
-            qualifier=self.qualifier,
-        )
-        out._arch = arch
-        return out
 
     def __repr__(self):
         return f"bitfield {self._name}"
@@ -2452,11 +2283,10 @@ class SimCppClass(SimStruct):
     def members(self, value):
         self.fields = value
 
-    @property
-    def size(self):
+    def size(self, arch: Arch):
         if self._size is not None:
             return self._size
-        return super().size
+        return super().size(arch)
 
     def __repr__(self):
         return f"class {self.name}" if not self.name.startswith("class") else self.name
@@ -2481,7 +2311,7 @@ class SimCppClass(SimStruct):
 
     def extract(self, state, addr, concrete=False) -> SimCppClassValue:
         values = {}
-        for name, offset in self.offsets.items():
+        for name, offset in self.offsets(state.arch).items():
             ty = self.fields[name]
             v = angr.state_plugins.view.SimMemView(ty=ty, addr=addr + offset, state=state)
             if concrete:
@@ -2500,48 +2330,13 @@ class SimCppClass(SimStruct):
             raise TypeError(f"Can't store struct of type {type(value)}")
 
         assert isinstance(value, dict)
+        offsets = self.offsets(state.arch)
         if len(value) != len(self.fields):
-            raise ValueError(f"Passed bad values for {self}; expected {len(self.offsets)}, got {len(value)}")
+            raise ValueError(f"Passed bad values for {self}; expected {len(offsets)}, got {len(value)}")
 
-        for field, offset in self.offsets.items():
+        for field, offset in offsets.items():
             ty = self.fields[field]
             ty.store(state, addr + offset, value[field])
-
-    def _with_arch(self, arch, *, memo: dict[str, SimType]) -> SimCppClass:
-        if self.name in memo:
-            return cast(SimCppClass, memo[self.name])
-
-        out = SimCppClass(
-            unique_name=self.unique_name,
-            name=self.name,
-            members={},
-            function_members={},
-            vtable_ptrs=self.vtable_ptrs,
-            pack=self._pack,
-            align=self._align,
-            size=self._size,
-        )
-        out._arch = arch
-        out._def_order = self._def_order
-        memo[self.name] = out
-
-        out.members = OrderedDict((k, v.with_arch(arch, memo=memo)) for k, v in self.members.items())
-        out.function_members = (
-            OrderedDict(
-                (k, cast(SimTypeCppFunction, v.with_arch(arch, memo=memo))) for k, v in self.function_members.items()
-            )
-            if self.function_members is not None
-            else None
-        )
-
-        # Fixup the offsets to byte aligned addresses for all SimTypeNumOffset types
-        offset_so_far = 0
-        for ty in out.members.values():
-            if isinstance(ty, SimTypeNumOffset):
-                out._pack = True
-                ty.offset = offset_so_far % arch.byte_width
-                offset_so_far += ty.size
-        return out
 
     def copy(self):
         return SimCppClass(
@@ -2624,24 +2419,25 @@ class SimTypeNumOffset(SimTypeNum):
     def extract(self, state: SimState, addr, concrete=False):
         if state.arch.memory_endness != Endness.LE:
             raise NotImplementedError("This has only been implemented and tested with Little Endian arches so far")
-        minimum_load_size = self.offset + self.size  # because we start from a byte aligned offset _before_ the value
+        size = self.size(state.arch)
+        minimum_load_size = self.offset + size  # because we start from a byte aligned offset _before_ the value
         # Now round up to the next byte
         load_size = (minimum_load_size - minimum_load_size % (-state.arch.byte_width)) // state.arch.byte_width
         out = state.memory.load(addr, size=load_size, endness=state.arch.memory_endness)
-        out = out[self.offset + self.size - 1 : self.offset]
+        out = out[self.offset + size - 1 : self.offset]
 
         if not concrete:
             return out
         n = state.solver.eval(out)
-        if self.signed and n >= 1 << (self.size - 1):
-            n -= 1 << (self.size)
+        if self.signed and n >= 1 << (size - 1):
+            n -= 1 << (size)
         return n
 
     def store(self, state, addr, value):
         raise NotImplementedError
 
     def copy(self):
-        return SimTypeNumOffset(self.size, signed=self.signed, label=self.label, offset=self.offset)
+        return SimTypeNumOffset(self._size, signed=self.signed, label=self.label, offset=self.offset)
 
 
 class SimTypeRef(SimType):
@@ -4021,11 +3817,7 @@ def _decl_to_type(
                 (
                     ...
                     if type(x) is c_ast.EllipsisParam
-                    else (
-                        SimTypeBottom().with_arch(arch)
-                        if type(x) is c_ast.ID
-                        else _decl_to_type(x.type, extra_types, arch=arch)
-                    )
+                    else (SimTypeBottom() if type(x) is c_ast.ID else _decl_to_type(x.type, extra_types, arch=arch))
                 )
                 for x in decl.args.params
             ]
@@ -4047,21 +3839,17 @@ def _decl_to_type(
             variadic = True
         else:
             variadic = False
-        r = SimTypeFunction(
+        return SimTypeFunction(
             cast(list[SimType], argtyps),
             _decl_to_type(decl.type, extra_types, arch=arch),
             arg_names=arg_names,
             variadic=variadic,
         )
-        r._arch = arch
-        return r
 
     if isinstance(decl, c_ast.TypeDecl):
         quals = list(decl.quals) if hasattr(decl, "quals") and decl.quals else None
         if decl.declname == "TOP":
-            r = SimTypeTop(qualifier=quals)
-            r._arch = arch
-            return r
+            return SimTypeTop(qualifier=quals)
         r = _decl_to_type(decl.type, extra_types, bitsize=bitsize, arch=arch)
         if quals:
             r = r.copy()
@@ -4072,26 +3860,20 @@ def _decl_to_type(
         quals = list(decl.quals) if hasattr(decl, "quals") and decl.quals else None
 
         pts_to = _decl_to_type(decl.type, extra_types, arch=arch)
-        r = SimTypePointer(pts_to, qualifier=quals)
-        r._arch = arch
-        return r
+        return SimTypePointer(pts_to, qualifier=quals)
 
     if isinstance(decl, c_ast.ArrayDecl):
         elem_type = _decl_to_type(decl.type, extra_types, arch=arch)
         quals = list(decl.quals) if hasattr(decl, "quals") and decl.quals else None  # type: ignore
 
         if decl.dim is None:
-            r = SimTypeArray(elem_type)
-            r._arch = arch
-            return r
+            return SimTypeArray(elem_type)
         try:
             size = _parse_const(decl.dim, extra_types=extra_types, arch=arch)
         except ValueError as e:
             l.warning("Got error parsing array dimension, defaulting to zero: %s", e)
             size = 0
-        r = SimTypeFixedSizeArray(elem_type, size, qualifier=quals)
-        r._arch = arch
-        return r
+        return SimTypeFixedSizeArray(elem_type, size, qualifier=quals)
 
     if isinstance(decl, c_ast.Struct):
         quals = list(decl.quals) if hasattr(decl, "quals") and decl.quals else None  # type: ignore
@@ -4110,7 +3892,6 @@ def _decl_to_type(
                 struct = ALL_TYPES.get(key)
                 if struct is not None:
                     from_global = True
-                    struct = struct.with_arch(arch)
             if struct is None:
                 # fallback to using decl.name as key directly
                 struct = ALL_TYPES.get(decl.name)
@@ -4119,7 +3900,6 @@ def _decl_to_type(
                     or (isinstance(struct, TypeRef) and isinstance(struct.type, SimStruct))
                 ):
                     from_global = True
-                    struct = struct.with_arch(arch)
                 else:
                     # give up
                     struct = None
@@ -4131,14 +3911,12 @@ def _decl_to_type(
 
             if struct is None:
                 struct = SimStruct(fields, decl.name, qualifier=quals)
-                struct._arch = arch
                 struct_ref = struct
             elif not struct.fields:
                 struct.fields = fields
             elif fields and struct.fields != fields:
                 if from_global:
                     struct = SimStruct(fields, decl.name, qualifier=quals)
-                    struct._arch = arch
                     struct_ref = struct
                 else:
                     raise ValueError("Redefining body of " + key)
@@ -4146,7 +3924,6 @@ def _decl_to_type(
             extra_types[key] = struct_ref
         else:
             struct = SimStruct(fields, qualifier=quals)
-            struct._arch = arch
         return struct
 
     if isinstance(decl, c_ast.Union):
@@ -4171,14 +3948,12 @@ def _decl_to_type(
 
             if union is None:
                 union = SimUnion(fields, decl.name, qualifier=quals)
-                union._arch = arch
                 union_ref = union
             elif not union.members:
                 union.members = fields
             elif fields and union.members != fields:
                 if from_global:
                     union = SimStruct(fields, decl.name, qualifier=quals)
-                    union._arch = arch
                     union_ref = union
                 else:
                     raise ValueError("Redefining body of " + key)
@@ -4187,17 +3962,16 @@ def _decl_to_type(
             extra_types[key] = union_ref
         else:
             union = SimUnion(fields, qualifier=quals)
-            union._arch = arch
         return union
 
     if isinstance(decl, c_ast.IdentifierType):
         key = " ".join(decl.names)
         if bitsize is not None:
-            return SimTypeNumOffset(int(bitsize.value), signed=False).with_arch(arch)
+            return SimTypeNumOffset(int(bitsize.value), signed=False)
         if key in extra_types:
-            return extra_types[key].with_arch(arch)
+            return extra_types[key]
         if key in ALL_TYPES:
-            return ALL_TYPES[key].with_arch(arch)
+            return ALL_TYPES[key]
         raise TypeError(f"Unknown type '{key}'")
 
     if isinstance(decl, c_ast.Enum):
@@ -4225,18 +3999,15 @@ def _decl_to_type(
                 # Update existing enum with members if it was forward-declared
                 if not existing.members and members:
                     existing.members = members
-                return existing.with_arch(arch)
+                return existing
 
             enum_type = SimTypeEnum(members, name=enum_name)
-            enum_type._arch = arch
             if extra_types is not None:
                 extra_types[key] = enum_type
             return enum_type
 
         # Anonymous enum
-        enum_type = SimTypeEnum(members)
-        enum_type._arch = arch
-        return enum_type
+        return SimTypeEnum(members)
 
     raise ValueError("Unknown type!")
 
@@ -4272,7 +4043,9 @@ def _parse_const(c, arch=None, extra_types=None):
         raise ValueError(f"Binary op {c.op}")
     if type(c) is c_ast.UnaryOp:
         if c.op == "sizeof":
-            return _decl_to_type(c.expr.type, extra_types=extra_types, arch=arch).size
+            if arch is None:
+                raise ValueError("Cannot evaluate sizeof(...) without an arch")
+            return _decl_to_type(c.expr.type, extra_types=extra_types, arch=arch).size(arch)
         if c.op == "-":
             return -_parse_const(c.expr, arch, extra_types)
         if c.op == "+":

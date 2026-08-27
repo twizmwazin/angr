@@ -37,9 +37,7 @@ class StringOutliner(OptimizationPass):
                     )
                     variable_map_of(self.manager).set_prototype(
                         call,
-                        self.kb.librust.get_prototype("alloc::string::String::new")
-                        .with_arch(self.project.arch)
-                        .normalize(),
+                        self.kb.librust.get_prototype("alloc::string::String::new").normalize(),
                     )
                     call.bits = 3 * self.project.arch.bits
                     new_stmt = stmt.copy()

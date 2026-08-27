@@ -147,7 +147,7 @@ class InlinedStrcpySimplifier(OptimizationPass):
                     **stmt.tags,
                 )
                 variable_map_of(self.manager).set_prototype(
-                    call, SIM_LIBRARIES["libc.so"][0].get_prototype("strncpy", arch=self.project.arch)
+                    call, SIM_LIBRARIES["libc.so"][0].get_prototype("strncpy")
                 )
                 return SideEffectStatement(
                     self.manager.next_atom(),
@@ -208,7 +208,7 @@ class InlinedStrcpySimplifier(OptimizationPass):
                         **stmt.tags,
                     )
                     variable_map_of(self.manager).set_prototype(
-                        call, SIM_LIBRARIES["libc.so"][0].get_prototype("strncpy", arch=self.project.arch)
+                        call, SIM_LIBRARIES["libc.so"][0].get_prototype("strncpy")
                     )
                     return SideEffectStatement(
                         self.manager.next_atom(),

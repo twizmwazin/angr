@@ -127,7 +127,7 @@ class FunctionPrototypeInference(OptimizationPass, CFAMixin, SSAVariableMixin):
         call = call_expr.copy()
         if call.args is not None:
             call.args = call.args[1:]
-        call.bits = returnty.size
+        call.bits = returnty.size(self.project.arch)
         # The copy reuses call_expr.idx; the original stmt is being replaced, so updating the shared entry is fine.
         vm.set_prototype(call, prototype)
         dst_vvar = self.new_stack_vvar(arg0.operand.stack_offset, call.bits, arg0.operand.tags)

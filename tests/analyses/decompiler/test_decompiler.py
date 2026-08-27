@@ -2104,7 +2104,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        assert f.prototype is not None and f.prototype.returnty is not None and f.prototype.returnty.size == 8
+        assert f.prototype is not None and f.prototype.returnty is not None and f.prototype.returnty.size(proj.arch) == 8
         assert "a0 - 65 < 26;" in d.codegen.text
 
     @for_all_structuring_algos
@@ -3533,7 +3533,7 @@ class TestDecompiler(unittest.TestCase):
 
         cproto = "int authenticate(char *username, char *password)"
         _, proto, _ = convert_cproto_to_py(cproto + ";")
-        f.prototype = proto.with_arch(p.arch)
+        f.prototype = proto
         f.prototype_source = PrototypeSource.USER
         f.calling_convention = default_cc(p.arch.name)(p.arch)
 
@@ -5084,11 +5084,11 @@ class TestDecompiler(unittest.TestCase):
         # we alter the function prototype of f1 and entry to make this test case work as expected
         f1 = p.kb.functions["f1"]
         assert f1 is not None
-        f1.prototype = SimTypeFunction([], SimTypeLongLong(signed=True)).with_arch(p.arch)
+        f1.prototype = SimTypeFunction([], SimTypeLongLong(signed=True))
         f1.prototype_source = PrototypeSource.USER
         entry = p.kb.functions[p.entry]
         assert entry is not None
-        entry.prototype = SimTypeFunction([], SimTypeLongLong(signed=True)).with_arch(p.arch)
+        entry.prototype = SimTypeFunction([], SimTypeLongLong(signed=True))
         entry.prototype_source = PrototypeSource.USER
         # decompile!
         decompiler_options = decompiler_options or []
@@ -5141,11 +5141,11 @@ class TestDecompiler(unittest.TestCase):
         # we alter the function prototype of f1 and entry to make this test case work as expected
         f1 = p.kb.functions["f1"]
         assert f1 is not None and f1.prototype is not None
-        f1.prototype.returnty = SimTypeLongLong(signed=True).with_arch(p.arch)
+        f1.prototype.returnty = SimTypeLongLong(signed=True)
         f1.prototype_source = PrototypeSource.USER
         entry = p.kb.functions[p.entry]
         assert entry is not None and entry.prototype is not None
-        entry.prototype.returnty = SimTypeLongLong(signed=True).with_arch(p.arch)
+        entry.prototype.returnty = SimTypeLongLong(signed=True)
         entry.prototype_source = PrototypeSource.USER
 
         dec = p.analyses.Decompiler(entry, cfg=cfg, options=decompiler_options)

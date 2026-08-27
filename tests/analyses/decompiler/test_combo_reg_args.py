@@ -34,7 +34,7 @@ class TestComboRegArgs(unittest.TestCase):
 
         func = cfg.functions["authenticate"]
         assert func is not None
-        func.prototype = proto.with_arch(proj.arch)
+        func.prototype = proto
         func.calling_convention = SimCCSystemVAMD64(proj.arch)
         func.prototype_libname = None
         func.prototype_source = PrototypeSource.USER

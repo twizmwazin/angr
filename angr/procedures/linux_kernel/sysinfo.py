@@ -55,5 +55,5 @@ class sysinfo(angr.SimProcedure):
             "freehigh": 12,
             "mem_unit": 13,
         }
-        sysinfo_ty.with_arch(self.arch).store(self.state, info, value)
+        sysinfo_ty.store(self.state, info, value)
         return 0

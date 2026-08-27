@@ -31,15 +31,11 @@ class TestEnumTypeInference(unittest.TestCase):
         color_enum = parse_type("enum Color { RED = 0, GREEN = 1, BLUE = 2 }")
         status_enum = parse_type("enum Status { OK = 0, ERROR = -1, PENDING = 100, UNKNOWN = 999 }")
 
-        # Apply architecture
-        color_enum = color_enum.with_arch(self.proj.arch)
-        status_enum = status_enum.with_arch(self.proj.arch)
-
         # Verify the types are properly formed
         assert isinstance(color_enum, SimTypeEnum)
         assert isinstance(status_enum, SimTypeEnum)
-        assert color_enum.size == 32
-        assert status_enum.size == 32
+        assert color_enum.size(self.proj.arch) == 32
+        assert status_enum.size(self.proj.arch) == 32
 
         # Test that we can lift these to type constants for Typehoon
         lifter = TypeTranslator(self.proj.arch.bits)
@@ -55,7 +51,6 @@ class TestEnumTypeInference(unittest.TestCase):
         """Test that enums survive translation to/from type constants."""
         # Create an enum type
         original = parse_type("enum FileMode { READ = 1, WRITE = 2, EXEC = 4 }")
-        original = original.with_arch(self.proj.arch)
         assert isinstance(original, SimTypeEnum)
 
         # Lift to type constant
@@ -222,8 +217,7 @@ class TestEnumTypeInference(unittest.TestCase):
         assert restored.members == original.members
 
         # Verify the restored enum is functional
-        restored_with_arch = restored.with_arch(archinfo.ArchAMD64())
-        assert restored_with_arch.size == 32
+        assert restored.size(archinfo.ArchAMD64()) == 32
 
 
 if __name__ == "__main__":

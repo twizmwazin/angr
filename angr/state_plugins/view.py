@@ -230,7 +230,7 @@ class SimMemView(SimStatePlugin):
         if k == "struct":
             return StructMode(self)
         if k in SimMemView.types:
-            return self._deeper(ty=SimMemView.types[k].with_arch(self.state.arch))
+            return self._deeper(ty=SimMemView.types[k])
         raise AttributeError(k)
 
     def __setattr__(self, k, v):
@@ -248,8 +248,7 @@ class SimMemView(SimStatePlugin):
         :param sim_type:    The new type.
         :returns:           The typed SimMemView copy.
         """
-        ty = sim_type.with_arch(self.state.arch)
-        return self._deeper(ty=ty)
+        return self._deeper(ty=sim_type)
 
     @SimStatePlugin.memo
     def copy(self, memo):  # pylint: disable=unused-argument
@@ -320,7 +319,7 @@ class StructMode:
 
     def __getattr__(self, k):
         assert k != "_view"
-        return self._view._deeper(ty=SimMemView.types["struct " + k].with_arch(self._view.state.arch))
+        return self._view._deeper(ty=SimMemView.types["struct " + k])
 
     def __setattr__(self, k, v):
         if k == "_view":

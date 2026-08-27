@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from unittest import TestCase, main
 
-import archinfo
 import networkx
 
 from angr.knowledge_plugins.functions import Function
@@ -104,7 +103,7 @@ class TestFunction(TestCase):
     def test_function_set_prototype_without_parameter_names(self):
         function = makeFunction(self.function_manager, 0x42, "function")
         parsed_proto = parse_defns("int func(int, char*);")["func"]
-        function.prototype = parsed_proto.with_arch(archinfo.arch_from_id("AMD64"))
+        function.prototype = parsed_proto
 
         assert len(function.prototype.args) == 2
         assert len(function.prototype.arg_names) == 2
@@ -116,7 +115,7 @@ class TestFunction(TestCase):
         function = makeFunction(self.function_manager, 0x42, "function")
         parsed_proto = parse_defns("int func(int, char*);")["func"]
         parsed_proto.arg_names = ["", "a3"]
-        function.prototype = parsed_proto.with_arch(archinfo.arch_from_id("AMD64"))
+        function.prototype = parsed_proto
 
         assert len(function.prototype.args) == 2
         assert len(function.prototype.arg_names) == 2

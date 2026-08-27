@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from typing import Self, cast
 
 from angr.sim_type import (
     IDENT_TO_CLS,
@@ -46,29 +45,25 @@ class RustSimTypeInt(RustSimType, SimTypeInt):
         self._size = size
 
     def copy(self):
-        return self.__class__(size=self._size, signed=self.signed, label=self.label).with_arch(self._arch)
+        return self.__class__(size=self._size, signed=self.signed, label=self.label)
 
     def repr(self, name=None, full=0, memo=None, indent: int | None = 0):
         if name is None or len(name) == 0:
             return repr(self)
         return f"{name}: {self!r}"
 
-    @property
-    def alignment(self):
-        align = super().alignment
+    def alignment(self, arch):
+        align = super().alignment(arch)
         align = align if align > 0 else 1
-        if self._arch:
-            align = min(align, self._arch.bytes)
-        return align
+        return min(align, arch.bytes)
 
-    @property
-    def size(self) -> int:
+    def size(self, arch) -> int:  # pylint: disable=unused-argument
         assert self._size is not None
         return self._size
 
     def __repr__(self):
         name = "i" if self.signed else "u"
-        name += str(self.size)
+        name += str(self._size)
         return name
 
     def to_json(self, fields=None, memo=None):
@@ -81,11 +76,6 @@ class RustSimTypeInt(RustSimType, SimTypeInt):
     def from_json(d, type_collection=None, memo=None):
         return RustSimTypeInt(size=d.get("size", 32), signed=d.get("signed", True), label=d.get("label"))
 
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):  # pylint: disable=unused-argument
-        out = RustSimTypeInt(size=self._size, signed=self.signed, label=self.label)
-        out._arch = arch
-        return out
-
 
 class RustSimTypeSize(RustSimTypeInt):
     _ident = "rust_size"
@@ -93,11 +83,8 @@ class RustSimTypeSize(RustSimTypeInt):
     def __init__(self, signed=True, label=None):
         super().__init__(size=0, signed=signed)
 
-    @property
-    def size(self):
-        if self._arch is None:
-            raise ValueError("Can't tell my size without an arch!")
-        return self._arch.bits
+    def size(self, arch) -> int:
+        return arch.bits
 
     def __repr__(self):
         name = "i" if self.signed else "u"
@@ -105,7 +92,7 @@ class RustSimTypeSize(RustSimTypeInt):
         return name
 
     def copy(self):
-        return RustSimTypeSize(signed=self.signed, label=self.label).with_arch(self._arch)
+        return RustSimTypeSize(signed=self.signed, label=self.label)
 
     def to_json(self, fields=None, memo=None):
         d = {"_t": self._ident, "signed": self.signed}
@@ -116,11 +103,6 @@ class RustSimTypeSize(RustSimTypeInt):
     @staticmethod
     def from_json(d, type_collection=None, memo=None):
         return RustSimTypeSize(signed=d.get("signed", True), label=d.get("label"))
-
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):  # pylint: disable=unused-argument
-        out = RustSimTypeSize(signed=self.signed, label=self.label)
-        out._arch = arch
-        return out
 
 
 class RustSimTypeFunction(RustSimType, SimTypeFunction):  # pyright: ignore[reportIncompatibleMethodOverride]
@@ -179,30 +161,13 @@ class RustSimTypeFunction(RustSimType, SimTypeFunction):  # pyright: ignore[repo
         proto = f"({name or ''})({', '.join(formatted_args)})"
         return f"void {proto}" if self.returnty is None else self.returnty.c_repr(proto, full, memo, indent)
 
-    @property
-    def size(self):
+    def size(self, arch) -> int:  # pylint: disable=unused-argument
         return 4096  # ???????????
 
     def repr(self, name=None, full=0, memo=None, indent: int | None = 0):
         if not name:
             return repr(self)
         return f"{name}: {self!r}"
-
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):
-        returnty = None
-        if self.returnty is not None:
-            returnty = cast(RustSimType, self.returnty.with_arch(arch, memo=memo))
-        out = RustSimTypeFunction(
-            [cast(RustSimType, a.with_arch(arch, memo=memo)) for a in self.args],
-            returnty,
-            label=self.label,
-            arg_names=self.arg_names,
-            variadic=self.variadic,
-            is_arg0_retbuf=self.is_arg0_retbuf,
-            is_class_member_function=self.is_class_member_function,
-        )
-        out._arch = arch
-        return out
 
     def _arg_names_str(self, show_variadic=True):
         argnames = list(self.arg_names)
@@ -243,7 +208,7 @@ class RustSimTypeFunction(RustSimType, SimTypeFunction):  # pyright: ignore[repo
             variadic=self.variadic,
             is_arg0_retbuf=self.is_arg0_retbuf,
             is_class_member_function=self.is_class_member_function,
-        ).with_arch(self._arch)
+        )
 
     def to_json(self, fields=None, memo=None):
         if memo is None:
@@ -289,19 +254,11 @@ class RustSimTypeReference(RustSimType, SimTypePointer):
             return out
         return f"{name}: {out}"
 
-    @property
-    def size(self):
-        if self._arch is None:
-            raise ValueError("Can't tell my size without an arch!")
-        return self._arch.bits
-
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):
-        out = RustSimTypeReference(self.pts_to.with_arch(arch, memo=memo), self.label, offset=self.offset)
-        out._arch = arch
-        return out
+    def size(self, arch) -> int:
+        return arch.bits
 
     def copy(self):
-        return RustSimTypeReference(self.pts_to, label=self.label, offset=self.offset).with_arch(self._arch)
+        return RustSimTypeReference(self.pts_to, label=self.label, offset=self.offset)
 
 
 class RustSimTypeArray(RustSimType, SimTypeArray):
@@ -330,20 +287,8 @@ class RustSimTypeArray(RustSimType, SimTypeArray):
 
         return f"{name}: {self!r}"
 
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):
-        out = RustSimTypeArray(self.elem_type.with_arch(arch, memo=memo), self.length, self.label)
-        out._arch = arch
-        return out
-
     def copy(self):
         return RustSimTypeArray(self.elem_type, length=self.length, label=self.label)
-
-    @property
-    def size(self):
-        fget = SimTypeArray.size.fget
-        if fget is None:
-            return 0
-        return fget(self)
 
 
 class RustSimStruct(RustSimType, SimStruct):
@@ -355,39 +300,15 @@ class RustSimStruct(RustSimType, SimStruct):
         SimStruct.__init__(self, fields, name, pack, align)
         self._size = None
 
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):
-        if self.name in memo:
-            return cast(RustSimStruct, memo[self.name])
-
-        out = RustSimStruct(OrderedDict(), name=self.name, pack=self._pack, align=self._align)
-        out._arch = arch
-        memo[self.name] = out
-
-        out.fields = OrderedDict((k, v.with_arch(arch)) for k, v in self.fields.items())
-
-        # Fixup the offsets to byte aligned addresses for all SimTypeNumOffset types
-        offset_so_far = 0
-        for ty in out.fields.values():
-            if isinstance(ty, RustSimTypeNumOffset):
-                out._pack = True
-                ty.offset = offset_so_far % arch.byte_width
-                offset_so_far += ty.size
-
-        out._size = self._size
-        return out
-
-    @property
-    def size(self):
+    def size(self, arch) -> int:
         if self._size is not None:
             return self._size
         if not self.fields:
             return 0
-        fget = SimStruct.size.fget
-        size = fget(self) if fget else 0
+        size = SimStruct.size(self, arch)
         if size == 0:
             return 0
-        assert self._arch is not None
-        align = self.alignment * self._arch.bytes
+        align = self.alignment(arch) * arch.bytes
         if size % align != 0:
             size += align - (size % align)
         self._size = size
@@ -414,7 +335,7 @@ class RustSimStruct(RustSimType, SimStruct):
         return self.name
 
     def copy(self):
-        out = RustSimStruct(dict(self.fields), name=self.name, pack=self._pack, align=self._align).with_arch(self._arch)
+        out = RustSimStruct(dict(self.fields), name=self.name, pack=self._pack, align=self._align)
         out._size = self._size
         return out
 
@@ -427,9 +348,9 @@ class RustSimStruct(RustSimType, SimStruct):
             return field_ty.get_field_ty(".".join(path[1:]))
         return None
 
-    def get_field_offset(self, name, default=None):
+    def get_field_offset(self, name, arch, default=None):
         path = name.split(".")
-        offsets = self.offsets
+        offsets = self.offsets(arch)
         field_ty = self.fields.get(path[0], None)
         base_offset = offsets.get(path[0], None)
         if base_offset is None:
@@ -437,7 +358,7 @@ class RustSimStruct(RustSimType, SimStruct):
         if len(path) == 1:
             return base_offset
         if isinstance(field_ty, RustSimStruct):
-            addon_offset = field_ty.get_field_offset(".".join(path[1:]))
+            addon_offset = field_ty.get_field_offset(".".join(path[1:]), arch)
             if addon_offset is not None:
                 return base_offset + addon_offset
         return default
@@ -490,33 +411,21 @@ class RustSimTypeNumOffset(RustSimType, SimTypeNumOffset):
     def repr(self, name=None, full=0, memo=None, indent: int | None = 0):
         super(SimTypeNumOffset, self).c_repr(name, full, memo, indent)
 
-    def _with_arch(self, arch, *, memo: dict[str, SimType]) -> RustSimTypeNumOffset:
-        out = RustSimTypeNumOffset(self.size, signed=self.signed, label=self.label, offset=self.offset)
-        out._arch = arch
-        return out
-
 
 class RustSimTypeSlice(RustSimStruct, SimType):
     _ident = "rust_slice"
 
-    def __init__(self, element_type, label=None, arch=None):
+    def __init__(self, element_type, label=None):
         self.element_type = element_type
         RustSimStruct.__init__(
             self,
             {
-                "data_ptr": RustSimTypeReference(pts_to=element_type).with_arch(arch),
-                "length": RustSimTypeSize(signed=False).with_arch(arch),
+                "data_ptr": RustSimTypeReference(pts_to=element_type),
+                "length": RustSimTypeSize(signed=False),
             },
             name=f"&[{element_type}]",
         )
         SimType.__init__(self, label)
-
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):
-        out = RustSimTypeSlice(self.element_type.with_arch(arch, memo=memo), label=self.label, arch=arch)
-        out._arch = arch
-        out._size = self._size
-
-        return out
 
     def repr(self, name=None, full=0, memo=None, indent: int | None = 0):
         if name is None or len(name) == 0:
@@ -524,14 +433,12 @@ class RustSimTypeSlice(RustSimStruct, SimType):
         return f"{name}: {self!r}"
 
     def copy(self):
-        out = RustSimTypeSlice(self.element_type, self.label).with_arch(self._arch)
+        out = RustSimTypeSlice(self.element_type, self.label)
         out._size = self._size
         return out
 
-    @property
-    def size(self):
-        assert self._arch is not None
-        return self._arch.bits * 2
+    def size(self, arch) -> int:
+        return arch.bits * 2
 
     def __repr__(self):
         return self.name
@@ -560,11 +467,11 @@ DEFAULT_VEC_FIELDS_ORDER = ("cap", "ptr", "len")
 class RustSimTypeVec(RustSimStruct, SimType):
     _ident = "rust_vec"
 
-    def __init__(self, element_type, order=DEFAULT_VEC_FIELDS_ORDER, label=None, arch=None):
+    def __init__(self, element_type, order=DEFAULT_VEC_FIELDS_ORDER, label=None):
         unordered_fields = {
-            "ptr": RustSimTypeReference(pts_to=element_type).with_arch(arch),
-            "cap": RustSimTypeSize().with_arch(arch),
-            "len": RustSimTypeSize().with_arch(arch),
+            "ptr": RustSimTypeReference(pts_to=element_type),
+            "cap": RustSimTypeSize(),
+            "len": RustSimTypeSize(),
         }
         fields = OrderedDict()
         for field_name in order:
@@ -577,17 +484,6 @@ class RustSimTypeVec(RustSimStruct, SimType):
         SimType.__init__(self, label)
         self.element_type = element_type
         self.order = order
-
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):
-        if self.name in memo:
-            return cast(RustSimTypeVec, memo[self.name])
-
-        out = RustSimTypeVec(self.element_type, self.order, label=self.label, arch=arch)
-        out._arch = arch
-        out._size = self._size
-        memo[self.name] = out
-
-        return out
 
     def repr(self, name=None, full=0, memo=None, indent: int | None = 0):
         if name is None or len(name) == 0:
@@ -622,15 +518,11 @@ class RustSimTypeBottom(RustSimType, SimTypeBottom):
     _ident = "rust_bot"
     _args = ("label",)
 
-    @property
-    def size(self) -> int:
+    def size(self, arch) -> int:  # pylint: disable=unused-argument
         return 0
 
     def repr(self, name=None, full=0, memo=None, indent: int | None = 0):
         return "BOT"
-
-    def _with_arch(self, arch, *, memo: dict[str, SimType]) -> Self:  # pylint: disable=unused-argument
-        return self
 
 
 class EnumVariant:
@@ -639,8 +531,6 @@ class EnumVariant:
         self.fields: list[tuple[SimType, str | None]] = fields
         self.discriminant = discriminant
         self.discriminant_size = discriminant_size
-
-        self._arch = None
 
     @staticmethod
     def from_no_data(name, discriminant, discriminant_size):
@@ -653,41 +543,35 @@ class EnumVariant:
     def has_fields(self):
         return len(self.fields) > 0
 
-    @property
-    def first_field_offset(self):
+    def first_field_offset(self, arch):
         if self.has_fields():
             field_ty = self.fields[0][0]
             if self.discriminant_size:
-                return max(self.discriminant_size, field_ty.alignment if isinstance(field_ty.alignment, int) else 0)
+                field_alignment = field_ty.alignment(arch)
+                return max(self.discriminant_size, field_alignment if isinstance(field_alignment, int) else 0)
         return 0
 
-    @property
-    def field_offsets(self):
+    def field_offsets(self, arch):
         struct_ty = self.type
         offsets = {}
-        first_field_offset = self.first_field_offset
-        for field_name, offset in struct_ty.offsets.items():
+        first_field_offset = self.first_field_offset(arch)
+        for field_name, offset in struct_ty.offsets(arch).items():
             field_ty = struct_ty.fields[field_name]
             offsets[offset + first_field_offset] = field_ty
         return offsets
 
-    @property
-    def bits(self):
-        return self.type.size + self.first_field_offset * 8
+    def bits(self, arch):
+        return self.type.size(arch) + self.first_field_offset(arch) * 8
 
-    @property
-    def size(self):
-        return self.bits // 8
+    def size(self, arch):
+        return self.bits(arch) // 8
 
     @property
     def type(self):
         fields = OrderedDict()
         for idx, (field_ty, name) in enumerate(self.fields):
             fields[name or f"field_{idx}"] = field_ty
-        result = RustSimStruct(fields, pack=True)
-        if self._arch:
-            return result.with_arch(self._arch)
-        return result
+        return RustSimStruct(fields, pack=True)
 
     def as_struct_ty(self):
         fields = OrderedDict()
@@ -695,21 +579,7 @@ class EnumVariant:
             fields["discriminant"] = RustSimTypeInt(self.discriminant_size * 8, signed=False)
         for idx, (field_ty, name) in enumerate(self.fields):
             fields[name or f"field_{idx}"] = field_ty
-        result = RustSimStruct(fields)
-        if self._arch:
-            return result.with_arch(self._arch)
-        return result
-
-    def with_arch(self, arch, memo: dict[str, SimType] | None = None):
-        if memo is None:
-            memo = {}
-        return self._with_arch(arch, memo=memo)
-
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):
-        fields = [(field_ty.with_arch(arch, memo=memo), name) for field_ty, name in self.fields]
-        result = EnumVariant(self.name, fields, self.discriminant, self.discriminant_size)
-        result._arch = arch
-        return result
+        return RustSimStruct(fields)
 
     def __eq__(self, other):
         return (
@@ -752,26 +622,14 @@ class RustSimEnum(RustSimType, SimType):
 
         self._size = None
 
-    @property
-    def size(self) -> int:
+    def size(self, arch) -> int:
         if self._size is None:
-            self._size = max((variant.bits for variant in self.variants), default=0)
+            self._size = max((variant.bits(arch) for variant in self.variants), default=0)
         return self._size or 0
 
     def copy(self):
-        out = RustSimEnum(self.name, self.variants).with_arch(self._arch)
+        out = RustSimEnum(self.name, self.variants)
         out._size = self._size
-        return out
-
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):
-        if self.name in memo:
-            return cast(RustSimEnum, memo[self.name])
-
-        out = RustSimEnum(self.name, [variant.with_arch(arch, memo=memo) for variant in self.variants])
-        out._arch = arch
-        out._size = self._size
-        memo[self.name] = out
-
         return out
 
     def repr(self, name=None, full=0, memo=None, indent: int | None = 0):
@@ -805,8 +663,8 @@ class RustSimEnum(RustSimType, SimType):
     def num_variants(self):
         return len(self.variants)
 
-    def as_struct_ty(self):
-        largest = max(self.variants, key=lambda variant: variant.bits)
+    def as_struct_ty(self, arch):
+        largest = max(self.variants, key=lambda variant: variant.bits(arch))
         struct_ty = largest.as_struct_ty()
         struct_ty.name = self.name
         return struct_ty
@@ -858,26 +716,7 @@ class RustSimTypeOption(RustSimEnum):
             self.some_discriminant,
             self.some_discriminant_size,
             self.name,
-        ).with_arch(self._arch)
-        out._size = self._size
-        return out
-
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):
-        if self.name in memo:
-            return cast(RustSimTypeOption, memo[self.name])
-
-        out = RustSimTypeOption(
-            self.none_discriminant,
-            self.none_discriminant_size,
-            self.some_type.with_arch(arch),
-            self.some_discriminant,
-            self.some_discriminant_size,
-            self.name,
         )
-        memo[self.name] = out
-
-        out._arch = arch
-        out.variants = [variant.with_arch(arch, memo=memo) for variant in out.variants]
         out._size = self._size
         return out
 
@@ -954,27 +793,7 @@ class RustSimTypeResult(RustSimEnum):
             self.err_discriminant,
             self.err_discriminant_size,
             self.name,
-        ).with_arch(self._arch)
-        out._size = self._size
-        return out
-
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):
-        if self.name in memo:
-            return cast(RustSimTypeResult, memo[self.name])
-
-        out = RustSimTypeResult(
-            self.ok_type.with_arch(arch, memo=memo),
-            self.ok_discriminant,
-            self.ok_discriminant_size,
-            self.err_type.with_arch(arch, memo=memo),
-            self.err_discriminant,
-            self.err_discriminant_size,
-            self.name,
         )
-        memo[self.name] = out
-
-        out._arch = arch
-        out.variants = [variant.with_arch(arch, memo=memo) for variant in out.variants]
         out._size = self._size
         return out
 
@@ -1029,20 +848,11 @@ class RustSimTypeUnit(RustSimStruct):
         )
 
     def copy(self):
-        out = RustSimTypeUnit().with_arch(self._arch)
-        out._size = self._size
-        return out
-
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):  # pylint: disable=unused-argument
         out = RustSimTypeUnit()
-        out._arch = arch
-        out.fields = OrderedDict(())
         out._size = self._size
-
         return out
 
-    @property
-    def size(self):
+    def size(self, arch) -> int:  # pylint: disable=unused-argument
         return 0
 
     def to_json(self, fields=None, memo=None):
@@ -1061,16 +871,8 @@ class RustSimTypeStrRef(RustSimTypeSlice):
         self.name = "&str"
 
     def copy(self):
-        out = RustSimTypeStrRef().with_arch(self._arch)
-        out._size = self._size
-        return out
-
-    def _with_arch(self, arch, *, memo: dict[str, SimType]):
         out = RustSimTypeStrRef()
-        out._arch = arch
-        out.fields = OrderedDict((k, v.with_arch(arch, memo=memo)) for k, v in self.fields.items())
         out._size = self._size
-
         return out
 
     def to_json(self, fields=None, memo=None):

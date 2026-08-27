@@ -1886,15 +1886,7 @@ class Function(Serializable):
                     continue
 
                 proto = library.get_prototype(name)
-                if self.project is None:
-                    # we need to get arch from self.project
-                    l.warning(
-                        "Function %s does not have .project set. A possible prototype is found, but we cannot set it "
-                        "without .project.arch.",
-                        self.name,
-                    )
-                    return False
-                self.prototype = proto.with_arch(self.project.arch) if proto is not None else proto
+                self.prototype = proto
                 self.prototype_libname = library.name
                 self.returning = library.is_returning(name)
 
@@ -2066,7 +2058,7 @@ class Function(Serializable):
         name, ty = func_def.popitem()
         assert isinstance(ty, SimTypeFunction)
         self.name = name
-        self.prototype = ty.with_arch(self.project.arch)
+        self.prototype = ty
         # setup the calling convention
         # If a SimCC object is passed assume that this is sane and just use it
         if isinstance(calling_convention, SimCC):

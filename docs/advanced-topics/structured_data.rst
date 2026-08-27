@@ -8,11 +8,11 @@ Working with types
 ------------------
 
 angr has a system for representing types. These SimTypes are found in
-``angr.types`` - an instance of any of these classes represents a type. Many of
-the types are incomplete unless they are supplemented with a SimState - their
-size depends on the architecture you're running under. You may do this with
-``ty.with_arch(arch)``, which returns a copy of itself, with the architecture
-specified.
+``angr.types`` - an instance of any of these classes represents a type. Types
+are architecture-independent descriptions; sizes and layouts that depend on the
+architecture are computed on demand by passing an ``archinfo.Arch`` to
+``ty.size(arch)``, ``ty.alignment(arch)``, and (for structs)
+``ty.offsets(arch)``.
 
 angr also has a light wrapper around ``pycparser``, which is a C parser.
 This helps with getting instances of type objects:

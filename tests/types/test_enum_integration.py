@@ -39,7 +39,6 @@ class TestEnumCallingConvention(unittest.TestCase):
             members={"A": 0, "B": 1, "C": 2},
             name="test_enum",
         )
-        enum = enum.with_arch(arch)
 
         # _classify should return INTEGER for enum types
         result = cc._classify(enum)
@@ -54,7 +53,6 @@ class TestEnumCallingConvention(unittest.TestCase):
             flags={"READ": 1, "WRITE": 2, "EXEC": 4},
             name="prot_flags",
         )
-        bf = bf.with_arch(arch)
 
         result = cc._classify(bf)
         assert result == ["INTEGER"]
@@ -73,7 +71,6 @@ class TestEnumCallingConvention(unittest.TestCase):
             args=[enum, SimTypePointer(SimTypeChar()), SimTypeInt()],
             returnty=SimTypeInt(),
         )
-        proto = proto.with_arch(arch)
 
         # This should not raise RecursionError
         args = cc.arg_locs(proto)
@@ -105,7 +102,6 @@ class TestEnumDecompilerIntegration(unittest.TestCase):
                 args=[stdio_enum, SimTypePointer(SimTypeChar()), SimTypeInt()],
                 returnty=SimTypeInt(),
             )
-            read_func.prototype = read_func.prototype.with_arch(proj.arch)
 
             # Decompile main
             main_func = proj.kb.functions["main"]
@@ -132,7 +128,6 @@ class TestEnumDecompilerIntegration(unittest.TestCase):
             args=[stdio_enum, SimTypePointer(SimTypeChar()), SimTypeInt()],
             returnty=SimTypeInt(),
         )
-        original_proto = original_proto.with_arch(proj.arch)
         read_func.prototype = original_proto
 
         # Decompile main (which calls read)

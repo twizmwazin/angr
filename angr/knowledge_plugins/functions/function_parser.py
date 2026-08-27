@@ -191,14 +191,9 @@ class FunctionParser:
         :return Function:
         """
         proto = SimType.from_json(json.loads(cmsg.prototype.decode("utf-8"))) if cmsg.prototype else None
-        if proto is not None:
-            if not isinstance(proto, SimTypeFunction):
-                l.warning("Unexpected type of function prototype deserialized: %s", type(proto))
-                proto = None
-            elif project is None:
-                proto = None  # we cannot assign an arch-less prototype to a function
-            else:
-                proto = proto.with_arch(project.arch)
+        if proto is not None and not isinstance(proto, SimTypeFunction):
+            l.warning("Unexpected type of function prototype deserialized: %s", type(proto))
+            proto = None
 
         cc = (
             CallingConventionSerializer.from_json(json.loads(cmsg.calling_convention.decode("utf-8")), project.arch)

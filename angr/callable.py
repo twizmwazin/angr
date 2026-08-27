@@ -86,7 +86,7 @@ class Callable:
         self._base_state = state
 
     def __call__(self, *args):
-        prototype = SimCC.guess_prototype(args, self._func_ty).with_arch(self._project.arch)
+        prototype = SimCC.guess_prototype(args, self._func_ty)
         self.perform_call(*args, prototype=prototype)
         if self.result_state is not None and prototype.returnty is not None:
             loc = self._cc.return_val(prototype.returnty)
@@ -96,7 +96,7 @@ class Callable:
         return None
 
     def perform_call(self, *args, prototype=None):
-        prototype = SimCC.guess_prototype(args, prototype or self._func_ty).with_arch(self._project.arch)
+        prototype = SimCC.guess_prototype(args, prototype or self._func_ty)
         state = self._project.factory.call_state(
             self._addr,
             *args,

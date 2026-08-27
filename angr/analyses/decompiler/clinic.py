@@ -1781,7 +1781,7 @@ class Clinic(Analysis, Serializable):
                 self.variable_map.set_calling_convention(new_call, SimCCUsercall(self.project.arch, [arg], []))
                 self.variable_map.set_prototype(
                     new_call,
-                    SimTypeFunction([IntCls(signed=False)], SimTypeBottom(label="void")).with_arch(self.project.arch),
+                    SimTypeFunction([IntCls(signed=False)], SimTypeBottom(label="void")),
                 )
                 call_stmt = ailment.Stmt.SideEffectStatement(
                     self._ail_manager.next_atom(),
@@ -2508,7 +2508,7 @@ class Clinic(Analysis, Serializable):
             else:
                 returnty = SimTypeInt()
 
-        self.function.prototype = SimTypeFunction(func_args, returnty).with_arch(self.project.arch)
+        self.function.prototype = SimTypeFunction(func_args, returnty)
         self.function.prototype_source = PrototypeSource.CCA_DECOMPILER
 
     @timethis
@@ -2629,7 +2629,7 @@ class Clinic(Analysis, Serializable):
 
         # for any left-over variables, assign Bottom type (which will get "corrected" into a default type in
         # VariableManager)
-        bottype = SimTypeBottom().with_arch(self.project.arch)
+        bottype = SimTypeBottom()
         for var in var_manager._variables:
             if var not in var_manager.variable_to_types:
                 var_manager.set_variable_type(var, bottype)
@@ -2910,11 +2910,7 @@ class Clinic(Analysis, Serializable):
             # custom string?
             if self.variable_map.custom_string(expr):
                 s = self.kb.custom_strings[expr.value]
-                ty = (
-                    expr.tags["type"]
-                    if "type" in expr.tags
-                    else SimTypePointer(SimTypeChar()).with_arch(self.project.arch)
-                )
+                ty = expr.tags["type"] if "type" in expr.tags else SimTypePointer(SimTypeChar())
                 self._set_reference_values(expr, {ty: s})
             else:
                 # global variable?
@@ -4402,7 +4398,7 @@ class Clinic(Analysis, Serializable):
             varman.set_unified_variable(buf, buf)
             varman.set_variable_type(
                 buf,
-                SimTypeArray(SimTypeNum(8, signed=False), length=None).with_arch(self.project.arch),
+                SimTypeArray(SimTypeNum(8, signed=False), length=None),
                 mark_manual=True,
             )
             varman.array_length_exprs[buf] = size_load
@@ -4555,7 +4551,7 @@ class Clinic(Analysis, Serializable):
                 # merged into their least general common supertype. We ignore the result when the join degrades to a
                 # bottom type, i.e., the observations have no meaningful common supertype.
                 precise_types = [
-                    self._flatten_pointer_to_array(a).with_arch(self.project.arch)
+                    self._flatten_pointer_to_array(a)
                     for a in all_args
                     if isinstance(a, (SimTypePointer, SimStruct, SimTypeArray, SimCppClass))
                 ]
@@ -4586,7 +4582,7 @@ class Clinic(Analysis, Serializable):
                     label=func.prototype.label if func.prototype is not None else None,
                     arg_names=func.prototype.arg_names if func.prototype is not None else None,
                     variadic=func.prototype.variadic if func.prototype is not None else False,
-                ).with_arch(self.project.arch)
+                )
                 func.prototype = new_type
                 func.prototype_source = PrototypeSource.CALLSITE_DECOMPILER
 

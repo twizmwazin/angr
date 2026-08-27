@@ -709,7 +709,6 @@ class VariableRecoveryFast(ForwardAnalysis, VariableRecoveryBase):  # pylint:dis
             ty = SIM_TYPE_COLLECTIONS["cpp::std"].get(type_hint_str)
         except AngrMissingTypeError:
             return None
-        ty = ty.with_arch(self.project.arch)
         lifted = self.type_lifter.lift(ty)
         return None if isinstance(lifted, (BottomType, TopType)) else lifted
 

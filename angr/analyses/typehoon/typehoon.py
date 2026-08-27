@@ -121,8 +121,9 @@ class Typehoon(Analysis):
             if len(type_candidates) > 1:
                 types_by_size: dict[int, list[SimType]] = defaultdict(list)
                 for t in type_candidates:
-                    if t.size is not None:
-                        types_by_size[t.size].append(t)
+                    t_size = t.size(self.project.arch)
+                    if t_size is not None:
+                        types_by_size[t_size].append(t)
                 if not types_by_size:
                     # we only have BOT and TOP? damn
                     the_type = type_candidates[0]
@@ -140,7 +141,7 @@ class Typehoon(Analysis):
             )
 
     @staticmethod
-    def _flatten_pointer_to_array(ty: SimType, arch) -> SimType:
+    def _flatten_pointer_to_array(ty: SimType, arch) -> SimType:  # pylint:disable=unused-argument
         """
         Flatten a pointer-to-array type (``T(*)[N]``) into a pointer to the array's element type (``T*``).
 
@@ -150,7 +151,7 @@ class Typehoon(Analysis):
         pointer-to-array form.
         """
         while isinstance(ty, SimTypePointer) and isinstance(ty.pts_to, SimTypeArray):
-            ty = SimTypePointer(ty.pts_to.elem_type).with_arch(arch)
+            ty = SimTypePointer(ty.pts_to.elem_type)
         return ty
 
     def pp_constraints(self) -> None:

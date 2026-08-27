@@ -673,7 +673,7 @@ class TestCallingConventionAnalysis(unittest.TestCase):
             self._check_return_type_comprehensive(funcs, "ret_or_long", SimTypeLongLong)
 
             if "ret_ptr" in funcs and funcs["ret_ptr"].prototype:
-                ret_size = funcs["ret_ptr"].prototype.returnty.size
+                ret_size = funcs["ret_ptr"].prototype.returnty.size(proj.arch)
                 self.assertEqual(ret_size, 64)
 
     @cca_mode("fast")

@@ -262,25 +262,25 @@ class TestTranslator(unittest.TestCase):
 
     def test_simtype_to_sint32(self):
         """SimTypeInt(signed=True) should translate to SInt32."""
-        st = SimTypeInt(signed=True).with_arch(self.arch)
+        st = SimTypeInt(signed=True)
         tc = self.translator.simtype2tc(st)
         assert type(tc) is SInt32
 
     def test_simtype_to_uint32(self):
         """SimTypeInt(signed=False) should translate to UInt32."""
-        st = SimTypeInt(signed=False).with_arch(self.arch)
+        st = SimTypeInt(signed=False)
         tc = self.translator.simtype2tc(st)
         assert type(tc) is UInt32
 
     def test_simtype_to_sint64(self):
         """SimTypeLongLong(signed=True) should translate to SInt64."""
-        st = SimTypeLongLong(signed=True).with_arch(self.arch)
+        st = SimTypeLongLong(signed=True)
         tc = self.translator.simtype2tc(st)
         assert type(tc) is SInt64
 
     def test_simtype_to_uint64(self):
         """SimTypeLongLong(signed=False) should translate to UInt64."""
-        st = SimTypeLongLong(signed=False).with_arch(self.arch)
+        st = SimTypeLongLong(signed=False)
         tc = self.translator.simtype2tc(st)
         assert type(tc) is UInt64
 

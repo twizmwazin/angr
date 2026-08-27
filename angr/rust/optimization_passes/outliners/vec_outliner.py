@@ -46,9 +46,7 @@ class VecOutliner(OptimizationPass):
                         call,
                         RustSimTypeFunction(
                             args=[RustSimTypeReference(stmt.src.tags["type"])], returnty=None, is_arg0_retbuf=True
-                        )
-                        .with_arch(self.project.arch)
-                        .normalize(),
+                        ).normalize(),
                     )
                     call.bits = 3 * self.project.arch.bits
                     new_stmt = stmt.copy()

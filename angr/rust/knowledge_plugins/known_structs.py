@@ -19,15 +19,14 @@ class StructMatcher:
         arguments_ty = self.project.kb.known_structs.get("core::fmt::Arguments")
         if arguments_ty is None:
             return None
-        arguments_ty = arguments_ty.with_arch(self.project.arch)
-        offsets = arguments_ty.offsets
+        offsets = arguments_ty.offsets(self.project.arch)
         pieces_ptr_offset = offsets["pieces"]
         pieces_len_offset = pieces_ptr_offset + self.project.arch.bytes
         args_ptr_offset = offsets["args"]
         args_len_offset = args_ptr_offset + self.project.arch.bytes
         fmt_offset = offsets["fmt"]
         if (
-            max(fields) < arguments_ty.size // 8
+            max(fields) < arguments_ty.size(self.project.arch) // 8
             and pieces_ptr_offset in fields
             and pieces_len_offset in fields
             and args_ptr_offset in fields

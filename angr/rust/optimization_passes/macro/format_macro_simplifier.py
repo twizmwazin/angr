@@ -209,9 +209,10 @@ class FormatMacroSimplifier(OptimizationPass, CFAMixin, DFAMixin, SRDAMixin, SSA
             arg_values
             and arg_values[0] is not None
             and isinstance(arg_values[0], Struct)
-            and arg_values[0].size == len(arg_values) * argument_ty.size // self.project.arch.bytes
+            and arg_values[0].size == len(arg_values) * argument_ty.size(self.project.arch) // self.project.arch.bytes
             and all(
-                isinstance(field, VirtualVariable) and field.size == argument_ty.size // self.project.arch.bytes
+                isinstance(field, VirtualVariable)
+                and field.size == argument_ty.size(self.project.arch) // self.project.arch.bytes
                 for field in arg_values[0].fields.values()
             )
         ):
@@ -259,9 +260,9 @@ class FormatMacroSimplifier(OptimizationPass, CFAMixin, DFAMixin, SRDAMixin, SSA
         # Pattern-3: Argument(s) are stack-allocated and are not recovered yet
         stack_defs = self.collect_callsite_stack_defs(arguments_def_block)
         for arg in args.elements:
-            argument_ty_value_offset = argument_ty.get_field_offset("value", 0) if argument_ty else 0
+            argument_ty_value_offset = argument_ty.get_field_offset("value", self.project.arch, 0) if argument_ty else 0
             argument_ty_formatter_offset = (
-                argument_ty.get_field_offset("formatter", self.project.arch.bytes)
+                argument_ty.get_field_offset("formatter", self.project.arch, self.project.arch.bytes)
                 if argument_ty
                 else self.project.arch.bytes
             )
@@ -270,7 +271,7 @@ class FormatMacroSimplifier(OptimizationPass, CFAMixin, DFAMixin, SRDAMixin, SSA
             if (
                 value_def
                 and isinstance(value_def.data, Struct)
-                and value_def.data.size == argument_ty.size // self.project.arch.byte_width
+                and value_def.data.size == argument_ty.size(self.project.arch) // self.project.arch.byte_width
             ):
                 argument_structs.append(value_def.data)
                 stmts_to_remove[value_def.block].append(value_def.stmt)
@@ -335,10 +336,6 @@ class FormatMacroSimplifier(OptimizationPass, CFAMixin, DFAMixin, SRDAMixin, SSA
                         macro_name, fmt_str, returnty = self._select_macro(name, fmt_str)
                         if macro_name is None or fmt_str is None:
                             return None
-                        if returnty is not None:
-                            returnty = returnty.with_arch(  # pyright: ignore[reportAttributeAccessIssue]
-                                self.project.arch
-                            )
                         macro_args.insert(
                             0, StringLiteral(self.manager.next_atom(), fmt_str, self.project.arch.bits * 2)
                         )

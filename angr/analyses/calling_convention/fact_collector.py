@@ -664,7 +664,7 @@ class FactCollector(Analysis):
                         and not isinstance(func.prototype.returnty, SimTypeBottom)
                     ):
                         # assume the function overwrites the return variable
-                        returnty_size = func.prototype.returnty.with_arch(self.project.arch).size
+                        returnty_size = func.prototype.returnty.size(self.project.arch)
                         assert returnty_size is not None
                         retval_size = returnty_size // self.project.arch.byte_width
                         propagated_retval_sizes.append(retval_size)
@@ -696,7 +696,7 @@ class FactCollector(Analysis):
                                 proto = dereference_simtype_by_lib(proto, func_succ.prototype_libname)
 
                             assert isinstance(proto, SimTypeFunction) and proto.returnty is not None
-                            returnty_size = proto.returnty.with_arch(self.project.arch).size
+                            returnty_size = proto.returnty.size(self.project.arch)
                             if returnty_size is None:
                                 # it may be None if somehow we cannot resolve a SimTypeRef; we fall back to the full
                                 # machine word size

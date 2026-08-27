@@ -208,18 +208,18 @@ def rename_variable(
 
 def _parse_type(c_type: str | SimType, arch) -> SimType:
     if not isinstance(c_type, str):
-        return c_type.with_arch(arch)
+        return c_type
     try:
-        return parse_type(c_type).with_arch(arch)
+        return parse_type(c_type, arch=arch)
     except Exception as ex:  # pylint:disable=broad-exception-caught
         raise TypeParseError(f"Could not parse C type {c_type!r}: {ex}") from ex
 
 
 def _parse_prototype(prototype: str | SimTypeFunction, arch) -> SimTypeFunction:
     if not isinstance(prototype, str):
-        return prototype.with_arch(arch)
+        return prototype
     try:
-        return parse_signature(prototype).with_arch(arch)
+        return parse_signature(prototype, arch=arch)
     except Exception as ex:  # pylint:disable=broad-exception-caught
         raise TypeParseError(f"Could not parse C prototype {prototype!r}: {ex}") from ex
 
@@ -280,7 +280,7 @@ def _set_argument_type(
     args = list(new_proto.args)
     args[rv.arg_index] = new_type
     new_proto.args = tuple(args)
-    func.prototype = new_proto.with_arch(project.arch)
+    func.prototype = new_proto
     func.prototype_source = PrototypeSource.USER
     func.ran_cca = True
 

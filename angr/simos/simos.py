@@ -255,9 +255,7 @@ class SimOS:
         stack_base = kwargs.pop("stack_base", None)
         alloc_base = kwargs.pop("alloc_base", None)
         grow_like_stack = kwargs.pop("grow_like_stack", True)
-        prototype = angr.calling_conventions.SimCC.guess_prototype(args, kwargs.pop("prototype", None)).with_arch(
-            self.arch
-        )
+        prototype = angr.calling_conventions.SimCC.guess_prototype(args, kwargs.pop("prototype", None))
 
         if state is None:
             if stack_base is not None:

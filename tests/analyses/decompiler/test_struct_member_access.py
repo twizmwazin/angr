@@ -44,7 +44,7 @@ class TestStructMemberAccess(unittest.TestCase):
         foo_func.calling_convention = default_cc(
             proj.arch.name, platform=proj.simos.name if proj.simos is not None else None
         )(proj.arch)
-        foo_func.prototype = angr.types.parse_type("void (struct Outer *a)").with_arch(proj.arch)
+        foo_func.prototype = angr.types.parse_type("void (struct Outer *a)")
         foo_func.prototype.args[0].disposition = PointerDisposition.IN
 
         dec = proj.analyses.Decompiler(main_func, cfg=cfg)
@@ -109,14 +109,14 @@ class TestAccessOpaqueAggregate(unittest.TestCase):
         arch = archinfo.ArchX86()
         codegen = _MinimalCodegen(arch)
         opaque = SimCppClass(unique_name="Opaque", name="Opaque", members={}, size=32)
-        assert not opaque.with_arch(arch).offsets
+        assert not opaque.offsets(arch)
 
-        pointer = _TypedExpression(SimTypePointer(opaque).with_arch(arch), codegen)
-        index = _TypedExpression(SimTypeInt(signed=True).with_arch(arch), codegen)
+        pointer = _TypedExpression(SimTypePointer(opaque), codegen)
+        index = _TypedExpression(SimTypeInt(signed=True), codegen)
         summed = CBinaryOp("Add", pointer, index, codegen=codegen)
 
         # bails out to pointer arithmetic instead of raising
-        result = CStructuredCodeGenerator._access(codegen, summed, SimTypeInt(signed=True).with_arch(arch), False)
+        result = CStructuredCodeGenerator._access(codegen, summed, SimTypeInt(signed=True), False)
         assert isinstance(result, CExpression)
 
 

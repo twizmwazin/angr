@@ -214,7 +214,7 @@ class TestTypes(unittest.TestCase):
 
         byte = angr.types.parse_type("byte")
         assert isinstance(byte, SimTypeNum)
-        assert byte.size == 8
+        assert byte.size(archinfo.ArchAMD64()) == 8
         assert not byte.signed
 
     def test_self_referential_struct_or_union(self):
@@ -281,12 +281,6 @@ class TestTypes(unittest.TestCase):
         sig = fdef["f"]
         assert sig.arg_names == ("param_1", "param_2")
 
-        # Check that arg_names survive a with_arch call
-        nsig = sig.with_arch(archinfo.ArchAMD64())
-        assert sig.arg_names == nsig.arg_names, (
-            "Function type generated with .with_arch() doesn't have identical arg_names"
-        )
-
         # If for some reason only some of the parameters are named,
         # the list can only be partially not None, but has to match the positions
         fdef: dict[str, SimTypeFunction] = angr.types.parse_defns("int f(int param1, int);")
@@ -346,8 +340,9 @@ class TestTypes(unittest.TestCase):
         }"""
         ty = angr.types.parse_type(code)
         assert isinstance(ty, SimStruct)
-        ty = ty.with_arch(archinfo.ArchAArch64())
-        assert [(t.size, t.offset) for t in list(ty.fields.values())[1:-1]] == [  # type: ignore
+        arch = archinfo.ArchAArch64()
+        ty.offsets(arch)  # computing the layout fixes up the bit offsets of bitfield members
+        assert [(t.size(arch), t.offset) for t in list(ty.fields.values())[1:-1]] == [  # type: ignore
             (36, 0),
             (8, 4),
             (7, 4),
@@ -361,9 +356,10 @@ class TestTypes(unittest.TestCase):
         assert isinstance(variant_type, SimStruct)
         assert isinstance(variant_type.fields["Anonymous"], SimUnion)
         assert variant_type.fields["Anonymous"].members["Anonymous"].anonymous is True  # type: ignore
-        t = dereference_simtype(variant_type, [angr.SIM_TYPE_COLLECTIONS["win32"]]).with_arch(archinfo.ArchX86())
-        assert t.size is not None
-        assert t.size > 0  # an exception is raised if anonymous structs are not handled correctly
+        t = dereference_simtype(variant_type, [angr.SIM_TYPE_COLLECTIONS["win32"]])
+        t_size = t.size(archinfo.ArchX86())
+        assert t_size is not None
+        assert t_size > 0  # an exception is raised if anonymous structs are not handled correctly
 
     def test_win32_struct_type_declaration(self):
         t = angr.sim_type.parse_type("struct IMAGE_NT_HEADERS64*")
@@ -400,18 +396,17 @@ class TestTypes(unittest.TestCase):
             name="<anon>",
             label="None",
         )
-        union_type = union_type.with_arch(archinfo.ArchAMD64())
-        assert union_type.size == 8  # fall back to architecture word size
+        assert union_type.size(archinfo.ArchAMD64()) == 8  # fall back to architecture word size
 
     def test_widechar_extraction(self):
         proj = angr.load_shellcode(b"\x90\x90\x90\x90", arch="AMD64")
         state = proj.factory.blank_state()
         state.memory.store(0xC000_0000, b"a\x00b\x00c\x00D\x00E\x00\x00\x00")
 
-        wchar_t = SimTypeWideChar(endness=Endness.LE).with_arch(proj.arch)
+        wchar_t = SimTypeWideChar(endness=Endness.LE)
         assert wchar_t.extract(state, 0xC000_0000, concrete=True) == "a"
 
-        wchar_array = SimTypeArray(SimTypeWideChar(endness=Endness.LE), length=5).with_arch(proj.arch)
+        wchar_array = SimTypeArray(SimTypeWideChar(endness=Endness.LE), length=5)
         assert wchar_array.extract(state, 0xC000_0000, concrete=True) == ["a", "b", "c", "D", "E"]
 
     def test_serialize_recursive_types(self):
@@ -433,27 +428,21 @@ class TestTypes(unittest.TestCase):
 
         assert t0 == t1  # should not raise RecursionError
 
-    def test_simstruct_arch_memo_cache_leak(self):
-        # regression test: this bug is causing angr management to fail to display complex win32 types during
+    def test_simstruct_recursive_dereference(self):
+        # regression test: this bug was causing angr management to fail to display complex win32 types during
         # decompilation.
-        #
-        # during dereference_simtype(), SimStruct._arch_memo may leak to the parent SimStruct, causing with_arch() to
-        # return an incomplete archified SimStruct.
 
         angr.procedures.definitions.load_win32_type_collections()
         st = SimStruct({}, name="foobar")
-        # the leak from _arch_memo happens when dereference_simtype() processes st.fields["a"].pts_to, which pollutes
-        # st._arch_memo
         st.fields["a"] = SimTypePointer(st)
         st.fields["b"] = SimTypeRef("UNICODE_STRING", SimStruct)
 
-        st = st.with_arch(archinfo.ArchAMD64())
-
         st_deref = cast(SimStruct, dereference_simtype(st, [angr.SIM_TYPE_COLLECTIONS["win32"]]))
+        offsets = st_deref.offsets(archinfo.ArchAMD64())
         assert "a" in st_deref.fields
         assert "b" in st_deref.fields
-        assert "a" in st_deref.offsets
-        assert "b" in st_deref.offsets  # this assertion fails because st_deref.fields["b"] is a SimTypeRef
+        assert "a" in offsets
+        assert "b" in offsets  # this assertion fails if st_deref.fields["b"] is left as a SimTypeRef
 
 
 if __name__ == "__main__":

@@ -41,9 +41,7 @@ class RustTypeHintsAnalysis(Analysis):
                         if returnty:
                             self.project.kb.type_hints.add_type_hint(stmt.dst, returnty, self._func.addr)
                     elif isinstance(stmt.src, StringLiteral):
-                        self.project.kb.type_hints.add_type_hint(
-                            stmt.dst, RustSimTypeStrRef().with_arch(self.project.arch), self._func.addr
-                        )
+                        self.project.kb.type_hints.add_type_hint(stmt.dst, RustSimTypeStrRef(), self._func.addr)
 
 
 AnalysesHub.register_default("RustTypeHints", RustTypeHintsAnalysis)

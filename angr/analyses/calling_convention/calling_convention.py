@@ -174,9 +174,6 @@ class CallingConventionAnalysis(Analysis):
                 ' "callsite_block_addr" and "callsite_insn_addr" to only analyze a call site.'
             )
 
-        if self.prototype is not None:
-            self.prototype = self.prototype.with_arch(self.project.arch)
-
     def _analyze(self):
         """
         The major analysis routine.
@@ -824,11 +821,11 @@ class CallingConventionAnalysis(Analysis):
         }
 
         default_type_cls = SimTypeInt if self.project.arch.bits == 32 else SimTypeLongLong
-        arg_session = cc.arg_session(default_type_cls().with_arch(self.project.arch))
+        arg_session = cc.arg_session(default_type_cls())
         temp_args: list[SimFunctionArgument | None] = []
         expected_args: list[SimFunctionArgument] = []
         for _ in range(30):  # at most 30 arguments
-            arg_loc = cc.next_arg(arg_session, default_type_cls().with_arch(self.project.arch))
+            arg_loc = cc.next_arg(arg_session, default_type_cls())
             expected_args.append(arg_loc)
             if isinstance(arg_loc, SimRegArg):
                 reg_offset = self.project.arch.registers[arg_loc.reg_name][0]
@@ -869,7 +866,7 @@ class CallingConventionAnalysis(Analysis):
                     returnty = {32: SimTypeInt, 16: SimTypeShort, 64: SimTypeLongLong}.get(
                         self.project.arch.bits, SimTypeInt
                     )(signed=True)
-                    proto.returnty = returnty.with_arch(self.project.arch)
+                    proto.returnty = returnty
 
         if (
             update_arguments == UpdateArgumentsOption.AlwaysUpdate
@@ -877,8 +874,7 @@ class CallingConventionAnalysis(Analysis):
         ) and len({len(fact.args) for fact in facts}) == 1:
             fact = next(iter(facts))
             proto.args = tuple(
-                self._guess_arg_type(arg) if arg is not None else SimTypeInt().with_arch(self.project.arch)
-                for arg in fact.args
+                self._guess_arg_type(arg) if arg is not None else SimTypeInt() for arg in fact.args
             )
 
         return proto

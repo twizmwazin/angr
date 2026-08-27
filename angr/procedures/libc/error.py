@@ -50,7 +50,7 @@ class error(angr.SimProcedure):
         cc = angr.default_cc(
             self.arch.name, platform=self.project.simos.name if self.project.simos is not None else None
         )(self.arch)
-        ty = angr.sim_type.parse_signature("void x(int, int, char*)").with_arch(self.arch)
+        ty = angr.sim_type.parse_signature("void x(int, int, char*)")
         args = cc.get_args(state, ty)
         # Return None if we can't determine the status
         if not args[0].concrete:

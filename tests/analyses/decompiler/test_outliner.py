@@ -169,7 +169,7 @@ class TestOutliner(TestCase):
                     {"module_name": SimTypeArray(SimTypeWideChar(), 10), "api": SimTypeArray(SimTypeChar(), 10)}
                 )
                 final_state, _ = outliner.execute()
-                tt = t.with_arch(proj.arch)
+                tt = t
                 extracted = tt.extract(final_state, 0xC000_0000)
                 print(extracted)
 

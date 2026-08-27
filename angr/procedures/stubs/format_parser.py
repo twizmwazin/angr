@@ -93,9 +93,10 @@ class FormatString:
                     # ummmmmmm this is a cheap translation but I think it should work
                     i_val = va_arg("void*")
                     c_val = int(self.parser.state.solver.eval(i_val))
-                    c_val &= (1 << (fmt_spec.size * 8)) - 1
-                    if fmt_spec.signed and (c_val & (1 << ((fmt_spec.size * 8) - 1))):
-                        c_val -= 1 << fmt_spec.size * 8
+                    spec_size = fmt_spec.size(self.parser.state.arch)
+                    c_val &= (1 << (spec_size * 8)) - 1
+                    if fmt_spec.signed and (c_val & (1 << ((spec_size * 8) - 1))):
+                        c_val -= 1 << spec_size * 8
 
                     if fmt_spec.spec_type in (b"d", b"i") or fmt_spec.spec_type == b"u":
                         s_val = str(c_val)
@@ -152,7 +153,7 @@ class FormatString:
                     self.state.memory.store(va_arg("char*"), sdata)
                     num_args += 1
                 else:
-                    bits = component.size * 8
+                    bits = component.size(self.state.arch) * 8
                     if component.spec_type == b"x":
                         base = 16
                     elif component.spec_type == b"o":
@@ -296,9 +297,10 @@ class FormatString:
                     else:
                         raise SimProcedureError(f"unsupported format spec '{fmt_spec.spec_type}' in interpret")
 
-                    i = claripy.Extract(fmt_spec.size * 8 - 1, 0, i)
+                    spec_size = fmt_spec.size(self.parser.state.arch)
+                    i = claripy.Extract(spec_size * 8 - 1, 0, i)
                     self.parser.state.memory.store(
-                        dest, i, size=fmt_spec.size, endness=self.parser.state.arch.memory_endness
+                        dest, i, size=spec_size, endness=self.parser.state.arch.memory_endness
                     )
 
                 num_args += 1
@@ -342,10 +344,10 @@ class FormatSpecifier:
     def signed(self):
         return getattr(self.ty, "size", False)
 
-    @property
-    def size(self):
-        assert self.ty.size is not None
-        return self.ty.size // 8
+    def size(self, arch):
+        ty_size = self.ty.size(arch)
+        assert ty_size is not None
+        return ty_size // 8
 
     @property
     def spec_type(self):
@@ -523,11 +525,7 @@ class FormatParser(SimProcedure):
                 nugget = nugget[: len(spec)]
                 original_nugget = original_nugget[: (length_spec_str_len + len(spec))]
                 nugtype: SimType = all_spec[nugget]
-                try:
-                    typeobj = nugtype.with_arch(self.arch)
-                except Exception as err:
-                    raise SimProcedureError(f"format specifier uses unknown type '{nugtype!r}'") from err
-                return FormatSpecifier(original_nugget, length_spec, pad_chr, typeobj)
+                return FormatSpecifier(original_nugget, length_spec, pad_chr, nugtype)
 
         return None
 

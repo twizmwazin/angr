@@ -324,7 +324,7 @@ class SimLibrary:
         if (proc.cc is None or proc.cc.arch != arch) and arch.name in self.fallback_cc:
             proc.cc = self.fallback_cc[arch.name]["Linux"](arch)
         if self.has_prototype(proc.display_name):
-            proc.prototype = self.get_prototype(proc.display_name, deref=True).with_arch(arch)  # type: ignore
+            proc.prototype = self.get_prototype(proc.display_name, deref=True)  # type: ignore
             proc.guessed_prototype = False
             if proc.prototype.arg_names is None:
                 # Use inspect to extract the parameters from the run python function
@@ -367,12 +367,11 @@ class SimLibrary:
         self._apply_metadata(proc, arch)
         return proc
 
-    def get_prototype(self, name: str, arch=None, deref: bool = False) -> SimTypeFunction | None:
+    def get_prototype(self, name: str, deref: bool = False) -> SimTypeFunction | None:
         """
-        Get a prototype of the given function name, optionally specialize the prototype to a given architecture.
+        Get a prototype of the given function name.
 
         :param name:    Name of the function.
-        :param arch:    The architecture to specialize to.
         :param deref:   True if any SimTypeRefs in the prototype should be dereferenced using library information.
         :return:        Prototype of the function, or None if the prototype does not exist.
         """
@@ -401,8 +400,6 @@ class SimLibrary:
 
             proto = dereference_simtype_by_lib(proto, self.name)
             assert isinstance(proto, SimTypeFunction)
-        if arch is not None:
-            return proto.with_arch(arch)
         return proto
 
     def has_metadata(self, name):
@@ -509,24 +506,21 @@ class SimCppLibrary(SimLibrary):
             # mangled function name
             stub.prototype = self._proto_from_demangled_name(demangled_name)
             if stub.prototype is not None:
-                stub.prototype = stub.prototype.with_arch(arch)
                 stub.guessed_prototype = False
                 if not stub.ARGS_MISMATCH:
                     stub.num_args = len(stub.prototype.args)
         return stub
 
-    def get_prototype(self, name: str, arch=None, deref: bool = False) -> SimTypeFunction | None:
+    def get_prototype(self, name: str, deref: bool = False) -> SimTypeFunction | None:
         """
-        Get a prototype of the given function name, optionally specialize the prototype to a given architecture. The
-        function name will be demangled first.
+        Get a prototype of the given function name. The function name will be demangled first.
 
         :param name:    Name of the function.
-        :param arch:    The architecture to specialize to.
         :param deref:   True if any SimTypeRefs in the prototype should be dereferenced using library information.
         :return:        Prototype of the function, or None if the prototype does not exist.
         """
         demangled_name = self._try_demangle(name)
-        return super().get_prototype(demangled_name, arch=arch, deref=deref)
+        return super().get_prototype(demangled_name, deref=deref)
 
     def has_metadata(self, name):
         """
@@ -693,7 +687,7 @@ class SimSyscallLibrary(SimLibrary):
             proc.guessed_prototype = False
             proto = self.get_prototype(abi, name, deref=True)
             assert proto is not None
-            proc.prototype = proto.with_arch(arch)
+            proc.prototype = proto
 
     def add_alias(self, name, *alt_names):
         """
@@ -758,15 +752,13 @@ class SimSyscallLibrary(SimLibrary):
         return proc
 
     def get_prototype(  # type: ignore
-        self, abi: str, name: str, arch=None, deref: bool = False
+        self, abi: str, name: str, deref: bool = False
     ) -> SimTypeFunction | None:
         """
-        Get a prototype of the given syscall name and its ABI, optionally specialize the prototype to a given
-        architecture.
+        Get a prototype of the given syscall name and its ABI.
 
         :param abi:     ABI of the prototype to get.
         :param name:    Name of the syscall.
-        :param arch:    The architecture to specialize to.
         :param deref:   True if any SimTypeRefs in the prototype should be dereferenced using library information.
         :return:        Prototype of the syscall, or None if the prototype does not exist.
         """
@@ -780,7 +772,7 @@ class SimSyscallLibrary(SimLibrary):
 
             proto = dereference_simtype_by_lib(proto, self.name)
             assert isinstance(proto, SimTypeFunction)
-        return proto.with_arch(arch=arch)
+        return proto
 
     def has_metadata(self, number, arch, abi_list=()):  # type: ignore
         """

@@ -106,7 +106,7 @@ class TestDecompilationWorkflows(unittest.TestCase):
         assert isinstance(t, TypeRef)
         assert len(t.type.fields) == 2
         assert "field_120" in t.type.fields
-        t.type.fields["field_120"] = SimTypeInt(signed=True).with_arch(proj.arch)
+        t.type.fields["field_120"] = SimTypeInt(signed=True)
 
         # decompile again, using decompilation cache
         dec_2 = proj.analyses.Decompiler(func, cfg=proj.kb.cfgs["CFGFast"])

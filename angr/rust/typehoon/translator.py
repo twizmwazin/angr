@@ -40,35 +40,35 @@ class RustTypeTranslator(TypeTranslator):
 
     def _translate_Pointer64(self, tc):
         if isinstance(tc.basetype, typeconsts.BottomType):
-            internal = sim_type.SimTypeBottom(label="void").with_arch(self.arch)
+            internal = sim_type.SimTypeBottom(label="void")
         else:
             internal = self._tc2simtype(tc.basetype)
-        return RustSimTypeReference(internal).with_arch(self.arch)
+        return RustSimTypeReference(internal)
 
     def _translate_Pointer32(self, tc):
         return self._translate_Pointer64(tc)
 
     def _translate_Int8(self, tc):  # type: ignore[override]
-        return RustSimTypeInt(size=8, signed=False).with_arch(self.arch)
+        return RustSimTypeInt(size=8, signed=False)
 
     def _translate_Int16(self, tc):  # type: ignore[override]
-        return RustSimTypeInt(size=16, signed=False).with_arch(self.arch)
+        return RustSimTypeInt(size=16, signed=False)
 
     def _translate_Int32(self, tc):
-        return RustSimTypeInt(size=32, signed=False).with_arch(self.arch)
+        return RustSimTypeInt(size=32, signed=False)
 
     def _translate_Int64(self, tc):  # type: ignore[override]
-        return RustSimTypeInt(size=64, signed=False).with_arch(self.arch)
+        return RustSimTypeInt(size=64, signed=False)
 
     def _translate_Int128(self, tc):  # type: ignore[override]
-        return RustSimTypeInt(size=128, signed=False).with_arch(self.arch)
+        return RustSimTypeInt(size=128, signed=False)
 
     def _translate_IntVar(self, tc: IntVar):
-        return RustSimTypeInt(size=tc.size, signed=False).with_arch(self.arch)
+        return RustSimTypeInt(size=tc.size, signed=False)
 
     def _translate_Array(self, tc: typeconsts.Array):
         elem_type = self._tc2simtype(tc.element)
-        return RustSimTypeArray(elem_type, tc.count).with_arch(self.arch)
+        return RustSimTypeArray(elem_type, tc.count)
 
     def _translate_Struct(self, tc):
         if tc in self.structs:
@@ -76,7 +76,7 @@ class RustTypeTranslator(TypeTranslator):
 
         name = tc.name or self.struct_name()
 
-        s = RustSimStruct({}, name=name).with_arch(self.arch)
+        s = RustSimStruct({}, name=name)
         self.structs[tc] = s
 
         next_offset = 0
@@ -86,13 +86,13 @@ class RustTypeTranslator(TypeTranslator):
                 # If struct's name is known, do not pad
                 padding_size = offset - next_offset
                 s.fields[f"padding_{next_offset}"] = RustSimTypeArray(
-                    RustSimTypeInt(size=8, signed=False).with_arch(self.arch), padding_size
-                ).with_arch(self.arch)
+                    RustSimTypeInt(size=8, signed=False), padding_size
+                )
 
             translated_type = self._tc2simtype(typ)
 
             if isinstance(translated_type, sim_type.SimTypeBottom):
-                translated_type = RustSimTypeInt(self.arch.bytes * self.arch.byte_width).with_arch(self.arch)
+                translated_type = RustSimTypeInt(self.arch.bytes * self.arch.byte_width)
 
             field_name = f"field_{offset:x}"
             if tc.field_names and offset in tc.field_names:
@@ -102,7 +102,7 @@ class RustTypeTranslator(TypeTranslator):
             if isinstance(translated_type, RustSimTypeTempRef):
                 next_offset = self.arch.bytes + offset
             else:
-                next_offset = (translated_type.size or 0) // self.arch.byte_width + offset
+                next_offset = (translated_type.size(self.arch) or 0) // self.arch.byte_width + offset
 
         return s
 
@@ -121,7 +121,7 @@ class RustTypeTranslator(TypeTranslator):
             err_variant.discriminant,
             err_variant.discriminant_size,
             name=tc.name,
-        ).with_arch(self.arch)
+        )
 
     def _translate_Option(self, tc: typeconsts.RustEnum):
         none_variant = tc.get_variant("None")
@@ -136,7 +136,7 @@ class RustTypeTranslator(TypeTranslator):
             some_variant.discriminant,
             some_variant.discriminant_size,
             name=tc.name,
-        ).with_arch(self.arch)
+        )
 
     def _translate_RustEnum(self, tc: typeconsts.RustEnum):
         name = tc.name or f"enum_{tc.size}"
@@ -155,16 +155,16 @@ class RustTypeTranslator(TypeTranslator):
                 )
                 for variant in tc.variants
             ],
-        ).with_arch(self.arch)
+        )
 
     def _tc2simtype(self, tc):
         if tc is None:
-            return sim_type.SimTypeBottom().with_arch(self.arch)
+            return sim_type.SimTypeBottom()
 
         try:
             handler = RustTypeConstHandlers[tc.__class__]
         except KeyError:
-            return sim_type.SimTypeBottom().with_arch(self.arch)
+            return sim_type.SimTypeBottom()
 
         return handler(self, tc)
 
@@ -182,18 +182,19 @@ class RustTypeTranslator(TypeTranslator):
             # fall back to parent for non-Rust types
             return super()._simtype2tc(simtype)
 
-    def _translate_RustSimTypeInt(self, ty: RustSimTypeInt):  # pylint: disable=no-self-use
-        if ty.size == 8:
+    def _translate_RustSimTypeInt(self, ty: RustSimTypeInt):
+        size = ty.size(self.arch)
+        if size == 8:
             return typeconsts.Int8()
-        if ty.size == 16:
+        if size == 16:
             return typeconsts.Int16()
-        if ty.size == 32:
+        if size == 32:
             return typeconsts.Int32()
-        if ty.size == 64:
+        if size == 64:
             return typeconsts.Int64()
-        if ty.size == 128:
+        if size == 128:
             return typeconsts.Int128()
-        return IntVar(size=ty.size)
+        return IntVar(size=size)
 
     def _translate_RustSimStruct(self, ty: RustSimStruct) -> TypeConstant | typeconsts.BottomType:
         if ty in self.memo:
@@ -203,7 +204,7 @@ class RustTypeTranslator(TypeTranslator):
         self.memo[ty] = obj
         converted_fields = {}
         field_names = {}
-        ty_offsets = ty.offsets
+        ty_offsets = ty.offsets(self.arch)
         for field_name, simtype in ty.fields.items():
             if field_name not in ty_offsets:
                 return typeconsts.BottomType()
@@ -224,7 +225,7 @@ class RustTypeTranslator(TypeTranslator):
             [(self.simtype2tc(field_ty), field_name) for field_ty, field_name in variant.fields],
             variant.discriminant,
             variant.discriminant_size,
-            variant.size,
+            variant.size(self.arch),
         )
 
     def _translate_RustSimTypeReference(self, ty: RustSimTypeReference):
@@ -245,7 +246,7 @@ class RustTypeTranslator(TypeTranslator):
         if isinstance(simtype, RustSimType):
             return simtype
         if isinstance(simtype, SimTypeNum):
-            simtype = RustSimTypeInt(size=simtype.size, signed=simtype.signed).with_arch(self.arch)
+            simtype = RustSimTypeInt(size=simtype.size(self.arch), signed=simtype.signed)
         tc = self.simtype2tc(simtype)
         return self.tc2simtype(tc)[0]
 

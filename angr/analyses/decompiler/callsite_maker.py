@@ -182,7 +182,9 @@ class CallSiteMaker:
                     if not isinstance(arg_loc.ptr_loc, (SimRegArg, SimStackArg)):
                         raise NotImplementedError("Why would a calling convention produce this?")
                     if isinstance(arg_loc.main_loc, SimStructArg):
-                        dereference_size = arg_loc.main_loc.struct.size // self.project.arch.byte_width
+                        dereference_size = (
+                            arg_loc.main_loc.struct.size(self.project.arch) // self.project.arch.byte_width
+                        )
                     else:
                         dereference_size = arg_loc.main_loc.size
                     arg_loc = arg_loc.ptr_loc
@@ -378,7 +380,7 @@ class CallSiteMaker:
             and not isinstance(ret_expr, Expr.VirtualVariable)
         ):
             # try to narrow the non-float return expression if needed
-            ret_type_bits = prototype.returnty.with_arch(self.project.arch).size
+            ret_type_bits = prototype.returnty.size(self.project.arch)
             if ret_type_bits is not None and ret_expr.bits > ret_type_bits:
                 ret_expr = ret_expr.copy()
                 ret_expr.bits = ret_type_bits

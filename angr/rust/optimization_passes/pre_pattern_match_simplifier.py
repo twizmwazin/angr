@@ -254,9 +254,10 @@ class PrePatternMatchSimplifier(OptimizationPass, ReturnDuplicatorBase, DFAMixin
                 src_vvar = stack_def.data
             if isinstance(src_vvar, VirtualVariable) and src_vvar.was_stack:
                 src_to_dst_and_stack_def[src_vvar.stack_offset] = (dst, stack_def)
-        expected_src_offset = scrutinee.stack_offset + variant.first_field_offset
+        arch = self.project.arch
+        expected_src_offset = scrutinee.stack_offset + variant.first_field_offset(arch)
         expected_dst_offset = None
-        expected_size = variant.size - variant.first_field_offset
+        expected_size = variant.size(arch) - variant.first_field_offset(arch)
         cur_size = 0
         move_stmts = []
         while expected_src_offset in src_to_dst_and_stack_def and cur_size < expected_size:

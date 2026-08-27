@@ -53,8 +53,8 @@ class SimDebugVariable:
         size = self.type.byte_size * arch.byte_width
         name = self.type.name
         if name in ALL_TYPES:
-            sim_type = ALL_TYPES[name].with_arch(arch)
-            assert size == sim_type.size
+            sim_type = ALL_TYPES[name]
+            assert size == sim_type.size(arch)
         else:
             # FIXME A lot more types are supported by angr that are not in ALL_TYPES (structs, arrays, pointers)
             # Use a fallback type

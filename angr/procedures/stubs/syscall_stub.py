@@ -12,7 +12,7 @@ class syscall(angr.SimProcedure):
             self.successors.artifacts["resolves"] = resolves
 
         # code duplicated from ReturnUnconstrained
-        size = self.prototype.returnty.size
+        size = self.prototype.returnty.size(self.arch)
         if size is None:
             return None
         return self.state.solver.Unconstrained(

@@ -43,9 +43,7 @@ class AMD64DirtyRewriter(DirtyRewriterBase):
                 )
                 variable_map_of(self.manager).set_prototype(
                     call,
-                    sim_type.SimTypeFunction(
-                        [self._inout_intrinsic_type(16)], self._inout_intrinsic_type(bits)
-                    ).with_arch(self.arch),
+                    sim_type.SimTypeFunction([self._inout_intrinsic_type(16)], self._inout_intrinsic_type(bits)),
                 )
                 return call
             case "amd64g_dirtyhelper_OUT":
@@ -66,7 +64,7 @@ class AMD64DirtyRewriter(DirtyRewriterBase):
                     call,
                     sim_type.SimTypeFunction(
                         [self._inout_intrinsic_type(16), self._inout_intrinsic_type(bits)], sim_type.SimTypeBottom()
-                    ).with_arch(self.arch),
+                    ),
                 )
                 return call
         return None

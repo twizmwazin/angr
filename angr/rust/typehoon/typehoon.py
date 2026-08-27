@@ -78,12 +78,12 @@ class RustTypehoon(Typehoon):
             # determine the best type - this logic can be made better!
             if not type_candidates:
                 continue
-            type_candidates = [t.with_arch(self.project.arch) for t in type_candidates]
             if len(type_candidates) > 1:
                 types_by_size: dict[int, list[SimType]] = defaultdict(list)
                 for t in type_candidates:
-                    if t.size is not None:
-                        types_by_size[t.size].append(t)
+                    t_size = t.size(self.project.arch)
+                    if t_size is not None:
+                        types_by_size[t_size].append(t)
                 if not types_by_size:
                     # we only have BOT and TOP? damn
                     the_type = type_candidates[0]
@@ -94,9 +94,7 @@ class RustTypehoon(Typehoon):
                 the_type = type_candidates[0]
 
             if isinstance(the_type, SimTypeBottom) and var.size is not None:
-                the_type = RustSimTypeInt(signed=False, size=var.size * self.project.arch.byte_width).with_arch(
-                    self.project.arch
-                )
+                the_type = RustSimTypeInt(signed=False, size=var.size * self.project.arch.byte_width)
 
             if func_addr != "global":
                 the_type = self._flatten_pointer_to_array(the_type, self.project.arch)

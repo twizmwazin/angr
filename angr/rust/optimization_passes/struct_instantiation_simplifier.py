@@ -35,12 +35,15 @@ class StructBuilder:
         self._arch = context.project.arch
 
     def _resolve_field(self, struct_ty, offset):
-        offsets = struct_ty.offsets
+        offsets = struct_ty.offsets(self._arch)
         for name, field_ty in struct_ty.fields.items():
             field_offset = offsets[name]
-            if offset == field_offset and field_ty.size > 0:
+            if offset == field_offset and field_ty.size(self._arch) > 0:
                 return name, field_ty
-            if isinstance(field_ty, RustSimStruct) and offsets[name] < offset < offsets[name] + field_ty.size // 8:
+            if (
+                isinstance(field_ty, RustSimStruct)
+                and offsets[name] < offset < offsets[name] + field_ty.size(self._arch) // 8
+            ):
                 return self._resolve_field(field_ty, offset - field_offset)
         return None, None
 
@@ -83,12 +86,12 @@ class StructBuilder:
         for offset in field_exprs:
             expr = field_exprs[offset]
             _, field_ty = self._resolve_field(struct_ty, offset)
-            if field_ty and expr.size > field_ty.size // 8:
-                new_expr, leftover = self._truncate(expr, field_ty.size)
+            if field_ty and expr.size > field_ty.size(self._arch) // 8:
+                new_expr, leftover = self._truncate(expr, field_ty.size(self._arch))
                 if new_expr is None:
                     return field_exprs
                 fixed_field_exprs[offset] = new_expr
-                fixed_field_exprs[offset + field_ty.size // 8] = leftover
+                fixed_field_exprs[offset + field_ty.size(self._arch) // 8] = leftover
             else:
                 fixed_field_exprs[offset] = expr
         return fixed_field_exprs
@@ -102,8 +105,9 @@ class StructBuilder:
         return rebased_field_exprs
 
     def _build_array(self, field_exprs, struct_ty: RustSimTypeSlice) -> Array | None:
-        ptr_offset = struct_ty.offsets["data_ptr"]
-        len_offset = struct_ty.offsets["length"]
+        struct_ty_offsets = struct_ty.offsets(self._arch)
+        ptr_offset = struct_ty_offsets["data_ptr"]
+        len_offset = struct_ty_offsets["length"]
         if ptr_offset not in field_exprs or len_offset not in field_exprs:
             return None
         elements = []
@@ -114,13 +118,16 @@ class StructBuilder:
             if isinstance(ptr_expr, Const):
                 for i in range(len_expr.value_int):
                     ele_expr = ptr_expr.copy()
-                    ele_expr.value = ptr_expr.value + ele_ty.size // 8 * i
+                    ele_expr.value = ptr_expr.value + ele_ty.size(self._arch) // 8 * i
                     ele_expr.tags["type"] = ele_ty
                     elements.append(ele_expr)
             elif vvar := unwrap_stack_vvar_reference(ptr_expr):
                 for i in range(len_expr.value_int):
                     ele_expr = self.context.new_stack_vvar(
-                        vvar.stack_offset + i * (ele_ty.size // 8), ele_ty.size, vvar.tags, record=False
+                        vvar.stack_offset + i * (ele_ty.size(self._arch) // 8),
+                        ele_ty.size(self._arch),
+                        vvar.tags,
+                        record=False,
                     )
                     # Looking for nested structs or struct references
                     if isinstance(ele_ty, RustSimTypeReference) and isinstance(ele_ty.pts_to, RustSimStruct):
@@ -130,7 +137,7 @@ class StructBuilder:
                     elements.append(ele_expr)
             else:
                 return None
-            return Array(0, elements, struct_ty.size)
+            return Array(0, elements, struct_ty.size(self._arch))
         return None
 
     def build(self, field_exprs, struct_ty) -> Struct | Array | None:
@@ -143,11 +150,12 @@ class StructBuilder:
             if array:
                 return array
         fields = {}
+        struct_ty_offsets = struct_ty.offsets(self._arch)
         for field_name, field_ty in struct_ty.fields.items():
-            field_offset = struct_ty.offsets[field_name]
+            field_offset = struct_ty_offsets[field_name]
             # Workaround: treat enum as struct
             if isinstance(field_ty, RustSimEnum) and not isinstance(field_ty, (RustSimTypeOption, RustSimTypeResult)):
-                field_ty = field_ty.as_struct_ty()
+                field_ty = field_ty.as_struct_ty(self._arch)
             if isinstance(field_ty, RustSimStruct):
                 field_struct = self.build(self._rebase_field_exprs(field_exprs, field_offset), field_ty)
                 if field_struct is None:
@@ -157,7 +165,7 @@ class StructBuilder:
                 if field_offset in field_exprs:
                     fields[field_offset] = field_exprs[field_offset]
         fields = OrderedDict(sorted(fields.items(), key=lambda t: t[0]))
-        return Struct(0, struct_ty.name, fields, struct_ty.offsets, struct_ty.size)
+        return Struct(0, struct_ty.name, fields, struct_ty_offsets, struct_ty.size(self._arch))
 
 
 class StructInstantiationSimplifier(OptimizationPass, SRDAMixin, CFAMixin, DFAMixin, SSAVariableMixin):
@@ -251,7 +259,7 @@ class StructInstantiationSimplifier(OptimizationPass, SRDAMixin, CFAMixin, DFAMi
         used_defs = []
         for offset, stack_def in stack_defs.items():
             offset = offset - vvar.stack_offset
-            if 0 <= offset < struct_ty.size // self.project.arch.bytes:
+            if 0 <= offset < struct_ty.size(self.project.arch) // self.project.arch.bytes:
                 fields[offset] = stack_def.data
                 used_defs.append(stack_def)
 
@@ -281,18 +289,18 @@ class StructInstantiationSimplifier(OptimizationPass, SRDAMixin, CFAMixin, DFAMi
 
     def _build_struct_ty(self, fields):
         if not fields:
-            return RustSimTypeUnit().with_arch(self.project.arch)
+            return RustSimTypeUnit()
         ty_fields = {}
         for offset in sorted(fields.keys()):
             expr = fields[offset]
             arg_ty = RustSimTypeInt(expr.bits, signed=False)
-            cur_size = RustSimStruct(ty_fields).with_arch(self.project.arch).size // self.project.arch.bytes
+            cur_size = RustSimStruct(ty_fields).size(self.project.arch) // self.project.arch.bytes
             if cur_size < offset:
                 ty_fields[f"padding_{cur_size}"] = RustSimTypeInt(offset - cur_size, signed=False)
             ty_fields[f"field_{offset}"] = arg_ty
-        struct_ty = RustSimStruct(ty_fields).with_arch(self.project.arch)
-        struct_ty.name = f"struct{struct_ty.size // 8}"
-        return struct_ty.with_arch(self.project.arch)
+        struct_ty = RustSimStruct(ty_fields)
+        struct_ty.name = f"struct{struct_ty.size(self.project.arch) // 8}"
+        return struct_ty
 
     def _try_build_struct_instantiation(self, sorted_stmts):
         if (
@@ -310,7 +318,13 @@ class StructInstantiationSimplifier(OptimizationPass, SRDAMixin, CFAMixin, DFAMi
                 else:
                     return None, None
             struct_ty = self._build_struct_ty(fields)
-            struct = Struct(self.manager.next_atom(), struct_ty.name, fields, struct_ty.offsets, struct_ty.size)
+            struct = Struct(
+                self.manager.next_atom(),
+                struct_ty.name,
+                fields,
+                struct_ty.offsets(self.project.arch),
+                struct_ty.size(self.project.arch),
+            )
             return struct_ty, struct
         return None, None
 
@@ -368,7 +382,7 @@ class StructInstantiationSimplifier(OptimizationPass, SRDAMixin, CFAMixin, DFAMi
                 cur_offset = 0
                 for arg_ty in prototype.args:
                     offset_to_arg_ty[cur_offset] = arg_ty
-                    cur_offset += (arg_ty.size or 0) // self.project.arch.bytes
+                    cur_offset += (arg_ty.size(self.project.arch) or 0) // self.project.arch.bytes
                 cur_offset = 0
                 while args:
                     arg = args.pop(0)
@@ -436,11 +450,11 @@ class StructInstantiationSimplifier(OptimizationPass, SRDAMixin, CFAMixin, DFAMi
                     cur_offset = 0
                     for arg_ty in call_prototype.args:
                         offset_to_arg_ty[cur_offset] = arg_ty
-                        cur_offset += (arg_ty.size or 0) // 8
+                        cur_offset += (arg_ty.size(self.project.arch) or 0) // 8
                     for offset in set(offset_to_arg) & set(offset_to_arg_ty):
                         arg = offset_to_arg[offset]
                         arg_ty = offset_to_arg_ty[offset]
-                        if arg.size == arg_ty.size // self.project.arch.bytes:
+                        if arg.size == arg_ty.size(self.project.arch) // self.project.arch.bytes:
                             if isinstance(arg_ty, RustSimTypeReference):
                                 arg_ty = arg_ty.pts_to
                             if (vvar := unwrap_stack_vvar_reference(arg)) and isinstance(arg_ty, RustSimStruct):

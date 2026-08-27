@@ -133,8 +133,9 @@ class UnwrapOutliner(OptimizationPass, CFAMixin, SRDAMixin, DFAMixin, CFGTransfo
                     ):
                         variant = enum_ty.get_variant_by_name("Some")
                     if variant and cmp_vvar.was_stack:
-                        offset = cmp_vvar.stack_offset + variant.first_field_offset
-                        size = variant.size - variant.first_field_offset
+                        arch = self.project.arch
+                        offset = cmp_vvar.stack_offset + variant.first_field_offset(arch)
+                        size = variant.size(arch) - variant.first_field_offset(arch)
                         dst_vvar = self.new_stack_vvar(offset, size * 8, cmp_vvar.tags)
                         unwrap_func_name = UNWRAP_FUNCTIONS[unwrap_failed_func_name]
                         _, second_block = self.split_block(pred, last_stmt)
@@ -148,8 +149,7 @@ class UnwrapOutliner(OptimizationPass, CFAMixin, SRDAMixin, DFAMixin, CFGTransfo
                         )
                         replacement_prototype = RustSimTypeFunction(
                             args=[RustSimTypeInt(cmp_vvar.bits)], returnty=variant.type
-                        ).with_arch(self.project.arch)
-                        replacement_prototype.returnty = variant.type.with_arch(self.project.arch)
+                        )
                         vm.set_prototype(replacement, replacement_prototype)
                         replacement.bits = dst_vvar.bits
                         if second_block is not None:
@@ -170,9 +170,7 @@ class UnwrapOutliner(OptimizationPass, CFAMixin, SRDAMixin, DFAMixin, CFGTransfo
                 )
                 vm.set_prototype(
                     replacement,
-                    RustSimTypeFunction(args=[RustSimTypeInt(cmp_vvar.bits)], returnty=None).with_arch(
-                        self.project.arch
-                    ),
+                    RustSimTypeFunction(args=[RustSimTypeInt(cmp_vvar.bits)], returnty=None),
                 )
                 if second_block is not None:
                     second_block.statements[-1] = SideEffectStatement(

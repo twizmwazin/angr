@@ -307,18 +307,14 @@ class ParseContext:
         return self._cfuncall_config.get(node_id, (True, True))
 
     def resolve_type(self, ref: int) -> SimType | None:
-        """Resolve a type-pool ref (index+1; 0 means absent) into a fresh SimType instance, arch-bound so it can
-        report its size when re-rendered."""
+        """Resolve a type-pool ref (index+1; 0 means absent) into a fresh SimType instance."""
         if ref == 0:
             return None
         loaded = self._type_json_cache.get(ref)
         if loaded is None:
             loaded = json.loads(self._type_pool[ref - 1])
             self._type_json_cache[ref] = loaded
-        ty = SimType.from_json(loaded)
-        if self.project is not None:
-            ty = ty.with_arch(self.project.arch)
-        return ty
+        return SimType.from_json(loaded)
 
     def resolve_simvar(self, ref: int) -> SimVariable | None:
         """Resolve a simvar-pool ref (index+1; 0 means absent) into a fresh SimVariable instance."""

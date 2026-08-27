@@ -63,10 +63,8 @@ class TestFunction(unittest.TestCase):
         # Check prototype of function
         assert func_main.prototype is not None
         assert func_main.prototype.args == (
-            angr.types.SimTypeInt().with_arch(p.arch),
-            angr.types.SimTypePointer(angr.types.SimTypePointer(angr.types.SimTypeChar()).with_arch(p.arch)).with_arch(
-                p.arch
-            ),
+            angr.types.SimTypeInt(),
+            angr.types.SimTypePointer(angr.types.SimTypePointer(angr.types.SimTypeChar())),
         )
         # Check that the default calling convention of the architecture was applied
         assert isinstance(func_main.calling_convention, angr.calling_conventions.DefaultCC[p.arch.name]["Linux"])

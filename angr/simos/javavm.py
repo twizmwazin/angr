@@ -260,9 +260,10 @@ class SimJavaVM(SimOS):
                     args = (*args[:idx], SootArgument(upper, "int"), SootArgument(lower, "int"), *args[idx + 1 :])
                     native_arg_values += [upper, lower]
                     continue
-                if type(arg.value) is BV and len(arg.value) > arg_ty.size:
+                arg_ty_size = arg_ty.size(self.native_arch)
+                if type(arg.value) is BV and len(arg.value) > arg_ty_size:
                     # hack??? all small primitives are passed around as 32bit but cc won't like that
-                    native_arg_value = native_arg_value[arg_ty.size - 1 : 0]
+                    native_arg_value = native_arg_value[arg_ty_size - 1 : 0]
             else:
                 # argument has a relative type
                 # => map Java reference to an opaque reference, which the native code

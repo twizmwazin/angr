@@ -150,7 +150,7 @@ class InlinedMemsetSimplifier(OptimizationPass):
                         **ref_stmt.tags,
                     )
                     variable_map_of(self.manager).set_prototype(
-                        call, SIM_LIBRARIES["libc.so"][0].get_prototype("memset", arch=self.project.arch)
+                        call, SIM_LIBRARIES["libc.so"][0].get_prototype("memset")
                     )
                     call_stmt = SideEffectStatement(
                         self.manager.next_atom(),

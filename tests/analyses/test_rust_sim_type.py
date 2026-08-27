@@ -43,34 +43,28 @@ def _blank_type_db_loader() -> TypeDBLoader:
 
 
 class TestRustSimType(unittest.TestCase):
-    def test_with_arch_never_strips_an_existing_arch(self):
-        # Function.prototype's setter copies arch-less prototypes, and copy() ends in with_arch(self._arch);
-        # rebuilding there instead of returning self strips the arch off every argument
+    def test_prototype_copy_preserves_args(self):
+        # Function.prototype's setter copies prototypes; copy() must not rebuild or lose the argument types
         arch = archinfo.ArchAMD64()
-        u64 = RustSimTypeInt(64, signed=False).with_arch(arch)
-        ok_ty = RustSimStruct(OrderedDict({"field_0": u64}), name="struct8", pack=True).with_arch(arch)
-        err_ty = RustSimStruct(OrderedDict({"field_0": u64}), name="struct16", pack=True).with_arch(arch)
-        ref = RustSimTypeReference(RustSimTypeResult(ok_ty, 0, 8, err_ty, 1, 8).with_arch(arch)).with_arch(arch)
-
-        assert ref.with_arch(None) is ref
-        assert ref.with_arch(arch) is ref
+        u64 = RustSimTypeInt(64, signed=False)
+        ok_ty = RustSimStruct(OrderedDict({"field_0": u64}), name="struct8", pack=True)
+        err_ty = RustSimStruct(OrderedDict({"field_0": u64}), name="struct16", pack=True)
+        ref = RustSimTypeReference(RustSimTypeResult(ok_ty, 0, 8, err_ty, 1, 8))
 
         prototype = RustSimTypeFunction([ref, u64], None, is_arg0_retbuf=True)
-        assert prototype._arch is None
-        assert prototype.copy().args[0]._arch == arch
+        assert prototype.copy().args[0] is ref
 
-        # every type entering the type solver has to carry an arch
+        # every type entering the type solver has to be translatable
         RustTypeTranslator(arch).simtype2tc(prototype.copy().args[0])
 
     def test_rust_retbuf_function_normalization(self):
-        arch = archinfo.ArchAMD64()
-        field_ty = RustSimTypeInt(64, signed=False).with_arch(arch)
-        ret_ty = RustSimStruct(OrderedDict({"field_0": field_ty}), name="Ret", pack=True).with_arch(arch)
+        field_ty = RustSimTypeInt(64, signed=False)
+        ret_ty = RustSimStruct(OrderedDict({"field_0": field_ty}), name="Ret", pack=True)
         prototype = RustSimTypeFunction(
-            [RustSimTypeReference(ret_ty).with_arch(arch), field_ty],
+            [RustSimTypeReference(ret_ty), field_ty],
             None,
             is_arg0_retbuf=True,
-        ).with_arch(arch)
+        )
 
         normalized = prototype.normalize()
 
@@ -82,32 +76,32 @@ class TestRustSimType(unittest.TestCase):
 
     def test_rust_scalar_reference_and_array_repr_json_roundtrip(self):
         arch = archinfo.ArchAMD64()
-        u32 = RustSimTypeInt(32, signed=False, label="len").with_arch(arch)
+        u32 = RustSimTypeInt(32, signed=False, label="len")
 
         assert repr(u32) == "u32"
         assert u32.repr("n") == "n: u32"
         assert RustSimTypeInt.from_json(u32.to_json()).label == "len"
 
-        usize = RustSimTypeSize(signed=False).with_arch(arch)
-        assert usize.size == 64
+        usize = RustSimTypeSize(signed=False)
+        assert usize.size(arch) == 64
         assert repr(usize) == "usize"
         assert RustSimTypeSize.from_json(usize.to_json()).signed is False
-        assert usize.copy().size == 64
+        assert usize.copy().size(arch) == 64
 
         bottom_ref = RustSimTypeReference(RustSimTypeBottom())
         assert bottom_ref.repr("ptr") == "*u8 ptr"
 
-        ref = RustSimTypeReference(u32, label="r", offset=4).with_arch(arch)
-        assert ref.size == 64
+        ref = RustSimTypeReference(u32, label="r", offset=4)
+        assert ref.size(arch) == 64
         assert ref.repr("arg") == "arg: &u32"
         assert ref.copy().offset == 4
 
-        array = RustSimTypeArray(u32, length=3, label="arr").with_arch(arch)
+        array = RustSimTypeArray(u32, length=3, label="arr")
         assert repr(array) == "[u32; 3]"
         assert array.repr("items") == "items: [u32; 3]"
         assert array.copy().length == 3
 
-        fn = RustSimTypeFunction([ref, u32], u32, arg_names=["self", "n"], variadic=True).with_arch(arch)
+        fn = RustSimTypeFunction([ref, u32], u32, arg_names=["self", "n"], variadic=True)
         assert "..." in repr(fn)
         assert "..." in fn._repr("callee", full=1)
         assert '"self"' in fn._arg_names_str()
@@ -116,6 +110,7 @@ class TestRustSimType(unittest.TestCase):
     def test_rust_int_equality_includes_size(self):
         # regression test for angr/angr#6625: ints of different sizes compared equal (and hashed equal), which made
         # the declared type of unified variables depend on nondeterministic set iteration order
+        arch = archinfo.ArchAMD64()
         u8 = RustSimTypeInt(8, signed=False)
         u32 = RustSimTypeInt(32, signed=False)
         u64 = RustSimTypeInt(64, signed=False)
@@ -128,43 +123,41 @@ class TestRustSimType(unittest.TestCase):
         assert u32 != RustSimTypeInt(32, signed=True)
 
         # copy() must preserve the explicit size
-        assert u64.copy().size == 64
+        assert u64.copy().size(arch) == 64
         assert u64.copy() == u64
 
     def test_rust_struct_nested_field_lookup_and_json_roundtrip(self):
         arch = archinfo.ArchAMD64()
-        inner = RustSimStruct(
-            OrderedDict({"value": RustSimTypeInt(16, signed=False)}), name="Inner", pack=True
-        ).with_arch(arch)
+        inner = RustSimStruct(OrderedDict({"value": RustSimTypeInt(16, signed=False)}), name="Inner", pack=True)
         outer = RustSimStruct(
             OrderedDict({"inner": inner, "tail": RustSimTypeInt(32, signed=False)}), name="Outer", pack=True
-        ).with_arch(arch)
+        )
 
         inner_value_ty = outer.get_field_ty("inner.value")
         assert inner_value_ty is not None
-        assert inner_value_ty.size == 16
-        assert outer.get_field_offset("inner.value") == 0
-        assert outer.get_field_offset("missing", default=-1) == -1
+        assert inner_value_ty.size(arch) == 16
+        assert outer.get_field_offset("inner.value", arch) == 0
+        assert outer.get_field_offset("missing", arch, default=-1) == -1
         assert "struct Outer" in outer.repr(full=2)
 
         data = outer.to_json()
-        data["_size"] = outer.size
+        data["_size"] = outer.size(arch)
         restored = RustSimStruct.from_json(data)
         assert restored.name == "Outer"
-        assert restored._size == outer.size
+        assert restored._size == outer.size(arch)
 
     def test_rust_enum_result_option_discriminants_and_json_roundtrip(self):
         arch = archinfo.ArchAMD64()
         ok_ty = RustSimTypeInt(64, signed=False)
         err_ty = RustSimTypeInt(16, signed=False)
 
-        result_ty = RustSimTypeResult(ok_ty, 0, 0, err_ty, -(1 << 15), 2).with_arch(arch)
+        result_ty = RustSimTypeResult(ok_ty, 0, 0, err_ty, -(1 << 15), 2)
         err_variant = result_ty.get_variant(1 << 15)
         assert err_variant is not None
         assert err_variant.name == "Err"
         assert RustSimTypeResult.from_json(result_ty.to_json()).name.startswith("Result<")
 
-        option_ty = RustSimTypeOption(0, 1, ok_ty, 1, 1).with_arch(arch)
+        option_ty = RustSimTypeOption(0, 1, ok_ty, 1, 1)
         none_variant = option_ty.get_variant(0)
         assert none_variant is not None
         assert none_variant.name == "None"
@@ -172,39 +165,38 @@ class TestRustSimType(unittest.TestCase):
 
         none = EnumVariant.from_no_data("None", 0, 1)
         some = EnumVariant.from_single_field_ty("Some", ok_ty, 1, 1)
-        enum_ty = RustSimEnum("OptionLike", [none, some]).with_arch(arch)
+        enum_ty = RustSimEnum("OptionLike", [none, some])
         some_variant = enum_ty.get_variant_by_name("Some")
         assert some_variant is not None
         assert some_variant.name == "Some"
         assert enum_ty.num_variants() == 2
         assert RustSimEnum.from_json(enum_ty.to_json()).name == "OptionLike"
 
-        some_with_arch = some.with_arch(arch)
-        assert some_with_arch.has_fields()
-        assert some_with_arch.first_field_offset >= 1
-        assert some_with_arch.size == some_with_arch.bits // 8
-        assert some_with_arch.as_struct_ty().fields["discriminant"].size == 8
-        assert EnumVariant.from_json(some_with_arch.to_json()) == some
+        assert some.has_fields()
+        assert some.first_field_offset(arch) >= 1
+        assert some.size(arch) == some.bits(arch) // 8
+        assert some.as_struct_ty().fields["discriminant"].size(arch) == 8
+        assert EnumVariant.from_json(some.to_json()) == some
 
     def test_rust_slice_layout_uses_two_machine_words(self):
         arch = archinfo.ArchAMD64()
-        slice_ty = RustSimTypeSlice(RustSimTypeInt(8, signed=False)).with_arch(arch)
+        slice_ty = RustSimTypeSlice(RustSimTypeInt(8, signed=False))
 
-        assert slice_ty.size == 128
+        assert slice_ty.size(arch) == 128
         assert list(slice_ty.fields) == ["data_ptr", "length"]
         assert slice_ty.repr("s") == "s: &[u8]"
 
-        vec_ty = RustSimTypeVec(RustSimTypeInt(16, signed=False), order=("ptr", "len", "cap")).with_arch(arch)
+        vec_ty = RustSimTypeVec(RustSimTypeInt(16, signed=False), order=("ptr", "len", "cap"))
         assert repr(vec_ty) == "Vec<u16>"
         assert list(vec_ty.fields) == ["ptr", "len", "cap"]
         assert RustSimTypeVec.from_json(vec_ty.to_json()).order == ("ptr", "len", "cap")
 
-        unit_ty = RustSimTypeUnit().with_arch(arch)
-        assert unit_ty.size == 0
+        unit_ty = RustSimTypeUnit()
+        assert unit_ty.size(arch) == 0
         assert unit_ty.copy().name == "()"
         assert RustSimTypeUnit.from_json(unit_ty.to_json()).name == "()"
 
-        strref_ty = RustSimTypeStrRef().with_arch(arch)
+        strref_ty = RustSimTypeStrRef()
         assert repr(strref_ty) == "&str"
         assert strref_ty.copy().name == "&str"
         assert RustSimTypeStrRef.from_json(strref_ty.to_json()).name == "&str"
@@ -224,7 +216,7 @@ class TestRustSimType(unittest.TestCase):
         assert struct_ty.name == "Pair"
         assert list(struct_ty.fields) == ["tag", "ptr"]
         assert isinstance(struct_ty.fields["tag"], RustSimTypeInt)
-        assert struct_ty.fields["tag"].size == 16
+        assert struct_ty.fields["tag"].size(arch) == 16
         assert isinstance(struct_ty.fields["ptr"], RustSimTypeReference)
 
         array_ty, has_nonexistent_ref = translator.tc2simtype(typeconsts.Array(typeconsts.Int32(), 2))
@@ -232,7 +224,7 @@ class TestRustSimType(unittest.TestCase):
         assert isinstance(array_ty, RustSimTypeArray)
         assert array_ty.length == 2
         assert isinstance(array_ty.elem_type, RustSimTypeInt)
-        assert array_ty.elem_type.size == 32
+        assert array_ty.elem_type.size(arch) == 32
 
         result_tc = typeconsts.RustEnum(
             "core::result::Result<u64, u16>",
@@ -259,9 +251,7 @@ class TestRustSimType(unittest.TestCase):
         assert option_ty.get_variant_by_name("Some") is not None
 
         lifted_struct = translator.simtype2tc(
-            RustSimStruct(OrderedDict({"value": RustSimTypeInt(32, signed=False)}), name="Lifted", pack=True).with_arch(
-                arch
-            )
+            RustSimStruct(OrderedDict({"value": RustSimTypeInt(32, signed=False)}), name="Lifted", pack=True)
         )
         assert isinstance(lifted_struct, typeconsts.Struct)
         assert lifted_struct.field_names == {0: "value"}
@@ -273,17 +263,18 @@ class TestRustSimType(unittest.TestCase):
                     EnumVariant.from_no_data("None", 0, 1),
                     EnumVariant.from_single_field_ty("Some", RustSimTypeInt(8), 1, 1),
                 ],
-            ).with_arch(arch)
+            )
         )
         assert isinstance(lifted_enum, typeconsts.RustEnum)
         assert lifted_enum.get_variant("Some") is not None
 
     def test_type_db_loader_parses_structs_slices_and_enums(self):
         loader = _blank_type_db_loader()
+        arch = loader.project.arch
 
         bool_ty = loader._parse_type({"kind": "Primitive", "name": "bool", "size": 1})
         assert bool_ty is not None
-        assert bool_ty.size == 8
+        assert bool_ty.size(arch) == 8
         assert loader._parse_type({"kind": "Primitive", "name": "f32", "size": 4}) is None
 
         str_data = {
@@ -349,15 +340,13 @@ class TestRustSimType(unittest.TestCase):
             ),
             name="Large",
             pack=True,
-        ).with_arch(loader.project.arch)
-
-        direct_arg = loader._fit_abi(RustSimTypeFunction([large_struct], RustSimTypeInt(32, signed=False))).with_arch(
-            loader.project.arch
         )
+
+        direct_arg = loader._fit_abi(RustSimTypeFunction([large_struct], RustSimTypeInt(32, signed=False)))
         assert isinstance(direct_arg.args[0], RustSimTypeReference)
         assert direct_arg.returnty is not None
 
-        retbuf = loader._fit_abi(RustSimTypeFunction([], large_struct)).with_arch(loader.project.arch)
+        retbuf = loader._fit_abi(RustSimTypeFunction([], large_struct))
         assert retbuf.returnty is None
         assert retbuf.is_arg0_retbuf is True
         assert isinstance(retbuf.args[0], RustSimTypeReference)
@@ -366,9 +355,9 @@ class TestRustSimType(unittest.TestCase):
             OrderedDict({"a": RustSimTypeInt(64, signed=False), "b": RustSimTypeInt(64, signed=False)}),
             name="Pair",
             pack=True,
-        ).with_arch(loader.project.arch)
-        rust_proto = RustSimTypeFunction([], two_word_struct).with_arch(loader.project.arch)
-        old_direct = SimTypeFunction([], SimTypeArray(SimTypeLongLong(signed=False), 2)).with_arch(loader.project.arch)
+        )
+        rust_proto = RustSimTypeFunction([], two_word_struct)
+        old_direct = SimTypeFunction([], SimTypeArray(SimTypeLongLong(signed=False), 2))
         assert loader._negotiate_prototype(rust_proto, old_direct) is rust_proto
 
 

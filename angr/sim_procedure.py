@@ -226,8 +226,6 @@ class SimProcedure:
                     " You must specify a calling convention."
                 )
         assert self.prototype is not None
-        if self.prototype._arch is None:
-            self.prototype = self.prototype.with_arch(self.arch)
 
         inst = copy.copy(self)
         inst.state = state
@@ -509,7 +507,7 @@ class SimProcedure:
             if (
                 self.guessed_prototype
                 and isinstance(expr, claripy.ast.bv.BV)
-                and self.prototype.returnty.size != len(expr)
+                and self.prototype.returnty.size(self.arch) != len(expr)
             ):
                 self.fix_prototype_returnty(len(expr))
 

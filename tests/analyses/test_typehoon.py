@@ -471,7 +471,7 @@ class TestTypeTranslator(unittest.TestCase):
                 ),
                 name="utmp",
             )
-        ).with_arch(arch)
+        )
         tx = TypeTranslator(arch)
 
         tc = tx.simtype2tc(st)
@@ -487,12 +487,12 @@ class TestTypeTranslator(unittest.TestCase):
         assert not has_nonexistent_ref
         assert isinstance(restored, SimTypePointer)
         assert isinstance(restored.pts_to, SimStruct)
-        assert restored.pts_to.offsets == {"ut_addr_v6": 0, "tv_usec": 16}
-        assert restored.pts_to.size == 192
+        assert restored.pts_to.offsets(arch) == {"ut_addr_v6": 0, "tv_usec": 16}
+        assert restored.pts_to.size(arch) == 192
         restored_array = restored.pts_to.fields["ut_addr_v6"]
         assert isinstance(restored_array, SimTypeArray)
-        assert restored_array.size == 128
-        assert restored_array.elem_type.size == 32
+        assert restored_array.size(arch) == 128
+        assert restored_array.elem_type.size(arch) == 32
         assert restored_array.elem_type.signed is True
 
     def test_unsupported_width_simtypenum(self):
@@ -502,7 +502,7 @@ class TestTypeTranslator(unittest.TestCase):
         for bits in (1, 9, 24, 128):
             for signed in (False, True):
                 with self.subTest(bits=bits, signed=signed):
-                    tc = tx.simtype2tc(SimTypeNum(bits, signed=signed, label=f"int{bits}_t").with_arch(arch))
+                    tc = tx.simtype2tc(SimTypeNum(bits, signed=signed, label=f"int{bits}_t"))
                     assert isinstance(tc, BottomType)
 
         # Int1 and IntVar cannot be converted to equally-sized SimTypes: their sizes use incompatible units. They must
@@ -511,7 +511,7 @@ class TestTypeTranslator(unittest.TestCase):
         restored, has_nonexistent_ref = tx.tc2simtype(struct)
         assert not has_nonexistent_ref
         assert isinstance(restored, SimStruct)
-        assert restored.offsets == {"field_0": 0, "field_1": 1, "field_2": 2}
+        assert restored.offsets(arch) == {"field_0": 0, "field_1": 1, "field_2": 2}
 
     def test_standard_width_simtypenum_round_trip(self):
         arch = archinfo.arch_from_id("amd64")
@@ -521,14 +521,14 @@ class TestTypeTranslator(unittest.TestCase):
             for signed in (False, True):
                 with self.subTest(bits=bits, signed=signed):
                     label = f"{'u' if not signed else ''}int{bits}_t"
-                    tc = tx.simtype2tc(SimTypeNum(bits, signed=signed, label=label).with_arch(arch))
+                    tc = tx.simtype2tc(SimTypeNum(bits, signed=signed, label=label))
                     assert not isinstance(tc, IntVar)
                     assert tc.size * arch.byte_width == bits
                     assert tc.name == label
 
                     restored, has_nonexistent_ref = tx.tc2simtype(tc)
                     assert not has_nonexistent_ref
-                    assert restored.size == bits
+                    assert restored.size(arch) == bits
                     assert restored.signed is signed
                     assert restored.label == label
 
@@ -538,7 +538,6 @@ class TestTypeTranslator(unittest.TestCase):
         st = SimStruct(fields, name="test_struct")
         assert isinstance(st.fields["ptr"], SimTypePointer)
         st.fields["ptr"].pts_to = st
-        st = st.with_arch(arch)
         tx = TypeTranslator(arch)
         tc = tx.simtype2tc(st)
         assert isinstance(tc, Struct)
@@ -555,10 +554,10 @@ class TestTypeTranslator(unittest.TestCase):
         struct Alpha { struct Beta *beta; int x; }; struct Beta { struct Alpha *alpha; int y; };
         The shape ``dereference_simtype`` produces for library types such as DRIVER_OBJECT/DEVICE_OBJECT.
         """
-        alpha = cast(SimStruct, SimStruct({}, name="Alpha").with_arch(arch))
-        beta = cast(SimStruct, SimStruct({}, name="Beta").with_arch(arch))
-        alpha.fields = OrderedDict({"beta": SimTypePointer(beta).with_arch(arch), "x": SimTypeInt().with_arch(arch)})
-        beta.fields = OrderedDict({"alpha": SimTypePointer(alpha).with_arch(arch), "y": SimTypeInt().with_arch(arch)})
+        alpha = cast(SimStruct, SimStruct({}, name="Alpha"))
+        beta = cast(SimStruct, SimStruct({}, name="Beta"))
+        alpha.fields = OrderedDict({"beta": SimTypePointer(beta), "x": SimTypeInt()})
+        beta.fields = OrderedDict({"alpha": SimTypePointer(alpha), "y": SimTypeInt()})
         return alpha, beta
 
     def test_mutually_recursive_structs_keep_their_references(self):
@@ -633,8 +632,8 @@ class TestSimpleSolverLatticeOps(unittest.TestCase):
     def test_join_signed_unsigned_int(self):
         # join(signed int, unsigned int) -> int (their common Int32 supertype)
         joined = SimpleSolver.join_simtypes(
-            SimTypeInt(signed=True).with_arch(self.arch),
-            SimTypeInt(signed=False).with_arch(self.arch),
+            SimTypeInt(signed=True),
+            SimTypeInt(signed=False),
             self.arch,
         )
         assert isinstance(joined, SimTypeInt)
@@ -642,8 +641,8 @@ class TestSimpleSolverLatticeOps(unittest.TestCase):
     def test_join_same_pointer(self):
         # join(char *, char *) -> char *
         joined = SimpleSolver.join_simtypes(
-            SimTypePointer(SimTypeChar()).with_arch(self.arch),
-            SimTypePointer(SimTypeChar()).with_arch(self.arch),
+            SimTypePointer(SimTypeChar()),
+            SimTypePointer(SimTypeChar()),
             self.arch,
         )
         assert isinstance(joined, SimTypePointer)
@@ -651,10 +650,10 @@ class TestSimpleSolverLatticeOps(unittest.TestCase):
 
     def test_join_same_struct_pointer_preserves_struct(self):
         # join(struct A *, struct A *) -> struct A *
-        s = SimStruct({"a": SimTypeInt()}, name="A").with_arch(self.arch)
+        s = SimStruct({"a": SimTypeInt()}, name="A")
         joined = SimpleSolver.join_simtypes(
-            SimTypePointer(s).with_arch(self.arch),
-            SimTypePointer(s).with_arch(self.arch),
+            SimTypePointer(s),
+            SimTypePointer(s),
             self.arch,
         )
         assert isinstance(joined, SimTypePointer)
@@ -663,11 +662,11 @@ class TestSimpleSolverLatticeOps(unittest.TestCase):
 
     def test_join_distinct_struct_pointers_to_void(self):
         # join(struct A *, struct B *) -> void * (no common struct supertype)
-        sa = SimStruct({"a": SimTypeInt()}, name="A").with_arch(self.arch)
-        sb = SimStruct({"b": SimTypeInt()}, name="B").with_arch(self.arch)
+        sa = SimStruct({"a": SimTypeInt()}, name="A")
+        sb = SimStruct({"b": SimTypeInt()}, name="B")
         joined = SimpleSolver.join_simtypes(
-            SimTypePointer(sa).with_arch(self.arch),
-            SimTypePointer(sb).with_arch(self.arch),
+            SimTypePointer(sa),
+            SimTypePointer(sb),
             self.arch,
         )
         assert isinstance(joined, SimTypePointer)
@@ -676,8 +675,8 @@ class TestSimpleSolverLatticeOps(unittest.TestCase):
     def test_join_incompatible_scalars_is_bottom(self):
         # join(char, int): the only common supertype is the generic Int, which has no precise SimType -> bottom
         joined = SimpleSolver.join_simtypes(
-            SimTypeChar().with_arch(self.arch),
-            SimTypeInt().with_arch(self.arch),
+            SimTypeChar(),
+            SimTypeInt(),
             self.arch,
         )
         assert isinstance(joined, SimTypeBottom)
@@ -685,8 +684,8 @@ class TestSimpleSolverLatticeOps(unittest.TestCase):
     def test_meet_identical_type(self):
         # meet(char, char) -> char
         met = SimpleSolver.meet_simtypes(
-            SimTypeChar(signed=True).with_arch(self.arch),
-            SimTypeChar(signed=True).with_arch(self.arch),
+            SimTypeChar(signed=True),
+            SimTypeChar(signed=True),
             self.arch,
         )
         assert isinstance(met, SimTypeChar)
@@ -694,8 +693,8 @@ class TestSimpleSolverLatticeOps(unittest.TestCase):
     def test_meet_incompatible_is_bottom(self):
         # meet(signed int, unsigned int): no common subtype on the lattice -> bottom
         met = SimpleSolver.meet_simtypes(
-            SimTypeInt(signed=True).with_arch(self.arch),
-            SimTypeInt(signed=False).with_arch(self.arch),
+            SimTypeInt(signed=True),
+            SimTypeInt(signed=False),
             self.arch,
         )
         assert isinstance(met, SimTypeBottom)
@@ -708,25 +707,25 @@ class TestFunctionArgTypeNormalization(unittest.TestCase):
 
     def test_pointer_to_array_becomes_pointer(self):
         # type[N] * -> type *
-        ty = SimTypePointer(SimTypeArray(SimTypeInt(), 4)).with_arch(self.arch)
+        ty = SimTypePointer(SimTypeArray(SimTypeInt(), 4))
         flattened = Clinic._flatten_pointer_to_array(ty)
         assert isinstance(flattened, SimTypePointer)
         assert isinstance(flattened.pts_to, SimTypeInt)
 
     def test_plain_pointer_unchanged(self):
-        ty = SimTypePointer(SimTypeChar()).with_arch(self.arch)
+        ty = SimTypePointer(SimTypeChar())
         flattened = Clinic._flatten_pointer_to_array(ty)
         assert flattened is ty
 
     def test_non_pointer_unchanged(self):
-        ty = SimTypeInt().with_arch(self.arch)
+        ty = SimTypeInt()
         flattened = Clinic._flatten_pointer_to_array(ty)
         assert flattened is ty
 
     def test_array_pointers_of_different_lengths_join_after_filter(self):
         # int[4] * and int[8] * normalize to int *, which then join to int *
-        t1 = Clinic._flatten_pointer_to_array(SimTypePointer(SimTypeArray(SimTypeInt(), 4)).with_arch(self.arch))
-        t2 = Clinic._flatten_pointer_to_array(SimTypePointer(SimTypeArray(SimTypeInt(), 8)).with_arch(self.arch))
+        t1 = Clinic._flatten_pointer_to_array(SimTypePointer(SimTypeArray(SimTypeInt(), 4)))
+        t2 = Clinic._flatten_pointer_to_array(SimTypePointer(SimTypeArray(SimTypeInt(), 8)))
         joined = SimpleSolver.join_simtypes(t1, t2, self.arch)
         assert isinstance(joined, SimTypePointer)
         assert isinstance(joined.pts_to, SimTypeInt)
@@ -745,7 +744,7 @@ class TestLocalVariableTypeFlattening(unittest.TestCase):
 
     def test_pointer_to_array_flattens_to_element_pointer(self):
         # int[8] * -> int *
-        ty = SimTypePointer(SimTypeArray(SimTypeInt(), 8)).with_arch(self.arch)
+        ty = SimTypePointer(SimTypeArray(SimTypeInt(), 8))
         flattened = Typehoon._flatten_pointer_to_array(ty, self.arch)
         assert isinstance(flattened, SimTypePointer)
         assert isinstance(flattened.pts_to, SimTypeInt)
@@ -754,19 +753,19 @@ class TestLocalVariableTypeFlattening(unittest.TestCase):
 
     def test_pointer_to_nested_array_flattens_fully(self):
         # int[4][8] * -> int *; single-level flattening would still be declared as an array
-        ty = SimTypePointer(SimTypeArray(SimTypeArray(SimTypeInt(), 4), 8)).with_arch(self.arch)
+        ty = SimTypePointer(SimTypeArray(SimTypeArray(SimTypeInt(), 4), 8))
         flattened = Typehoon._flatten_pointer_to_array(ty, self.arch)
         assert isinstance(flattened, SimTypePointer)
         assert isinstance(flattened.pts_to, SimTypeInt)
 
     def test_plain_array_unchanged(self):
         # a genuine in-place local array (char v[22]) is typed as a plain array and must keep its type
-        ty = SimTypeArray(SimTypeChar(), 22).with_arch(self.arch)
+        ty = SimTypeArray(SimTypeChar(), 22)
         flattened = Typehoon._flatten_pointer_to_array(ty, self.arch)
         assert flattened is ty
 
     def test_plain_pointer_unchanged(self):
-        ty = SimTypePointer(SimTypeChar()).with_arch(self.arch)
+        ty = SimTypePointer(SimTypeChar())
         flattened = Typehoon._flatten_pointer_to_array(ty, self.arch)
         assert flattened is ty
 

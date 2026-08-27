@@ -133,7 +133,7 @@ class InlinedWcscpySimplifier(OptimizationPass):
 
     def _make_wcsncpy_call(self, stmt, dst, s):
         str_id = self.kb.custom_strings.allocate(s)
-        wstr_type = SimTypePointer(SimTypeWideChar()).with_arch(self.project.arch)
+        wstr_type = SimTypePointer(SimTypeWideChar())
         wstr_type_out = SimTypePointer(SimTypeWideChar(), disposition=PointerDisposition.OUT)
         str_const = Const(
             self.manager.next_atom(),
@@ -154,9 +154,7 @@ class InlinedWcscpySimplifier(OptimizationPass):
         )
         variable_map_of(self.manager).set_prototype(
             call,
-            SimTypeFunction([wstr_type_out, wstr_type, SimTypeLong(signed=False)], wstr_type).with_arch(
-                self.project.arch
-            ),
+            SimTypeFunction([wstr_type_out, wstr_type, SimTypeLong(signed=False)], wstr_type),
         )
         return SideEffectStatement(
             self.manager.next_atom(),
@@ -373,11 +371,9 @@ class InlinedWcscpySimplifier(OptimizationPass):
                         new_str = s_last + s
 
             if new_str is not None:
-                wstr_type = SimTypePointer(SimTypeWideChar()).with_arch(self.project.arch)
+                wstr_type = SimTypePointer(SimTypeWideChar())
                 wstr_type_out = SimTypePointer(SimTypeWideChar(), disposition=PointerDisposition.OUT)
-                prototype = SimTypeFunction([wstr_type_out, wstr_type, SimTypeLong(signed=False)], wstr_type).with_arch(
-                    self.project.arch
-                )
+                prototype = SimTypeFunction([wstr_type_out, wstr_type, SimTypeLong(signed=False)], wstr_type)
                 if new_str.endswith(b"\x00\x00"):
                     call_name = "wcsncpy"
                     new_str_idx = self.kb.custom_strings.allocate(new_str[:-2])

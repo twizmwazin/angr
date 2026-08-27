@@ -238,7 +238,7 @@ class DataTransformationEmbedder(Analysis):
                         s = self.project.kb.custom_strings[arg.value_int]
                         # FIXME: we force the first argument to be a uint8_t* here
                         callee_func.prototype.args = (
-                            SimTypePointer(SimTypeChar()).with_arch(self.project.arch),
+                            SimTypePointer(SimTypeChar()),
                             *callee_func.prototype.args[1:],
                         )
 
@@ -421,7 +421,7 @@ class DataTransformationEmbedder(Analysis):
                 if can_pe:
                     # looks like we can partially evaluate the loop and embed the results
                     def lifter(_addr: int):
-                        return d.clinic  # noqa:B023
+                        return d.clinic
 
                     # very much a hack for now
                     d.clinic.arg_vvars = {}

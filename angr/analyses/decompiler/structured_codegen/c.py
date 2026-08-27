@@ -111,17 +111,17 @@ _CAST_TYPES_BY_BITS: dict[int, type[SimTypeInt | SimTypeChar]] = {
 }
 
 
-def qualifies_for_simple_cast(ty1, ty2):
+def qualifies_for_simple_cast(ty1, ty2, arch):
     # converting ty1 to ty2 - can this happen precisely?
     # used to decide whether to add explicit typecasts instead of doing *(int*)&v1
     return (
-        ty1.size == ty2.size
-        and isinstance(ty1, (SimTypeInt, SimTypeChar, SimTypeNum, SimTypePointer))
+        isinstance(ty1, (SimTypeInt, SimTypeChar, SimTypeNum, SimTypePointer))
         and isinstance(ty2, (SimTypeInt, SimTypeChar, SimTypeNum, SimTypePointer))
+        and ty1.size(arch) == ty2.size(arch)
     )
 
 
-def qualifies_for_implicit_cast(ty1, ty2):
+def qualifies_for_implicit_cast(ty1, ty2, arch):
     # converting ty1 to ty2 - can this happen without a cast?
     # used to decide whether to omit typecasts from output during promotion
     # this function need to answer the question:
@@ -132,18 +132,20 @@ def qualifies_for_implicit_cast(ty1, ty2):
     ):
         return False
 
-    return ty1.size <= ty2.size if ty1.size is not None and ty2.size is not None else False
+    size1 = ty1.size(arch)
+    size2 = ty2.size(arch)
+    return size1 <= size2 if size1 is not None and size2 is not None else False
 
 
-def extract_terms(expr: CExpression) -> tuple[int, list[tuple[int, CExpression]]]:
+def extract_terms(expr: CExpression, arch: archinfo.Arch) -> tuple[int, list[tuple[int, CExpression]]]:
     # handle unnecessary type casts
     if isinstance(expr, CTypeCast):
-        expr = MakeTypecastsImplicit.collapse(expr.dst_type, expr.expr)
+        expr = MakeTypecastsImplicit.collapse(expr.dst_type, expr.expr, arch)
     if (
         isinstance(expr, CTypeCast)
         and isinstance(expr.dst_type, SimTypeInt)
         and isinstance(expr.src_type, SimTypeInt)
-        and expr.dst_type.size == expr.src_type.size
+        and expr.dst_type.size(arch) == expr.src_type.size(arch)
         and expr.dst_type.signed != expr.src_type.signed
     ):
         # (unsigned int)(a + 60)  ==>  a + 60, assuming a + 60 is an int
@@ -153,44 +155,44 @@ def extract_terms(expr: CExpression) -> tuple[int, list[tuple[int, CExpression]]
         return expr.value, []
     # elif isinstance(expr, CUnaryOp) and expr.op == 'Minus'
     if isinstance(expr, CBinaryOp) and expr.op == "Add":
-        c1, t1 = extract_terms(expr.lhs)
-        c2, t2 = extract_terms(expr.rhs)
+        c1, t1 = extract_terms(expr.lhs, arch)
+        c2, t2 = extract_terms(expr.rhs, arch)
         return c1 + c2, t1 + t2
     if isinstance(expr, CBinaryOp) and expr.op == "Sub":
-        c1, t1 = extract_terms(expr.lhs)
-        c2, t2 = extract_terms(expr.rhs)
+        c1, t1 = extract_terms(expr.lhs, arch)
+        c2, t2 = extract_terms(expr.rhs, arch)
         return c1 - c2, t1 + [(-c, t) for c, t in t2]
     if isinstance(expr, CBinaryOp) and expr.op == "Mul":
         if isinstance(expr.lhs, CConstant) and isinstance(expr.lhs.value, int):
-            c, t = extract_terms(expr.rhs)
+            c, t = extract_terms(expr.rhs, arch)
             return c * expr.lhs.value, [(c1 * expr.lhs.value, t1) for c1, t1 in t]
         if isinstance(expr.rhs, CConstant) and isinstance(expr.rhs.value, int):
-            c, t = extract_terms(expr.lhs)
+            c, t = extract_terms(expr.lhs, arch)
             return c * expr.rhs.value, [(c1 * expr.rhs.value, t1) for c1, t1 in t]
         return 0, [(1, expr)]
     if isinstance(expr, CBinaryOp) and expr.op == "Shl":
         if isinstance(expr.rhs, CConstant) and isinstance(expr.rhs.value, int):
-            c, t = extract_terms(expr.lhs)
+            c, t = extract_terms(expr.lhs, arch)
             return c << expr.rhs.value, [(c1 << expr.rhs.value, t1) for c1, t1 in t]
         return 0, [(1, expr)]
     return 0, [(1, expr)]
 
 
 def is_machine_word_size_type(type_: SimType, arch: archinfo.Arch) -> bool:
-    return isinstance(type_, SimTypeReg) and type_.size == arch.bits
+    return isinstance(type_, SimTypeReg) and type_.size(arch) == arch.bits
 
 
 def guess_value_type(value: int, project: angr.Project) -> SimType | None:
     if project.kb.functions.contains_addr(value):
         # might be a function pointer
-        return SimTypePointer(SimTypeBottom(label="void")).with_arch(project.arch)
+        return SimTypePointer(SimTypeBottom(label="void"))
     if value > 4096:
         sec = project.loader.find_section_containing(value)
         if sec is not None and sec.is_readable:
-            return SimTypePointer(SimTypeBottom(label="void")).with_arch(project.arch)
+            return SimTypePointer(SimTypeBottom(label="void"))
         seg = project.loader.find_segment_containing(value)
         if seg is not None and seg.is_readable:
-            return SimTypePointer(SimTypeBottom(label="void")).with_arch(project.arch)
+            return SimTypePointer(SimTypeBottom(label="void"))
     return None
 
 
@@ -206,12 +208,12 @@ def type_equals(t0: SimType, t1: SimType) -> bool:
     return t0 == t1
 
 
-def _safe_type_size(ty) -> int:
-    sz = getattr(ty, "size", -1)
+def _safe_type_size(ty, arch) -> int:
+    sz = ty.size(arch)
     return sz if isinstance(sz, int) else -1
 
 
-def type_layout_key(ty, _seen: frozenset = frozenset()) -> str:
+def type_layout_key(ty, arch, _seen: frozenset = frozenset()) -> str:
     """
     A structural sort key for a type, derived purely from its memory layout (sizes, field offsets, and the
     layouts of field/element/pointee types) and not from any user-renamable struct or field name. This lets
@@ -223,14 +225,16 @@ def type_layout_key(ty, _seen: frozenset = frozenset()) -> str:
         if id(ty) in _seen:
             return "@"  # a reference back to an enclosing struct (recursive type)
         _seen = _seen | {id(ty)}
-        offsets = ty.offsets
-        fields = sorted(f"{offsets.get(fname, -1)}:{type_layout_key(fty, _seen)}" for fname, fty in ty.fields.items())
-        return f"S[{_safe_type_size(ty)};{int(bool(getattr(ty, 'packed', False)))};{';'.join(fields)}]"
+        offsets = ty.offsets(arch)
+        fields = sorted(
+            f"{offsets.get(fname, -1)}:{type_layout_key(fty, arch, _seen)}" for fname, fty in ty.fields.items()
+        )
+        return f"S[{_safe_type_size(ty, arch)};{int(bool(getattr(ty, 'packed', False)))};{';'.join(fields)}]"
     if isinstance(ty, SimTypePointer):
-        return f"P({type_layout_key(ty.pts_to, _seen)})"
+        return f"P({type_layout_key(ty.pts_to, arch, _seen)})"
     if isinstance(ty, (SimTypeArray, SimTypeFixedSizeArray)):
-        return f"A{getattr(ty, 'length', None)}({type_layout_key(ty.elem_type, _seen)})"
-    return f"T:{type(ty).__name__}:{_safe_type_size(ty)}:{getattr(ty, 'signed', None)}"
+        return f"A{getattr(ty, 'length', None)}({type_layout_key(ty.elem_type, arch, _seen)})"
+    return f"T:{type(ty).__name__}:{_safe_type_size(ty, arch)}:{getattr(ty, 'signed', None)}"
 
 
 def cextern_sort_key(cextern) -> tuple:
@@ -623,7 +627,7 @@ class CFunction(CConstruct):  # pylint:disable=abstract-method
                 var_type = self.variable_manager.get_variable_type(var)
 
             if var_type is None:
-                var_type = SimTypeBottom().with_arch(self.codegen.project.arch)
+                var_type = SimTypeBottom()
 
             unified_to_var_and_types[key].add((cvar, var_type))
 
@@ -780,7 +784,7 @@ class CFunction(CConstruct):  # pylint:disable=abstract-method
                 tiebreak = (
                     (0, order) if order is not None else (1, ty.name if isinstance(ty, SimStruct) and ty.name else "")
                 )
-                return (type_layout_key(ty), tiebreak)
+                return (type_layout_key(ty, self.codegen.project.arch), tiebreak)
 
             emitted_struct_names: set[str] = set()
             for ty in sorted(local_types, key=_local_type_sort_key):
@@ -1647,7 +1651,7 @@ class CFunctionCall(CExpression):
                 proto = cast(SimTypeFunction, dereference_simtype_by_lib(proto, self.callee_func.prototype_libname))
             return proto
         returnty = SimTypeInt(signed=False)
-        return SimTypeFunction([arg.type for arg in self.args], returnty).with_arch(self.codegen.project.arch)
+        return SimTypeFunction([arg.type for arg in self.args], returnty)
 
     @property
     def prototype_returnty(self) -> SimType:
@@ -1657,7 +1661,7 @@ class CFunctionCall(CExpression):
         """
         if self.callee_func is not None and self.callee_func.prototype is not None:
             return self.prototype.returnty  # type: ignore
-        return SimTypeInt(signed=False).with_arch(self.codegen.project.arch)
+        return SimTypeInt(signed=False)
 
     @property
     def type(self):
@@ -1856,7 +1860,7 @@ class CDirtyStatement(CExpression):
 
     @property
     def type(self):
-        return SimTypeInt().with_arch(self.codegen.project.arch)
+        return SimTypeInt()
 
     def c_repr_chunks(self, indent=0, asexpr=False):
         indent_str = self.indent_str(indent=indent)
@@ -1918,7 +1922,7 @@ class CFakeVariable(CExpression):
     def __init__(self, name: str, ty: SimType, **kwargs):
         super().__init__(**kwargs)
         self.name = name
-        self._type = ty.with_arch(self.codegen.project.arch)
+        self._type = ty
 
     @property
     def type(self):
@@ -1947,9 +1951,7 @@ class CVariable(CExpression):
 
         self.variable: SimVariable = variable
         self.unified_variable: SimVariable | None = unified_variable
-        self.variable_type: SimType | None = (
-            variable_type.with_arch(self.codegen.project.arch) if variable_type is not None else None
-        )
+        self.variable_type: SimType | None = variable_type if variable_type is not None else None
         self.vvar_id = vvar_id
 
     @property
@@ -2062,7 +2064,7 @@ class CUnaryOp(CExpression):
         if operand.type is not None:
             var_type = unpack_typeref(operand.type)
             if op == "Reference":
-                self._type = SimTypePointer(var_type).with_arch(self.codegen.project.arch)
+                self._type = SimTypePointer(var_type)
             elif op == "Dereference":
                 if isinstance(var_type, SimTypePointer):
                     self._type = unpack_typeref(var_type.pts_to)
@@ -2163,14 +2165,14 @@ class CBinaryOp(CExpression):
         self.rhs = rhs
         self._cstyle_null_cmp = self.codegen.cstyle_null_cmp
 
-        self.common_type = self.compute_common_type(self.op, self.lhs.type, self.rhs.type)
+        self.common_type = self.compute_common_type(self.op, self.lhs.type, self.rhs.type, self.codegen.project.arch)
         if self.op.startswith("Cmp"):
-            self._type = SimTypeChar().with_arch(self.codegen.project.arch)
+            self._type = SimTypeChar()
         else:
             self._type = self.common_type
 
     @staticmethod
-    def compute_common_type(op: str, lhs_ty: SimType, rhs_ty: SimType) -> SimType:
+    def compute_common_type(op: str, lhs_ty: SimType, rhs_ty: SimType, arch) -> SimType:
         # C spec https://www.open-std.org/jtc1/sc22/wg14/www/docs/n2596.pdf 6.3.1.8 Usual arithmetic conversions
         rhs_ptr = isinstance(rhs_ty, SimTypePointer)
         lhs_ptr = isinstance(lhs_ty, SimTypePointer)
@@ -2184,7 +2186,7 @@ class CBinaryOp(CExpression):
 
         if op in ("Add", "Sub"):
             if lhs_ptr and rhs_ptr:
-                return SimTypeLength().with_arch(rhs_ty._arch)
+                return SimTypeLength()
             if lhs_ptr:
                 return lhs_ty
             if rhs_ptr:
@@ -2192,7 +2194,7 @@ class CBinaryOp(CExpression):
 
         if lhs_ptr or rhs_ptr:
             # uh oh!
-            return SimTypeLength().with_arch(rhs_ty._arch)
+            return SimTypeLength()
 
         if lhs_ty == rhs_ty:
             return lhs_ty
@@ -2206,7 +2208,7 @@ class CBinaryOp(CExpression):
             return rhs_ty
 
         if lhs_signed == rhs_signed:
-            if lhs_ty.size > rhs_ty.size:  # type: ignore[operator]
+            if lhs_ty.size(arch) > rhs_ty.size(arch):  # type: ignore[operator]
                 return lhs_ty
             return rhs_ty
 
@@ -2217,9 +2219,9 @@ class CBinaryOp(CExpression):
             signed_ty = rhs_ty
             unsigned_ty = lhs_ty
 
-        if unsigned_ty.size >= signed_ty.size:  # type: ignore[operator]
+        if unsigned_ty.size(arch) >= signed_ty.size(arch):  # type: ignore[operator]
             return unsigned_ty
-        if signed_ty.size > unsigned_ty.size:  # type: ignore[operator]
+        if signed_ty.size(arch) > unsigned_ty.size(arch):  # type: ignore[operator]
             return signed_ty
         # uh oh!!
         return signed_ty
@@ -2377,12 +2379,17 @@ class CBinaryOp(CExpression):
         # emitted here at render time because the earlier typecast-collapsing passes treat same-size signed/unsigned
         # integer casts as redundant and would strip a cast added during code generation.
         lhs_ty = self.lhs.type
+        lhs_size = (
+            lhs_ty.size(self.codegen.project.arch)
+            if isinstance(lhs_ty, (SimTypeInt, SimTypeChar, SimTypeNum))
+            else None
+        )
         if (
             isinstance(lhs_ty, (SimTypeInt, SimTypeChar, SimTypeNum))
             and getattr(lhs_ty, "signed", None) is False
-            and lhs_ty.size is not None
+            and lhs_size is not None
         ):
-            signed_ty = self.codegen.default_simtype_from_bits(lhs_ty.size, signed=True)
+            signed_ty = self.codegen.default_simtype_from_bits(lhs_size, signed=True)
             paren = CClosingObject("(")
             yield "(", paren
             yield f"{signed_ty.c_repr(name=None)}", signed_ty
@@ -2468,8 +2475,8 @@ class CTypeCast(CExpression):
 
         src_type = src_type or expr.type
         assert src_type is not None
-        self.src_type = src_type.with_arch(self.codegen.project.arch)
-        self.dst_type = dst_type.with_arch(self.codegen.project.arch)
+        self.src_type = src_type
+        self.dst_type = dst_type
         self.expr = expr
 
     @property
@@ -2508,7 +2515,7 @@ class CConstant(CExpression):
         super().__init__(**kwargs)
 
         self.value: int | float | str = value
-        self._type = type_.with_arch(self.codegen.project.arch)
+        self._type = type_
         self.reference_values = reference_values
 
     @property
@@ -2540,7 +2547,7 @@ class CConstant(CExpression):
         if result is None:
             result = False
             if isinstance(self.value, int):
-                bits = self._type.size if self._type is not None else None
+                bits = self._type.size(self.codegen.project.arch) if self._type is not None else None
                 result = should_use_hex(self.value, bits)
         return result
 
@@ -2705,8 +2712,9 @@ class CConstant(CExpression):
 
         if self.fmt_char:
             if value < 0:
-                assert self._type.size is not None
-                value += 2**self._type.size
+                type_size = self._type.size(self.codegen.project.arch)
+                assert type_size is not None
+                value += 2**type_size
             value &= 0xFF
             return repr(chr(value)) if value < 0x80 else f"'\\x{value:x}'"
 
@@ -2715,11 +2723,13 @@ class CConstant(CExpression):
 
         if self.fmt_neg:
             if value > 0:
-                assert self._type.size is not None
-                value -= 2**self._type.size
+                type_size = self._type.size(self.codegen.project.arch)
+                assert type_size is not None
+                value -= 2**type_size
             elif value < 0:
-                assert self._type.size is not None
-                value += 2**self._type.size
+                type_size = self._type.size(self.codegen.project.arch)
+                assert type_size is not None
+                value += 2**type_size
 
         if self.fmt_hex:
             return hex(value)
@@ -2738,7 +2748,7 @@ class CRegister(CExpression):
     @property
     def type(self):
         # FIXME
-        return SimTypeInt().with_arch(self.codegen.project.arch)
+        return SimTypeInt()
 
     def c_repr_chunks(self, indent=0, asexpr=False):
         yield str(self.reg), None
@@ -2819,7 +2829,7 @@ class CVEXCCallExpression(CExpression):
 
     @property
     def type(self):
-        return SimTypeInt().with_arch(self.codegen.project.arch)
+        return SimTypeInt()
 
     def c_repr_chunks(self, indent=0, asexpr=False):
         paren = CClosingObject("(")
@@ -2848,7 +2858,7 @@ class CDirtyExpression(CExpression):
 
     @property
     def type(self):
-        return SimTypeInt().with_arch(self.codegen.project.arch)
+        return SimTypeInt()
 
     def intrinsic_name(self) -> str | None:
         """Return the dirty callee if it is a clean C identifier, else None."""
@@ -3219,9 +3229,9 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
             return None
         ty = unpack_typeref(ty)
         if isinstance(ty, SimTypePointer):
-            return unpack_typeref(ty.pts_to).with_arch(self.project.arch)
+            return unpack_typeref(ty.pts_to)
         if isinstance(ty, SimTypeArray):
-            return unpack_typeref(ty.elem_type).with_arch(self.project.arch)
+            return unpack_typeref(ty.elem_type)
         return ty
 
     def reload_variable_types(self) -> None:
@@ -3247,7 +3257,7 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
                     and not isinstance(cvar.variable, SimStackVariable),
                 )
                 if vartype is not None:
-                    cvar.variable_type = vartype.with_arch(self.project.arch)
+                    cvar.variable_type = vartype
 
     #
     # Util methods
@@ -3261,8 +3271,8 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
             8: SimTypeChar,
         }
         if n in _mapping:
-            return _mapping.get(n)(signed=signed).with_arch(self.project.arch)
-        return SimTypeNum(n, signed=signed).with_arch(self.project.arch)
+            return _mapping.get(n)(signed=signed)
+        return SimTypeNum(n, signed=signed)
 
     def _variable(
         self, variable: SimVariable, fallback_type_size: int | None, vvar_id: int | None = None, mark_used: bool = True
@@ -3329,8 +3339,8 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
         renegotiate_type: Callable[[SimType, SimType], SimType] = lambda old, proposed: old,
     ) -> CExpression:
         def _force_type_cast(src_type_: SimType, dst_type_: SimType, expr_: CExpression) -> CUnaryOp:
-            src_type_ptr = SimTypePointer(src_type_).with_arch(self.project.arch)
-            dst_type_ptr = SimTypePointer(dst_type_).with_arch(self.project.arch)
+            src_type_ptr = SimTypePointer(src_type_)
+            dst_type_ptr = SimTypePointer(dst_type_)
             return CUnaryOp(
                 "Dereference",
                 CTypeCast(
@@ -3354,7 +3364,7 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
                 expr = CBinaryOp("Add", expr, CConstant(offset, SimTypeInt(), codegen=self), codegen=self)
             return CUnaryOp(
                 "Dereference",
-                CTypeCast(expr.type, SimTypePointer(data_type).with_arch(self.project.arch), expr, codegen=self),
+                CTypeCast(expr.type, SimTypePointer(data_type), expr, codegen=self),
                 codegen=self,
             )
 
@@ -3362,8 +3372,10 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
 
         if offset == 0:
             data_type = renegotiate_type(data_type, base_type)
+            base_type_size = base_type.size(self.project.arch)
+            data_type_size = data_type.size(self.project.arch)
             if type_equals(base_type, data_type) or (
-                base_type.size is not None and data_type.size is not None and base_type.size < data_type.size
+                base_type_size is not None and data_type_size is not None and base_type_size < data_type_size
             ):
                 # case 1: we're done because we found it
                 # case 2: we're done because we can never find it and we might as well stop early
@@ -3376,7 +3388,8 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
                     return _force_type_cast(base_type, data_type, expr)
                 return CUnaryOp("Dereference", expr, codegen=self)
 
-        stride = 1 if base_type.size is None else base_type.size // self.project.arch.byte_width or 1
+        base_type_size = base_type.size(self.project.arch)
+        stride = 1 if base_type_size is None else base_type_size // self.project.arch.byte_width or 1
         index, remainder = divmod(offset, stride)
         if index != 0:
             index = CConstant(index, SimTypeInt(), codegen=self)
@@ -3392,10 +3405,10 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
             )
             return self._access_constant_offset(result, remainder, data_type, lvalue, renegotiate_type)
 
-        if isinstance(base_type, SimStruct) and base_type.offsets:
+        if isinstance(base_type, SimStruct) and base_type.offsets(self.project.arch):
             # find the field that we're accessing
             field_name, field_offset = max(
-                ((x, y) for x, y in base_type.offsets.items() if y <= remainder), key=lambda x: x[1]
+                ((x, y) for x, y in base_type.offsets(self.project.arch).items() if y <= remainder), key=lambda x: x[1]
             )
             field = CStructField(base_type, field_offset, field_name, codegen=self)
             if base_expr:
@@ -3434,15 +3447,13 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
             # pointer cast time!
             # TODO: BYTE2() and other ida-isms if we're okay with an rvalue
             if stride != 1:
-                expr = CTypeCast(
-                    expr.type, SimTypePointer(SimTypeChar()).with_arch(self.project.arch), expr, codegen=self
-                )
+                expr = CTypeCast(expr.type, SimTypePointer(SimTypeChar()), expr, codegen=self)
             expr_with_offset = CBinaryOp("Add", expr, CConstant(remainder, SimTypeInt(), codegen=self), codegen=self)
             return CUnaryOp(
                 "Dereference",
                 CTypeCast(
                     expr_with_offset.type,
-                    SimTypePointer(data_type).with_arch(self.project.arch),
+                    SimTypePointer(data_type),
                     expr_with_offset,
                     codegen=self,
                 ),
@@ -3473,7 +3484,7 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
             # use the fallback from above
             return self._access_constant_offset(expr, 0, data_type, lvalue, renegotiate_type)
 
-        o_constant, o_terms = extract_terms(expr)
+        o_constant, o_terms = extract_terms(expr, self.project.arch)
 
         def bail_out():
             if len(o_terms) == 0:
@@ -3561,9 +3572,10 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
             kernel_type = unpack_typeref(unpack_pointer_and_array(kernel.type))
             assert kernel_type
 
-            if kernel_type.size is None or kernel_type.size == 0:
+            kernel_type_size = kernel_type.size(self.project.arch)
+            if kernel_type_size is None or kernel_type_size == 0:
                 return bail_out()
-            kernel_stride = kernel_type.size // self.project.arch.byte_width
+            kernel_stride = kernel_type_size // self.project.arch.byte_width
             if kernel_stride == 0:
                 return bail_out()
 
@@ -3607,9 +3619,10 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
 
             # nothing has the ability to escape the kernel
             # go in deeper
-            if isinstance(kernel_type, SimStruct) and kernel_type.offsets:
+            if isinstance(kernel_type, SimStruct) and kernel_type.offsets(self.project.arch):
                 field_name, field_offset = max(
-                    ((x, y) for x, y in kernel_type.offsets.items() if y <= constant), key=lambda x: x[1]
+                    ((x, y) for x, y in kernel_type.offsets(self.project.arch).items() if y <= constant),
+                    key=lambda x: x[1],
                 )
                 field_type = kernel_type.fields[field_name]
                 kernel = CUnaryOp(
@@ -3821,14 +3834,14 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
     def _handle_Stmt_Store(self, stmt: Stmt.Store, **kwargs):
         cdata = self._handle(stmt.data)
 
-        if cdata.type is not None and cdata.type.size != stmt.size * self.project.arch.byte_width:
+        if cdata.type is not None and cdata.type.size(self.project.arch) != stmt.size * self.project.arch.byte_width:
             l.error("Store data lifted to a C type with a different size. Decompilation output will be wrong.")
 
         def negotiate(old_ty, proposed_ty):
             # transfer casts from the dst to the src if possible
             # if we see something like *(size_t*)&v4 = x; where v4 is a pointer, change to v4 = (void*)x;
             nonlocal cdata
-            if old_ty != proposed_ty and qualifies_for_simple_cast(old_ty, proposed_ty):
+            if old_ty != proposed_ty and qualifies_for_simple_cast(old_ty, proposed_ty, self.project.arch):
                 cdata = CTypeCast(cdata.type, proposed_ty, cdata, codegen=self)
                 return proposed_ty
             return old_ty
@@ -3881,7 +3894,9 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
                 # transfer casts from the dst to the src if possible
                 # if we see something like *(size_t*)&v4 = x; where v4 is a pointer, change to v4 = (void*)x;
                 nonlocal csrc
-                if not type_equals(old_ty, proposed_ty) and qualifies_for_simple_cast(old_ty, proposed_ty):
+                if not type_equals(old_ty, proposed_ty) and qualifies_for_simple_cast(
+                    old_ty, proposed_ty, self.project.arch
+                ):
                     csrc = CTypeCast(csrc.type, proposed_ty, csrc, codegen=self)
                     return proposed_ty
                 return old_ty
@@ -3929,7 +3944,7 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
                     and target_func.prototype is not None
                     and i < len(target_func.prototype.args)
                 ):
-                    type_ = target_func.prototype.args[i].with_arch(self.project.arch)
+                    type_ = target_func.prototype.args[i]
                     if target_func.prototype_libname is not None:
                         type_ = dereference_simtype_by_lib(type_, target_func.prototype_libname)
 
@@ -3960,7 +3975,7 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
 
         if is_expr:
             # Used as an expression (e.g. nested in another expression)
-            if call_expr.type.size != stmt.size * self.project.arch.byte_width:
+            if call_expr.type.size(self.project.arch) != stmt.size * self.project.arch.byte_width:
                 call_expr = CTypeCast(
                     call_expr.type,
                     self.default_simtype_from_bits(
@@ -4008,7 +4023,7 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
                     and target_func.prototype is not None
                     and i < len(target_func.prototype.args)
                 ):
-                    type_ = target_func.prototype.args[i].with_arch(self.project.arch)
+                    type_ = target_func.prototype.args[i]
                     if target_func.prototype_libname is not None:
                         type_ = dereference_simtype_by_lib(type_, target_func.prototype_libname)
 
@@ -4032,7 +4047,11 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
             codegen=self,
         )
 
-        if expr.bits and call_expr.type is not None and call_expr.type.size != expr.size * self.project.arch.byte_width:
+        if (
+            expr.bits
+            and call_expr.type is not None
+            and call_expr.type.size(self.project.arch) != expr.size * self.project.arch.byte_width
+        ):
             call_expr = CTypeCast(
                 call_expr.type,
                 self.default_simtype_from_bits(
@@ -4138,7 +4157,7 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
     def _handle_Expr_Register(self, expr: Expr.Register, lvalue: bool = False, **kwargs):
         def negotiate(old_ty: SimType, proposed_ty: SimType) -> SimType:
             # we do not allow returning a struct for a primitive type
-            if old_ty.size == proposed_ty.size and (
+            if old_ty.size(self.project.arch) == proposed_ty.size(self.project.arch) and (
                 not isinstance(proposed_ty, SimStruct) or isinstance(old_ty, SimStruct)
             ):
                 return proposed_ty
@@ -4166,14 +4185,14 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
             expr_bits = expr.bits
 
         if expr_size > 100 and isinstance(expr.addr, Expr.Const):
-            return self._handle_Expr_Const(expr.addr, type_=SimTypePointer(SimTypeChar()).with_arch(self.project.arch))
+            return self._handle_Expr_Const(expr.addr, type_=SimTypePointer(SimTypeChar()))
 
         ty = self.default_simtype_from_bits(expr_bits)
 
         def negotiate(old_ty: SimType, proposed_ty: SimType) -> SimType:
             # we do not allow returning a struct for a primitive type
             if (
-                old_ty.size == proposed_ty.size
+                old_ty.size(self.project.arch) == proposed_ty.size(self.project.arch)
                 and not isinstance(proposed_ty, SimStruct)
                 and not isinstance(old_ty, SimStruct)
             ):
@@ -4259,7 +4278,7 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
                 if expr.value in self.project.kb.functions:
                     # It's a function pointer
                     # We don't care about the actual prototype here
-                    type_ = SimTypePointer(SimTypeBottom(label="void")).with_arch(self.project.arch)
+                    type_ = SimTypePointer(SimTypeBottom(label="void"))
                     reference_values[type_] = self.project.kb.functions[expr.value]
                     function_pointer = True
 
@@ -4272,7 +4291,7 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
                 ):
                     md = self._cfg.memory_data[expr.value]
                     if md.sort == MemoryDataSort.String:
-                        type_ = SimTypePointer(SimTypeChar().with_arch(self.project.arch)).with_arch(self.project.arch)
+                        type_ = SimTypePointer(SimTypeChar())
                         reference_values[type_] = self._cfg.memory_data[expr.value]
                         # is it a constant string?
                         if is_in_readonly_segment(self.project, expr.value) or is_in_readonly_section(
@@ -4280,9 +4299,7 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
                         ):
                             inline_string = True
                     elif md.sort == MemoryDataSort.UnicodeString:
-                        type_ = SimTypePointer(SimTypeWideChar().with_arch(self.project.arch)).with_arch(
-                            self.project.arch
-                        )
+                        type_ = SimTypePointer(SimTypeWideChar())
                         reference_values[type_] = self._cfg.memory_data[expr.value]
                         # is it a constant string?
                         if is_in_readonly_segment(self.project, expr.value) or is_in_readonly_section(
@@ -4382,10 +4399,10 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
         # do we need an intermediate cast?
         if orig_child_signed != expr.is_signed and expr.to_bits > expr.from_bits and child.type is not None:
             # this is a problem. sign-extension only happens when the SOURCE of the cast is signed
-            child_ty = self.default_simtype_from_bits(child.type.size, expr.is_signed)
+            child_ty = self.default_simtype_from_bits(child.type.size(self.project.arch), expr.is_signed)
             child = CTypeCast(None, child_ty, child, codegen=self)
 
-        return CTypeCast(None, dst_type.with_arch(self.project.arch), child, tags=expr.tags, codegen=self)
+        return CTypeCast(None, dst_type, child, tags=expr.tags, codegen=self)
 
     def _handle_Expr_Extract(self, expr: Expr.Extract, **kwargs):
         child = self._handle(expr.base)
@@ -4398,15 +4415,15 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
         if isinstance(child_type, TypeRef):
             child_type = child_type.type
         if isinstance(child_type, SimStruct) and offset is not None:
-            field = next((name for name, off in child_type.offsets.items() if off == offset), None)
-            if field is not None and expr.bits == child_type.fields[field].size:
+            field = next((name for name, off in child_type.offsets(self.project.arch).items() if off == offset), None)
+            if field is not None and expr.bits == child_type.fields[field].size(self.project.arch):
                 return CVariableField(child, CStructField(child_type, offset, field, codegen=self), codegen=self)
         if isinstance(child_type, SimTypeInt) and offset == 0:  # TODO not big-endian safe
             return CTypeCast(child_type, target_type, child, codegen=self)
 
-        voidp = SimTypePointer(SimTypeBottom()).with_arch(self.project.arch)
+        voidp = SimTypePointer(SimTypeBottom())
         inner_expr = CTypeCast(
-            SimTypePointer(child_type).with_arch(self.project.arch),
+            SimTypePointer(child_type),
             voidp,
             CUnaryOp("Reference", child, codegen=self),
             codegen=self,
@@ -4422,7 +4439,7 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
             "Dereference",
             CTypeCast(
                 voidp,
-                SimTypePointer(target_type).with_arch(self.project.arch),
+                SimTypePointer(target_type),
                 inner_expr,
                 codegen=self,
             ),
@@ -4468,7 +4485,7 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
                     raise TypeError(f"Unsupported floating-point type with bits {bits} in Reinterpret")
             else:
                 raise TypeError(f"Unexpected reinterpret type {typestr}")
-            return r.with_arch(self.project.arch)
+            return r
 
         src_type = _to_type(expr.from_bits, expr.from_type)
         dst_type = _to_type(expr.to_bits, expr.to_type)
@@ -4505,7 +4522,7 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
                     8: SimTypeChar(signed=False),
                 }.get(expr.bits)
                 if dst_type is not None:
-                    dst_type = dst_type.with_arch(self.project.arch)
+                    dst_type = dst_type
                     return CTypeCast(src_type, dst_type, cvar, tags=expr.tags, codegen=self)
             return cvar
         return CDirtyExpression(expr, codegen=self)
@@ -4648,14 +4665,16 @@ class CStructuredCodeWalker:
 
 class MakeTypecastsImplicit(CStructuredCodeWalker):
     @classmethod
-    def collapse(cls, dst_ty: SimType, child: CExpression) -> CExpression:
+    def collapse(cls, dst_ty: SimType, child: CExpression, arch) -> CExpression:
         result = child
         if isinstance(child, CTypeCast):
             intermediate_ty = child.dst_type
             start_ty = child.src_type
 
             # step 1: collapse pointer-integer casts of the same size
-            if qualifies_for_simple_cast(intermediate_ty, dst_ty) and qualifies_for_simple_cast(start_ty, dst_ty):
+            if qualifies_for_simple_cast(intermediate_ty, dst_ty, arch) and qualifies_for_simple_cast(
+                start_ty, dst_ty, arch
+            ):
                 result = child.expr
             # step 2: collapse integer conversions which are redundant
             if (
@@ -4663,11 +4682,14 @@ class MakeTypecastsImplicit(CStructuredCodeWalker):
                 and isinstance(intermediate_ty, (SimTypeChar, SimTypeInt, SimTypeNum))
                 and isinstance(start_ty, (SimTypeChar, SimTypeInt, SimTypeNum))
             ):
-                assert dst_ty.size and start_ty.size and intermediate_ty.size
-                if dst_ty.size <= start_ty.size and dst_ty.size <= intermediate_ty.size:
+                dst_size = dst_ty.size(arch)
+                start_size = start_ty.size(arch)
+                intermediate_size = intermediate_ty.size(arch)
+                assert dst_size and start_size and intermediate_size
+                if dst_size <= start_size and dst_size <= intermediate_size:
                     # this is a down- or neutral-cast with an intermediate step that doesn't matter
                     result = child.expr
-                elif dst_ty.size >= intermediate_ty.size >= start_ty.size and intermediate_ty.signed == start_ty.signed:
+                elif dst_size >= intermediate_size >= start_size and intermediate_ty.signed == start_ty.signed:
                     # this is an up- or neutral-cast which is monotonically ascending
                     # we can leave out the dst_ty.signed check
                     result = child.expr
@@ -4675,39 +4697,40 @@ class MakeTypecastsImplicit(CStructuredCodeWalker):
 
         if result is not child:
             # TODO this is not the best since it prohibits things like the BinaryOp optimizer from working incrementally
-            return cls.collapse(dst_ty, result)
+            return cls.collapse(dst_ty, result, arch)
         return result
 
     def handle_CAssignment(self, obj):
-        obj.rhs = self.collapse(obj.lhs.type, obj.rhs)
+        obj.rhs = self.collapse(obj.lhs.type, obj.rhs, obj.codegen.project.arch)
         return super().handle_CAssignment(obj)
 
     def handle_CFunctionCall(self, obj: CFunctionCall):
         prototype_args = [] if obj.prototype is None else obj.prototype.args
         for i, (c_arg, arg_ty) in enumerate(zip(obj.args, prototype_args)):
-            obj.args[i] = self.collapse(arg_ty, c_arg)
+            obj.args[i] = self.collapse(arg_ty, c_arg, obj.codegen.project.arch)
         return super().handle_CFunctionCall(obj)
 
     def handle_CReturn(self, obj: CReturn):
-        obj.retval = self.collapse(obj.codegen._func.prototype.returnty, obj.retval)
+        obj.retval = self.collapse(obj.codegen._func.prototype.returnty, obj.retval, obj.codegen.project.arch)
         return super().handle_CReturn(obj)
 
     def handle_CBinaryOp(self, obj: CBinaryOp):
         obj = super().handle_CBinaryOp(obj)
+        arch = obj.codegen.project.arch
         while True:
-            new_lhs = self.collapse(obj.common_type, obj.lhs)
+            new_lhs = self.collapse(obj.common_type, obj.lhs, arch)
             assert obj.rhs.type is not None and new_lhs.type is not None
             if (
                 new_lhs is not obj.lhs
-                and CBinaryOp.compute_common_type(obj.op, new_lhs.type, obj.rhs.type) == obj.common_type
+                and CBinaryOp.compute_common_type(obj.op, new_lhs.type, obj.rhs.type, arch) == obj.common_type
             ):
                 obj.lhs = new_lhs
             else:
-                new_rhs = self.collapse(obj.common_type, obj.rhs)
+                new_rhs = self.collapse(obj.common_type, obj.rhs, arch)
                 assert new_rhs.type is not None and obj.lhs.type is not None
                 if (
                     new_rhs is not obj.rhs
-                    and CBinaryOp.compute_common_type(obj.op, obj.lhs.type, new_rhs.type) == obj.common_type
+                    and CBinaryOp.compute_common_type(obj.op, obj.lhs.type, new_rhs.type, arch) == obj.common_type
                 ):
                     obj.rhs = new_rhs
                 else:
@@ -4717,12 +4740,13 @@ class MakeTypecastsImplicit(CStructuredCodeWalker):
     def handle_CTypeCast(self, obj: CTypeCast):
         # note that the expression that this method returns may no longer be a CTypeCast
         obj = super().handle_CTypeCast(obj)
-        inner = self.collapse(obj.dst_type, obj.expr)
+        arch = obj.codegen.project.arch
+        inner = self.collapse(obj.dst_type, obj.expr, arch)
         assert inner.type is not None
         if inner is not obj.expr:
             obj.src_type = inner.type
             obj.expr = inner
-        if obj.src_type == obj.dst_type or qualifies_for_implicit_cast(obj.src_type, obj.dst_type):
+        if obj.src_type == obj.dst_type or qualifies_for_implicit_cast(obj.src_type, obj.dst_type, arch):
             return obj.expr
         return obj
 

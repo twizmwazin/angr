@@ -22,11 +22,12 @@ from angr.rust.utils.ail import unwrap_stack_vvar_reference
 class PatternMatchWalker(SequenceWalker, DFAMixin):
     """Walker that converts condition nodes into pattern match or if-let nodes."""
 
-    def __init__(self, var_manager, graph, variable_map):
+    def __init__(self, var_manager, graph, variable_map, arch):
         super().__init__()
         self.var_manager = var_manager
         self.graph = graph
         self._variable_map = variable_map
+        self.arch = arch
 
     @staticmethod
     def _find_first_block(node):
@@ -88,14 +89,14 @@ class PatternMatchWalker(SequenceWalker, DFAMixin):
                         and src_vvar.stack_offset not in src_offset_to_stmt
                     ):
                         src_offset_to_stmt[src_vvar.stack_offset] = stmt
-            field_offsets = variant.field_offsets
+            field_offsets = variant.field_offsets(self.arch)
             move_stmts = []
             for field_offset in sorted(field_offsets.keys()):
                 field_ty = field_offsets[field_offset]
                 field_offset += scrutinee.stack_offset
                 if (
                     field_offset in src_offset_to_stmt
-                    and src_offset_to_stmt[field_offset].dst.size == field_ty.size // 8
+                    and src_offset_to_stmt[field_offset].dst.size == field_ty.size(self.arch) // 8
                 ):
                     move_stmts.append(src_offset_to_stmt[field_offset])
                 else:
@@ -263,6 +264,7 @@ class PatternMatchSimplifier(SequenceOptimizationPass):
             self._dvars_kb.dec_variables.get_function_manager(self._func.addr),
             self._graph,
             variable_map_of(self.manager),
+            self.project.arch,
         )
         walker.walk(self.seq)
         self.out_seq = self.seq

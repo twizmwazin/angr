@@ -70,25 +70,9 @@ class TestSimTypeEnum(unittest.TestCase):
         """Test enum size and alignment derived from base type."""
         arch = archinfo.ArchAMD64()
         enum = SimTypeEnum(members={"A": 0}, name="test")
-        enum = enum.with_arch(arch)
         # Default is unsigned int, which is 32 bits on AMD64
-        assert enum.size == 32
-        assert enum.alignment == 4
-
-    def test_enum_with_arch(self):
-        """Test enum with_arch method."""
-        enum = SimTypeEnum(
-            members={"A": 0, "B": 1},
-            name="test",
-            qualifier=["const"],
-        )
-        arch = archinfo.ArchAMD64()
-        enum_with_arch = enum.with_arch(arch)
-        assert enum_with_arch._arch == arch
-        assert enum_with_arch.members == enum.members
-        assert enum_with_arch._name == enum._name
-        assert enum_with_arch.label == enum.label
-        assert enum_with_arch.qualifier == ["const"]
+        assert enum.size(arch) == 32
+        assert enum.alignment(arch) == 4
 
     def test_enum_c_repr_short(self):
         """Test enum C representation (short form)."""
@@ -278,22 +262,8 @@ class TestSimTypeBitfield(unittest.TestCase):
         """Test bitfield size and alignment from base type."""
         arch = archinfo.ArchAMD64()
         bf = SimTypeBitfield(flags={"A": 1}, name="test")
-        bf = bf.with_arch(arch)
-        assert bf.size == 32
-        assert bf.alignment == 4
-
-    def test_bitfield_with_arch(self):
-        """Test bitfield with_arch method."""
-        bf = SimTypeBitfield(
-            flags={"A": 1, "B": 2},
-            name="test",
-            qualifier=["const"],
-        )
-        arch = archinfo.ArchAMD64()
-        bf_with_arch = bf.with_arch(arch)
-        assert bf_with_arch._arch == arch
-        assert bf_with_arch.flags == bf.flags
-        assert bf_with_arch._name == bf._name
+        assert bf.size(arch) == 32
+        assert bf.alignment(arch) == 4
 
     def test_bitfield_c_repr(self):
         """Test bitfield C representation."""

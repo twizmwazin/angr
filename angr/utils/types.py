@@ -98,8 +98,6 @@ def dereference_simtype(
                     continue
         if real_type is None:
             raise AngrMissingTypeError(t.name)
-        if t._arch is not None:
-            real_type = real_type.with_arch(t._arch)
         return dereference_simtype(real_type, type_collections, memo=memo)
 
     # the following code prepares a real_type SimType object that will be returned at the end of this method
@@ -135,8 +133,6 @@ def dereference_simtype(
     else:
         return t
 
-    if t._arch is not None:
-        real_type = real_type.with_arch(t._arch)
     return real_type
 
 
@@ -191,6 +187,4 @@ def make_type_reference(t: SimType, memo: dict[str, SimTypeRef] | None = None) -
     else:
         return t
 
-    if t._arch is not None:
-        ref_t = ref_t.with_arch(t._arch)
     return ref_t

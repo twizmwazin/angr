@@ -44,7 +44,7 @@ class TestCallingConvention(TestCase):
         arch = archinfo.arch_from_id("amd64")
         cc = SimCCSystemVAMD64(arch)
 
-        int_type = SimTypeInt().with_arch(arch)
+        int_type = SimTypeInt()
         flattened_int = cc._flatten(int_type)
         self.assertTrue(all(isinstance(key, int) for key in flattened_int))
         self.assertTrue(all(isinstance(value, list) for value in flattened_int.values()))
@@ -56,8 +56,8 @@ class TestCallingConvention(TestCase):
         arch = archinfo.arch_from_id("amd64")
         cc = SimCCSystemVAMD64(arch)
 
-        int_type = SimTypeInt().with_arch(arch)
-        array_type = SimTypeFixedSizeArray(int_type, 20).with_arch(arch)
+        int_type = SimTypeInt()
+        array_type = SimTypeFixedSizeArray(int_type, 20)
         flattened_array = cc._flatten(array_type)
         self.assertTrue(all(isinstance(key, int) for key in flattened_array))
         self.assertTrue(all(isinstance(value, list) for value in flattened_array.values()))
@@ -68,7 +68,7 @@ class TestCallingConvention(TestCase):
     def test_arg_locs_array(self):
         arch = archinfo.arch_from_id("amd64")
         cc = SimCCSystemVAMD64(arch)
-        proto = SimTypeFunction([SimTypeFixedSizeArray(SimTypeInt().with_arch(arch), 2).with_arch(arch)], None)
+        proto = SimTypeFunction([SimTypeFixedSizeArray(SimTypeInt(), 2)], None)
 
         # It should not raise any exception!
         cc.arg_locs(proto)
@@ -81,7 +81,7 @@ class TestCallingConvention(TestCase):
         cc = SimCCMicrosoftFastcall(arch)
 
         def footprints(proto):
-            return [list(loc.get_footprint()) for loc in cc.arg_locs(proto.with_arch(arch))]
+            return [list(loc.get_footprint()) for loc in cc.arg_locs(proto)]
 
         # __int64 first arg -> stack (two words); the following int still gets ECX.
         assert footprints(SimTypeFunction([SimTypeLongLong(), SimTypeInt()], SimTypeInt())) == [
@@ -106,7 +106,7 @@ class TestCallingConvention(TestCase):
             [SimRegArg("ecx", 4)],
         ]
         # A sub-DWORD integer still uses a register, refined to its size.
-        char_locs = cc.arg_locs(SimTypeFunction([SimTypeChar(), SimTypeInt()], SimTypeInt()).with_arch(arch))
+        char_locs = cc.arg_locs(SimTypeFunction([SimTypeChar(), SimTypeInt()], SimTypeInt()))
         assert isinstance(char_locs[0], SimRegArg) and char_locs[0].reg_name == "ecx" and char_locs[0].size == 1
         assert char_locs[1] == SimRegArg("edx", 4)
 
@@ -177,7 +177,7 @@ class TestCallingConvention(TestCase):
         with open(c_decl, encoding="utf-8") as f:
             raw_content = f.read()
         defns, _ = types.parse_file(raw_content)
-        proto = defns["complex_func"].with_arch(proj.arch)
+        proto = defns["complex_func"]
 
         args = [100, {"f": 1.0, "i": 2}, 3.0, {"x": 10.0, "y": 20.0, "z": 30.0}, 4, 5, 6, 7, 8, 9.0, 10, 11, 12.0]
 
@@ -219,7 +219,7 @@ class TestCallingConvention(TestCase):
         with open(c_decl, encoding="utf-8") as f:
             raw_content = f.read()
         defns, _ = types.parse_file(raw_content)
-        proto = defns["complex_func"].with_arch(proj.arch)
+        proto = defns["complex_func"]
 
         args = [{"f": 1.0, "i": 2}, {"x": 10, "y": 20}, {"a": 101.3, "c": 102.3, "d": 60}]
         state = proj.factory.call_state(func_addr, *args, cc=cc, prototype=proto)
@@ -248,7 +248,7 @@ class TestCallingConvention(TestCase):
         func_proto = SimTypeFunction([], SimTypeRef("std::wstring_t", SimCppClass))
 
         for arch in [archinfo.ArchAMD64, archinfo.ArchX86, archinfo.ArchARM]:
-            proto = func_proto.with_arch(arch())
+            proto = func_proto
             cc = default_cc(arch.name)(arch())
 
             # It should not raise any exception!

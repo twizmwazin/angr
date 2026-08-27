@@ -46,9 +46,7 @@ class TypeDBLoader(Analysis):
         return self.project.kb.known_structs.known_struct_types
 
     def _parse_Pointer(self, data):
-        return RustSimTypeReference(self._parse_type(data["pts_to"]) or RustSimTypeBottom()).with_arch(
-            self.project.arch
-        )
+        return RustSimTypeReference(self._parse_type(data["pts_to"]) or RustSimTypeBottom())
 
     def _parse_Primitive(self, data):
         name = data["name"]
@@ -76,7 +74,7 @@ class TypeDBLoader(Analysis):
         }
         result = rust_primitive_types.get(name, RustSimTypeInt(data["size"] * self.project.arch.byte_width, False))
         if result is not None:
-            return result.with_arch(self.project.arch)
+            return result
         return None
 
     def _to_slice(self, ty: RustSimStruct):
@@ -86,11 +84,11 @@ class TypeDBLoader(Analysis):
             if (
                 isinstance(data_ptr_ty, RustSimTypeReference)
                 and isinstance(length_ty, RustSimTypeSize)
-                and length_ty.size == self.project.arch.bits
+                and length_ty.size(self.project.arch) == self.project.arch.bits
             ):
-                if ty.name == "&str" and data_ptr_ty.pts_to == RustSimTypeInt(8, False).with_arch(self.project.arch):
-                    return RustSimTypeStrRef().with_arch(self.project.arch)
-                return RustSimTypeSlice(data_ptr_ty.pts_to).with_arch(self.project.arch)
+                if ty.name == "&str" and data_ptr_ty.pts_to == RustSimTypeInt(8, False):
+                    return RustSimTypeStrRef()
+                return RustSimTypeSlice(data_ptr_ty.pts_to)
         return ty
 
     @staticmethod
@@ -140,7 +138,7 @@ class TypeDBLoader(Analysis):
             for field_name, field_data in fields_data.values():
                 fields[field_name] = self._parse_type(field_data)
             if None not in fields.values():
-                result = RustSimStruct(fields=fields, name=name).with_arch(self.project.arch)
+                result = RustSimStruct(fields=fields, name=name)
                 result = self._apply_patches(result)
                 self._structs[name] = result
             self._pending_types.remove(name)
@@ -188,7 +186,7 @@ class TypeDBLoader(Analysis):
                     some_variant.discriminant,
                     some_variant.discriminant_size,
                     name=name,
-                ).with_arch(self.project.arch)
+                )
             elif name.startswith("core::result::Result") and set(name_to_variant.keys()) == {"Ok", "Err"}:
                 ok_variant = name_to_variant["Ok"]
                 err_variant = name_to_variant["Err"]
@@ -200,9 +198,9 @@ class TypeDBLoader(Analysis):
                     err_variant.discriminant,
                     err_variant.discriminant_size,
                     name=name,
-                ).with_arch(self.project.arch)
+                )
             else:
-                result = RustSimEnum(name=name, variants=variants).with_arch(self.project.arch)
+                result = RustSimEnum(name=name, variants=variants)
             self._structs[name] = result
             self._pending_types.remove(name)
         return result
@@ -211,7 +209,7 @@ class TypeDBLoader(Analysis):
         ele_ty = self._parse_type(data["ele_type"])
         length = data["length"]
         if ele_ty is not None:
-            return RustSimTypeArray(ele_ty, length).with_arch(self.project.arch)
+            return RustSimTypeArray(ele_ty, length)
         return None
 
     def _parse_type(self, data):
@@ -235,15 +233,16 @@ class TypeDBLoader(Analysis):
     def _fit_abi(self, prototype: RustSimTypeFunction):
         # This is a heuristic to adjust function prototypes to match Rust's ABI conventions
         # Rust's ABI is unstable, but we can assume that large structs/enums are passed by reference
+        arch = self.project.arch
         new_args = []
         for arg_ty in prototype.args:
-            if isinstance(arg_ty, (RustSimEnum, RustSimStruct)) and arg_ty.size > self.project.arch.bits * 2:
+            if isinstance(arg_ty, (RustSimEnum, RustSimStruct)) and arg_ty.size(arch) > arch.bits * 2:
                 new_args.append(RustSimTypeReference(arg_ty))
             else:
                 new_args.append(arg_ty)
         if (
             isinstance(prototype.returnty, (RustSimEnum, RustSimStruct))
-            and prototype.returnty.size > self.project.arch.bits * 2
+            and prototype.returnty.size(arch) > arch.bits * 2
         ):
             new_args.insert(0, RustSimTypeReference(prototype.returnty))
             return RustSimTypeFunction(new_args, None, is_arg0_retbuf=True)
@@ -255,31 +254,31 @@ class TypeDBLoader(Analysis):
             return None
         ret_ty = self._parse_type(data["returnty"])
         fn_ty = RustSimTypeFunction(args, ret_ty)  # pyright: ignore[reportArgumentType]
-        return self._fit_abi(fn_ty).with_arch(self.project.arch)
+        return self._fit_abi(fn_ty)
 
     def _negotiate_prototype(self, prototype: RustSimTypeFunction, old_prototype: SimTypeFunction):
         # Negotiate the prototype with the old one to ensure compatibility
         # This is a heuristic and may not cover all cases
+        arch = self.project.arch
+        old_args_size = sum(arg_ty.size(arch) or 0 for arg_ty in old_prototype.args)
+        new_args_size = sum(arg_ty.size(arch) for arg_ty in prototype.args)
         if (
             isinstance(prototype.returnty, (RustSimEnum, RustSimStruct))
-            and prototype.returnty.size == self.project.arch.bits * 2
+            and prototype.returnty.size(arch) == arch.bits * 2
         ):
             # If the return type is a large struct/enum that fits in two registers, assume it's returned directly
             if (
-                sum(arg_ty.size or 0 for arg_ty in old_prototype.args) == sum(arg_ty.size for arg_ty in prototype.args)
+                old_args_size == new_args_size
                 and old_prototype.returnty
-                and old_prototype.returnty.size == self.project.arch.bits * 2
+                and old_prototype.returnty.size(arch) == arch.bits * 2
             ):
                 return prototype
-            if (
-                sum(arg_ty.size or 0 for arg_ty in old_prototype.args)
-                == sum(arg_ty.size for arg_ty in prototype.args) + self.project.arch.bits
-            ):
+            if old_args_size == new_args_size + arch.bits:
                 new_args = list(prototype.args)
                 new_args.insert(0, RustSimTypeReference(prototype.returnty))
-                return RustSimTypeFunction(new_args, None, is_arg0_retbuf=True).with_arch(self.project.arch)
+                return RustSimTypeFunction(new_args, None, is_arg0_retbuf=True)
         else:
-            if sum(arg_ty.size or 0 for arg_ty in old_prototype.args) == sum(arg_ty.size for arg_ty in prototype.args):
+            if old_args_size == new_args_size:
                 return prototype
         return None
 
@@ -315,7 +314,6 @@ class TypeDBLoader(Analysis):
         for func_data in prototype_db:
             prototype = self._parse_Prototype(func_data["prototype"])
             if prototype is not None:
-                prototype = prototype.with_arch(self.project.arch)
                 func_name = func_data["name"]
                 name_to_prototypes[func_name].append(prototype)
 
@@ -327,7 +325,7 @@ class TypeDBLoader(Analysis):
                     # Re-fetch the function each time to get the current object from the cache
                     func = self.kb.functions[func_addr]
                     if func.prototype:
-                        old_prototype = func.prototype.with_arch(self.project.arch)
+                        old_prototype = func.prototype
                         if len(prototypes) == 1:
                             # If there's only one prototype for this function name, we can be more confident about it
                             # and skip negotiation

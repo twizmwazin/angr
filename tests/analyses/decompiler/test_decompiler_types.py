@@ -39,11 +39,13 @@ class TestDecompilerTypes(unittest.TestCase):
         proto_0 = proj.kb.functions[0x1402004F8].prototype
         assert proto_0 is not None
         assert proto_0.args
-        assert proto_0.args[0].size is not None and proto_0.args[0].size > 0
+        arg_0_size = proto_0.args[0].size(proj.arch)
+        assert arg_0_size is not None and arg_0_size > 0
         proto_1 = proj.kb.functions[0x140200518].prototype
         assert proto_1 is not None
         assert proto_1.args
-        assert proto_1.args[-1].size is not None and proto_1.args[-1].size > 0
+        arg_last_size = proto_1.args[-1].size(proj.arch)
+        assert arg_last_size is not None and arg_last_size > 0
 
     def test_guid_stackvar_assignment(self):
         bin_path = os.path.join(
@@ -116,7 +118,7 @@ class TestDecompilerTypes(unittest.TestCase):
         assert isinstance(ty, SimTypeArray) and isinstance(ty.elem_type, SimTypeChar) and ty.length == 64
 
         # set it to an array of size 0
-        varman.set_variable_type(var2, SimTypeArray(SimTypeChar(), 0).with_arch(proj.arch), mark_manual=True)
+        varman.set_variable_type(var2, SimTypeArray(SimTypeChar(), 0), mark_manual=True)
 
         # decompile again; should not crash!
         new_dec = proj.analyses.Decompiler(func, fail_fast=True, regen_clinic=True)
@@ -125,7 +127,7 @@ class TestDecompilerTypes(unittest.TestCase):
         assert f"char {var2.name}[0];" in new_dec.codegen.text
 
         # set it to an integer
-        varman.set_variable_type(var2, SimTypeInt().with_arch(proj.arch), mark_manual=True)
+        varman.set_variable_type(var2, SimTypeInt(), mark_manual=True)
 
         # decompile again; should not crash!
         new_dec = proj.analyses.Decompiler(func, fail_fast=True, regen_clinic=True)
@@ -147,9 +149,7 @@ class TestDecompilerTypes(unittest.TestCase):
 
         callee = cfg.functions["authenticate"]
         callee.calling_convention = default_cc(proj.arch.name, platform=proj.simos.name)(proj.arch)
-        callee.prototype = SimTypeFunction([SimTypePointer(alpha), SimTypePointer(beta)], SimTypeInt()).with_arch(
-            proj.arch
-        )
+        callee.prototype = SimTypeFunction([SimTypePointer(alpha), SimTypePointer(beta)], SimTypeInt())
 
         dec = proj.analyses.Decompiler(cfg.functions["main"], cfg=cfg, fail_fast=True)
         assert dec.codegen is not None and dec.codegen.text is not None

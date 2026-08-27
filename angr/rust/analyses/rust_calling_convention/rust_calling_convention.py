@@ -173,7 +173,7 @@ class RustCallingConventionAnalysis(Analysis):
         args = []
         for arg_idx, old_arg_type in enumerate(prototype.args):
             if is_arg0_ret_buf and arg_idx == 0:
-                args.append(RustSimTypeReference(returnty).with_arch(self.project.arch))
+                args.append(RustSimTypeReference(returnty))
                 returnty = None
                 continue
             arg_type = self._infer_arg_type(arg_idx)
@@ -204,18 +204,16 @@ class RustCallingConventionAnalysis(Analysis):
 
             # Heuristics: check if the return type is &str (ptr, len pair in two registers)
             if self._is_str_ref_return():
-                return RustSimTypeStrRef().with_arch(self.project.arch), False
+                return RustSimTypeStrRef(), False
 
             # Heuristics: check if the return type could be Result<(), &str> (std::io::Result<()>)
             if len(ret_values) == 2 and 0 in ret_values:
                 _, another_const = sorted(ret_values)
                 error_msg = extract_str_from_addr(self.project, another_const)
                 if error_msg is not None:
-                    ok_type = RustSimStruct(OrderedDict(), "()", True).with_arch(self.project.arch)
-                    err_type = RustSimTypeReference(RustSimTypeStrRef()).with_arch(self.project.arch)
-                    result_ty = RustSimTypeResult(ok_type, 0, self.project.arch.bytes, err_type, None, 0).with_arch(
-                        self.project.arch
-                    )
+                    ok_type = RustSimStruct(OrderedDict(), "()", True)
+                    err_type = RustSimTypeReference(RustSimTypeStrRef())
+                    result_ty = RustSimTypeResult(ok_type, 0, self.project.arch.bytes, err_type, None, 0)
                     return result_ty, False
             # 16-byte struct/enum returned via two registers
             # Infer the return type based on const return values (discriminants) found across return sites:
@@ -224,7 +222,7 @@ class RustCallingConventionAnalysis(Analysis):
             #   2 const values, differ by 1 → Result<T, E>, smaller discriminant is Ok
             #   2 const values, differ by >1 → Option<T>, smaller value is None's discriminant
             #                                  (the other value is a concrete payload, not a discriminant)
-            if prototype.returnty and prototype.returnty.size == self.project.arch.bits * 2:
+            if prototype.returnty and prototype.returnty.size(self.project.arch) == self.project.arch.bits * 2:
                 arch_bytes = self.project.arch.bytes
                 payload_ty = RustSimStruct(
                     OrderedDict(
@@ -235,7 +233,7 @@ class RustCallingConventionAnalysis(Analysis):
                     ),
                     name=f"struct{arch_bytes * 2}",
                     pack=True,
-                ).with_arch(self.project.arch)
+                )
                 # Check if discriminant 0 has any concrete overflow value
                 none_has_concrete_overflow = any(ov is not None for rv, ov in self.model.const_ret_values if rv == 0)
 
@@ -250,7 +248,7 @@ class RustCallingConventionAnalysis(Analysis):
                             payload_ty,
                             None,
                             0,
-                        ).with_arch(self.project.arch),
+                        ),
                         False,
                     )
                 if len(ret_values) == 2:
@@ -271,7 +269,7 @@ class RustCallingConventionAnalysis(Analysis):
                                 payload_ty,
                                 err_discriminant,
                                 arch_bytes,
-                            ).with_arch(self.project.arch),
+                            ),
                             False,
                         )
                     if 0 in ret_values and not none_has_concrete_overflow:
@@ -284,7 +282,7 @@ class RustCallingConventionAnalysis(Analysis):
                                 payload_ty,
                                 None,
                                 0,
-                            ).with_arch(self.project.arch),
+                            ),
                             False,
                         )
             return prototype.returnty, False  # pyright: ignore[reportReturnType]
@@ -304,15 +302,17 @@ class RustCallingConventionAnalysis(Analysis):
                     discriminant = expr
             struct_ty = RustSimStruct(
                 fields,
-                name=f"struct{sum(field.size or 0 for field in fields.values()) // 8}",
+                name=f"struct{sum(field.size(self.project.arch) or 0 for field in fields.values()) // 8}",
                 pack=True,
-            ).with_arch(self.project.arch)
+            )
             candidates_and_paths.append(((struct_ty, discriminant), path))
 
         # Return inferred enum type if we found one, otherwise return the struct type with the largest size
         returnty = self._infer_potential_enum_type(candidates_and_paths)
         if not returnty and candidates_and_paths:
-            returnty = next(iter(sorted(candidates_and_paths, key=lambda item: item[0][0].size, reverse=True)))[0][0]
+            returnty = next(
+                iter(sorted(candidates_and_paths, key=lambda item: item[0][0].size(self.project.arch), reverse=True))
+            )[0][0]
         return returnty, True
 
     def _is_str_ref_return(self) -> bool:
@@ -337,19 +337,19 @@ class RustCallingConventionAnalysis(Analysis):
                     fields[f"field_{offset}"] = arg_ty
                 struct_ty = RustSimStruct(
                     fields,
-                    name=f"struct{sum(field.size or 0 for field in fields.values()) // 8}",
+                    name=f"struct{sum(field.size(self.project.arch) or 0 for field in fields.values()) // 8}",
                     pack=True,
-                ).with_arch(self.project.arch)
+                )
             candidates.append(struct_ty)
 
-        final_ty = max(candidates, key=lambda candidate: candidate.size) if candidates else None
+        final_ty = max(candidates, key=lambda candidate: candidate.size(self.project.arch)) if candidates else None
 
         # Filter out register-size structs
-        if final_ty and final_ty.size <= self.project.arch.bits:
+        if final_ty and final_ty.size(self.project.arch) <= self.project.arch.bits:
             return None
 
         if final_ty:
-            final_ty = RustSimTypeReference(final_ty).with_arch(self.project.arch)
+            final_ty = RustSimTypeReference(final_ty)
 
         return final_ty
 
@@ -379,7 +379,10 @@ class RustCallingConventionAnalysis(Analysis):
                         and next_arg.varid - arg.varid == 1
                     ):
                         arg_ty = self._arg_idx_to_arg_ty(i, call)
-                        if isinstance(arg_ty, RustSimType) and arg_ty.size == self.project.arch.bits * 2:
+                        if (
+                            isinstance(arg_ty, RustSimType)
+                            and arg_ty.size(self.project.arch) == self.project.arch.bits * 2
+                        ):
                             combo_arg_types[arg.varid] = arg_ty
                             i += 1
                 i += 1
@@ -411,7 +414,7 @@ class RustCallingConventionAnalysis(Analysis):
             for arg_ty in call_prototype.args:
                 if cur_offset == arg_offset:
                     return arg_ty
-                cur_offset += arg_ty.size or 0
+                cur_offset += arg_ty.size(self.project.arch) or 0
                 if cur_offset > arg_offset:
                     break
         return None
@@ -434,17 +437,18 @@ class RustCallingConventionAnalysis(Analysis):
         return None
 
     def _remove_discriminant_from_struct(self, struct_type: RustSimStruct):
+        arch = self.project.arch
         field_types = list(struct_type.fields.values())[1:]
         fields = OrderedDict()
         offset = 0
         for field_type in field_types:
             fields[f"field_{offset}"] = field_type
-            offset += (field_type.size or 0) // self.project.arch.byte_width
+            offset += (field_type.size(arch) or 0) // arch.byte_width
         return RustSimStruct(
             fields,
-            name=f"struct{sum(field.size or 0 for field in fields.values()) // 8}",
+            name=f"struct{sum(field.size(arch) or 0 for field in fields.values()) // 8}",
             pack=True,
-        ).with_arch(self.project.arch)
+        )
 
     def _infer_potential_enum_type(
         self, candidates_and_paths: list[tuple[tuple[RustSimStruct, Const | None], tuple[Block]]]
@@ -452,22 +456,24 @@ class RustCallingConventionAnalysis(Analysis):
         if len(candidates_and_paths) <= 1:
             return None
 
+        arch = self.project.arch
+
         # Deduplicate candidates by (size, discriminant value)
         candidates_and_discriminants = []
         visited = set()
         for (candidate, discriminant), _ in candidates_and_paths:
-            key = (candidate.size, discriminant.value if discriminant else None)
+            key = (candidate.size(arch), discriminant.value if discriminant else None)
             if key not in visited:
                 visited.add(key)
                 candidates_and_discriminants.append((candidate, discriminant))
-        candidates_and_discriminants = tuple(sorted(candidates_and_discriminants, key=lambda item: item[0].size))
+        candidates_and_discriminants = tuple(sorted(candidates_and_discriminants, key=lambda item: item[0].size(arch)))
 
         if len(candidates_and_discriminants) == 2:
             discriminants = [discriminant for _, discriminant in candidates_and_discriminants]
             discriminant_sizes = {discriminant.bits for discriminant in discriminants if discriminant is not None}
             if len(discriminant_sizes) == 1:
                 discriminant_size = next(iter(discriminant_sizes))
-                candidate_sizes = sorted({candidate.size for candidate, _ in candidates_and_discriminants})
+                candidate_sizes = sorted({candidate.size(arch) for candidate, _ in candidates_and_discriminants})
                 overlapping_discriminant = None in discriminants
                 if candidate_sizes[0] == discriminant_size:
                     # Option<T> or Result<(), E>
@@ -482,7 +488,7 @@ class RustCallingConventionAnalysis(Analysis):
                         some_type = self._remove_discriminant_from_struct(some_type)
                     none_discriminant_size = discriminant_size // 8
                     some_discriminant_size = discriminant_size // 8 if not overlapping_discriminant else 0
-                    if some_type.size // 8 == self.project.arch.bytes * 2:
+                    if some_type.size(arch) // 8 == arch.bytes * 2:
                         # Heuristics: Maybe it's a Result<(), E>
                         some_type.name = "Error"
                         return RustSimTypeResult(
@@ -492,14 +498,14 @@ class RustCallingConventionAnalysis(Analysis):
                             some_type,
                             some_discriminant,
                             some_discriminant_size,
-                        ).with_arch(self.project.arch)
+                        )
                     return RustSimTypeOption(
                         none_discriminant,
                         none_discriminant_size,
                         some_type,
                         some_discriminant,
                         some_discriminant_size,
-                    ).with_arch(self.project.arch)
+                    )
                 if None not in discriminants:
                     # Result<T, E> with both discriminants known
                     # Default: sort by discriminant value (smaller = Ok, larger = Err)
@@ -526,7 +532,7 @@ class RustCallingConventionAnalysis(Analysis):
                         err_type,
                         err_discriminant.value,
                         discriminant_size,
-                    ).with_arch(self.project.arch)
+                    )
                 if candidates_and_discriminants[1][1] is None:
                     # Result<T, E> with one discriminant missing (T is larger, discriminant omitted)
                     (err_type, err_discriminant), (ok_type, _) = candidates_and_discriminants
@@ -538,15 +544,15 @@ class RustCallingConventionAnalysis(Analysis):
                         err_type,
                         err_discriminant.value,
                         discriminant_size,
-                    ).with_arch(self.project.arch)
+                    )
 
         if len(candidates_and_discriminants) >= 2:
             structs_by_size = {}
             for candidate, _ in candidates_and_discriminants:
-                if candidate.size not in structs_by_size:
-                    structs_by_size[candidate.size] = candidate
+                if candidate.size(arch) not in structs_by_size:
+                    structs_by_size[candidate.size(arch)] = candidate
             if len(structs_by_size) == 2:
-                small_type, large_type = sorted(structs_by_size.values(), key=lambda ty: ty.size)
+                small_type, large_type = sorted(structs_by_size.values(), key=lambda ty: ty.size(arch))
                 return RustSimTypeResult(
                     ok_type=large_type,
                     ok_discriminant=None,
@@ -554,23 +560,21 @@ class RustCallingConventionAnalysis(Analysis):
                     err_type=small_type,
                     err_discriminant=None,
                     err_discriminant_size=0,
-                ).with_arch(self.project.arch)
+                )
             if (
                 len(structs_by_size) > 2
-                and min(structs_by_size) > 16 * self.project.arch.byte_width
+                and min(structs_by_size) > 16 * arch.byte_width
                 and not all(discriminant is None for _, discriminant in candidates_and_discriminants)
             ):
                 variants = []
                 for candidate, _ in candidates_and_discriminants:
-                    variant_name = f"variant{candidate.size // self.project.arch.byte_width}"
+                    variant_name = f"variant{candidate.size(arch) // arch.byte_width}"
                     variants.append(
                         EnumVariant(
                             name=variant_name, fields=[(candidate, None)], discriminant=None, discriminant_size=0
                         )
                     )
-                return RustSimEnum(f"enum{max(structs_by_size) // self.project.arch.byte_width}", variants).with_arch(
-                    self.project.arch
-                )
+                return RustSimEnum(f"enum{max(structs_by_size) // arch.byte_width}", variants)
 
         return None
 

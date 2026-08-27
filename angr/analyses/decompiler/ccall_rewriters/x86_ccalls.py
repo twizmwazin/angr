@@ -353,10 +353,10 @@ class X86CCallRewriter(CCallRewriterBase):
                 accessor_name = X86_Win32_TIB_Funcs[virtual_addr.value_int]
                 prototype = SIM_LIBRARIES["ntdll.dll"][0].get_prototype(accessor_name, deref=True)
                 returnty_bits = ccall.bits
-                if prototype is not None:
-                    prototype = prototype.with_arch(self.project.arch)
-                    if prototype.returnty and prototype.returnty.size:
-                        returnty_bits = prototype.returnty.size
+                if prototype is not None and prototype.returnty:
+                    returnty_size = prototype.returnty.size(self.project.arch)
+                    if returnty_size:
+                        returnty_bits = returnty_size
                 call_expr = Call(
                     ccall.idx,
                     X86_Win32_TIB_Funcs[virtual_addr.value_int],

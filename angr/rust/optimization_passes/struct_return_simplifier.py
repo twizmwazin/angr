@@ -40,18 +40,18 @@ class StructReturnSimplifier(OptimizationPass, SRDAMixin, CFGTransformationMixin
 
     def _build_struct_ty(self, fields):
         if not fields:
-            return RustSimTypeUnit().with_arch(self.project.arch)
+            return RustSimTypeUnit()
         ty_fields = {}
         for offset in sorted(fields.keys()):
             expr = fields[offset]
             arg_ty = RustSimTypeInt(expr.bits, signed=False)
-            cur_size = RustSimStruct(ty_fields).with_arch(self.project.arch).size // self.project.arch.bytes
+            cur_size = RustSimStruct(ty_fields).size(self.project.arch) // self.project.arch.bytes
             if cur_size < offset:
                 ty_fields[f"padding_{cur_size}"] = RustSimTypeInt(offset - cur_size, signed=False)
             ty_fields[f"field_{offset}"] = arg_ty
-        struct_ty = RustSimStruct(ty_fields).with_arch(self.project.arch)
-        struct_ty.name = f"struct{struct_ty.size // 8}"
-        return struct_ty.with_arch(self.project.arch)
+        struct_ty = RustSimStruct(ty_fields)
+        struct_ty.name = f"struct{struct_ty.size(self.project.arch) // 8}"
+        return struct_ty
 
     @staticmethod
     def _is_stack_mem(expr):
@@ -88,13 +88,16 @@ class StructReturnSimplifier(OptimizationPass, SRDAMixin, CFGTransformationMixin
         return None
 
     def _remove_discriminant_from_struct(self, struct: Struct, variant: EnumVariant):
+        arch = self.project.arch
         new_fields = {}
         for offset, v in struct.fields.items():
-            new_offset = offset - variant.first_field_offset
+            new_offset = offset - variant.first_field_offset(arch)
             if new_offset >= 0:
                 new_fields[new_offset] = v
         struct_ty = self._build_struct_ty(new_fields)
-        return Struct(self.manager.next_atom(), struct_ty.name, new_fields, struct_ty.offsets, struct_ty.size)
+        return Struct(
+            self.manager.next_atom(), struct_ty.name, new_fields, struct_ty.offsets(arch), struct_ty.size(arch)
+        )
 
     def try_convert_to_enum(self, struct: Struct):
         prototype = self._func.prototype
@@ -106,15 +109,16 @@ class StructReturnSimplifier(OptimizationPass, SRDAMixin, CFGTransformationMixin
             variant = None
             returnty = prototype.returnty
             if isinstance(returnty, (RustSimTypeResult, RustSimTypeOption)):
-                returnty = returnty.with_arch(self.project.arch)
                 variant = returnty.get_variant(discriminant)
                 if not variant and discriminant is not None:
                     variant = returnty.get_variant(None)
-                if variant and struct.size == variant.size:
+                if variant and struct.size == variant.size(self.project.arch):
                     new_expr = self._remove_discriminant_from_struct(struct, variant)
                     if len(new_expr.fields) == 1 and 0 in new_expr.fields:
                         new_expr = new_expr.fields[0]
-                    return RustEnum(self.manager.next_atom(), variant.name, [new_expr], returnty.size)
+                    return RustEnum(
+                        self.manager.next_atom(), variant.name, [new_expr], returnty.size(self.project.arch)
+                    )
         return struct
 
     def collect_ret_expr(self, path):
@@ -131,8 +135,11 @@ class StructReturnSimplifier(OptimizationPass, SRDAMixin, CFGTransformationMixin
         if existing_vvar:
             return existing_vvar, stmts_to_remove
         if 0 in fields:
+            arch = self.project.arch
             struct_ty = self._build_struct_ty(fields)
-            result = Struct(self.manager.next_atom(), struct_ty.name, fields, struct_ty.offsets, struct_ty.size)
+            result = Struct(
+                self.manager.next_atom(), struct_ty.name, fields, struct_ty.offsets(arch), struct_ty.size(arch)
+            )
             return self.try_convert_to_enum(result), stmts_to_remove
         return None, None
 

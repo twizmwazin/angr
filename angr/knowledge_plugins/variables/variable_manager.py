@@ -432,11 +432,9 @@ class VariableManagerInternal(Serializable):
 
         # Types: variable_to_types (keyed by both regular and unified variables) + variables_with_manual_types.
         # Each pooled type JSON is parsed once and shared across the variables that reference it.
-        arch = model.manager._kb._project.arch if model.manager is not None else None
         type_by_ref: dict[int, SimType] = {}
         for ref, type_json in enumerate(cmsg.type_pool, start=1):
-            var_type = SimType.from_json(json.loads(type_json))
-            type_by_ref[ref] = var_type.with_arch(arch) if arch is not None else var_type
+            type_by_ref[ref] = SimType.from_json(json.loads(type_json))
         for type_pb2 in cmsg.types:
             var = variable_by_ident.get(type_pb2.ident) or unified_variable_by_ident.get(type_pb2.ident)
             var_type = type_by_ref.get(type_pb2.type_ref)
@@ -1115,7 +1113,7 @@ class VariableManagerInternal(Serializable):
             name = self.types.unique_type_name()
         if name in self.types:
             return cast(TypeRef, self.types[name])
-        ty_ref = TypeRef(name, ty).with_arch(self.manager._kb._project.arch)
+        ty_ref = TypeRef(name, ty)
         self.types[name] = ty_ref
         return ty_ref
 
@@ -1137,18 +1135,18 @@ class VariableManagerInternal(Serializable):
                 8: SimTypeLong,
             }
             if var.size in size_to_type:
-                ty = size_to_type[var.size](signed=False, label=ty.label).with_arch(self.manager._kb._project.arch)
+                ty = size_to_type[var.size](signed=False, label=ty.label)
 
         if name:
             if name not in self.types:
-                self.types[name] = TypeRef(name, ty).with_arch(self.manager._kb._project.arch)
+                self.types[name] = TypeRef(name, ty)
             ty = self.types[name]
         elif (inner_ty := unpack_pointer(ty, iterative=True)) and isinstance(inner_ty, SimStruct):
             typeref = self._register_struct_type(inner_ty)
             # rebuild the multi-layer pointer type
             replaced_ty = replace_pointer_pts_to(ty, inner_ty, typeref)
             assert replaced_ty is not None
-            ty = replaced_ty.with_arch(self.manager._kb._project.arch)
+            ty = replaced_ty
         elif isinstance(ty, SimStruct):
             ty = self._register_struct_type(ty, name=name)
 

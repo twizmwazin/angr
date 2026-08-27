@@ -71,11 +71,11 @@ class DerefCoercionSimplifier(OptimizationPass, SRDAMixin, CFAMixin):
         if string_ty is None:
             return call
         ptr_offset = (
-            string_ty.get_field_offset("vec.buf.ptr.pointer")
-            or string_ty.get_field_offset("vec.buf.inner.ptr.pointer")
+            string_ty.get_field_offset("vec.buf.ptr.pointer", self.project.arch)
+            or string_ty.get_field_offset("vec.buf.inner.ptr.pointer", self.project.arch)
             or 0
         )
-        len_offset = string_ty.get_field_offset("vec.len") or self.project.arch.bytes
+        len_offset = string_ty.get_field_offset("vec.len", self.project.arch) or self.project.arch.bytes
         if call.args:
             changed = False
             args = list(call.args)

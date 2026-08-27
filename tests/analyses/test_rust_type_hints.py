@@ -15,10 +15,10 @@ class TestRustTypeHints(unittest.TestCase):
 
         ty_a = RustSimStruct(
             OrderedDict({"field_0": RustSimTypeInt(64, signed=False)}), name="TypeA", pack=True
-        ).with_arch(project.arch)
+        )
         ty_b = RustSimStruct(
             OrderedDict({"field_0": RustSimTypeInt(32, signed=False)}), name="TypeB", pack=True
-        ).with_arch(project.arch)
+        )
 
         project.kb.type_hints.add_type_hint(vvar, ty_a, 0x1000)
         project.kb.type_hints.add_type_hint(vvar, ty_b, 0x2000)

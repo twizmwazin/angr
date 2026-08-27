@@ -12,7 +12,7 @@ class ReturnUnconstrained(angr.SimProcedure):
         return_val = kwargs.pop("return_val", None)
         if return_val is None:
             # code duplicated to syscall_stub
-            size = self.prototype.returnty.size
+            size = self.prototype.returnty.size(self.arch)
             if size is None:
                 o = None
             else:

@@ -228,8 +228,9 @@ class StringObfuscationFinder(Analysis):
                         real_arg = func.prototype.args[arg_idx]
                         if isinstance(func_arg, SimRegArg):
                             reg_offset, reg_size = arch.registers[func_arg.reg_name]
+                            real_arg_size = real_arg.size(arch)
                             arg_size = (
-                                real_arg.size if real_arg.size is not None else reg_size
+                                real_arg_size if real_arg_size is not None else reg_size
                             ) // self.project.arch.byte_width
                             try:
                                 mv = observ.registers.load(reg_offset, size=arg_size)
@@ -359,8 +360,9 @@ class StringObfuscationFinder(Analysis):
                 # FIXME: stack-passing arguments are used
                 if isinstance(func_arg, SimRegArg):
                     reg_offset, reg_size = arch.registers[func_arg.reg_name]
+                    real_arg_size = real_arg.size(arch)
                     arg_size = (
-                        real_arg.size if real_arg.size is not None else reg_size
+                        real_arg_size if real_arg_size is not None else reg_size
                     ) // self.project.arch.byte_width
                     try:
                         mv = observ.registers.load(reg_offset, size=arg_size)
@@ -886,9 +888,7 @@ class StringObfuscationFinder(Analysis):
         cc = cc_cls(self.project.arch)
         cc.STACKARG_SP_BUFF = 0  # disable shadow stack space because the binary code already sets it if needed
         cc.STACK_ALIGNMENT = 1  # disable stack address aligning because the binary code already sets it if needed
-        prototype_0 = SimTypeFunction([], SimTypePointer(pts_to=SimTypeBottom(label="void"))).with_arch(
-            self.project.arch
-        )
+        prototype_0 = SimTypeFunction([], SimTypePointer(pts_to=SimTypeBottom(label="void")))
         callable_0 = self.project.factory.callable(
             func_addr,
             concrete_only=True,

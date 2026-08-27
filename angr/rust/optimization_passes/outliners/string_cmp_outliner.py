@@ -100,7 +100,7 @@ class StringCmpOutliner(OptimizationPass):
                 # call = Call(
                 #     idx=None,
                 #     target=name,
-                #     prototype=self.kb.librust.get_prototype(name).with_arch(self.project.arch).normalize(),
+                #     prototype=self.kb.librust.get_prototype(name).normalize(),
                 #     args=[str_var, StringLiteral(None, combined_str, self.project.arch.bits * 2)],
                 #     ret_expr=None,
                 #     **stmt.condition.tags,

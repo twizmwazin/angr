@@ -141,8 +141,8 @@ class TestFunctionHandler(TestCase):
         # c_return_as_atoms; the return atom is the register holding the returned pointer (issue #6536)
         arch = archinfo.ArchAMD64()
         state = SimpleNamespace(arch=arch)
-        retty = SimStruct({"a": SimTypeLongLong(), "b": SimTypeLongLong()}, name="big").with_arch(arch)
-        proto = SimTypeFunction([], retty).with_arch(arch)
+        retty = SimStruct({"a": SimTypeLongLong(), "b": SimTypeLongLong()}, name="big")
+        proto = SimTypeFunction([], retty)
 
         atoms = FunctionHandler.c_return_as_atoms(state, SimCCMicrosoftAMD64(arch), proto)
         assert atoms == {Register(*arch.registers["rax"], arch=arch)}
@@ -154,8 +154,8 @@ class TestFunctionHandler(TestCase):
         # on x86 cdecl, large structs are also returned through an implicit out-parameter
         arch_x86 = archinfo.ArchX86()
         state_x86 = SimpleNamespace(arch=arch_x86)
-        retty_x86 = SimStruct({"a": SimTypeLongLong(), "b": SimTypeLongLong()}, name="big").with_arch(arch_x86)
-        proto_x86 = SimTypeFunction([], retty_x86).with_arch(arch_x86)
+        retty_x86 = SimStruct({"a": SimTypeLongLong(), "b": SimTypeLongLong()}, name="big")
+        proto_x86 = SimTypeFunction([], retty_x86)
         atoms = FunctionHandler.c_return_as_atoms(state_x86, SimCCCdecl(arch_x86), proto_x86)
         assert atoms == {Register(*arch_x86.registers["eax"], arch=arch_x86)}
 

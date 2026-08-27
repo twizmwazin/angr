@@ -189,7 +189,7 @@ class FunctionCallData:
     def reset_prototype(
         self, prototype: SimTypeFunction, state: ReachingDefinitionsState, soft_reset: bool = False
     ) -> set[Atom]:
-        self.prototype = prototype.with_arch(state.arch)
+        self.prototype = prototype
         if not soft_reset:
             self.args_atoms = self.args_values = self.ret_atoms = None
 
@@ -379,7 +379,7 @@ class FunctionHandler:
             if data.cc is None and hook is not None:
                 data.cc = hook.cc
             if data.prototype is None and hook is not None and hook.prototype is not None:
-                data.prototype = hook.prototype.with_arch(state.arch)
+                data.prototype = hook.prototype
                 data.guessed_prototype = hook.guessed_prototype
                 hook_libname = hook.library_name
 
@@ -513,7 +513,7 @@ class FunctionHandler:
         if data.prototype.returnty is not None:
             if not isinstance(data.prototype.returnty, SimTypeBottom):
                 data.ret_values = MultiValues(
-                    state.top(data.prototype.returnty.with_arch(state.arch).size or state.arch.bits)
+                    state.top(data.prototype.returnty.size(state.arch) or state.arch.bits)
                 )
             else:
                 data.ret_values = MultiValues(state.top(state.arch.bits))

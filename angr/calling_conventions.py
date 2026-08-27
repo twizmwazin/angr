@@ -100,7 +100,7 @@ class AllocHelper:
     @classmethod
     def calc_size(cls, val, arch):
         if type(val) is SimStructValue:
-            return val.struct.size // arch.byte_width
+            return val.struct.size(arch) // arch.byte_width
         if isinstance(val, claripy.ast.Bits):
             return len(val) // arch.byte_width
         if type(val) is list:
@@ -121,10 +121,11 @@ class AllocHelper:
             stride = cls.calc_size(val[0], arch)
             return SimArrayArg([cls.stack_loc(subval, arch, offset + i * stride) for i, subval in enumerate(val)])
         if type(val) is SimStructValue:
+            struct_offsets = val.struct.offsets(arch)
             return SimStructArg(
                 val.struct,
                 {
-                    field: cls.stack_loc(subval, arch, offset + val.struct.offsets[field])
+                    field: cls.stack_loc(subval, arch, offset + struct_offsets[field])
                     for field, subval in val._values.items()
                 },
             )
@@ -144,18 +145,19 @@ def refine_locs_with_struct_type(
     # that's why this is named with_struct_type, because it will blindly trust the offsets given to it.
 
     if treat_bot_as_int and isinstance(arg_type, SimTypeBottom):
-        arg_type = SimTypeInt(label=arg_type.label).with_arch(arch)
+        arg_type = SimTypeInt(label=arg_type.label)
 
     if isinstance(arg_type, (SimTypeReg, SimTypeNum, SimTypeFloat)):
-        assert arg_type.size is not None
+        arg_size = arg_type.size(arch)
+        assert arg_size is not None
         seen_bytes = 0
         pieces = []
-        while seen_bytes < arg_type.size // arch.byte_width:
+        while seen_bytes < arg_size // arch.byte_width:
             start_offset = offset + seen_bytes
             chunk = start_offset // arch.bytes
             chunk_offset = start_offset % arch.bytes
             chunk_remaining = arch.bytes - chunk_offset
-            type_remaining = arg_type.size // arch.byte_width - seen_bytes
+            type_remaining = arg_size // arch.byte_width - seen_bytes
             use_bytes = min(chunk_remaining, type_remaining)
             pieces.append(locs[chunk].refine(size=use_bytes, offset=chunk_offset))
             seen_bytes += use_bytes
@@ -165,30 +167,33 @@ def refine_locs_with_struct_type(
             piece.is_fp = True
         return piece
     if isinstance(arg_type, SimTypeFixedSizeArray):
-        assert arg_type.elem_type.size is not None and arg_type.length is not None
+        elem_size = arg_type.elem_type.size(arch)
+        assert elem_size is not None and arg_type.length is not None
         # TODO explicit stride
         locs_list = [
             refine_locs_with_struct_type(
-                arch, locs, arg_type.elem_type, offset=offset + i * arg_type.elem_type.size // arch.byte_width
+                arch, locs, arg_type.elem_type, offset=offset + i * elem_size // arch.byte_width
             )
             for i in range(arg_type.length)
         ]
         return SimArrayArg(locs_list)
     if isinstance(arg_type, SimStruct):
+        struct_offsets = arg_type.offsets(arch)
         locs_dict = {
-            field: refine_locs_with_struct_type(arch, locs, field_ty, offset=offset + arg_type.offsets[field])
+            field: refine_locs_with_struct_type(arch, locs, field_ty, offset=offset + struct_offsets[field])
             for field, field_ty in arg_type.fields.items()
         }
         return SimStructArg(arg_type, locs_dict)
     if isinstance(arg_type, SimUnion):
         # Treat a SimUnion as functionality equivalent to its longest member
+        union_size = arg_type.size(arch)
         for member in arg_type.members.values():
-            if member.size == arg_type.size:
+            if member.size(arch) == union_size:
                 return refine_locs_with_struct_type(arch, locs, member, offset)
 
     # for all other types, we basically treat them as integers until someone implements proper layouting logic
     if treat_unsupported_as_int:
-        arg_type = SimTypeInt().with_arch(arch)
+        arg_type = SimTypeInt()
         return refine_locs_with_struct_type(
             arch,
             locs,
@@ -476,9 +481,7 @@ class SimStructArg(SimFunctionArgument):
 
         return others
 
-    def get_single_footprint(self) -> SimStackArg | SimRegArg | SimComboArg:
-        if self.struct._arch is None:
-            raise TypeError("Can't tell the size of a struct without an arch")
+    def get_single_footprint(self, arch) -> SimStackArg | SimRegArg | SimComboArg:
         stack_min = None
         stack_max = None
         regs = []
@@ -508,7 +511,7 @@ class SimStructArg(SimFunctionArgument):
                 assert False, (
                     "Unknown CC argument passing structure - why are we passing both regs and stack at the same time?"
                 )
-            return SimStackArg(stack_min, self.struct.size // self.struct._arch.byte_width)
+            return SimStackArg(stack_min, self.struct.size(arch) // arch.byte_width)
         if not regs:
             assert False, "huh??????"
         if len(regs) == 1:
@@ -732,7 +735,7 @@ class SimCC:
         """
         session = self.ArgSession(self)
         if self.return_in_implicit_outparam(ret_ty):
-            self.next_arg(session, SimTypePointer(SimTypeBottom()).with_arch(self.arch))
+            self.next_arg(session, SimTypePointer(SimTypeBottom()))
         return session
 
     def return_in_implicit_outparam(self, ty) -> bool:  # pylint:disable=unused-argument
@@ -757,8 +760,6 @@ class SimCC:
         """
         The location the return value is stored, based on its type.
         """
-        if ty._arch is None:
-            ty = ty.with_arch(self.arch)
         if isinstance(ty, (SimStruct, SimUnion, SimTypeFixedSizeArray)):
             raise AngrTypeError(
                 f"{self} doesn't know how to return aggregate types ({type(ty)}). Consider overriding return_val to "
@@ -769,17 +770,20 @@ class SimCC:
                 assert self.RETURN_VAL is not None
                 ptr_loc = self.RETURN_VAL
             else:
-                ptr_loc = self.next_arg(self.ArgSession(self), SimTypePointer(SimTypeBottom()).with_arch(self.arch))
+                ptr_loc = self.next_arg(self.ArgSession(self), SimTypePointer(SimTypeBottom()))
             return SimReferenceArgument(
-                ptr_loc, SimStackArg(0, ty.size // self.arch.byte_width, is_fp=isinstance(ty, SimTypeFloat))
+                ptr_loc, SimStackArg(0, ty.size(self.arch) // self.arch.byte_width, is_fp=isinstance(ty, SimTypeFloat))
             )
 
         if isinstance(ty, SimTypeFloat) and self.FP_RETURN_VAL is not None:
-            return self.FP_RETURN_VAL.refine(size=ty.size // self.arch.byte_width, arch=self.arch, is_fp=True)
+            return self.FP_RETURN_VAL.refine(
+                size=ty.size(self.arch) // self.arch.byte_width, arch=self.arch, is_fp=True
+            )
 
         if self.RETURN_VAL is None or isinstance(ty, SimTypeBottom):
             return None
-        ty_size = ty.size if ty.size is not None else self.RETURN_VAL.size * self.arch.byte_width
+        size = ty.size(self.arch)
+        ty_size = size if size is not None else self.RETURN_VAL.size * self.arch.byte_width
         if ty_size > self.RETURN_VAL.size * self.arch.byte_width:
             assert self.OVERFLOW_RETURN_VAL is not None
             return SimComboArg([self.RETURN_VAL, self.OVERFLOW_RETURN_VAL])
@@ -794,7 +798,7 @@ class SimCC:
 
     def next_arg(self, session: ArgSession, arg_type: SimType) -> SimFunctionArgument:
         if isinstance(arg_type, (SimTypeArray, SimTypeFixedSizeArray)):  # hack
-            arg_type = SimTypePointer(arg_type.elem_type).with_arch(self.arch)
+            arg_type = SimTypePointer(arg_type.elem_type)
         if isinstance(arg_type, (SimStruct, SimUnion, SimTypeFixedSizeArray)):
             raise TypeError(
                 f"{self} doesn't know how to store aggregate type {type(arg_type)}. Consider overriding next_arg to "
@@ -803,10 +807,11 @@ class SimCC:
         if isinstance(arg_type, SimTypeBottom):
             # This is usually caused by failures or mistakes during type inference
             l.warning("Function argument type cannot be BOT. Treating it as a 32-bit int.")
-            arg_type = SimTypeInt().with_arch(self.arch)
+            arg_type = SimTypeInt()
         is_fp = isinstance(arg_type, SimTypeFloat)
-        assert arg_type.size is not None
-        size = arg_type.size // self.arch.byte_width
+        arg_size = arg_type.size(self.arch)
+        assert arg_size is not None
+        size = arg_size // self.arch.byte_width
         try:
             arg = next(session.fp_iter) if is_fp else next(session.int_iter)
         except StopIteration:
@@ -880,8 +885,6 @@ class SimCC:
         return result
 
     def arg_locs(self, prototype) -> list[SimFunctionArgument]:
-        if prototype._arch is None:
-            prototype = prototype.with_arch(self.arch)
         session = self.arg_session(prototype.returnty)
         return [self.next_arg(session, arg_ty) for arg_ty in prototype.args]
 
@@ -926,8 +929,6 @@ class SimCC:
         allocator = AllocHelper(self.arch.bits)
         if type(prototype) is str:
             prototype = parse_signature(prototype, arch=self.arch)
-        elif prototype._arch is None:
-            prototype = prototype.with_arch(self.arch)
 
         #
         # STEP 1: convert all values into serialized form
@@ -1128,7 +1129,7 @@ class SimCC:
             if isinstance(ty, SimTypeFloat):
                 return SimCC._standardize_value(float(arg), ty, state, alloc)
 
-            return claripy.BVV(arg, ty.size)
+            return claripy.BVV(arg, ty.size(state.arch))
 
         if isinstance(arg, float):
             if isinstance(ty, SimTypeDouble):
@@ -1142,18 +1143,18 @@ class SimCC:
 
         if isinstance(arg, claripy.ast.FP):
             if isinstance(ty, SimTypeFloat):
-                if len(arg) != ty.size:
+                if len(arg) != ty.size(state.arch):
                     raise TypeError(f"Type mismatch: expected {ty}, got {arg.sort}")
                 return arg
             if isinstance(ty, (SimTypeReg, SimTypeNum)):
-                return arg.val_to_bv(ty.size, ty.signed if isinstance(ty, SimTypeNum) else False)
+                return arg.val_to_bv(ty.size(state.arch), ty.signed if isinstance(ty, SimTypeNum) else False)
             raise TypeError(f"Type mismatch: expected {ty}, got {arg.sort}")
 
         if isinstance(arg, claripy.ast.BV):
             if isinstance(ty, (SimTypeReg, SimTypeNum)):
-                if len(arg) != ty.size:
+                if len(arg) != ty.size(state.arch):
                     if arg.concrete:
-                        size = ty.size
+                        size = ty.size(state.arch)
                         assert size is not None
                         return claripy.BVV(arg.concrete_value, size)
                     raise TypeError(f"Type mismatch of symbolic data: expected {ty}, got {len(arg)} bits")
@@ -1355,9 +1356,10 @@ class SimCCCdecl(SimCC):
 
     def next_arg(self, session, arg_type):
         if isinstance(arg_type, (SimTypeArray, SimTypeFixedSizeArray)):  # hack
-            arg_type = SimTypePointer(arg_type.elem_type).with_arch(self.arch)
+            arg_type = SimTypePointer(arg_type.elem_type)
         locs_size = 0
-        byte_size = arg_type.size // self.arch.byte_width if arg_type.size is not None else self.arch.bytes
+        arg_size = arg_type.size(self.arch)
+        byte_size = arg_size // self.arch.byte_width if arg_size is not None else self.arch.bytes
         locs = []
         while locs_size < byte_size:
             locs.append(next(session.both_iter))
@@ -1368,14 +1370,13 @@ class SimCCCdecl(SimCC):
     STRUCT_RETURN_THRESHOLD = 32
 
     def return_val(self, ty, perspective_returned=False):
-        if ty._arch is None:
-            ty = ty.with_arch(self.arch)
         if not isinstance(ty, SimStruct):
             return super().return_val(ty, perspective_returned)
 
-        if ty.size > self.STRUCT_RETURN_THRESHOLD:
+        ty_size = ty.size(self.arch)
+        if ty_size > self.STRUCT_RETURN_THRESHOLD:
             # TODO this code is duplicated a ton of places. how should it be a function?
-            byte_size = ty.size // self.arch.byte_width
+            byte_size = ty_size // self.arch.byte_width
             referenced_locs = [SimStackArg(offset, self.arch.bytes) for offset in range(0, byte_size, self.arch.bytes)]
             referenced_loc = refine_locs_with_struct_type(self.arch, referenced_locs, ty)
             ptr_loc = self.RETURN_VAL if perspective_returned else SimStackArg(0, 4)
@@ -1387,7 +1388,7 @@ class SimCCCdecl(SimCC):
     def return_in_implicit_outparam(self, ty):
         if isinstance(ty, SimTypeBottom):
             return False
-        return isinstance(ty, SimStruct) and ty.size > self.STRUCT_RETURN_THRESHOLD
+        return isinstance(ty, SimStruct) and ty.size(self.arch) > self.STRUCT_RETURN_THRESHOLD
 
 
 class SimCCMicrosoftCdecl(SimCCCdecl):
@@ -1401,8 +1402,6 @@ class SimCCMicrosoftThiscall(SimCCCdecl):
     STRUCT_RETURN_THRESHOLD = 64
 
     def arg_locs(self, prototype) -> list[SimFunctionArgument]:
-        if prototype._arch is None:
-            prototype = prototype.with_arch(self.arch)
         session = self.arg_session(prototype.returnty)
         if not prototype.args:
             return []
@@ -1424,9 +1423,10 @@ class SimCCMicrosoftFastcall(SimCC):
 
     def next_arg(self, session, arg_type):
         if isinstance(arg_type, (SimTypeArray, SimTypeFixedSizeArray)):  # hack
-            arg_type = SimTypePointer(arg_type.elem_type).with_arch(self.arch)
+            arg_type = SimTypePointer(arg_type.elem_type)
 
-        byte_size = arg_type.size // self.arch.byte_width if arg_type.size is not None else self.arch.bytes
+        arg_size = arg_type.size(self.arch)
+        byte_size = arg_size // self.arch.byte_width if arg_size is not None else self.arch.bytes
         # Per the Microsoft __fastcall ABI, only the first two DWORD-or-smaller integer/pointer
         # arguments are passed in ECX/EDX. Floating-point values, __int64, and aggregates are
         # passed on the stack and do NOT consume a register slot (so a later small integer
@@ -1469,14 +1469,15 @@ class SimCCMicrosoftAMD64(SimCC):
 
     def next_arg(self, session, arg_type):
         if isinstance(arg_type, (SimTypeArray, SimTypeFixedSizeArray)):  # hack
-            arg_type = SimTypePointer(arg_type.elem_type).with_arch(self.arch)
+            arg_type = SimTypePointer(arg_type.elem_type)
         try:
             int_loc = next(session.int_iter)
             fp_loc = next(session.fp_iter)
         except StopIteration:
             int_loc = fp_loc = next(session.both_iter)
 
-        byte_size = arg_type.size // self.arch.byte_width if arg_type.size is not None else self.arch.bytes
+        arg_size = arg_type.size(self.arch)
+        byte_size = arg_size // self.arch.byte_width if arg_size is not None else self.arch.bytes
 
         if isinstance(arg_type, SimTypeFloat):
             return fp_loc.refine(size=byte_size, is_fp=True, arch=self.arch)
@@ -1491,37 +1492,37 @@ class SimCCMicrosoftAMD64(SimCC):
     def return_in_implicit_outparam(self, ty):
         if isinstance(ty, (SimTypeBottom, SimTypeRef)):
             return False
-        return not isinstance(ty, SimTypeFloat) and ty.size > self.STRUCT_RETURN_THRESHOLD
+        return not isinstance(ty, SimTypeFloat) and ty.size(self.arch) > self.STRUCT_RETURN_THRESHOLD
 
     def return_val(self, ty, perspective_returned=False):
-        if ty._arch is None:
-            ty = ty.with_arch(self.arch)
 
         # Unions are allocated according to the layout of the largest member
         if isinstance(ty, SimUnion):
             chosen = None
             size = None
             for subty in ty.members.values():
-                if subty.size is not None and (size is None or size < subty.size):
+                subty_size = subty.size(self.arch)
+                if subty_size is not None and (size is None or size < subty_size):
                     chosen = subty
-                    size = subty.size
+                    size = subty_size
             if chosen is None:
                 # fallback to void*
-                chosen = SimTypePointer(SimTypeBottom()).with_arch(self.arch)
+                chosen = SimTypePointer(SimTypeBottom())
             return self.return_val(chosen, perspective_returned=perspective_returned)
 
         if not isinstance(ty, SimStruct):
             return super().return_val(ty, perspective_returned)
 
-        if ty.size > self.STRUCT_RETURN_THRESHOLD:
+        ty_size = ty.size(self.arch)
+        if ty_size > self.STRUCT_RETURN_THRESHOLD:
             # TODO this code is duplicated a ton of places. how should it be a function?
-            byte_size = ty.size // self.arch.byte_width
+            byte_size = ty_size // self.arch.byte_width
             referenced_locs = [SimStackArg(offset, self.arch.bytes) for offset in range(0, byte_size, self.arch.bytes)]
             referenced_loc = refine_locs_with_struct_type(self.arch, referenced_locs, ty)
             if perspective_returned:
                 ptr_loc = self.RETURN_VAL
             else:
-                ptr_loc = self.next_arg(self.ArgSession(self), SimTypePointer(SimTypeBottom()).with_arch(self.arch))
+                ptr_loc = self.next_arg(self.ArgSession(self), SimTypePointer(SimTypeBottom()))
             assert ptr_loc is not None
             return SimReferenceArgument(ptr_loc, referenced_loc)
 
@@ -1674,9 +1675,9 @@ class SimCCSystemVAMD64(SimCC):
     # section 3.2.3
     def next_arg(self, session, arg_type):
         if isinstance(arg_type, (SimTypeArray, SimTypeFixedSizeArray)):  # hack
-            arg_type = SimTypePointer(arg_type.elem_type).with_arch(self.arch)
+            arg_type = SimTypePointer(arg_type.elem_type)
         if isinstance(arg_type, RustSimEnum):
-            arg_type = arg_type.as_struct_ty()
+            arg_type = arg_type.as_struct_ty(self.arch)
         state = session.getstate()
         classification = self._classify(arg_type)
         try:
@@ -1703,15 +1704,14 @@ class SimCCSystemVAMD64(SimCC):
     def return_val(self, ty: SimType | None, perspective_returned=False):
         if ty is None:
             return None
-        if ty._arch is None:
-            ty = ty.with_arch(self.arch)
         if isinstance(ty, RustSimEnum):
-            ty = ty.as_struct_ty()
+            ty = ty.as_struct_ty(self.arch)
         classification = self._classify(ty)
         if any(cls == "MEMORY" for cls in classification):
             assert all(cls == "MEMORY" for cls in classification)
-            assert ty.size is not None
-            byte_size = ty.size // self.arch.byte_width
+            ty_size = ty.size(self.arch)
+            assert ty_size is not None
+            byte_size = ty_size // self.arch.byte_width
             referenced_locs = [SimStackArg(offset, self.arch.bytes) for offset in range(0, byte_size, self.arch.bytes)]
             referenced_loc = refine_locs_with_struct_type(self.arch, referenced_locs, ty)
             ptr_loc = self.RETURN_VAL if perspective_returned else SimRegArg("rdi", 8)
@@ -1744,19 +1744,20 @@ class SimCCSystemVAMD64(SimCC):
         if chunksize is None:
             chunksize = self.arch.bytes
         # treat BOT as INTEGER
-        nchunks = 1 if ty.size is None else (ty.size // self.arch.byte_width + chunksize - 1) // chunksize
+        ty_size = ty.size(self.arch)
+        nchunks = 1 if ty_size is None else (ty_size // self.arch.byte_width + chunksize - 1) // chunksize
         if isinstance(ty, (SimTypeFloat,)):
             return ["SSE"] + ["SSEUP"] * (nchunks - 1)
         if isinstance(ty, (SimTypeReg, SimTypeNum, SimTypeBottom, SimTypeEnum, SimTypeBitfield)):
             return ["INTEGER"] * nchunks
-        if isinstance(ty, SimCppClass) and not ty.fields and ty.size:
+        if isinstance(ty, SimCppClass) and not ty.fields and ty_size:
             # this is an opaque C++ class (likely unresolved); we cannot lay it out. so we must treat it as a native
             # integer.
             return ["INTEGER"]
         if isinstance(ty, SimTypeArray) or (isinstance(ty, SimType) and isinstance(ty, NamedTypeMixin)):
             # NamedTypeMixin covers SimUnion, SimStruct, SimCppClass, and other struct-like classes
-            assert ty.size is not None
-            if ty.size > 512:
+            assert ty_size is not None
+            if ty_size > 512:
                 return ["MEMORY"] * nchunks
             flattened = self._flatten(ty)
             if flattened is None:
@@ -1765,13 +1766,14 @@ class SimCCSystemVAMD64(SimCC):
             for offset, subty_list in flattened.items():
                 for subty in subty_list:
                     if isinstance(subty, RustSimEnum):
-                        subty = subty.as_struct_ty()
-                    if subty.size == 0:
+                        subty = subty.as_struct_ty(self.arch)
+                    subty_size = subty.size(self.arch)
+                    if subty_size == 0:
                         continue
                     # is the smaller chunk size necessary? Genuinely unsure
                     subresult = self._classify(subty, chunksize=1)
                     idx_start = offset // chunksize
-                    idx_end = (offset + ((subty.size or 0) // self.arch.byte_width) - 1) // chunksize
+                    idx_end = (offset + ((subty_size or 0) // self.arch.byte_width) - 1) // chunksize
                     for i, idx in enumerate(range(idx_start, idx_end + 1)):
                         subclass = subresult[i * chunksize]
                         result[idx] = self._combine_classes(result[idx], subclass)
@@ -1795,21 +1797,22 @@ class SimCCSystemVAMD64(SimCC):
             if ty.packed:
                 return None
             for field, subty in ty.fields.items():
-                offset = ty.offsets[field]
+                offset = ty.offsets(self.arch)[field]
                 subresult = self._flatten(subty)
                 if subresult is None:
                     return None
                 for suboffset, subsubty_list in subresult.items():
                     result[offset + suboffset] += subsubty_list
         elif isinstance(ty, SimTypeFixedSizeArray):
-            assert ty.length is not None and ty.elem_type.size is not None
+            elem_size = ty.elem_type.size(self.arch)
+            assert ty.length is not None and elem_size is not None
             subresult = self._flatten(ty.elem_type)
             if subresult is None:
                 return None
             for suboffset, subsubty_list in subresult.items():
                 for idx in range(ty.length):
                     # TODO I think we need an explicit stride field on array types
-                    result[idx * ty.elem_type.size // self.arch.byte_width + suboffset] += subsubty_list
+                    result[idx * elem_size // self.arch.byte_width + suboffset] += subsubty_list
         elif isinstance(ty, SimUnion):
             for subty in ty.members.values():
                 subresult = self._flatten(subty)
@@ -1882,7 +1885,7 @@ class SimCCARM(SimCC):
     # https://github.com/ARM-software/abi-aa/blob/60a8eb8c55e999d74dac5e368fc9d7e36e38dda4/aapcs32/aapcs32.rst#parameter-passing
     def next_arg(self, session, arg_type):
         if isinstance(arg_type, (SimTypeArray, SimTypeFixedSizeArray)):  # hack
-            arg_type = SimTypePointer(arg_type.elem_type).with_arch(self.arch)
+            arg_type = SimTypePointer(arg_type.elem_type)
         state = session.getstate()
         classification = self._classify(arg_type)
         try:
@@ -1923,15 +1926,16 @@ class SimCCARM(SimCC):
         if chunksize is None:
             chunksize = self.arch.bytes
         # treat BOT as INTEGER
-        nchunks = 1 if isinstance(ty, SimTypeBottom) else (ty.size // self.arch.byte_width + chunksize - 1) // chunksize
+        ty_size = None if isinstance(ty, SimTypeBottom) else ty.size(self.arch)
+        nchunks = 1 if ty_size is None else (ty_size // self.arch.byte_width + chunksize - 1) // chunksize
         if isinstance(
             ty, (SimTypeInt, SimTypeChar, SimTypeBool, SimTypePointer, SimTypeNum, SimTypeBottom, SimTypeReference)
         ):
             return ["INTEGER"] * nchunks
         if isinstance(ty, (SimTypeFloat,)):
-            if ty.size == 64:
+            if ty_size == 64:
                 return ["DOUBLEP"]
-            if ty.size == 32:
+            if ty_size == 32:
                 return ["SINGLEP"]
             return ["NO_CLASS"]
         if isinstance(ty, (SimStruct, SimTypeFixedSizeArray, SimUnion)):
@@ -1941,11 +1945,12 @@ class SimCCARM(SimCC):
             result = ["NO_CLASS"] * nchunks
             for offset, subty_list in flattened.items():
                 for subty in subty_list:
-                    assert subty.size is not None
+                    subty_size = subty.size(self.arch)
+                    assert subty_size is not None
                     # is the smaller chunk size necessary? Genuinely unsure
                     subresult = self._classify(subty, chunksize=1)
                     idx_start = offset // chunksize
-                    idx_end = (offset + ((subty.size or 0) // self.arch.byte_width) - 1) // chunksize
+                    idx_end = (offset + ((subty_size or 0) // self.arch.byte_width) - 1) // chunksize
                     for i, idx in enumerate(range(idx_start, idx_end + 1)):
                         subclass = subresult[i * chunksize]
                         result[idx] = self._combine_classes(result[idx], subclass)
@@ -1975,7 +1980,7 @@ class SimCCARM(SimCC):
             if ty.packed:
                 return None
             for field, subty in ty.fields.items():
-                offset = ty.offsets[field]
+                offset = ty.offsets(self.arch)[field]
                 subresult = self._flatten(subty)
                 if subresult is None:
                     return None
@@ -1984,16 +1989,17 @@ class SimCCARM(SimCC):
             if not result:
                 # the struct is empty (because somehow we do not know its members), so we treat it as a single INTEGER
                 # at offset 0
-                result[0].append(SimTypeInt().with_arch(self.arch))
+                result[0].append(SimTypeInt())
         elif isinstance(ty, SimTypeFixedSizeArray):
-            assert ty.length is not None and ty.elem_type.size is not None
+            elem_size = ty.elem_type.size(self.arch)
+            assert ty.length is not None and elem_size is not None
             subresult = self._flatten(ty.elem_type)
             if subresult is None:
                 return None
             for suboffset, subsubty_list in subresult.items():
                 for idx in range(ty.length):
                     # TODO I think we need an explicit stride field on array types
-                    result[idx * ty.elem_type.size // self.arch.byte_width + suboffset] += subsubty_list
+                    result[idx * elem_size // self.arch.byte_width + suboffset] += subsubty_list
         elif isinstance(ty, SimUnion):
             for subty in ty.members.values():
                 subresult = self._flatten(subty)
@@ -2019,7 +2025,7 @@ class SimCCARMHF(SimCCARM):
 
     def next_arg(self, session: ArgSession, arg_type):
         if isinstance(arg_type, (SimTypeArray, SimTypeFixedSizeArray)):  # hack
-            arg_type = SimTypePointer(arg_type.elem_type).with_arch(self.arch)
+            arg_type = SimTypePointer(arg_type.elem_type)
         state = session.getstate()
         classification = self._classify(arg_type)
         try:
@@ -2143,7 +2149,8 @@ class SimCCRISCV64(SimCC):
         classification = self._classify(arg_type)
 
         if "REFERENCE" in classification:
-            arg_size = arg_type.size if arg_type.size is not None else 0
+            arg_type_size = arg_type.size(self.arch)
+            arg_size = arg_type_size if arg_type_size is not None else 0
             slot_count = (arg_size + self.arch.bits - 1) // self.arch.bits
             referenced_locs = [SimStackArg(i * 8, 8) for i in range(slot_count)]
             main_loc = refine_locs_with_struct_type(self.arch, referenced_locs, arg_type)
@@ -2159,16 +2166,18 @@ class SimCCRISCV64(SimCC):
                 is_flattened = any(c == "FLOAT" for c in classification)
                 locs_dict = {}
 
+                struct_offsets = arg_type.offsets(self.arch)
                 if is_flattened:  # The type of faN + aN
                     # struct {float a, int b} => {fa0, a0}
-                    sorted_fields = sorted(arg_type.fields.items(), key=lambda item: arg_type.offsets[item[0]])
+                    sorted_fields = sorted(arg_type.fields.items(), key=lambda item: struct_offsets[item[0]])
                     for i, (name, field_ty) in enumerate(sorted_fields):
                         cls = classification[i]
 
                         reg = next(session.fp_iter) if cls == "FLOAT" else next(session.int_iter)
 
                         is_field_fp = isinstance(field_ty, (SimTypeFloat, SimTypeDouble))
-                        field_size_bits = field_ty.size if field_ty.size is not None else 0
+                        field_ty_size = field_ty.size(self.arch)
+                        field_size_bits = field_ty_size if field_ty_size is not None else 0
                         locs_dict[name] = reg.refine(size=field_size_bits // 8, arch=self.arch, is_fp=is_field_fp)
                     return SimStructArg(arg_type, locs_dict)
                 # The type of aN, a(N+1), ...
@@ -2177,7 +2186,8 @@ class SimCCRISCV64(SimCC):
 
                 # upper
                 bytes_per_reg = self.arch.bytes
-                arg_size_bits = arg_type.size if arg_type.size is not None else 0
+                arg_type_size = arg_type.size(self.arch)
+                arg_size_bits = arg_type_size if arg_type_size is not None else 0
                 arg_bytes = (arg_size_bits + self.arch.byte_width - 1) // self.arch.byte_width
                 n_slots_needed = (arg_bytes + bytes_per_reg - 1) // bytes_per_reg
 
@@ -2188,8 +2198,8 @@ class SimCCRISCV64(SimCC):
                     locs_to_use = raw_locs
 
                 for name, field_ty in arg_type.fields.items():
-                    offset = arg_type.offsets[name]
-                    field_size = (field_ty.size or 0) // 8
+                    offset = struct_offsets[name]
+                    field_size = (field_ty.size(self.arch) or 0) // 8
 
                     reg_idx = offset // self.arch.bytes
                     reg_offset = offset % self.arch.bytes
@@ -2220,7 +2230,7 @@ class SimCCRISCV64(SimCC):
 
         session.both_iter.setstate(aligned_offset)
 
-        size_bits = arg_type.size
+        size_bits = arg_type.size(self.arch)
         n_slots = (size_bits + self.arch.bits - 1) // self.arch.bits
         locs = [next(session.both_iter) for _ in range(n_slots)]
         return refine_locs_with_struct_type(self.arch, locs, arg_type)
@@ -2229,7 +2239,7 @@ class SimCCRISCV64(SimCC):
         result = defaultdict(list)
         if isinstance(ty, SimStruct):
             for field, subty in ty.fields.items():
-                offset = ty.offsets[field]
+                offset = ty.offsets(self.arch)[field]
                 subresult = self._flatten(subty)
                 if subresult is None:
                     return None
@@ -2240,10 +2250,11 @@ class SimCCRISCV64(SimCC):
             if subresult is None:
                 return None
 
-            if ty.elem_type.size is None:
+            elem_size = ty.elem_type.size(self.arch)
+            if elem_size is None:
                 return None
 
-            stride = ty.elem_type.size // self.arch.byte_width
+            stride = elem_size // self.arch.byte_width
 
             if ty.length is None:
                 return None
@@ -2259,7 +2270,7 @@ class SimCCRISCV64(SimCC):
         if isinstance(arg_type, (SimTypeFloat, SimTypeDouble)):
             return ["FLOAT"]
 
-        size_bits = arg_type.size
+        size_bits = arg_type.size(self.arch)
         # > 2 * _XLEN (Bytes)
         # REFERENCE from psABI:
         # Scalars wider than 2 * XLEN bits are passed by reference
@@ -2322,7 +2333,7 @@ class SimCCO32(SimCC):
     # http://math-atlas.sourceforge.net/devel/assembly/mipsabi32.pdf Section 3-17
     def next_arg(self, session, arg_type):
         if isinstance(arg_type, (SimTypeArray, SimTypeFixedSizeArray)):  # hack
-            arg_type = SimTypePointer(arg_type.elem_type).with_arch(self.arch)
+            arg_type = SimTypePointer(arg_type.elem_type)
         state = session.getstate()
         classification = self._classify(arg_type)
         try:
@@ -2366,13 +2377,14 @@ class SimCCO32(SimCC):
         if chunksize is None:
             chunksize = self.arch.bytes
         # treat BOT as INTEGER
-        nchunks = 1 if isinstance(ty, SimTypeBottom) else (ty.size // self.arch.byte_width + chunksize - 1) // chunksize
+        ty_size = None if isinstance(ty, SimTypeBottom) else ty.size(self.arch)
+        nchunks = 1 if ty_size is None else (ty_size // self.arch.byte_width + chunksize - 1) // chunksize
         if isinstance(ty, (SimTypeInt, SimTypeChar, SimTypePointer, SimTypeNum, SimTypeBottom, SimTypeReference)):
             return ["INTEGER"] * nchunks
         if isinstance(ty, (SimTypeFloat,)):
-            if ty.size == 64:
+            if ty_size == 64:
                 return ["DOUBLEP"]
-            if ty.size == 32:
+            if ty_size == 32:
                 return ["SINGLEP"]
             return ["NO_CLASS"]
         if isinstance(ty, (SimStruct, SimTypeFixedSizeArray, SimUnion)):
@@ -2382,11 +2394,12 @@ class SimCCO32(SimCC):
             result = ["NO_CLASS"] * nchunks
             for offset, subty_list in flattened.items():
                 for subty in subty_list:
-                    assert subty.size is not None
+                    subty_size = subty.size(self.arch)
+                    assert subty_size is not None
                     # is the smaller chunk size necessary? Genuinely unsure
                     subresult = self._classify(subty, chunksize=1)
                     idx_start = offset // chunksize
-                    idx_end = (offset + ((subty.size or 0) // self.arch.byte_width) - 1) // chunksize
+                    idx_end = (offset + ((subty_size or 0) // self.arch.byte_width) - 1) // chunksize
                     for i, idx in enumerate(range(idx_start, idx_end + 1)):
                         subclass = subresult[i * chunksize]
                         result[idx] = self._combine_classes(result[idx], subclass)
@@ -2416,21 +2429,22 @@ class SimCCO32(SimCC):
             if ty.packed:
                 return None
             for field, subty in ty.fields.items():
-                offset = ty.offsets[field]
+                offset = ty.offsets(self.arch)[field]
                 subresult = self._flatten(subty)
                 if subresult is None:
                     return None
                 for suboffset, subsubty_list in subresult.items():
                     result[offset + suboffset] += subsubty_list
         elif isinstance(ty, SimTypeFixedSizeArray):
-            assert ty.length is not None and ty.elem_type.size is not None
+            elem_size = ty.elem_type.size(self.arch)
+            assert ty.length is not None and elem_size is not None
             subresult = self._flatten(ty.elem_type)
             if subresult is None:
                 return None
             for suboffset, subsubty_list in subresult.items():
                 for idx in range(ty.length):
                     # TODO I think we need an explicit stride field on array types
-                    result[idx * ty.elem_type.size // self.arch.byte_width + suboffset] += subsubty_list
+                    result[idx * elem_size // self.arch.byte_width + suboffset] += subsubty_list
         elif isinstance(ty, SimUnion):
             for subty in ty.members.values():
                 subresult = self._flatten(subty)

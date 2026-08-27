@@ -36,7 +36,7 @@ class TestDecompilationNotes(unittest.TestCase):
 
         proj.kb.functions["PsLookupProcessByProcessId"].prototype = parse_signature(
             "int PsLookupProcessByProcessId(uint64_t a, uint64_t b);"
-        ).with_arch(proj.arch)
+        )
 
         # ensure we correctly recognize security_check_cookie
         assert proj.kb.functions[0x1400070B0].name == "_security_check_cookie"

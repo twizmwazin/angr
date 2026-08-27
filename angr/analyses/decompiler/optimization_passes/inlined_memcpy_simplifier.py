@@ -100,7 +100,7 @@ class InlinedMemcpySimplifier(OptimizationPass):
                 **stmt.tags,
             )
             variable_map_of(self.manager).set_prototype(
-                call, SIM_LIBRARIES["libc.so"][0].get_prototype("memcpy", arch=self.project.arch)
+                call, SIM_LIBRARIES["libc.so"][0].get_prototype("memcpy")
             )
             return SideEffectStatement(
                 self.manager.next_atom(),

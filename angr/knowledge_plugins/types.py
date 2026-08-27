@@ -56,7 +56,7 @@ class TypesStore(KnowledgeBasePlugin, UserDict[str, TypeRef]):
         if type(value) is not TypeRef:
             raise TypeError("Can only store TypeRefs in TypesStore")
 
-        super().__setitem__(item, value.with_arch(self._kb._project.arch))
+        super().__setitem__(item, value)
 
     def __iter__(self) -> Iterator[str]:
         yield from super().__iter__()
