@@ -1092,8 +1092,8 @@ class BinDiff(Analysis):
         return name_matches
 
     def _get_string_reference_matches(self) -> list[tuple[int, int]]:
-        strs_main: dict[str, int | None] = {}
-        strs_secondary: dict[str, int | None] = {}
+        strs_main: dict[bytes | None, int | None] = {}
+        strs_secondary: dict[bytes | None, int | None] = {}
 
         for mem_data in self.cfg_a.memory_data.values():
             if mem_data.sort == MemoryDataSort.String:
