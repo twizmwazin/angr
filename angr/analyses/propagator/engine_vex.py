@@ -46,7 +46,7 @@ class SimEnginePropagatorVEX(
     def _process_block_end(self, stmt_result, whitelist):
         return self.state
 
-    def _process_block(self, whitelist=None):
+    def _process_block(self, whitelist: set[int] | None = None):
         result = super()._process_block(whitelist)
         if self.block.vex.jumpkind == "Ijk_Call" and self.arch.call_pushes_ret:
             # pop ret from the stack

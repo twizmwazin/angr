@@ -4,7 +4,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import claripy
 import pyvex
@@ -17,6 +17,16 @@ from angr.knowledge_plugins.propagations.propagation_model import PropagationMod
 from angr.knowledge_plugins.propagations.states import PropagatorState, PropagatorVEXState
 
 from .engine_vex import SimEnginePropagatorVEX
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Container
+
+    import networkx
+
+    from angr.analyses.stack_pointer_tracker import StackPointerTracker
+    from angr.block import Block
+    from angr.knowledge_plugins.functions.function import Function
+    from angr.sim_state import SimState
 
 _l = logging.getLogger(name=__name__)
 
@@ -44,15 +54,15 @@ class PropagatorAnalysis(ForwardAnalysis, Analysis):  # pylint:disable=abstract-
 
     def __init__(
         self,
-        func=None,
-        block=None,
-        func_graph=None,
-        base_state=None,
+        func: Function | None = None,
+        block: Block | None = None,
+        func_graph: networkx.DiGraph | None = None,
+        base_state: SimState | None = None,
         max_iterations=30,
-        load_callback=None,
-        stack_pointer_tracker=None,
+        load_callback: Callable[[claripy.ast.BV, int], bool] | None = None,
+        stack_pointer_tracker: StackPointerTracker | None = None,
         only_consts=False,
-        completed_funcs=None,
+        completed_funcs: Container[int] | None = None,
         do_binops=True,
         store_tops=True,
         vex_cross_insn_opt=False,

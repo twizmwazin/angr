@@ -9,8 +9,14 @@ from angr.errors import SimEngineError
 from angr.misc.testing import is_testing
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    import claripy
+
     from angr.analyses.reaching_definitions.reaching_definitions import ReachingDefinitionsModel
+    from angr.analyses.stack_pointer_tracker import StackPointerTracker
     from angr.project import Project
+    from angr.sim_state import SimState
 
 l = logging.getLogger(name=__name__)
 
@@ -25,7 +31,7 @@ class SimEnginePropagatorBaseMixin[StateType, DataType_co, BlockType: BlockProto
     def __init__(
         self,
         project: Project,
-        stack_pointer_tracker=None,
+        stack_pointer_tracker: StackPointerTracker | None = None,
         propagate_tmps=True,
         reaching_definitions: ReachingDefinitionsModel | None = None,
         bp_as_gpr: bool = False,
@@ -46,7 +52,13 @@ class SimEnginePropagatorBaseMixin[StateType, DataType_co, BlockType: BlockProto
         self._multi_occurrence_registers = None
 
     def process(
-        self, state: StateType, *, block: BlockType | None = None, base_state=None, load_callback=None, **kwargs
+        self,
+        state: StateType,
+        *,
+        block: BlockType | None = None,
+        base_state: SimState | None = None,
+        load_callback: Callable[[claripy.ast.BV, int], bool] | None = None,
+        **kwargs,
     ) -> StateType:
         self.base_state = base_state
         self._load_callback = load_callback
