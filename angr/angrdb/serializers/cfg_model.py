@@ -1,8 +1,13 @@
 # pylint:disable=unused-import
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from angr.angrdb.models import DbCFGModel
 from angr.knowledge_plugins.cfg.cfg_model import CFGModel
+
+if TYPE_CHECKING:
+    import cle
 
 
 class CFGModelSerializer:
@@ -34,7 +39,7 @@ class CFGModelSerializer:
         session.add(db_cfg)
 
     @staticmethod
-    def load(session, db_kb, ident, cfg_manager, loader=None):
+    def load(session, db_kb, ident, cfg_manager, loader: cle.Loader | None = None):
         db_cfg: DbCFGModel = session.query(DbCFGModel).filter_by(kb=db_kb, ident=ident).scalar()
         if db_cfg is None:
             return None

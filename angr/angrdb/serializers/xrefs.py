@@ -1,8 +1,13 @@
 # pylint:disable=unused-import
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from angr.angrdb.models import DbXRefs
 from angr.knowledge_plugins.xrefs import XRefManager
+
+if TYPE_CHECKING:
+    from angr.knowledge_plugins.cfg.cfg_model import CFGModel
 
 
 class XRefsSerializer:
@@ -32,7 +37,7 @@ class XRefsSerializer:
             session.add(db_xrefs)
 
     @staticmethod
-    def load(session, db_kb, kb, cfg_model=None):  # pylint:disable=unused-argument
+    def load(session, db_kb, kb, cfg_model: CFGModel | None = None):  # pylint:disable=unused-argument
         """
 
         :param session:

@@ -57,7 +57,7 @@ class VariableManagerSerializer:
 
     @staticmethod
     def _internal_row(
-        db_kb: DbKnowledgeBase, internal_manager: VariableManagerInternal, func_addr: int, ident=None
+        db_kb: DbKnowledgeBase, internal_manager: VariableManagerInternal, func_addr: int, ident: str | None = None
     ) -> dict | None:
         if not internal_manager._variables:  # pylint:disable=protected-access
             # Empty variable managers are not stored.
@@ -69,7 +69,7 @@ class VariableManagerSerializer:
         return {"kb_id": db_kb.id, "ident": ident or None, "func_addr": func_addr, "blob": blob}
 
     @staticmethod
-    def load(session, db_kb: DbKnowledgeBase, kb: KnowledgeBase, ident=None, table=DbVariableCollection):
+    def load(session, db_kb: DbKnowledgeBase, kb: KnowledgeBase, ident: str | None = None, table=DbVariableCollection):
         variable_manager = DecompilationVariableManager(kb) if table is DbDecVariableCollection else VariableManager(kb)
 
         db_varcolls = session.query(table).filter_by(kb=db_kb, ident=ident)
@@ -87,7 +87,7 @@ class VariableManagerSerializer:
         return variable_manager
 
     @staticmethod
-    def load_dvars(session, db_kb: DbKnowledgeBase, kb: KnowledgeBase, ident=None):
+    def load_dvars(session, db_kb: DbKnowledgeBase, kb: KnowledgeBase, ident: str | None = None):
         return VariableManagerSerializer.load(session, db_kb, kb, ident=ident, table=DbDecVariableCollection)
 
     @staticmethod
