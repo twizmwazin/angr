@@ -13,7 +13,7 @@ rand_count = itertools.count()
 class random(angr.SimProcedure):
     # pylint:disable=arguments-differ,missing-class-docstring
 
-    def run(self, buf, count, rnd_bytes, concrete_data=None):
+    def run(self, buf, count, rnd_bytes, concrete_data: bytes | None = None):
         if isinstance(rnd_bytes, SimActionObject):
             rnd_bytes = rnd_bytes.ast
 
