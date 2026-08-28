@@ -58,7 +58,7 @@ class SimEngineLight[StateType, DataType_co, BlockType: BlockProtocol, ResultTyp
     ins_addr: int
     tmps: dict[int, DataType_co]
 
-    def __init__(self, project: Project, logger=None):
+    def __init__(self, project: Project, logger: logging.Logger | None = None):
         self.l = logger or logging.getLogger(self.__module__ + "." + self.__class__.__name__)
         super().__init__(project)
 
@@ -72,7 +72,7 @@ class SimEngineLight[StateType, DataType_co, BlockType: BlockProtocol, ResultTyp
     # Helper methods
     #
 
-    def _codeloc(self, block_only=False, context=None):
+    def _codeloc(self, block_only=False, context: tuple[int, ...] | None = None):
         return CodeLocation(
             self.block.addr,
             None if block_only else self.stmt_idx,
@@ -679,7 +679,7 @@ class SimEngineLightAIL[StateType, DataType_co, StmtDataType, ResultType](
     # Helper methods
     #
 
-    def _codeloc(self, block_only=False, context=None):
+    def _codeloc(self, block_only=False, context: tuple[int, ...] | None = None):
         return CodeLocation(
             self.block.addr,
             None if block_only else self.stmt_idx,
