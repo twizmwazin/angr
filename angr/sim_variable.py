@@ -36,7 +36,12 @@ class SimVariable(Serializable):
     _hash: int | None
 
     def __init__(
-        self, size: int, ident: str | None = None, name: str | None = None, region: int | None = None, category=None
+        self,
+        size: int,
+        ident: str | None = None,
+        name: str | None = None,
+        region: int | None = None,
+        category: str | None = None,
     ):
         """
         :param ident: A unique identifier provided by user or the program. Usually a string.
@@ -118,7 +123,7 @@ class SimConstantVariable(SimVariable):
 
     __slots__ = ["value"]
 
-    def __init__(self, size: int, *, value: float, region: int | None = None, ident=None):
+    def __init__(self, size: int, *, value: float, region: int | None = None, ident: str | None = None):
         super().__init__(ident=ident, region=region, size=size)
         is_negative = value < 0
         abs_value = -value if is_negative else value
@@ -246,7 +251,15 @@ class SimRegisterVariable(SimVariable):
 
     __slots__ = ["reg"]
 
-    def __init__(self, reg_offset: int, size: int, ident=None, name=None, region=None, category=None):
+    def __init__(
+        self,
+        reg_offset: int,
+        size: int,
+        ident: str | None = None,
+        name: str | None = None,
+        region: int | None = None,
+        category: str | None = None,
+    ):
         SimVariable.__init__(self, ident=ident, name=name, region=region, category=category, size=size)
 
         self.reg = reg_offset
@@ -314,7 +327,15 @@ class SimComboRegisterVariable(SimVariable):
 
     __slots__ = ["reg_offsets"]
 
-    def __init__(self, reg_offsets: tuple, size: int, ident=None, name=None, region=None, category=None):
+    def __init__(
+        self,
+        reg_offsets: tuple,
+        size: int,
+        ident: str | None = None,
+        name: str | None = None,
+        region: int | None = None,
+        category: str | None = None,
+    ):
         SimVariable.__init__(self, ident=ident, name=name, region=region, category=category, size=size)
 
         self.reg_offsets = reg_offsets
@@ -388,7 +409,15 @@ class SimMemoryVariable(SimVariable):
 
     __slots__ = ["addr"]
 
-    def __init__(self, addr, size: int, ident=None, name=None, region=None, category=None):
+    def __init__(
+        self,
+        addr,
+        size: int,
+        ident: str | None = None,
+        name: str | None = None,
+        region: int | None = None,
+        category: str | None = None,
+    ):
         SimVariable.__init__(self, ident=ident, name=name, region=region, category=category, size=size)
 
         self.addr = addr
@@ -468,7 +497,15 @@ class SimStackVariable(SimMemoryVariable):
     )
 
     def __init__(
-        self, offset: int, size: int, base="bp", base_addr=None, ident=None, name=None, region=None, category=None
+        self,
+        offset: int,
+        size: int,
+        base="bp",
+        base_addr: int | None = None,
+        ident: str | None = None,
+        name: str | None = None,
+        region: int | None = None,
+        category: str | None = None,
     ):
         if isinstance(offset, int) and offset > 0x1000000:
             # I don't think any positive stack offset will be greater than that...

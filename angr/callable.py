@@ -35,7 +35,7 @@ class Callable:
         concrete_only=False,
         perform_merge=True,
         base_state: SimState | None = None,
-        toc=None,
+        toc: int | None = None,
         cc: SimCC | None = None,
         add_options: set[str] | None = None,
         remove_options: set[str] | None = None,

@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import networkx
 
 from .errors import AngrAnnotatedCFGError, AngrExitError
 from .knowledge_plugins.cfg import CFGNode
 from .utils.constants import DEFAULT_STATEMENT
+
+if TYPE_CHECKING:
+    from .analyses.cfg.cfg_emulated import CFGEmulated
+    from .project import Project
 
 l = logging.getLogger(name=__name__)
 
@@ -19,7 +23,7 @@ class AnnotatedCFG:
     program.
     """
 
-    def __init__(self, project, cfg=None, detect_loops=False):
+    def __init__(self, project, cfg: CFGEmulated | None = None, detect_loops=False):
         """
         Constructor.
 
@@ -214,7 +218,7 @@ class AnnotatedCFG:
 
         return ret_str
 
-    def dbg_print_irsb(self, irsb_addr, project=None):
+    def dbg_print_irsb(self, irsb_addr, project: Project | None = None):
         """
         Pretty-print an IRSB with whitelist information
         """

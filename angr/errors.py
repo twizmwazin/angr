@@ -1,6 +1,11 @@
 # pylint:disable=missing-class-docstring
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import claripy
+
 
 class AngrError(Exception):
     pass
@@ -562,7 +567,7 @@ class SimException(SimError):
 
 
 class SimSegfaultException(SimException, SimMemoryError):
-    def __init__(self, addr, reason, original_addr=None):
+    def __init__(self, addr, reason, original_addr: claripy.ast.Base | None = None):
         self.addr = addr
         self.reason = reason
         self.original_addr = original_addr

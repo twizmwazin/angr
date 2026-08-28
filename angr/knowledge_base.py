@@ -49,7 +49,7 @@ class KnowledgeBase:
     obfuscations: Obfuscations
     rtdb: RuntimeDb
 
-    def __init__(self, project, obj=None, name=None):
+    def __init__(self, project, obj: object = None, name: str | None = None):
         if obj is not None:
             l.warning("The obj parameter in KnowledgeBase.__init__() has been deprecated.")
         object.__setattr__(self, "_project", project)

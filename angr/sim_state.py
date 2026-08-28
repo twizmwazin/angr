@@ -113,7 +113,7 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
         stack_perms: int | None = None,
         stack_end: int | None = None,
         stack_size: int | None = None,
-        regioned_memory_cls=None,
+        regioned_memory_cls: type | None = None,
         **kwargs,
     ):
         if kwargs:

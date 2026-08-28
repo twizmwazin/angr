@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from angr.analyses.decompiler.clinic import Clinic
     from angr.project import Project
     from angr.sim_manager import SimulationManager
+    from angr.sim_type import SimTypeFunction
 
 
 class AILCallable(VEXCallable):
@@ -37,7 +38,7 @@ class AILCallable(VEXCallable):
         self._preset = preset
         self._boundary = boundary
 
-    def perform_call(self, *args, prototype=None):
+    def perform_call(self, *args, prototype: SimTypeFunction | None = None):
         state = ail_call_state(
             self._project,
             self._addr,

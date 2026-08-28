@@ -9,6 +9,8 @@ from archinfo.arch_soot import SootMethodDescriptor
 import angr
 
 if TYPE_CHECKING:
+    import networkx
+
     from . import SimProcedure
 
 l = logging.getLogger(name=__name__)
@@ -27,7 +29,7 @@ class CodeNode[K: (int, SootMethodDescriptor)]:
 
     __slots__ = ["_graph", "_hash", "addr", "size", "thumb"]
 
-    def __init__(self, addr: K, size: int, graph=None, thumb=False):
+    def __init__(self, addr: K, size: int, graph: networkx.DiGraph | None = None, thumb=False):
         self.addr = addr
         self.size: int = size
         self.thumb = thumb
@@ -91,7 +93,7 @@ class BlockNode[K: (int, SootMethodDescriptor)](CodeNode[K]):
 
     is_hook = False
 
-    def __init__(self, addr: int, size, bytestr=None, **kwargs):
+    def __init__(self, addr: int, size, bytestr: bytes | None = None, **kwargs):
         super().__init__(addr, size, **kwargs)
         self.bytestr = bytestr
 

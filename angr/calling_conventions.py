@@ -68,7 +68,7 @@ class AllocHelper:
         self.ptr += size
         return out
 
-    def dump(self, val, state, loc=None):
+    def dump(self, val, state, loc: SimFunctionArgument | None = None):
         if loc is None:
             loc = self.stack_loc(val, state.arch)
         self.stores[self.ptr] = (val, loc)
@@ -294,7 +294,7 @@ class SimFunctionArgument:
     def get_value(self, state, **kwargs):
         raise NotImplementedError
 
-    def refine(self, size, arch=None, offset=None, is_fp=None):
+    def refine(self, size, arch: archinfo.Arch | None = None, offset: int | None = None, is_fp: bool | None = None):
         raise NotImplementedError
 
     def get_footprint(self) -> Iterable[SimRegArg | SimStackArg]:
@@ -352,7 +352,7 @@ class SimRegArg(SimFunctionArgument):
         offset = self.check_offset(state.arch)
         return self.check_value_get(state.registers.load(offset, size=self.size))
 
-    def refine(self, size, arch=None, offset=None, is_fp=None):
+    def refine(self, size, arch: archinfo.Arch | None = None, offset: int | None = None, is_fp: bool | None = None):
         passed_offset_none = offset is None
         if offset is None:
             if arch is None:
@@ -403,7 +403,7 @@ class SimStackArg(SimFunctionArgument):
         value = state.memory.load(stack_base + self.stack_offset, endness=state.arch.memory_endness, size=self.size)
         return self.check_value_get(value)
 
-    def refine(self, size, arch=None, offset=None, is_fp=None):
+    def refine(self, size, arch: archinfo.Arch | None = None, offset: int | None = None, is_fp: bool | None = None):
         if offset is None:
             if arch is None:
                 raise ValueError("Need to specify either offset or arch in order to refine a stack argument")
@@ -899,17 +899,28 @@ class SimCC:
         session = self.arg_session(prototype.returnty)
         return [self.next_arg(session, arg_ty) for arg_ty in prototype.args]
 
-    def get_args(self, state, prototype, stack_base=None):
+    def get_args(self, state, prototype, stack_base: int | claripy.ast.BV | None = None):
         arg_locs = self.arg_locs(prototype)
         return [loc.get_value(state, stack_base=stack_base) for loc in arg_locs]
 
-    def set_return_val(self, state, val, ty, stack_base=None, perspective_returned=False):
+    def set_return_val(
+        self, state, val, ty, stack_base: int | claripy.ast.BV | None = None, perspective_returned=False
+    ):
         loc = self.return_val(ty, perspective_returned=perspective_returned)
         if loc is None:
             raise ValueError("Cannot set return value - there is no return value location")
         loc.set_value(state, val, stack_base=stack_base)
 
-    def setup_callsite(self, state, ret_addr, args, prototype, stack_base=None, alloc_base=None, grow_like_stack=True):
+    def setup_callsite(
+        self,
+        state,
+        ret_addr,
+        args,
+        prototype,
+        stack_base: int | claripy.ast.BV | None = None,
+        alloc_base=None,
+        grow_like_stack=True,
+    ):
         """
         This function performs the actions of the caller getting ready to jump into a function.
 
@@ -1017,7 +1028,13 @@ class SimCC:
         if self.return_addr is not None:
             self.return_addr.set_value(state, ret_addr, stack_base=stack_base)
 
-    def teardown_callsite(self, state, return_val=None, prototype=None, force_callee_cleanup=False):
+    def teardown_callsite(
+        self,
+        state,
+        return_val: claripy.ast.Base | SimActionObject | float | None = None,
+        prototype: SimTypeFunction | None = None,
+        force_callee_cleanup=False,
+    ):
         """
         This function performs the actions of the callee as it's getting ready to return.
         It returns the address to return to.
@@ -1339,7 +1356,7 @@ class SimLyingRegArg(SimRegArg):
         state.registers.store(self.reg_name, value)
         # super(SimLyingRegArg, self).set_value(state, value, endness=endness, **kwargs)
 
-    def refine(self, size, arch=None, offset=None, is_fp=None):
+    def refine(self, size, arch: archinfo.Arch | None = None, offset: int | None = None, is_fp: bool | None = None):
         return SimLyingRegArg(self.reg_name, size)
 
 
@@ -1598,7 +1615,9 @@ class SimCCX86LinuxSyscall(SimCCSyscall):
     ARCH = archinfo.ArchX86
 
     @classmethod
-    def _match(cls, arch, args, sp_delta, unused_hint=None, extra_pop=None):  # pylint: disable=unused-argument
+    def _match(  # pylint: disable=unused-argument
+        cls, arch, args, sp_delta, unused_hint: list[SimRegArg] | None = None, extra_pop: int | None = None
+    ):
         # never appears anywhere except syscalls
         return False
 
@@ -1616,7 +1635,9 @@ class SimCCX86WindowsSyscall(SimCCSyscall):
     ARCH = archinfo.ArchX86
 
     @classmethod
-    def _match(cls, arch, args, sp_delta, unused_hint=None, extra_pop=None):  # pylint: disable=unused-argument
+    def _match(  # pylint: disable=unused-argument
+        cls, arch, args, sp_delta, unused_hint: list[SimRegArg] | None = None, extra_pop: int | None = None
+    ):
         # never appears anywhere except syscalls
         return False
 
@@ -1649,7 +1670,7 @@ class SimCCSystemVAMD64(SimCC):
     STACK_ALIGNMENT = 16
 
     @classmethod
-    def _match(cls, arch, args, sp_delta, unused_hint=None, extra_pop=None):
+    def _match(cls, arch, args, sp_delta, unused_hint: list[SimRegArg] | None = None, extra_pop: int | None = None):
         if cls.ARCH is not None and ":" not in arch.name and not isinstance(arch, cls.ARCH):
             return False
         # if sp_delta != cls.STACKARG_SP_DIFF:
@@ -1756,7 +1777,7 @@ class SimCCSystemVAMD64(SimCC):
         # :P
         return isinstance(self.return_val(ty), SimReferenceArgument)
 
-    def _classify(self, ty: SimType, chunksize=None) -> list[str]:
+    def _classify(self, ty: SimType, chunksize: int | None = None) -> list[str]:
         if chunksize is None:
             chunksize = self.arch.bytes
         # treat BOT as INTEGER
@@ -1859,7 +1880,9 @@ class SimCCAMD64LinuxSyscall(SimCCSyscall):
     CALLER_SAVED_REGS = ["rax", "rcx", "r11"]
 
     @staticmethod
-    def _match(arch, args, sp_delta, unused_hint=None, extra_pop=None):  # type: ignore # pylint: disable=unused-argument
+    def _match(  # type: ignore # pylint: disable=unused-argument
+        arch, args, sp_delta, unused_hint: list[SimRegArg] | None = None, extra_pop: int | None = None
+    ):
         # doesn't appear anywhere but syscalls
         return False
 
@@ -1877,7 +1900,9 @@ class SimCCAMD64WindowsSyscall(SimCCSyscall):
     ARCH = archinfo.ArchAMD64
 
     @classmethod
-    def _match(cls, arch, args, sp_delta, unused_hint=None, extra_pop=None):  # pylint: disable=unused-argument
+    def _match(  # pylint: disable=unused-argument
+        cls, arch, args, sp_delta, unused_hint: list[SimRegArg] | None = None, extra_pop: int | None = None
+    ):
         # never appears anywhere except syscalls
         return False
 
@@ -1935,7 +1960,7 @@ class SimCCARM(SimCC):
 
         return refine_locs_with_struct_type(self.arch, mapped_classes, arg_type)
 
-    def _classify(self, ty, chunksize=None):
+    def _classify(self, ty, chunksize: int | None = None):
         if chunksize is None:
             chunksize = self.arch.bytes
         # treat BOT as INTEGER
@@ -2087,7 +2112,9 @@ class SimCCARMLinuxSyscall(SimCCSyscall):
     ARCH = archinfo.ArchARM
 
     @classmethod
-    def _match(cls, arch, args, sp_delta, unused_hint=None, extra_pop=None):  # pylint: disable=unused-argument
+    def _match(  # pylint: disable=unused-argument
+        cls, arch, args, sp_delta, unused_hint: list[SimRegArg] | None = None, extra_pop: int | None = None
+    ):
         # never appears anywhere except syscalls
         return False
 
@@ -2125,7 +2152,9 @@ class SimCCARMWindowsSyscall(SimCCSyscall):
     ARCH = archinfo.ArchARM
 
     @classmethod
-    def _match(cls, arch, args, sp_delta, unused_hint=None, extra_pop=None):  # pylint: disable=unused-argument
+    def _match(  # pylint: disable=unused-argument
+        cls, arch, args, sp_delta, unused_hint: list[SimRegArg] | None = None, extra_pop: int | None = None
+    ):
         # never appears anywhere except syscalls
         return False
 
@@ -2151,7 +2180,9 @@ class SimCCAArch64LinuxSyscall(SimCCSyscall):
     ARCH = archinfo.ArchAArch64
 
     @classmethod
-    def _match(cls, arch, args, sp_delta, unused_hint=None, extra_pop=None):  # pylint: disable=unused-argument
+    def _match(  # pylint: disable=unused-argument
+        cls, arch, args, sp_delta, unused_hint: list[SimRegArg] | None = None, extra_pop: int | None = None
+    ):
         # never appears anywhere except syscalls
         return False
 
@@ -2176,7 +2207,9 @@ class SimCCAArch64WindowsSyscall(SimCCSyscall):
     ARCH = archinfo.ArchAArch64
 
     @classmethod
-    def _match(cls, arch, args, sp_delta, unused_hint=None, extra_pop=None):  # pylint: disable=unused-argument
+    def _match(  # pylint: disable=unused-argument
+        cls, arch, args, sp_delta, unused_hint: list[SimRegArg] | None = None, extra_pop: int | None = None
+    ):
         # never appears anywhere except syscalls
         return False
 
@@ -2364,7 +2397,9 @@ class SimCCRISCV64LinuxSyscall(SimCCSyscall):
     ARCH = archinfo.ArchRISCV64
 
     @classmethod
-    def _match(cls, arch, args, sp_delta, unused_hint=None, extra_pop=None):  # pylint: disable=unused-argument
+    def _match(  # pylint: disable=unused-argument
+        cls, arch, args, sp_delta, unused_hint: list[SimRegArg] | None = None, extra_pop: int | None = None
+    ):
         # never appears anywhere except syscalls
         return False
 
@@ -2431,7 +2466,7 @@ class SimCCO32(SimCC):
 
         return refine_locs_with_struct_type(self.arch, mapped_classes, arg_type)
 
-    def _classify(self, ty, chunksize=None):
+    def _classify(self, ty, chunksize: int | None = None):
         if chunksize is None:
             chunksize = self.arch.bytes
         # treat BOT as INTEGER
@@ -2524,7 +2559,9 @@ class SimCCO32LinuxSyscall(SimCCSyscall):
     SYSCALL_ERRNO_START = -1133
 
     @classmethod
-    def _match(cls, arch, args, sp_delta, unused_hint=None, extra_pop=None):  # pylint: disable=unused-argument
+    def _match(  # pylint: disable=unused-argument
+        cls, arch, args, sp_delta, unused_hint: list[SimRegArg] | None = None, extra_pop: int | None = None
+    ):
         # never appears anywhere except syscalls
         return False
 
@@ -2566,7 +2603,9 @@ class SimCCN64LinuxSyscall(SimCCSyscall):
     SYSCALL_ERRNO_START = -1133
 
     @classmethod
-    def _match(cls, arch, args, sp_delta, unused_hint=None, extra_pop=None):  # pylint: disable=unused-argument
+    def _match(  # pylint: disable=unused-argument
+        cls, arch, args, sp_delta, unused_hint: list[SimRegArg] | None = None, extra_pop: int | None = None
+    ):
         # never appears anywhere except syscalls
         return False
 
@@ -2602,7 +2641,9 @@ class SimCCPowerPCLinuxSyscall(SimCCSyscall):
     SYSCALL_ERRNO_START = -515
 
     @classmethod
-    def _match(cls, arch, args, sp_delta, unused_hint=None, extra_pop=None):  # pylint: disable=unused-argument
+    def _match(  # pylint: disable=unused-argument
+        cls, arch, args, sp_delta, unused_hint: list[SimRegArg] | None = None, extra_pop: int | None = None
+    ):
         # never appears anywhere except syscalls
         return False
 
@@ -2632,7 +2673,9 @@ class SimCCPowerPC64LinuxSyscall(SimCCSyscall):
     SYSCALL_ERRNO_START = -515
 
     @classmethod
-    def _match(cls, arch, args, sp_delta, unused_hint=None, extra_pop=None):  # pylint: disable=unused-argument
+    def _match(  # pylint: disable=unused-argument
+        cls, arch, args, sp_delta, unused_hint: list[SimRegArg] | None = None, extra_pop: int | None = None
+    ):
         # never appears anywhere except syscalls
         return False
 
@@ -2645,7 +2688,16 @@ class SimCCSoot(SimCC):
     ARCH = archinfo.ArchSoot
     ARG_REGS = []
 
-    def setup_callsite(self, state, ret_addr, args, prototype, stack_base=None, alloc_base=None, grow_like_stack=True):
+    def setup_callsite(
+        self,
+        state,
+        ret_addr,
+        args,
+        prototype,
+        stack_base: int | claripy.ast.BV | None = None,
+        alloc_base=None,
+        grow_like_stack=True,
+    ):
         angr.engines.SootMixin.setup_callsite(state, args, ret_addr)
 
     @staticmethod
@@ -2660,7 +2712,9 @@ class SimCCUnknown(SimCC):
     """
 
     @staticmethod
-    def _match(arch, args, sp_delta, unused_hint=None, extra_pop=None):  # type: ignore  # pylint: disable=unused-argument
+    def _match(  # type: ignore  # pylint: disable=unused-argument
+        arch, args, sp_delta, unused_hint: list[SimRegArg] | None = None, extra_pop: int | None = None
+    ):
         # It always returns True
         return True
 
@@ -2685,7 +2739,9 @@ class SimCCS390XLinuxSyscall(SimCCSyscall):
     ARCH = archinfo.ArchS390X
 
     @classmethod
-    def _match(cls, arch, args, sp_delta, unused_hint=None, extra_pop=None):  # pylint: disable=unused-argument
+    def _match(  # pylint: disable=unused-argument
+        cls, arch, args, sp_delta, unused_hint: list[SimRegArg] | None = None, extra_pop: int | None = None
+    ):
         # never appears anywhere except syscalls
         return False
 

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from angr.sim_procedure import SimProcedure
 
 
 class CodeLocation[BlockAddr: int | None, StmtIdx: int | None, Context]:
@@ -25,7 +28,7 @@ class CodeLocation[BlockAddr: int | None, StmtIdx: int | None, Context]:
         self,
         block_addr: BlockAddr,
         stmt_idx: StmtIdx,
-        sim_procedure=None,
+        sim_procedure: SimProcedure | None = None,
         ins_addr: int | None = None,
         context: Context = None,
         block_idx: int | None = None,

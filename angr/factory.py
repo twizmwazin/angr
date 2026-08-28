@@ -28,6 +28,8 @@ except ImportError:
     register_pcode_arch_default_cc = None
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
+
     from angr import Project, SimCC
     from angr.engines import SimEngine
 
@@ -83,7 +85,7 @@ class AngrObjectFactory:
             self._tls.default_engine = self.default_engine_factory(self.project)
         return self._tls.default_engine
 
-    def snippet(self, addr, jumpkind=None, **block_opts):
+    def snippet(self, addr, jumpkind: str | None = None, **block_opts):
         if self.project.is_hooked(addr) and jumpkind != "Ijk_NoHook":
             hook = self.project._sim_procedures[addr]
             size = hook.kwargs.get("length", 0)
@@ -244,11 +246,11 @@ class AngrObjectFactory:
         prototype=None,
         concrete_only=False,
         perform_merge=True,
-        base_state=None,
-        toc=None,
-        cc=None,
-        add_options=None,
-        remove_options=None,
+        base_state: SimState | None = None,
+        toc: int | None = None,
+        cc: SimCC | None = None,
+        add_options: set[str] | None = None,
+        remove_options: set[str] | None = None,
         techniques: list[ExplorationTechnique] | None = None,
         step_limit: int | None = None,
     ):
@@ -311,22 +313,22 @@ class AngrObjectFactory:
     def block(
         self,
         addr: int,
-        size=None,
-        max_size=None,
-        byte_string=None,
+        size: int | None = None,
+        max_size: int | None = None,
+        byte_string: bytes | None = None,
         thumb=False,
-        backup_state=None,
-        extra_stop_points=None,
-        opt_level=None,
-        num_inst=None,
+        backup_state: SimState | None = None,
+        extra_stop_points: Iterable[int] | None = None,
+        opt_level: int | None = None,
+        num_inst: int | None = None,
         traceflags=0,
-        insn_bytes=None,
-        strict_block_end=None,
+        insn_bytes: bytes | None = None,
+        strict_block_end: bool | None = None,
         collect_data_refs=False,
         cross_insn_opt=True,
         load_from_ro_regions=False,
         const_prop=False,
-        initial_regs=None,
+        initial_regs: Sequence[tuple[int, int, int]] | None = None,
         skip_stmts=False,
     ) -> Block: ...
 
@@ -335,17 +337,17 @@ class AngrObjectFactory:
     def block(
         self,
         addr: SootAddressDescriptor,
-        size=None,
-        max_size=None,
-        byte_string=None,
+        size: int | None = None,
+        max_size: int | None = None,
+        byte_string: bytes | None = None,
         thumb=False,
-        backup_state=None,
-        extra_stop_points=None,
-        opt_level=None,
-        num_inst=None,
+        backup_state: SimState | None = None,
+        extra_stop_points: Iterable[int] | None = None,
+        opt_level: int | None = None,
+        num_inst: int | None = None,
         traceflags=0,
-        insn_bytes=None,
-        strict_block_end=None,
+        insn_bytes: bytes | None = None,
+        strict_block_end: bool | None = None,
         collect_data_refs=False,
         load_from_ro_regions=False,
         const_prop=False,
@@ -356,22 +358,22 @@ class AngrObjectFactory:
     def block(
         self,
         addr,
-        size=None,
-        max_size=None,
-        byte_string=None,
+        size: int | None = None,
+        max_size: int | None = None,
+        byte_string: bytes | None = None,
         thumb=False,
-        backup_state=None,
-        extra_stop_points=None,
-        opt_level=None,
-        num_inst=None,
+        backup_state: SimState | None = None,
+        extra_stop_points: Iterable[int] | None = None,
+        opt_level: int | None = None,
+        num_inst: int | None = None,
         traceflags=0,
-        insn_bytes=None,
-        strict_block_end=None,
+        insn_bytes: bytes | None = None,
+        strict_block_end: bool | None = None,
         collect_data_refs=False,
         cross_insn_opt=True,
         load_from_ro_regions=False,
         const_prop=False,
-        initial_regs=None,
+        initial_regs: Sequence[tuple[int, int, int]] | None = None,
         skip_stmts=False,
     ):
         if isinstance(self.project.arch, ArchSoot) and isinstance(addr, SootAddressDescriptor):
@@ -401,7 +403,7 @@ class AngrObjectFactory:
             skip_stmts=skip_stmts,
         )
 
-    def fresh_block(self, addr, size, backup_state=None):
+    def fresh_block(self, addr, size, backup_state: SimState | None = None):
         return Block(addr, project=self.project, size=size, backup_state=backup_state)
 
     cc.SimRegArg = SimRegArg
