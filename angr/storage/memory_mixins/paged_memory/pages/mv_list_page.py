@@ -28,17 +28,14 @@ class MVListPage(
     Each load() returns an iterator of all values stored at that location.
     """
 
-    def __init__(self, memory=None, content=None, sinkhole=None, mo_cmp=None, **kwargs):
+    def __init__(self, memory, content=None, sinkhole=None, mo_cmp=None, **kwargs):
         super().__init__(**kwargs)
 
-        self.content: DynamicDictList[_MOTYPE | set[_MOTYPE] | None] = (
-            DynamicDictList(max_size=memory.page_size, content=content) if content is not None else None
+        self.content: DynamicDictList[_MOTYPE | set[_MOTYPE] | None] = DynamicDictList(
+            max_size=memory.page_size, content=content
         )
         self.stored_offset = set()
         self._mo_cmp: Callable | None = mo_cmp
-
-        if self.content is None and memory is not None:
-            self.content: DynamicDictList[_MOTYPE | set[_MOTYPE] | None] = DynamicDictList(max_size=memory.page_size)
 
         self.sinkhole: _MOTYPE | None = sinkhole
 
@@ -125,7 +122,7 @@ class MVListPage(
                 self.content[subaddr] = data
                 self.stored_offset.add(subaddr)
 
-    def erase(self, addr, size=None, **kwargs) -> None:
+    def erase(self, addr, size, **kwargs) -> None:
         for off in range(size):
             self.content[addr + off] = None
 
