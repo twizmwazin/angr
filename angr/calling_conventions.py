@@ -1549,7 +1549,7 @@ class SimCCSyscall(SimCC):
     The base class of all syscall CCs.
     """
 
-    ERROR_REG: SimRegArg = None  # type: ignore
+    ERROR_REG: SimRegArg | None = None
     SYSCALL_ERRNO_START = None
 
     @staticmethod
@@ -1565,6 +1565,7 @@ class SimCCSyscall(SimCC):
             expr = claripy.BVV(expr, state.arch.bits)
         with contextlib.suppress(AttributeError):
             expr = expr.ast  # type: ignore
+        assert self.ERROR_REG is not None
         nbits = self.ERROR_REG.size * state.arch.byte_width
         if self.SYSCALL_ERRNO_START is None:
             raise ValueError(f"SYSCALL_ERRNO_START is not defined for {self}")
