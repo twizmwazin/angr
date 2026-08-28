@@ -3813,17 +3813,22 @@ class RustStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis):
                 return RustAssignment(ret_expr, macro, tags=stmt.tags, codegen=self)
             return macro
 
+        # anything that is not a FunctionLikeMacro must be a Call: the code below unconditionally accesses
+        # .target and .args, which only exist on the Call variant
+        call = stmt.expr
+        assert isinstance(call, Expr.Call)
+
         try:
             # Try to handle it as a normal function call
-            target = self._handle(stmt.expr.target) if not isinstance(stmt.expr.target, str) else stmt.expr.target
+            target = self._handle(call.target) if not isinstance(call.target, str) else call.target
         except UnsupportedNodeTypeError:
-            target = stmt.expr.target
+            target = call.target
 
         target_func = self.kb.functions.function(addr=target.value) if isinstance(target, RustConstant) else None
 
         args = []
-        if stmt.expr.args is not None:
-            for i, arg in enumerate(stmt.expr.args):
+        if call.args is not None:
+            for i, arg in enumerate(call.args):
                 type_ = None
                 if (
                     target_func is not None

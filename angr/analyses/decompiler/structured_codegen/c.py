@@ -3927,15 +3927,15 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
         return CAssignment(cdst, csrc, tags=stmt.tags, codegen=self)
 
     def _handle_Stmt_SideEffectStatement(self, stmt: Stmt.SideEffectStatement, is_expr: bool = False, **kwargs):
+        # the C backend only ever wraps Call expressions in SideEffectStatement; bind to a local so the variant is
+        # visible to both readers and the type checker
+        call = stmt.expr
+        assert isinstance(call, Expr.Call)
         try:
             # Try to handle it as a normal function call
-            target = (
-                self._handle(stmt.expr.target, lvalue=True)
-                if not isinstance(stmt.expr.target, str)
-                else stmt.expr.target
-            )
+            target = self._handle(call.target, lvalue=True) if not isinstance(call.target, str) else call.target
         except UnsupportedNodeTypeError:
-            target = stmt.expr.target
+            target = call.target
 
         if (
             isinstance(target, CUnaryOp)
@@ -3951,8 +3951,8 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
         target_func = self.kb.functions.function(addr=target.value) if isinstance(target, CConstant) else None
 
         args = []
-        if stmt.expr.args is not None:
-            for i, arg in enumerate(stmt.expr.args):
+        if call.args is not None:
+            for i, arg in enumerate(call.args):
                 type_ = None
                 if (
                     target_func is not None
