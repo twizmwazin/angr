@@ -9,6 +9,7 @@ from angr.errors import SimSolverModeError, SimValueError
 from angr.state_plugins.callstack import CallStack
 
 if TYPE_CHECKING:
+    from angr.knowledge_plugins.cfg.block_id import BlockID
     from angr.sim_state import SimState
 l = logging.getLogger(name=__name__)
 
@@ -65,15 +66,15 @@ class CFGJobBase:
         addr,
         state: SimState,
         context_sensitivity_level,
-        block_id=None,
-        src_block_id=None,
-        src_exit_stmt_idx=None,
-        src_ins_addr=None,
+        block_id: BlockID | None = None,
+        src_block_id: BlockID | None = None,
+        src_exit_stmt_idx: int | None = None,
+        src_ins_addr: int | None = None,
         jumpkind: str | None = None,
-        call_stack=None,
+        call_stack: CallStack | None = None,
         is_narrowing=False,
         skip=False,
-        final_return_address=None,
+        final_return_address: int | None = None,
     ):
         self.addr = addr  # Note that addr may not always be equal to self.state.ip (for syscalls, for example)
         self.state = state

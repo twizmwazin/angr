@@ -66,7 +66,15 @@ class MemoryRegion:
 
 
 class Unknown:
-    def __init__(self, addr, size, bytes_=None, object_=None, segment=None, section=None):
+    def __init__(
+        self,
+        addr,
+        size,
+        bytes_: bytes | None = None,
+        object_: cle.Backend | None = None,
+        segment: cle.Segment | None = None,
+        section: cle.Section | None = None,
+    ):
         self.addr = addr
         self.size = size
 
@@ -213,7 +221,7 @@ class CFBlanket(Analysis):
         key = self.floor_addr(addr)
         return key, self._blanket[key]
 
-    def floor_items(self, addr=None, reverse=False):
+    def floor_items(self, addr: int | None = None, reverse=False):
         if addr is None:
             start_addr = None
         else:
@@ -235,7 +243,7 @@ class CFBlanket(Analysis):
         key = self.ceiling_addr(addr)
         return key, self._blanket[key]
 
-    def ceiling_items(self, addr=None, reverse=False, include_first=True):
+    def ceiling_items(self, addr: int | None = None, reverse=False, include_first=True):
         if addr is None:
             start_addr = None
         else:
@@ -386,7 +394,14 @@ class CFBlanket(Analysis):
                 min_addr, max_addr = obj.min_addr, obj.max_addr
                 self._mark_unknowns_core(min_addr, max_addr + 1, obj=obj)
 
-    def _mark_unknowns_core(self, min_addr, max_addr, obj=None, segment=None, section=None):
+    def _mark_unknowns_core(
+        self,
+        min_addr,
+        max_addr,
+        obj: cle.Backend | None = None,
+        segment: cle.Segment | None = None,
+        section: cle.Section | None = None,
+    ):
         # The region should be [min_addr, max_addr)
 
         try:

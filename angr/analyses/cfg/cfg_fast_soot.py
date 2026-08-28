@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from copy import copy
+from typing import TYPE_CHECKING
 
 from archinfo.arch_soot import SootAddressDescriptor, SootMethodDescriptor
 from sortedcontainers import SortedDict
@@ -14,6 +15,9 @@ from angr.knowledge_plugins.cfg import CFGNode
 from angr.utils.constants import DEFAULT_STATEMENT
 
 from .cfg_fast import CFGFast, CFGJob, FunctionTransitionEdge, PendingJobs
+
+if TYPE_CHECKING:
+    from angr.sim_state import SimState
 
 l = logging.getLogger(name=__name__)
 
@@ -335,7 +339,14 @@ class CFGFastSoot(CFGFast):
         return location
 
     def _to_snippet(
-        self, cfg_node=None, addr=None, size=None, thumb=False, jumpkind=None, base_state=None, byte_string=None
+        self,
+        cfg_node=None,
+        addr=None,
+        size: int | None = None,
+        thumb=False,
+        jumpkind: str | None = None,
+        base_state: SimState | None = None,
+        byte_string: bytes | None = None,
     ):
         assert thumb is False and byte_string is None
 

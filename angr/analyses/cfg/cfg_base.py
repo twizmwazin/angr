@@ -53,6 +53,11 @@ from angr.utils.orderedset import OrderedSet
 from .indirect_jump_resolvers.default_resolvers import default_indirect_jump_resolvers
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
+
+    from cle import Backend
+
+    from angr.analyses.cfg.indirect_jump_resolvers.resolver import IndirectJumpResolver
     from angr.knowledge_plugins.cfg.spilling_cfg import SpillingCFG
     from angr.knowledge_plugins.cfg.types import K
     from angr.sim_state import SimState
@@ -78,21 +83,21 @@ class CFGBase(Analysis):
         sort,
         context_sensitivity_level,
         normalize=False,
-        binary=None,
-        objects=None,
-        regions=None,
+        binary: Backend | None = None,
+        objects: list[Backend] | None = None,
+        regions: Sequence[tuple[int, int]] | None = None,
         exclude_sparse_regions=True,
         skip_specific_regions=True,
         force_segment=False,
-        base_state=None,
+        base_state: SimState | None = None,
         resolve_indirect_jumps=True,
-        indirect_jump_resolvers=None,
+        indirect_jump_resolvers: list[IndirectJumpResolver] | None = None,
         indirect_jump_target_limit=100000,
         detect_tail_calls=False,
         low_priority=False,
         skip_unmapped_addrs=True,
         sp_tracking_track_memory=True,
-        model=None,
+        model: CFGModel | None = None,
     ):
         """
         :param str sort:                            'fast' or 'emulated'.
@@ -457,10 +462,10 @@ class CFGBase(Analysis):
         self,
         cfg_node=None,
         addr=None,
-        size=None,
+        size: int | None = None,
         thumb=False,
-        jumpkind=None,
-        base_state=None,
+        jumpkind: str | None = None,
+        base_state: SimState | None = None,
         byte_string: bytes | None = None,
     ):
         """
@@ -495,7 +500,9 @@ class CFGBase(Analysis):
             return BlockNode(addr, size, thumb=thumb, bytestr=byte_string)  # pylint: disable=no-member
         return self.project.factory.snippet(addr, size=size, jumpkind=jumpkind, thumb=thumb, backup_state=base_state)
 
-    def _node_key_to_snippet(self, node_key: K, jumpkind: str | None = None, base_state=None) -> BlockNode:
+    def _node_key_to_snippet(
+        self, node_key: K, jumpkind: str | None = None, base_state: SimState | None = None
+    ) -> BlockNode:
         addr = block_key_to_addr(node_key)
         size = block_key_to_size(node_key)
         thumb = is_arm_arch(self.project.arch) and addr % 2 == 1
@@ -776,7 +783,7 @@ class CFGBase(Analysis):
 
         return False
 
-    def _executable_memory_regions(self, objects=None, force_segment=False):
+    def _executable_memory_regions(self, objects: Iterable[Backend] | None = None, force_segment=False):
         """
         Get all executable memory regions from the binaries
 
@@ -1049,7 +1056,7 @@ class CFGBase(Analysis):
         except KeyError:
             return None
 
-    def _fast_memory_load_pointer(self, addr, size=None) -> int | None:
+    def _fast_memory_load_pointer(self, addr, size: int | None = None) -> int | None:
         """
         Perform a fast memory loading of a pointer.
 
@@ -1608,7 +1615,7 @@ class CFGBase(Analysis):
 
         return finished_func_addrs
 
-    def _cleanup_analysis_jobs(self, finished_func_addrs=None):
+    def _cleanup_analysis_jobs(self, finished_func_addrs: Iterable[MethodType] | None = None):
         """
         From job manager, remove all functions of which we have finished analysis.
 

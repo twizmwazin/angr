@@ -6,10 +6,11 @@ from angr.errors import SimMemoryError
 
 if typing.TYPE_CHECKING:
     from angr import Project
+    from angr.sim_state import SimState
 
 
 class IndirectJumpResolver:
-    def __init__(self, project, timeless=False, base_state=None):
+    def __init__(self, project, timeless=False, base_state: SimState | None = None):
         self.project: Project = project
         self.timeless = timeless
         self.base_state = base_state

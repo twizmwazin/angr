@@ -75,10 +75,16 @@ from .pe_msvc_eh_structs import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
+
+    from angr.analyses.cfg.cfb import CFBlanket
+    from angr.analyses.cfg.indirect_jump_resolvers.resolver import IndirectJumpResolver
     from angr.block import Block
     from angr.engines.pcode.lifter import IRSB as PcodeIRSB
+    from angr.knowledge_plugins.cfg import CFGModel
     from angr.knowledge_plugins.cfg.spilling_cfg import SpillingCFG
     from angr.knowledge_plugins.cfg.types import CFGNODE_K
+    from angr.sim_state import SimState
 
 
 VEX_IRSB_MAX_SIZE = 400
@@ -349,9 +355,9 @@ class FunctionTransitionEdge(FunctionEdge):
         dst_addr,
         src_func_addr,
         to_outside=False,
-        dst_func_addr=None,
-        stmt_idx=None,
-        ins_addr=None,
+        dst_func_addr: int | None = None,
+        stmt_idx: int | None = None,
+        ins_addr: int | None = None,
         is_exception=False,
     ):
         self.src_node = src_node
@@ -389,7 +395,16 @@ class FunctionCallEdge(FunctionEdge):
 
     __slots__ = ("dst_addr", "ret_addr", "src_node", "syscall")
 
-    def __init__(self, src_node, dst_addr, ret_addr, src_func_addr, syscall=False, stmt_idx=None, ins_addr=None):
+    def __init__(
+        self,
+        src_node,
+        dst_addr,
+        ret_addr,
+        src_func_addr,
+        syscall=False,
+        stmt_idx: int | None = None,
+        ins_addr: int | None = None,
+    ):
         self.src_node = src_node
         self.dst_addr = dst_addr
         self.ret_addr = ret_addr
@@ -416,7 +431,7 @@ class FunctionFakeRetEdge(FunctionEdge):
 
     __slots__ = ("confirmed", "dst_addr", "src_node")
 
-    def __init__(self, src_node, dst_addr, src_func_addr, confirmed=None):
+    def __init__(self, src_node, dst_addr, src_func_addr, confirmed: bool | None = None):
         self.src_node = src_node
         self.dst_addr = dst_addr
         self.src_func_addr = src_func_addr
@@ -614,8 +629,8 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
 
     def __init__(
         self,
-        binary=None,
-        objects=None,
+        binary: cle.Backend | None = None,
+        objects: list[cle.Backend] | None = None,
         regions=None,
         pickle_intermediate_results=False,
         symbols=True,
@@ -629,19 +644,19 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
         cross_references=False,
         normalize=False,
         start_at_entry=True,
-        function_starts=None,
-        extra_memory_regions=None,
-        data_type_guessing_handlers=None,
-        arch_options=None,
-        indirect_jump_resolvers=None,
-        base_state=None,
+        function_starts: Iterable[int] | None = None,
+        extra_memory_regions: list[tuple[int, int]] | None = None,
+        data_type_guessing_handlers: list[Callable] | None = None,
+        arch_options: CFGArchOptions | None = None,
+        indirect_jump_resolvers: list[IndirectJumpResolver] | None = None,
+        base_state: SimState | None = None,
         exclude_sparse_regions=True,
         skip_specific_regions=True,
-        heuristic_plt_resolving=None,
+        heuristic_plt_resolving: bool | None = None,
         detect_tail_calls=False,
         low_priority=False,
-        cfb=None,
-        model=None,
+        cfb: CFBlanket | None = None,
+        model: CFGModel | None = None,
         eh_frame=True,
         exceptions=True,
         skip_unmapped_addrs=True,
@@ -654,11 +669,11 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
         jumptable_resolver_resolves_calls: bool | None = None,
         retedges: bool = False,
         drop_bad_funcs: bool = True,
-        start=None,  # deprecated
-        end=None,  # deprecated
-        collect_data_references=None,  # deprecated
-        extra_cross_references=None,  # deprecated
-        elf_eh_frame=None,  # deprecated
+        start: int | None = None,  # deprecated
+        end: int | None = None,  # deprecated
+        collect_data_references: bool | None = None,  # deprecated
+        extra_cross_references: bool | None = None,  # deprecated
+        elf_eh_frame: bool | None = None,  # deprecated
         **extra_arch_options,
     ):
         """
@@ -952,7 +967,7 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
     #
 
     @staticmethod
-    def _calc_entropy(data, size=None):
+    def _calc_entropy(data, size: int | None = None):
         """
         Calculate the entropy of a piece of data
 
@@ -1049,13 +1064,13 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
         )
         self._update_progress(percentage, text=text, cfg=self)
 
-    def _update_progress(self, percentage, text=None, **kwargs):
+    def _update_progress(self, percentage, text: str | None = None, **kwargs):
         self._last_percentage = percentage
         super()._update_progress(percentage, text=text, **kwargs)
 
     # Methods for scanning the entire image
 
-    def _next_unscanned_addr(self, alignment=None):
+    def _next_unscanned_addr(self, alignment: int | None = None):
         """
         Find the next address that we haven't processed
 
@@ -2753,7 +2768,7 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
 
         self._finish_progress()
 
-    def do_full_xrefs(self, overlay_state=None):
+    def do_full_xrefs(self, overlay_state: SimState | None = None):
         """
         Perform xref recovery on all functions.
 
@@ -3953,7 +3968,7 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
 
     def _collect_data_references_by_scanning_stmts(self, irsb, irsb_addr):
         # helper methods
-        def _process(stmt_idx_, data_, insn_addr, next_insn_addr, data_size=None, data_type=None):
+        def _process(stmt_idx_, data_, insn_addr, next_insn_addr, data_size: int | None = None, data_type=None):
             """
             Helper method used for calling _add_data_reference after checking
             for manipulation of constants
@@ -5083,9 +5098,9 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
         src_node,
         src_func_addr,
         to_outside=False,
-        dst_func_addr=None,
-        stmt_idx=None,
-        ins_addr=None,
+        dst_func_addr: int | None = None,
+        stmt_idx: int | None = None,
+        ins_addr: int | None = None,
         is_exception=False,
     ):
         """
@@ -5134,7 +5149,9 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
         except (SimMemoryError, SimEngineError):
             return False
 
-    def _function_add_call_edge(self, addr, src_node, function_addr, syscall=False, stmt_idx=None, ins_addr=None):
+    def _function_add_call_edge(
+        self, addr, src_node, function_addr, syscall=False, stmt_idx: int | None = None, ins_addr: int | None = None
+    ):
         """
         Add a call edge to the function transition map.
 
@@ -5172,7 +5189,7 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
         except (SimMemoryError, SimEngineError):
             return False
 
-    def _function_add_fakeret_edge(self, addr, src_node, src_func_addr, confirmed=None):
+    def _function_add_fakeret_edge(self, addr, src_node, src_func_addr, confirmed: bool | None = None):
         """
         Generate CodeNodes for target and source, if no source node add node
         for function, otherwise creates fake return to in function manager

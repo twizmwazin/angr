@@ -54,8 +54,16 @@ from .cfg_base import CFGBase
 from .cfg_job_base import CFGJobBase
 
 if TYPE_CHECKING:
-    from angr.knowledge_plugins.cfg import CFGNode
+    from collections.abc import Callable, Iterable
+    from types import TracebackType
+
+    from angr.analyses.cfg.indirect_jump_resolvers.resolver import IndirectJumpResolver
+    from angr.knowledge_plugins.cfg import CFGModel, CFGNode
     from angr.knowledge_plugins.cfg.spilling_cfg import SpillingCFG
+
+    # A graph that CFGEmulated's dominator computation can walk: either a plain networkx graph or the
+    # spilling graph exposed by `self.graph`.
+    DominatorGraph = networkx.DiGraph | SpillingCFG
 
 
 l = logging.getLogger(name=__name__)
@@ -175,29 +183,29 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
         self,
         context_sensitivity_level=1,
         start=None,
-        avoid_runs=None,
+        avoid_runs: list[int] | set[int] | None = None,
         enable_function_hints=False,
-        call_depth=None,
-        call_tracing_filter=None,
-        initial_state=None,
+        call_depth: int | None = None,
+        call_tracing_filter: Callable[[SimState, str | None], bool] | None = None,
+        initial_state: SimState | None = None,
         starts=None,
         keep_state=False,
         indirect_jump_target_limit=100000,
         resolve_indirect_jumps=True,
         enable_advanced_backward_slicing=False,
         enable_symbolic_back_traversal=False,
-        indirect_jump_resolvers=None,
-        additional_edges=None,
+        indirect_jump_resolvers: list[IndirectJumpResolver] | None = None,
+        additional_edges: dict[int, list[int]] | list[tuple[int, int]] | None = None,
         no_construct=False,
         normalize=False,
         max_iterations=1,
-        address_whitelist=None,
-        base_graph=None,
+        address_whitelist: Iterable[int] | None = None,
+        base_graph: networkx.DiGraph | None = None,
         iropt_level=None,
-        max_steps=None,
-        state_add_options=None,
-        state_remove_options=None,
-        model=None,
+        max_steps: int | None = None,
+        state_add_options: set[str] | None = None,
+        state_remove_options: set[str] | None = None,
+        model: CFGModel | None = None,
     ):
         """
         All parameters are optional.
@@ -392,7 +400,7 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
 
         return new_cfg
 
-    def resume(self, starts=None, max_steps=None):
+    def resume(self, starts=None, max_steps: int | None = None):
         """
         Resume a paused or terminated control flow graph recovery.
 
@@ -628,7 +636,7 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
 
         self.model.graph.from_networkx(graph_copy)
 
-    def immediate_dominators(self, start, target_graph=None):
+    def immediate_dominators(self, start, target_graph: DominatorGraph | None = None):
         """
         Get all immediate dominators of sub graph from given node upwards.
 
@@ -640,7 +648,7 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
         """
         return self._immediate_dominators(start, target_graph=target_graph, reverse_graph=False)
 
-    def immediate_postdominators(self, end, target_graph=None):
+    def immediate_postdominators(self, end, target_graph: DominatorGraph | None = None):
         """
         Get all immediate postdominators of sub graph from given node upwards.
 
@@ -713,7 +721,7 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
 
         return cfg
 
-    def get_function_subgraph(self, start, max_call_depth=None):
+    def get_function_subgraph(self, start, max_call_depth: int | None = None):
         """
         Get a sub-graph of a certain function.
 
@@ -2076,7 +2084,13 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
             self.graph.add_edge(src_node, dst_node, **kwargs)
 
     def _update_function_transition_graph(
-        self, src_node_key, dst_node_key, jumpkind="Ijk_Boring", ins_addr=None, stmt_idx=None, confirmed=None
+        self,
+        src_node_key,
+        dst_node_key,
+        jumpkind="Ijk_Boring",
+        ins_addr: int | None = None,
+        stmt_idx: int | None = None,
+        confirmed: bool | None = None,
     ):
         """
         Update transition graphs of functions in function manager based on information passed in.
@@ -2771,7 +2785,7 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
 
         return new_concrete_successors
 
-    def _get_symbolic_function_initial_state(self, function_addr, fastpath_mode_state=None):
+    def _get_symbolic_function_initial_state(self, function_addr, fastpath_mode_state: SimState | None = None):
         """
         Symbolically execute the first basic block of the specified function,
         then returns it. We prepares the state using the already existing
@@ -3140,7 +3154,15 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
 
         return new_call_stack
 
-    def _create_cfgnode(self, sim_successors, call_stack, func_addr, block_id=None, depth=None, exception_info=None):
+    def _create_cfgnode(
+        self,
+        sim_successors,
+        call_stack,
+        func_addr,
+        block_id: BlockID | None = None,
+        depth: int | None = None,
+        exception_info: tuple[type[BaseException], BaseException, TracebackType] | None = None,
+    ):
         """
         Create a context-sensitive CFGNode instance for a specific block.
 
@@ -3212,7 +3234,7 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
 
     # Private methods - loops and graph normalization
 
-    def _detect_loops(self, loop_callback=None):
+    def _detect_loops(self, loop_callback: Callable[[networkx.DiGraph, Loop], None] | None = None):
         """
         Loop detection.
 
@@ -3236,7 +3258,7 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
 
     # Private methods - dominators and post-dominators
 
-    def _immediate_dominators(self, node, target_graph=None, reverse_graph=False):
+    def _immediate_dominators(self, node, target_graph: DominatorGraph | None = None, reverse_graph=False):
         """
         Get all immediate dominators of sub graph from given node upwards.
 
