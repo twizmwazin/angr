@@ -15,12 +15,14 @@ from angr.sim_type import parse_signature, parse_type
 from angr.sim_variable import SimMemoryVariable, SimStackVariable
 
 from .cache import DEFAULT_FLAVOR, get_cache, invalidate, require_cache, restore_user_edits, snapshot_user_edits
-from .errors import NameCollisionError, TypeParseError, UnsupportedEditError
+from .errors import NameCollisionError, NotDecompiledError, TypeParseError, UnsupportedEditError
 from .hooks import coerce_hooks
 from .resolve import concrete_variables, list_variable_names, resolve_variable, validate_name
 from .results import EditResult, Refresh
 
 if TYPE_CHECKING:
+    from angr.analyses.decompiler.decompilation_cache import DecompilationCache
+    from angr.analyses.decompiler.structured_codegen.base import BaseStructuredCodeGenerator
     from angr.knowledge_base import KnowledgeBase
     from angr.knowledge_plugins.functions import Function
     from angr.project import Project
@@ -40,6 +42,21 @@ def _require_free_function_name(kb: KnowledgeBase, name: str, own_addr: int) -> 
     existing = kb.labels.lookup(name, None)
     if existing is not None and existing != own_addr:
         raise NameCollisionError(f"The label {name!r} is already bound to {existing:#x}.", existing=existing)
+
+
+def _cached_codegen(cache: DecompilationCache, func_addr: int, flavor: str) -> BaseStructuredCodeGenerator:
+    """
+    The codegen of a cache that :func:`require_cache` has already accepted.
+
+    ``DecompilationCache.codegen`` stays declared optional, so the guarantee require_cache makes has
+    to be restated here for anything that dereferences it.
+    """
+    codegen = cache.codegen
+    if codegen is None:
+        raise NotDecompiledError(
+            f"Function {func_addr:#x} has not been decompiled yet (flavor {flavor!r}). Decompile it first."
+        )
+    return codegen
 
 
 def _set_arg_name(codegen, arg_index: int, new_name: str) -> None:
@@ -96,11 +113,14 @@ def rename_function(
     func.is_default_name = False
 
     cache = get_cache(kb, func.addr, flavor)
-    if cache is not None and cache.codegen is not None and getattr(cache.codegen, "cfunc", None) is not None:
-        cache.codegen.cfunc.name = new_name
-        cache.codegen.cfunc.demangled_name = new_name
+    codegen = cache.codegen if cache is not None else None
+    # cfunc belongs to the C flavor, not to the base codegen interface
+    cfunc = getattr(codegen, "cfunc", None) if codegen is not None else None
+    if codegen is not None and cfunc is not None:
+        cfunc.name = new_name
+        cfunc.demangled_name = new_name
         if rerender:
-            cache.codegen.regenerate_text()
+            codegen.regenerate_text()
 
     return EditResult(
         changed=True,
@@ -142,7 +162,7 @@ def rename_variable(
 
     cache = require_cache(kb, func.addr, flavor)
     if codegen is None:
-        codegen = cache.codegen
+        codegen = _cached_codegen(cache, func.addr, flavor)
 
     rv = resolve_variable(kb, func.addr, variable_name, codegen=codegen, flavor=flavor)
     old_name = rv.name
@@ -321,7 +341,7 @@ def set_variable_type(
 
     cache = require_cache(kb, func.addr, flavor)
     if codegen is None:
-        codegen = cache.codegen
+        codegen = _cached_codegen(cache, func.addr, flavor)
 
     rv = resolve_variable(kb, func.addr, variable_name, codegen=codegen, flavor=flavor)
 
@@ -406,13 +426,17 @@ def set_function_prototype(
     code = None
     if redecompile:
         dec = project.analyses.Decompiler(func, flavor=flavor)
+        codegen = dec.codegen
+        restored_any = False
         if snapshot:
             restored, missing = restore_user_edits(kb, func.addr, snapshot)
             detail.update({"restored_user_edits": restored, "unrestored_user_edits": missing})
             detail["user_edits"] = {}
-            if restored and dec.codegen is not None:
-                dec.codegen.regenerate_text()
-        code = dec.codegen.text if dec.codegen is not None else None
+            restored_any = bool(restored)
+        if codegen is not None:
+            if restored_any:
+                codegen.regenerate_text()
+            code = codegen.text
     detail["code"] = code
 
     return EditResult(
