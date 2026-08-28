@@ -3,7 +3,7 @@ from __future__ import annotations
 import collections
 import logging
 from collections.abc import Iterator
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
 
 import claripy
 
@@ -13,6 +13,9 @@ from angr.sim_state import SimState
 from angr.state_plugins.inspect import BP_AFTER, BP_BEFORE
 
 from .plugin import SimStatePlugin
+
+if TYPE_CHECKING:
+    from angr.engines.soot.values.base import SimSootValue
 
 l = logging.getLogger(name=__name__)
 
@@ -31,7 +34,7 @@ class CallStack(SimStatePlugin):
         ret_addr=0,
         jumpkind="Ijk_Call",
         next_frame: Self | None = None,
-        invoke_return_variable=None,
+        invoke_return_variable: SimSootValue | None = None,
     ):
         super().__init__()
         self.call_site_addr = call_site_addr
@@ -92,7 +95,7 @@ class CallStack(SimStatePlugin):
                 bits = state.arch.bits
             self.stack_ptr = 2**bits - 1
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: CallStack | None = None):  # pylint: disable=unused-argument
         for o in others:
             if o != self:
                 l.error("Trying to merge states with disparate callstacks!")
@@ -264,7 +267,7 @@ class CallStack(SimStatePlugin):
 
         return new_list
 
-    def call(self, callsite_addr, addr, retn_target=None, stack_pointer=None):
+    def call(self, callsite_addr, addr, retn_target: int | None = None, stack_pointer: int | None = None):
         """
         Push a stack frame into the call stack. This method is called when calling a function in CFG recovery.
 
@@ -278,7 +281,7 @@ class CallStack(SimStatePlugin):
         frame = type(self)(call_site_addr=callsite_addr, func_addr=addr, ret_addr=retn_target, stack_ptr=stack_pointer)
         return self.push(frame)
 
-    def ret(self, retn_target=None):
+    def ret(self, retn_target: int | None = None):
         """
         Pop one or many call frames from the stack. This method is called when returning from a function in CFG
         recovery.
@@ -449,7 +452,14 @@ class CallStackAction:
     each time the callstack is changed.
     """
 
-    def __init__(self, callstack_hash, callstack_depth, action, callframe=None, ret_site_addr=None):
+    def __init__(
+        self,
+        callstack_hash,
+        callstack_depth,
+        action,
+        callframe: CallStack | None = None,
+        ret_site_addr: int | None = None,
+    ):
         self.callstack_hash = callstack_hash
         self.callstack_depth = callstack_depth
         self.action = action
