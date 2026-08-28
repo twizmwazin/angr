@@ -2,8 +2,15 @@ from __future__ import annotations
 
 import logging
 import traceback
+from typing import TYPE_CHECKING
 
 from angr.knowledge_plugins.plugin import KnowledgeBasePlugin
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from angr.analyses.decompiler.clinic import ClinicStage
+    from angr.analyses.decompiler.optimization_passes.optimization_pass import BaseOptimizationPass
 
 l = logging.getLogger(name=__name__)
 
@@ -15,7 +22,12 @@ class ClinicFactory(KnowledgeBasePlugin):
         super().__init__(kb)
         self.cache = {}
 
-    def get(self, func, optimization_passes=None, end_stage=None):
+    def get(
+        self,
+        func,
+        optimization_passes: Sequence[type[BaseOptimizationPass]] | None = None,
+        end_stage: ClinicStage | None = None,
+    ):
         if optimization_passes is None:
             optimization_passes = ()
         key = (func.addr, tuple(optimization_passes), end_stage)

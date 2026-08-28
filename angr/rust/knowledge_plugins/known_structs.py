@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from typing import TYPE_CHECKING
 
 from angr.ailment import Const
 from angr.knowledge_plugins.plugin import KnowledgeBasePlugin
 from angr.rust.optimization_passes.utils import extract_str_from_addr
 from angr.rust.sim_type import RustSimStruct
+
+if TYPE_CHECKING:
+    from angr.rust.sim_type import RustSimType
 
 
 class StructMatcher:
@@ -74,7 +78,7 @@ class KnownStructs(KnowledgeBasePlugin):
     def __getitem__(self, item):
         return self.known_struct_types[item]
 
-    def get(self, item, default=None):
+    def get(self, item, default: RustSimType | None = None):
         return self.known_struct_types.get(item, default)
 
     def __contains__(self, item):
