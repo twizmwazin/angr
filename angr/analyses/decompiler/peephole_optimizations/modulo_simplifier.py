@@ -1,9 +1,14 @@
 # pylint:disable=too-many-boolean-expressions
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from angr.ailment.expression import BinaryOp, Const, Convert
 
 from .base import PeepholeOptimizationExprBase
+
+if TYPE_CHECKING:
+    from angr.ailment.block import Block
 
 
 class ModuloSimplifier(PeepholeOptimizationExprBase):
@@ -17,7 +22,7 @@ class ModuloSimplifier(PeepholeOptimizationExprBase):
     expr_classes = (BinaryOp,)
 
     def optimize(  # pylint:disable=unused-argument
-        self, expr: BinaryOp, stmt_idx: int | None = None, block=None, **kwargs
+        self, expr: BinaryOp, stmt_idx: int | None = None, block: Block | None = None, **kwargs
     ):
         if expr.op == "Sub" and len(expr.operands) == 2:
             sub0, sub1 = expr.operands

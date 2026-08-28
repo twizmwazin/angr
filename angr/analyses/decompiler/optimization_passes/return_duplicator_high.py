@@ -54,7 +54,7 @@ class ReturnDuplicatorHigh(OptimizationPass, ReturnDuplicatorBase):
         # TODO: implement a better check
         return dst_is_const_ret
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         graph_copy = copy_graph(self._graph)
         # since we run before the RegionIdentification pass in the decompiler, we need to collect it early here
         self._ri = self._recover_regions(graph_copy)

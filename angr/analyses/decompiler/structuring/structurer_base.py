@@ -59,11 +59,11 @@ class StructurerBase(Analysis):
     def __init__(
         self,
         region,
-        parent_map=None,
-        condition_processor=None,
+        parent_map: dict[RegionOverlay, RegionOverlay] | None = None,
+        condition_processor: ConditionProcessor | None = None,
         func: Function | None = None,
         case_entry_to_switch_head: dict[int, int] | None = None,
-        parent_region=None,
+        parent_region: RegionOverlay | None = None,
         jump_tables: dict[int, IndirectJump] | None = None,
         ail_manager: Manager | None = None,
         **kwargs,
@@ -115,7 +115,9 @@ class StructurerBase(Analysis):
         return not networkx.is_directed_acyclic_graph(self._region.graph)
 
     @staticmethod
-    def _remove_conditional_jumps_from_block(block, parent=None, index=0, label=None):
+    def _remove_conditional_jumps_from_block(
+        block, parent: BaseNode | MultiNode | None = None, index: int = 0, label: str | None = None
+    ):
         block.statements = [stmt for stmt in block.statements if not isinstance(stmt, ailment.Stmt.ConditionalJump)]
 
     @staticmethod
@@ -215,7 +217,7 @@ class StructurerBase(Analysis):
 
         # rewrite all _goto switch_end_addr_ to _break_
 
-        def _rewrite_gotos(block, parent=None, index=0, label=None):
+        def _rewrite_gotos(block, parent: BaseNode | MultiNode | None = None, index=0, label: str | None = None):
             if block.statements and parent is not None:
                 stmt = block.statements[-1]
                 if isinstance(stmt, ailment.Stmt.Jump):
@@ -228,7 +230,7 @@ class StructurerBase(Analysis):
                         # remove the last statement
                         block.statements = block.statements[:-1]
 
-        def _handle_Loop(node: LoopNode, parent=None, index=0, label=None):
+        def _handle_Loop(node: LoopNode, parent: BaseNode | MultiNode | None = None, index=0, label: str | None = None):
             # if a node inside this loop node has a goto that goes to the end of the outer switch-case, we will
             # convert the goto into a break node, and then add a break node at the end of this switch-case.
             # of course, this only works if all nodes either end with a return or a goto that goes to the end of the
@@ -236,7 +238,9 @@ class StructurerBase(Analysis):
             # TODO: Implement the above logic
             return walker._handle_Loop(node, parent=parent, index=index, label=label)
 
-        def _handle_SwitchCase(node: SwitchCaseNode, parent=None, index=0, label=None):
+        def _handle_SwitchCase(
+            node: SwitchCaseNode, parent: BaseNode | MultiNode | None = None, index=0, label: str | None = None
+        ):
             # if a node inside this switch-case has a goto that goes to the end of the outer switch-case, we will
             # convert the goto into a break node, and then add a break node at the end of this switch-case.
             # of course, this only works if all nodes either end with a return or a goto that goes to the end of the
@@ -435,7 +439,9 @@ class StructurerBase(Analysis):
         return seq
 
     def _rewrite_conditional_jumps_to_breaks(self, loop_node, successor_addrs):
-        def _rewrite_conditional_jump_to_break(node: ailment.Block, *, parent, index: int, label=None, **kwargs):
+        def _rewrite_conditional_jump_to_break(
+            node: ailment.Block, *, parent, index: int, label: str | None = None, **kwargs
+        ):
             if not node.statements:
                 return
 
@@ -507,7 +513,13 @@ class StructurerBase(Analysis):
                 # remove the current node
                 node.statements = []
 
-        def _dummy(node, parent=None, index=None, label=None, **kwargs):
+        def _dummy(
+            node,
+            parent: BaseNode | MultiNode | None = None,
+            index: int | None = None,
+            label: str | None = None,
+            **kwargs,
+        ):
             return
 
         handlers = {
@@ -524,7 +536,7 @@ class StructurerBase(Analysis):
         # folded into the loop condition -- the latch block that evaluates the condition.
         continue_node_addr = loop_node.continue_addr if loop_node is not None else loop_seq.addr
 
-        def _rewrite_jump_to_continue(node, *, parent, index: int, label=None, **kwargs):
+        def _rewrite_jump_to_continue(node, *, parent, index: int, label: str | None = None, **kwargs):
             if not node.statements:
                 return
             stmt = node.statements[-1]
@@ -573,7 +585,13 @@ class StructurerBase(Analysis):
                     # remove the current conditional jump statement
                     node.statements = node.statements[:-1]
 
-        def _dummy(node, parent=None, index=None, label=None, **kwargs):
+        def _dummy(
+            node,
+            parent: BaseNode | MultiNode | None = None,
+            index: int | None = None,
+            label: str | None = None,
+            **kwargs,
+        ):
             return
 
         handlers = {
@@ -587,21 +605,39 @@ class StructurerBase(Analysis):
 
     @staticmethod
     def _remove_continue_node_at_loop_body_ends(loop_seq: SequenceNode):
-        def _handle_Sequence(node: SequenceNode, parent=None, index=None, label=None, **kwargs):
+        def _handle_Sequence(
+            node: SequenceNode,
+            parent: BaseNode | MultiNode | None = None,
+            index: int | None = None,
+            label: str | None = None,
+            **kwargs,
+        ):
             if node.nodes:
                 if isinstance(node.nodes[-1], ContinueNode):
                     node.nodes = node.nodes[:-1]
                 else:
                     walker._handle(node.nodes[-1], parent=node, index=len(node.nodes) - 1)
 
-        def _handle_MultiNode(node: MultiNode, parent=None, index=None, label=None, **kwargs):
+        def _handle_MultiNode(
+            node: MultiNode,
+            parent: BaseNode | MultiNode | None = None,
+            index: int | None = None,
+            label: str | None = None,
+            **kwargs,
+        ):
             if node.nodes:
                 if isinstance(node.nodes[-1], ContinueNode):
                     node.nodes = node.nodes[:-1]
                 else:
                     walker._handle(node.nodes[-1], parent=node, index=len(node.nodes) - 1)
 
-        def _dummy(node, parent=None, index=None, label=None, **kwargs):
+        def _dummy(
+            node,
+            parent: BaseNode | MultiNode | None = None,
+            index: int | None = None,
+            label: str | None = None,
+            **kwargs,
+        ):
             return
 
         handlers = {
@@ -675,7 +711,9 @@ class StructurerBase(Analysis):
 
             merged = False
 
-        def _handle_SequenceNode(seq_node, parent=None, index=0, label=None):
+        def _handle_SequenceNode(
+            seq_node, parent: BaseNode | MultiNode | None = None, index=0, label: str | None = None
+        ):
             new_nodes = []
             i = 0
             while i < len(seq_node.nodes):
@@ -747,7 +785,9 @@ class StructurerBase(Analysis):
                 return True, node
             return False, None
 
-        def _handle_SequenceNode(seq_node, parent=None, index=0, label=None):
+        def _handle_SequenceNode(
+            seq_node, parent: BaseNode | MultiNode | None = None, index=0, label: str | None = None
+        ):
             i = 0
             while i < len(seq_node.nodes):
                 node = seq_node.nodes[i]
@@ -1050,7 +1090,14 @@ class StructurerBase(Analysis):
                     new_sequences.append(new_seq_)
         self._new_sequences = new_sequences
 
-    def replace_nodes(self, graph, old_node_0, new_node, old_node_1=None, self_loop=True):  # pylint:disable=no-self-use
+    def replace_nodes(  # pylint:disable=no-self-use
+        self,
+        graph,
+        old_node_0,
+        new_node,
+        old_node_1: ailment.Block | BaseNode | MultiNode | None = None,
+        self_loop=True,
+    ):
         in_edges = list(graph.in_edges(old_node_0, data=True))
         out_edges = list(graph.out_edges(old_node_0, data=True))
         if old_node_1 is not None:

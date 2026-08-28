@@ -328,7 +328,7 @@ class StaticVVarRewriter(OptimizationPass):
             return False, None
         return True, None
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         # rewrite vvars
         g = self._graph
 

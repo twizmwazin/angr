@@ -33,7 +33,7 @@ class RecursiveStructurer(Analysis):
     def __init__(
         self,
         region,
-        cond_proc=None,
+        cond_proc: ConditionProcessor | None = None,
         func: Function | None = None,
         structurer_cls: type | None = None,
         *,

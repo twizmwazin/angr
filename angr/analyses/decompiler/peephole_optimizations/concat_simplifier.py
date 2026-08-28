@@ -1,9 +1,14 @@
 # pylint:disable=too-many-boolean-expressions
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from angr.ailment.expression import BinaryOp, Const, Convert, Expression
 
 from .base import PeepholeOptimizationExprBase
+
+if TYPE_CHECKING:
+    from angr.ailment.block import Block
 
 
 class ConcatSimplifier(PeepholeOptimizationExprBase):
@@ -21,7 +26,7 @@ class ConcatSimplifier(PeepholeOptimizationExprBase):
     NAME = "Simplify Concat expressions"
     expr_classes = (BinaryOp, Convert)
 
-    def optimize(self, expr: BinaryOp | Convert, stmt_idx: int | None = None, block=None, **kwargs):
+    def optimize(self, expr: BinaryOp | Convert, stmt_idx: int | None = None, block: Block | None = None, **kwargs):
         if isinstance(expr, BinaryOp):
             if expr.op == "Concat":
                 return self._optimize_concat(expr, stmt_idx, block)
@@ -33,7 +38,9 @@ class ConcatSimplifier(PeepholeOptimizationExprBase):
             return self._optimize_convert_concat(expr)
         return None
 
-    def _optimize_concat(self, expr: BinaryOp, stmt_idx: int | None = None, block=None) -> Expression | None:
+    def _optimize_concat(
+        self, expr: BinaryOp, stmt_idx: int | None = None, block: Block | None = None
+    ) -> Expression | None:
         """
         Simplify Concat expressions that represent sign/zero extension.
         """

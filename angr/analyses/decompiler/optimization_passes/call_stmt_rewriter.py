@@ -28,7 +28,7 @@ class CallStatementRewriter(OptimizationPass):
     def _check(self):
         return True, None
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         changed = False
 
         for block in self._graph.nodes:

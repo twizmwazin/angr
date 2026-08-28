@@ -95,7 +95,7 @@ class EagerStdStringEvalPass(OptimizationPass):
 
         return string_construction_calls_found, {}
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         cfg = self.kb.cfgs.get_most_accurate()
         assert cfg is not None
 

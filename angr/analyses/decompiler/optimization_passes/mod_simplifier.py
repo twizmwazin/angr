@@ -84,7 +84,7 @@ class ModSimplifier(OptimizationPass):
     def _check(self):
         return True, None
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         assert self._graph is not None
         for block in list(self._graph.nodes()):
             new_block = block

@@ -35,6 +35,7 @@ from .variable_map import variable_map_of
 
 if TYPE_CHECKING:
     from angr.analyses.s_reaching_definitions import SRDAModel
+    from angr.analyses.stack_pointer_tracker import StackPointerTracker
     from angr.knowledge_plugins.functions import Function
     from angr.knowledge_plugins.key_definitions.definition import Definition
     from angr.project import Project
@@ -55,7 +56,7 @@ class CallSiteMaker:
         *,
         ail_manager: Manager,
         reaching_definitions: SRDAModel | None = None,
-        stack_pointer_tracker=None,
+        stack_pointer_tracker: StackPointerTracker | None = None,
     ):
         self.project = project
         self.kb = project.kb

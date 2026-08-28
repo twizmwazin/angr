@@ -129,7 +129,7 @@ class ConditionConstantPropagation(OptimizationPass):
         return True, {"cconds_by_src": cconds_by_src}
 
     @timethis
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         if not cache or cache.get("cconds_by_src", None) is None:
             return
         cconds_by_src = cache["cconds_by_src"]

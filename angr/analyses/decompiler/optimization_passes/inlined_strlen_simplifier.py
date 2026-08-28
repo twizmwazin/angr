@@ -31,7 +31,7 @@ class InlinedStrlenSimplifier(OptimizationPass):
 
         return bool(strlen_descs), {"descs": strlen_descs}
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         if not cache or "descs" not in cache:
             return
 

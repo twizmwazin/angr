@@ -32,7 +32,7 @@ class X86GccGetPcSimplifier(OptimizationPass):
             "getpc_calls": getpc_calls,
         }
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         getpc_calls = None
 
         if cache is not None:

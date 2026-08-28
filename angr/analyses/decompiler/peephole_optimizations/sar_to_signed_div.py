@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from angr.ailment.expression import ITE, BinaryOp, Const, Convert, Expression, VirtualVariable
 
 from .base import PeepholeOptimizationExprBase
+
+if TYPE_CHECKING:
+    from angr.ailment.block import Block
 
 
 class SarToSignedDiv(PeepholeOptimizationExprBase):
@@ -15,7 +20,7 @@ class SarToSignedDiv(PeepholeOptimizationExprBase):
     NAME = "(signed(expr)? expr + A ** 2 - 1: expr) >>s A => expr /s 2 ** A"
     expr_classes = (BinaryOp,)
 
-    def optimize(self, expr: BinaryOp, stmt_idx: int | None = None, block=None, **kwargs):
+    def optimize(self, expr: BinaryOp, stmt_idx: int | None = None, block: Block | None = None, **kwargs):
         if expr.op == "Sar" and isinstance(expr.operands[1], Const):
             op0, const = expr.operands
 

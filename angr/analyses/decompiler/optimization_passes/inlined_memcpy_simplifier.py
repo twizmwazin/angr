@@ -27,7 +27,7 @@ class InlinedMemcpySimplifier(OptimizationPass):
     def _check(self):
         return not self.project.is_rust_binary, None
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         for block in list(self._graph.nodes()):
             new_statements = []
             changed = False

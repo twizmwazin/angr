@@ -57,6 +57,7 @@ from angr.utils.graph import (
 from .structurer_base import StructurerBase
 
 if TYPE_CHECKING:
+    from angr.analyses.decompiler.condition_processor import ConditionProcessor
     from angr.knowledge_plugins.functions import Function
 
 l = logging.getLogger(__name__)
@@ -93,11 +94,11 @@ class PhoenixStructurer(StructurerBase):
     def __init__(
         self,
         region,
-        parent_map=None,
-        condition_processor=None,
+        parent_map: dict[RegionOverlay, RegionOverlay] | None = None,
+        condition_processor: ConditionProcessor | None = None,
         func: Function | None = None,
         case_entry_to_switch_head: dict[int, int] | None = None,
-        parent_region=None,
+        parent_region: RegionOverlay | None = None,
         improve_algorithm=False,
         use_multistmtexprs: MultiStmtExprMode = MultiStmtExprMode.MAX_ONE_CALL,
         multistmtexpr_stmt_threshold: int = 5,
@@ -1024,7 +1025,9 @@ class PhoenixStructurer(StructurerBase):
         return bool(outgoing_edges or len(continue_edges) > 1)
 
     @staticmethod
-    def _refine_cyclic_determine_loop_body(graph, fullgraph, loop_head, loop_heads, successor=None) -> set[BaseNode]:
+    def _refine_cyclic_determine_loop_body(
+        graph, fullgraph, loop_head, loop_heads, successor: Block | BaseNode | None = None
+    ) -> set[BaseNode]:
         # determine the loop body: all nodes that have paths going to loop_head
         # networkx.has_path(graph, node, loop_head) is too expensive though.
         loop_body = {loop_head}
@@ -2085,7 +2088,7 @@ class PhoenixStructurer(StructurerBase):
         to_remove: set,
         graph: networkx.DiGraph,
         full_graph: networkx.DiGraph,
-        node_a=None,
+        node_a: Block | BaseNode | None = None,
         bail_on_nonhead_outedges: bool = False,
     ) -> bool:
         scnode = SwitchCaseNode(cmp_expr, cases, node_default, addr=addr)
@@ -3330,7 +3333,7 @@ class PhoenixStructurer(StructurerBase):
                 )
             )
 
-        def _handle_Block(block: Block, parent=None, **kwargs):  # pylint:disable=unused-argument
+        def _handle_Block(block: Block, parent: BaseNode | MultiNode | None = None, **kwargs):  # pylint:disable=unused-argument
             if block.statements:
                 first_stmt = first_nonlabel_nonphi_statement(block)
                 if first_stmt is not None:
@@ -3347,7 +3350,7 @@ class PhoenixStructurer(StructurerBase):
                     ):
                         _Holder.parent_and_block.append((_Holder.block_id, parent, block))
 
-        def _handle_MultiNode(block: MultiNode, parent=None, **kwargs):  # pylint:disable=unused-argument
+        def _handle_MultiNode(block: MultiNode, parent: BaseNode | MultiNode | None = None, **kwargs):  # pylint:disable=unused-argument
             if block.nodes and isinstance(block.nodes[-1], Block) and block.nodes[-1].statements:
                 first_stmt = first_nonlabel_nonphi_statement(block)
                 if first_stmt is not None:
@@ -3356,7 +3359,7 @@ class PhoenixStructurer(StructurerBase):
                 if _check(block.nodes[-1].statements[-1]):
                     _Holder.parent_and_block.append((_Holder.block_id, parent, block))
 
-        def _handle_BreakNode(break_node: BreakNode, parent=None, **kwargs):  # pylint:disable=unused-argument
+        def _handle_BreakNode(break_node: BreakNode, parent: BaseNode | MultiNode | None = None, **kwargs):  # pylint:disable=unused-argument
             _Holder.block_id += 1
             if break_node.target == dst_addr or (
                 isinstance(break_node.target, Const) and break_node.target.value == dst_addr
@@ -3364,7 +3367,7 @@ class PhoenixStructurer(StructurerBase):
                 # FIXME: idx is ignored
                 _Holder.parent_and_block.append((_Holder.block_id, parent, break_node))
 
-        def _handle_ConditionNode(cond_node: ConditionNode, parent=None, **kwargs):  # pylint:disable=unused-argument
+        def _handle_ConditionNode(cond_node: ConditionNode, parent: BaseNode | MultiNode | None = None, **kwargs):  # pylint:disable=unused-argument
             _Holder.block_id += 1
             if (
                 isinstance(parent, SequenceNode)
@@ -3381,7 +3384,7 @@ class PhoenixStructurer(StructurerBase):
                     # we insert the parent node (the SequenceNode) instead
                     _Holder.parent_and_block.append((_Holder.block_id, None, parent))
 
-        def _handle_Loop(loop_node: LoopNode, parent=None, **kwargs):  # pylint:disable=unused-argument
+        def _handle_Loop(loop_node: LoopNode, parent: BaseNode | MultiNode | None = None, **kwargs):  # pylint:disable=unused-argument
             if enter_loops:
                 walker._handle_Loop(loop_node, parent=parent, **kwargs)  # pylint:disable=protected-access
 
@@ -3587,7 +3590,7 @@ class PhoenixStructurer(StructurerBase):
         self,
         old_node_0,
         new_node,
-        old_node_1=None,
+        old_node_1: Block | BaseNode | None = None,
         self_loop=True,
         drop_refinement_marks: bool = False,
     ):

@@ -53,7 +53,7 @@ class WinStackCanarySimplifier(OptimizationPass):
 
         return init_stmts is not None, {"init_stmts": init_stmts}
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         init_stmts = None
         if cache is not None:
             init_stmts = cache.get("init_stmts", None)

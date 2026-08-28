@@ -612,7 +612,7 @@ class InlinedStringTransformationSimplifier(OptimizationPass):
 
         return bool(string_transformation_descs), {"descs": string_transformation_descs}
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         if not cache or "descs" not in cache:
             return
 

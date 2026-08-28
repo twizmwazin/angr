@@ -2,10 +2,14 @@
 from __future__ import annotations
 
 import math
+from typing import TYPE_CHECKING
 
 from angr.ailment.expression import BinaryOp, Const, Convert, Expression
 
 from .base import PeepholeOptimizationExprBase
+
+if TYPE_CHECKING:
+    from angr.ailment.block import Block
 
 
 class OptimizedDivisionSimplifier(PeepholeOptimizationExprBase):
@@ -19,7 +23,7 @@ class OptimizedDivisionSimplifier(PeepholeOptimizationExprBase):
     expr_classes = (Convert, BinaryOp)
 
     def optimize(  # pylint:disable=unused-argument
-        self, expr: Convert | BinaryOp, stmt_idx: int | None = None, block=None, **kwargs
+        self, expr: Convert | BinaryOp, stmt_idx: int | None = None, block: Block | None = None, **kwargs
     ):
         r = None
 

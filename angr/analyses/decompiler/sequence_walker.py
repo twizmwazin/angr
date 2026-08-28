@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from typing import TYPE_CHECKING
 
 from angr import ailment
 from angr.errors import UnsupportedNodeTypeError
@@ -19,6 +20,9 @@ from .structurer_nodes import (
     SwitchCaseNode,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
+
 
 class SequenceWalker:
     """
@@ -27,7 +31,7 @@ class SequenceWalker:
 
     def __init__(
         self,
-        handlers=None,
+        handlers: Mapping[type, Callable] | None = None,
         exception_on_unsupported=False,
         update_seqnode_in_place=True,
         force_forward_scan: bool = False,
@@ -39,7 +43,7 @@ class SequenceWalker:
         if self._force_forward_scan and self._update_seqnode_in_place:
             raise TypeError("force_forward_scan and update_seqnode_in_place cannot be enabled at the same time")
 
-        default_handlers = {
+        default_handlers: dict[type, Callable] = {
             # Structurer nodes
             CodeNode: self._handle_Code,
             SequenceNode: self._handle_Sequence,

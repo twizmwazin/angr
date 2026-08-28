@@ -95,7 +95,7 @@ class SwitchReusedEntryRewriter(OptimizationPass):
         cache = {"reused_entries": reused_entries}
         return True, cache
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         reused_entries: dict[Block, set[Block]] = cache["reused_entries"]
         out_graph = None
 

@@ -60,7 +60,7 @@ class RetAddrSaveSimplifier(OptimizationPass):
             "restore_stmts": [],
         }
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         save_stmt = None
         restore_stmts = None
 

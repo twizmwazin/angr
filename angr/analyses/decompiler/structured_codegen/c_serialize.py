@@ -15,7 +15,7 @@ import json
 import zlib
 from collections import defaultdict
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from angr import sim_variable
 from angr.analyses.decompiler.notes import DecompilationNote
@@ -67,6 +67,11 @@ from .c import (
     CVEXCCallExpression,
     CWhileLoop,
 )
+
+if TYPE_CHECKING:
+    from angr.knowledge_base import KnowledgeBase
+    from angr.knowledge_plugins.functions import Function
+    from angr.project import Project
 
 # ---------------------------------------------------------------------------------------------------------------------
 # Tag sanitization
@@ -282,7 +287,14 @@ class ParseContext:
     )
 
     def __init__(
-        self, nodes_msg, project=None, kb=None, type_pool=(), tag_pool=(), simvar_pool=(), node_config=None
+        self,
+        nodes_msg,
+        project: Project | None = None,
+        kb: KnowledgeBase | None = None,
+        type_pool=(),
+        tag_pool=(),
+        simvar_pool=(),
+        node_config: codegen_pb2.NodeConfigMsg | None = None,
     ) -> None:
         self._msg_by_id: dict[int, codegen_pb2.CConstructNode] = {n.node_id: n for n in nodes_msg}
         self._parsed: dict[int, Any] = {}
@@ -395,7 +407,7 @@ def serialize_subtree(root: CConstruct) -> bytes:
     return msg.SerializeToString()
 
 
-def parse_subtree(data: bytes, project=None, kb=None) -> CConstruct | None:
+def parse_subtree(data: bytes, project: Project | None = None, kb: KnowledgeBase | None = None) -> CConstruct | None:
     msg = codegen_pb2.Codegen()
     msg.ParseFromString(data)
     ctx = ParseContext(
@@ -607,7 +619,9 @@ def _rebuild_ast_to_pos(pos_to_node):
     return ast_to_pos
 
 
-def parse_codegen(msg, *, project=None, kb=None, func=None):
+def parse_codegen(
+    msg, *, project: Project | None = None, kb: KnowledgeBase | None = None, func: Function | None = None
+):
     """Create a CStructuredCodeGenerator from a Codegen cmessage. Bypasses __init__ (which runs the full
     decompilation pipeline) and populates the attributes directly. The parsed instance is suitable for display,
     navigation, and cache-validity checks; re-rendering and re-running analyses require ``project`` / ``func`` /

@@ -8,7 +8,7 @@ import logging
 from collections import defaultdict, namedtuple
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, NamedTuple, TypeGuard
+from typing import TYPE_CHECKING, Any, TypeGuard
 
 import capstone
 import networkx
@@ -106,7 +106,9 @@ from .stackarg_offset_manager import StackArgOffsetManager
 from .variable_map import VariableMap
 
 if TYPE_CHECKING:
+    from angr.analyses.stack_pointer_tracker import StackPointerTracker
     from angr.knowledge_plugins.cfg import CFGModel
+    from angr.project import Project
 
     from .decompilation_cache import DecompilationCache
     from .peephole_optimizations import PeepholeOptimizationExprBase, PeepholeOptimizationStmtBase
@@ -274,7 +276,7 @@ class Clinic(Analysis, Serializable):
         fold_callexprs_into_conditions=False,
         insert_labels=True,
         optimization_passes=None,
-        cfg=None,
+        cfg: CFGModel | None = None,
         peephole_optimizations: Iterable[type[PeepholeOptimizationStmtBase | PeepholeOptimizationExprBase]]
         | None = None,  # pylint:disable=line-too-long
         must_struct: set[str] | None = None,
@@ -1247,7 +1249,7 @@ class Clinic(Analysis, Serializable):
             graph_copy.add_edge(new_src, new_dst, **data)
         return graph_copy
 
-    def copy_graph(self, graph=None) -> networkx.DiGraph:
+    def copy_graph(self, graph: networkx.DiGraph | None = None) -> networkx.DiGraph:
         return self._copy_graph(graph or self.graph)  # type: ignore
 
     @timethis
@@ -1275,7 +1277,7 @@ class Clinic(Analysis, Serializable):
                 self._func_graph.remove_node(node)
 
     @timethis
-    def _recover_calling_conventions(self, func_graph=None) -> None:
+    def _recover_calling_conventions(self, func_graph: networkx.DiGraph[ailment.Block] | None = None) -> None:
         """
         Examine the calling convention and function prototype for each function called. For functions with missing
         calling conventions or function prototypes, analyze each *call site* and recover the calling convention and
@@ -1914,8 +1916,8 @@ class Clinic(Analysis, Serializable):
     def _simplify_blocks(
         self,
         ail_graph: networkx.DiGraph,
-        stack_pointer_tracker=None,
-        cache: dict[ailment.Block, NamedTuple] | None = None,
+        stack_pointer_tracker: StackPointerTracker | None = None,
+        cache: dict[tuple[int, int | None], BlockCache] | None = None,
         preserve_vvar_ids: set[int] | None = None,
         type_hints: list[tuple[atoms.VirtualVariable | atoms.MemoryLocation, str]] | None = None,
         only_blocks: set[tuple[int, int | None]] | None = None,
@@ -1995,8 +1997,8 @@ class Clinic(Analysis, Serializable):
     def _simplify_block(
         self,
         ail_block,
-        stack_pointer_tracker=None,
-        cache=None,
+        stack_pointer_tracker: StackPointerTracker | None = None,
+        cache: dict[tuple[int, int | None], BlockCache] | None = None,
         preserve_vvar_ids: set[int] | None = None,
         type_hints: list[tuple[atoms.VirtualVariable | atoms.MemoryLocation, str]] | None = None,
     ) -> ailment.Block | None:
@@ -2157,7 +2159,7 @@ class Clinic(Analysis, Serializable):
         ail_graph,
         stage: OptimizationPassStage = OptimizationPassStage.AFTER_GLOBAL_SIMPLIFICATION,
         stack_items: dict[int, StackItem] | None = None,
-        stack_pointer_tracker=None,
+        stack_pointer_tracker: StackPointerTracker | None = None,
         **kwargs,
     ) -> tuple[bool, networkx.DiGraph]:
         """
@@ -2450,7 +2452,7 @@ class Clinic(Analysis, Serializable):
         self,
         ail_graph,
         func_args: set[ailment.Expr.VirtualVariable] | None = None,
-        stack_pointer_tracker=None,
+        stack_pointer_tracker: StackPointerTracker | None = None,
         preserve_vvar_ids: set[int] | None = None,
     ):
         """
@@ -3022,7 +3024,9 @@ class Clinic(Analysis, Serializable):
             for arg in expr.args:
                 self._link_variables_on_expr(variable_manager, global_variables, block, stmt_idx, stmt, arg)
 
-    def _function_graph_to_ail_graph(self, func_graph, blocks_by_addr_and_size=None):
+    def _function_graph_to_ail_graph(
+        self, func_graph, blocks_by_addr_and_size: dict[tuple[int, int], ailment.Block] | None = None
+    ):
         if blocks_by_addr_and_size is None:
             blocks_by_addr_and_size = self._blocks_by_addr_and_size
         assert blocks_by_addr_and_size is not None
@@ -4634,7 +4638,7 @@ class Clinic(Analysis, Serializable):
                 func.prototype = new_type
                 func.prototype_source = PrototypeSource.CALLSITE_DECOMPILER
 
-    def _compute_reaching_definitions(self, func_args=None) -> SRDAModel:
+    def _compute_reaching_definitions(self, func_args: set[ailment.Expr.VirtualVariable] | None = None) -> SRDAModel:
         # Computing reaching definitions
         # TODO: Refactor this into a method of the upcoming AILFunctionGraph class.
         return SReachingDefinitions(
@@ -4792,10 +4796,10 @@ class Clinic(Analysis, Serializable):
         cls,
         cmsg,
         *,
-        project=None,
-        kb=None,
-        function=None,
-        cfg=None,
+        project: Project | None = None,
+        kb: KnowledgeBase | None = None,
+        function: Function | None = None,
+        cfg: CFGModel | None = None,
         **kwargs,
     ):
         """Bypasses :meth:`Clinic.__init__` (which runs the analysis) and reconstructs the instance directly. Runtime

@@ -28,7 +28,7 @@ class TagSlicer(OptimizationPass):
     def _check(self):
         return True, {}
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         for n in self._graph.nodes():
             for i, s in enumerate(n.statements):
                 if isinstance(s, (ConditionalJump, Jump, Label)):

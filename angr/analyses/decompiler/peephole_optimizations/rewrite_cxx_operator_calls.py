@@ -1,6 +1,8 @@
 # pylint:disable=arguments-differ,too-many-boolean-expressions,no-self-use
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from archinfo import Endness
 
 from angr.ailment.constant import UNDETERMINED_SIZE
@@ -11,6 +13,9 @@ from angr.knowledge_plugins.key_definitions import atoms
 from angr.sim_type import SimCppClass, SimTypeReference
 
 from .base import PeepholeOptimizationStmtBase
+
+if TYPE_CHECKING:
+    from angr.ailment.block import Block
 
 
 class RewriteCxxOperatorCalls(PeepholeOptimizationStmtBase):
@@ -23,7 +28,9 @@ class RewriteCxxOperatorCalls(PeepholeOptimizationStmtBase):
     NAME = "Rewrite C++ operator function calls into operations"
     stmt_classes = (SideEffectStatement, WeakAssignment)
 
-    def optimize(self, stmt: SideEffectStatement | WeakAssignment, block=None, **kwargs):  # type: ignore
+    def optimize(  # type: ignore
+        self, stmt: SideEffectStatement | WeakAssignment, block: Block | None = None, **kwargs
+    ):
         assert self.project is not None
 
         if isinstance(stmt, SideEffectStatement) and isinstance(stmt.expr, Call):

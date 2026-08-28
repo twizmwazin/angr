@@ -14,6 +14,7 @@ from .traversal_state import TraversalState
 if TYPE_CHECKING:
     import networkx
 
+    from angr.analyses.decompiler.variable_map import VariableMap
     from angr.knowledge_plugins.functions.function import Function
     from angr.project import Project
 
@@ -37,7 +38,7 @@ class TraversalAnalysis:
         tmps: bool,
         func_args: set[ailment.Expr.VirtualVariable],
         functions: Callable[[int | str], Function | None] | None,
-        variable_map=None,
+        variable_map: VariableMap | None = None,
     ):
         self.project = project
         self._stackvars = stackvars

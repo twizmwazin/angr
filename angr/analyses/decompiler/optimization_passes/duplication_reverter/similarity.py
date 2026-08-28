@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import itertools
 import logging
+from typing import TYPE_CHECKING
 
 import networkx as nx
 
@@ -9,6 +10,9 @@ from angr.ailment.block import Block
 from angr.analyses.decompiler.block_similarity import is_similar, longest_ail_subseq
 
 from .utils import bfs_list_blocks
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 _l = logging.getLogger(name=__name__)
 
@@ -114,7 +118,7 @@ def ail_similarity_to_orig_blocks(orig_block, graph_similarity, graph):
     return orig_blocks, split_blocks
 
 
-def find_block_by_similarity(block, graph, node_list=None):
+def find_block_by_similarity(block, graph, node_list: Sequence[Block] | None = None):
     nodes = node_list or list(graph.nodes())
     similar_blocks = []
     for other_block in nodes:

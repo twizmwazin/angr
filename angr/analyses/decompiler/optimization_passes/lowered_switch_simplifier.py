@@ -220,7 +220,7 @@ class LoweredSwitchSimplifier(StructuringOptimizationPass):
         # TODO: More filtering
         return True, None
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         self._block_copies.clear()
         variablehash_to_cases = self._find_cascading_switch_variable_comparisons()
 

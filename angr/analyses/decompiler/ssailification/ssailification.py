@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from itertools import count
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import networkx
 
@@ -20,6 +20,10 @@ from angr.knowledge_plugins.functions import Function
 
 from .rewriting import RewritingAnalysis
 from .traversal import TraversalAnalysis
+
+if TYPE_CHECKING:
+    from angr.ailment import Manager
+    from angr.analyses.stack_pointer_tracker import StackPointerTracker
 
 l = logging.getLogger(name=__name__)
 
@@ -40,9 +44,9 @@ class Ssailification(Analysis):  # pylint:disable=abstract-method
         ail_graph: networkx.DiGraph[Block],
         entry: Block | None = None,
         canonical_size: int = 8,
-        stack_pointer_tracker=None,
+        stack_pointer_tracker: StackPointerTracker | None = None,
         func_addr: int | None = None,
-        ail_manager=None,
+        ail_manager: Manager | None = None,
         ssa_stackvars: bool = False,
         ssa_tmps: bool = False,
         func_args: set[VirtualVariable] | None = None,

@@ -54,7 +54,9 @@ from .variable_map import VariableMap
 if TYPE_CHECKING:
     from angr.analyses.typehoon.typevars import TypeConstraint, TypeVariable
     from angr.knowledge_plugins.cfg.cfg_model import CFGModel
+    from angr.sim_variable import SimVariable
 
+    from .optimization_passes.expr_op_swapper import OpDescriptor
     from .peephole_optimizations import PeepholeOptimizationExprBase, PeepholeOptimizationStmtBase
     from .structured_codegen.base import BaseStructuredCodeGenerator
 
@@ -145,31 +147,31 @@ class Decompiler(Analysis):
         self,
         func: Function | str | int,
         cfg: CFGFast | CFGModel | None = None,
-        options=None,
+        options: list[tuple[DecompilationOption | str, Any]] | None = None,
         preset: str | DecompilationPreset | None = None,
         optimization_passes=None,
         sp_tracker_track_memory=True,
         peephole_optimizations: _PEEPHOLE_OPTIMIZATIONS_TYPE = None,
         vars_must_struct: set[str] | None = None,
         flavor="pseudocode",
-        expr_comments=None,
-        stmt_comments=None,
-        ite_exprs=None,
-        binop_operators=None,
+        expr_comments: dict[int, str] | None = None,
+        stmt_comments: dict[int, str] | None = None,
+        ite_exprs: set[tuple[int, ailment.Expression]] | None = None,
+        binop_operators: dict[OpDescriptor, str] | None = None,
         decompile=True,
         regen_clinic=False,
-        inline_functions=None,
-        desired_variables=None,
+        inline_functions: Iterable[Function] | None = None,
+        desired_variables: Iterable[str] | None = None,
         update_memory_data: bool = True,
         want_full_graph: bool = False,
         generate_code: bool = True,
         use_cache: bool = True,
         update_cache: bool = True,
         expr_collapse_depth: int = 16,
-        clinic_graph=None,
-        clinic_arg_vvars=None,
-        clinic_start_stage=None,
-        clinic_end_stage=None,
+        clinic_graph: networkx.DiGraph | None = None,
+        clinic_arg_vvars: dict[int, tuple[ailment.Expr.VirtualVariable, SimVariable]] | None = None,
+        clinic_start_stage: ClinicStage | None = None,
+        clinic_end_stage: ClinicStage | None = None,
         clinic_skip_stages=(),
         static_vvars: dict | None = None,
         static_buffers: dict | None = None,

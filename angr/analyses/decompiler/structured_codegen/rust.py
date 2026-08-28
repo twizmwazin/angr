@@ -82,8 +82,13 @@ from angr.utils.loader import is_in_readonly_section, is_in_readonly_segment
 from .base import BaseStructuredCodeGenerator, InstructionMapping, PositionMapping, PositionMappingElement
 
 if TYPE_CHECKING:
+    import networkx
+
     import angr
+    from angr.analyses.decompiler.notes import DecompilationNote
+    from angr.knowledge_plugins.cfg.cfg_model import CFGModel
     from angr.knowledge_plugins.variables.variable_manager import VariableManagerInternal
+    from angr.rustylib.ailment import TagsView
 
 
 l = logging.getLogger(name=__name__)
@@ -222,7 +227,13 @@ def _with_arch(ty, arch):
     return ty
 
 
-def type_to_rust_repr_chunks(ty: SimType, name=None, name_type=None, full=False, indent_str=""):
+def type_to_rust_repr_chunks(
+    ty: SimType,
+    name: str | None = None,
+    name_type: RustStructFieldNameDef | RustVariable | str | None = None,
+    full=False,
+    indent_str="",
+):
     """
     Helper generator function to turn a SimType into generated tuples of (C-string, AST node).
     """
@@ -293,7 +304,13 @@ class RustConstruct:
     def __init__(self, codegen):
         self.codegen: RustStructuredCodeGenerator = codegen
 
-    def c_repr(self, indent=0, pos_to_node=None, pos_to_addr=None, addr_to_pos=None):
+    def c_repr(
+        self,
+        indent=0,
+        pos_to_node: PositionMapping | None = None,
+        pos_to_addr: PositionMapping | None = None,
+        addr_to_pos: InstructionMapping | None = None,
+    ):
         """
         Creates the C representation of the code and displays it by
         constructing a large string. This function is called by each program function that needs to be decompiled.
@@ -437,7 +454,7 @@ class RustFunction(RustConstruct):  # pylint:disable=abstract-method
         statements,
         variables_in_use,
         variable_manager,
-        demangled_name=None,
+        demangled_name: str | None = None,
         show_demangled_name=True,
         **kwargs,
     ):
@@ -743,7 +760,7 @@ class RustInfiniteLoop(RustLoop):
         "tags",
     )
 
-    def __init__(self, body, tags=None, **kwargs):
+    def __init__(self, body, tags: TagsView | dict[str, Any] | None = None, **kwargs):
         super().__init__(**kwargs)
 
         self.body = body
@@ -783,7 +800,7 @@ class RustWhileLoop(RustLoop):
         "tags",
     )
 
-    def __init__(self, condition, body, tags=None, **kwargs):
+    def __init__(self, condition, body, tags: TagsView | dict[str, Any] | None = None, **kwargs):
         super().__init__(**kwargs)
 
         self.condition = condition
@@ -831,7 +848,7 @@ class RustDoWhileLoop(RustLoop):
         "tags",
     )
 
-    def __init__(self, condition, body, tags=None, **kwargs):
+    def __init__(self, condition, body, tags: TagsView | dict[str, Any] | None = None, **kwargs):
         super().__init__(**kwargs)
 
         self.condition = condition
@@ -878,7 +895,7 @@ class RustForLoop(RustStatement):
 
     __slots__ = ("body", "condition", "initializer", "iterator", "tags")
 
-    def __init__(self, initializer, condition, iterator, body, tags=None, **kwargs):
+    def __init__(self, initializer, condition, iterator, body, tags: TagsView | dict[str, Any] | None = None, **kwargs):
         super().__init__(**kwargs)
 
         self.initializer = initializer
@@ -933,10 +950,10 @@ class RustIfElse(RustStatement):
     def __init__(
         self,
         condition_and_nodes: list[tuple[RustExpression, RustStatement | None]],
-        else_node=None,
+        else_node: RustStatement | RustExpression | None = None,
         simplify_else_scope=False,
         cstyle_ifs=True,
-        tags=None,
+        tags: TagsView | dict[str, Any] | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -1031,7 +1048,7 @@ class RustIfBreak(RustStatement):
         "tags",
     )
 
-    def __init__(self, condition, cstyle_ifs=True, tags=None, **kwargs):
+    def __init__(self, condition, cstyle_ifs=True, tags: TagsView | dict[str, Any] | None = None, **kwargs):
         super().__init__(**kwargs)
 
         self.condition = condition
@@ -1074,7 +1091,7 @@ class RustBreak(RustStatement):
 
     __slots__ = ("tags",)
 
-    def __init__(self, tags=None, **kwargs):
+    def __init__(self, tags: TagsView | dict[str, Any] | None = None, **kwargs):
         super().__init__(**kwargs)
         self.tags = tags
 
@@ -1092,7 +1109,7 @@ class RustContinue(RustStatement):
 
     __slots__ = ("tags",)
 
-    def __init__(self, tags=None, **kwargs):
+    def __init__(self, tags: TagsView | dict[str, Any] | None = None, **kwargs):
         super().__init__(**kwargs)
         self.tags = tags
 
@@ -1110,7 +1127,7 @@ class RustSwitchCase(RustStatement):
 
     __slots__ = ("cases", "default", "switch", "tags")
 
-    def __init__(self, switch, cases, default, tags=None, **kwargs):
+    def __init__(self, switch, cases, default, tags: TagsView | dict[str, Any] | None = None, **kwargs):
         super().__init__(**kwargs)
 
         self.switch = switch
@@ -1189,7 +1206,7 @@ class RustPatternMatch(RustStatement):
 
     __slots__ = ("arms", "default", "scrutinee", "tags")
 
-    def __init__(self, match_expr, cases, default, tags=None, **kwargs):
+    def __init__(self, match_expr, cases, default, tags: TagsView | dict[str, Any] | None = None, **kwargs):
         super().__init__(**kwargs)
 
         self.scrutinee = match_expr
@@ -1249,7 +1266,9 @@ class RustIfLet(RustStatement):
 
     __slots__ = ("false_node", "pattern", "scrutinee", "tags", "true_node")
 
-    def __init__(self, pattern, scrutinee, true_node, false_node, tags=None, **kwargs):
+    def __init__(
+        self, pattern, scrutinee, true_node, false_node, tags: TagsView | dict[str, Any] | None = None, **kwargs
+    ):
         super().__init__(**kwargs)
 
         self.pattern = pattern
@@ -1310,7 +1329,7 @@ class RustAssignment(RustStatement):
         "tags",
     )
 
-    def __init__(self, lhs, rhs, tags=None, **kwargs):
+    def __init__(self, lhs, rhs, tags: TagsView | dict[str, Any] | None = None, **kwargs):
         super().__init__(**kwargs)
 
         self.lhs = lhs
@@ -1366,7 +1385,16 @@ class RustAssignment(RustStatement):
 
 
 class RustFunctionLikeMacro(RustStatement, RustExpression):
-    def __init__(self, name, args, delimiter, is_expr, returnty=None, tags=None, **kwargs):
+    def __init__(
+        self,
+        name,
+        args,
+        delimiter,
+        is_expr,
+        returnty: SimType | None = None,
+        tags: TagsView | dict[str, Any] | None = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.name = name
         self.args = args
@@ -1428,9 +1456,9 @@ class RustFunctionCall(RustStatement, RustExpression):
         callee_func,
         args,
         returning=True,
-        ret_expr=None,
-        receiver=None,
-        tags=None,
+        ret_expr: RustExpression | None = None,
+        receiver: RustExpression | None = None,
+        tags: TagsView | dict[str, Any] | None = None,
         is_expr: bool = False,
         show_demangled_name=True,
         show_disambiguated_name: bool = True,
@@ -1532,7 +1560,7 @@ class RustReturn(RustStatement):
         "tags",
     )
 
-    def __init__(self, retval, tags=None, **kwargs):
+    def __init__(self, retval, tags: TagsView | dict[str, Any] | None = None, **kwargs):
         super().__init__(**kwargs)
 
         self.retval = retval
@@ -1560,7 +1588,7 @@ class RustGoto(RustStatement):
         "target_idx",
     )
 
-    def __init__(self, target, target_idx, tags=None, **kwargs):
+    def __init__(self, target, target_idx, tags: TagsView | dict[str, Any] | None = None, **kwargs):
         super().__init__(**kwargs)
 
         if isinstance(target, RustConstant):
@@ -1625,7 +1653,7 @@ class RustIncompleteSwitchCase(RustStatement):
 
     __slots__ = ("cases", "head", "tags")
 
-    def __init__(self, head, cases, tags=None, **kwargs):
+    def __init__(self, head, cases, tags: TagsView | dict[str, Any] | None = None, **kwargs):
         super().__init__(**kwargs)
 
         self.head = head
@@ -1693,7 +1721,14 @@ class RustLabel(RustStatement):
         "tags",
     )
 
-    def __init__(self, name: str, ins_addr: int | None, block_idx: int | None, tags=None, **kwargs):
+    def __init__(
+        self,
+        name: str,
+        ins_addr: int | None,
+        block_idx: int | None,
+        tags: TagsView | dict[str, Any] | None = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.name = name
         self.ins_addr = ins_addr
@@ -1716,7 +1751,7 @@ class RustStruct(RustExpression):
         "tags",
     )
 
-    def __init__(self, name, fields, field_names, tags=None, **kwargs):
+    def __init__(self, name, fields, field_names, tags: TagsView | dict[str, Any] | None = None, **kwargs):
         super().__init__(**kwargs)
 
         self.name = name
@@ -1759,7 +1794,7 @@ class RustEnum(RustExpression):
         "tags",
     )
 
-    def __init__(self, name, fields, tags=None, **kwargs):
+    def __init__(self, name, fields, tags: TagsView | dict[str, Any] | None = None, **kwargs):
         super().__init__(**kwargs)
 
         self.name = name
@@ -1791,7 +1826,7 @@ class RustStructField(RustExpression):
         "tags",
     )
 
-    def __init__(self, struct_type: SimStruct, offset, field, tags=None, **kwargs):
+    def __init__(self, struct_type: SimStruct, offset, field, tags: TagsView | dict[str, Any] | None = None, **kwargs):
         super().__init__(**kwargs)
 
         self.struct_type = struct_type
@@ -1813,7 +1848,7 @@ class RustStructField(RustExpression):
 class RustArray(RustExpression):
     __slots__ = ("elements", "tags")
 
-    def __init__(self, elements, tags=None, **kwargs):
+    def __init__(self, elements, tags: TagsView | dict[str, Any] | None = None, **kwargs):
         super().__init__(**kwargs)
 
         self.elements = elements
@@ -1832,7 +1867,7 @@ class RustArray(RustExpression):
 class RustLet(RustExpression):
     __slots__ = ("let_expr", "tags")
 
-    def __init__(self, let_expr: Let, tags=None, **kwargs):
+    def __init__(self, let_expr: Let, tags: TagsView | dict[str, Any] | None = None, **kwargs):
         super().__init__(**kwargs)
 
         self.let_expr = let_expr
@@ -1883,7 +1918,7 @@ class RustLet(RustExpression):
 class RustStringLiteral(RustExpression):
     __slots__ = ("data", "tags")
 
-    def __init__(self, data, tags=None, **kwargs):
+    def __init__(self, data, tags: TagsView | dict[str, Any] | None = None, **kwargs):
         super().__init__(**kwargs)
 
         self.data = data
@@ -1906,7 +1941,7 @@ class RustFakeVariable(RustExpression):
 
     __slots__ = ("name", "tags")
 
-    def __init__(self, name: str, ty: SimType, tags=None, **kwargs):
+    def __init__(self, name: str, ty: SimType, tags: TagsView | dict[str, Any] | None = None, **kwargs):
         super().__init__(**kwargs)
         self.name = name
         self._type = ty.with_arch(self.codegen.project.arch)
@@ -1934,7 +1969,14 @@ class RustVariable(RustExpression):
         "variable_type",
     )
 
-    def __init__(self, variable: SimVariable, unified_variable=None, variable_type=None, tags=None, **kwargs):
+    def __init__(
+        self,
+        variable: SimVariable,
+        unified_variable: SimVariable | None = None,
+        variable_type: SimType | None = None,
+        tags: TagsView | dict[str, Any] | None = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
 
         self.variable: SimVariable = variable
@@ -1966,7 +2008,14 @@ class RustIndexedVariable(RustExpression):
     Represent a variable (an array) that is indexed.
     """
 
-    def __init__(self, variable: RustExpression, index: RustExpression, variable_type=None, tags=None, **kwargs):
+    def __init__(
+        self,
+        variable: RustExpression,
+        index: RustExpression,
+        variable_type: SimType | None = None,
+        tags: TagsView | dict[str, Any] | None = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.variable = variable
         self.index: RustExpression = index
@@ -2014,7 +2063,14 @@ class RustVariableField(RustExpression):
     Represent a field of a variable.
     """
 
-    def __init__(self, variable: RustExpression, field: RustStructField, var_is_ptr: bool = False, tags=None, **kwargs):
+    def __init__(
+        self,
+        variable: RustExpression,
+        field: RustStructField,
+        var_is_ptr: bool = False,
+        tags: TagsView | dict[str, Any] | None = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.variable = variable
         self.field = field
@@ -2048,7 +2104,7 @@ class RustUnaryOp(RustExpression):
         "tags",
     )
 
-    def __init__(self, op, operand: RustExpression, tags=None, **kwargs):
+    def __init__(self, op, operand: RustExpression, tags: TagsView | dict[str, Any] | None = None, **kwargs):
         super().__init__(**kwargs)
 
         self.op = op
@@ -2134,7 +2190,7 @@ class RustBinaryOp(RustExpression):
 
     __slots__ = ("_cstyle_null_cmp", "common_type", "lhs", "op", "rhs", "tags")
 
-    def __init__(self, op, lhs, rhs, tags=None, **kwargs):
+    def __init__(self, op, lhs, rhs, tags: TagsView | dict[str, Any] | None = None, **kwargs):
         super().__init__(**kwargs)
 
         self.op = op
@@ -2418,7 +2474,7 @@ class RustTypeCast(RustExpression):
         src_type: SimType | None,
         dst_type: SimType,
         expr: RustExpression,
-        tags=None,
+        tags: TagsView | dict[str, Any] | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -2462,7 +2518,14 @@ class RustConstant(RustExpression):
         "value",
     )
 
-    def __init__(self, value, type_: SimType, reference_values=None, tags: dict | None = None, **kwargs):
+    def __init__(
+        self,
+        value,
+        type_: SimType,
+        reference_values: dict[SimType, Any] | None = None,
+        tags: dict | None = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
 
         self.value = value
@@ -2631,7 +2694,7 @@ class RustRegister(RustExpression):
         "tags",
     )
 
-    def __init__(self, reg, tags=None, **kwargs):
+    def __init__(self, reg, tags: TagsView | dict[str, Any] | None = None, **kwargs):
         super().__init__(**kwargs)
 
         self.reg = reg
@@ -2654,7 +2717,7 @@ class RustITE(RustExpression):
         "tags",
     )
 
-    def __init__(self, cond, iftrue, iffalse, tags=None, **kwargs):
+    def __init__(self, cond, iftrue, iffalse, tags: TagsView | dict[str, Any] | None = None, **kwargs):
         super().__init__(**kwargs)
         self.cond = cond
         self.iftrue = iftrue
@@ -2686,7 +2749,9 @@ class RustMultiStatementExpression(RustExpression):
 
     __slots__ = ("expr", "stmts", "tags")
 
-    def __init__(self, stmts: RustStatements, expr: RustExpression, tags=None, **kwargs):
+    def __init__(
+        self, stmts: RustStatements, expr: RustExpression, tags: TagsView | dict[str, Any] | None = None, **kwargs
+    ):
         super().__init__(**kwargs)
         self.stmts = stmts
         self.expr = expr
@@ -2715,7 +2780,9 @@ class RustVEXCCallExpression(RustExpression):
         "tags",
     )
 
-    def __init__(self, callee: str, operands: list[RustExpression], tags=None, **kwargs):
+    def __init__(
+        self, callee: str, operands: list[RustExpression], tags: TagsView | dict[str, Any] | None = None, **kwargs
+    ):
         super().__init__(**kwargs)
         self.callee = callee
         self.operands = operands
@@ -2802,7 +2869,7 @@ class RustStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis):
         func,
         sequence,
         indent=0,
-        cfg=None,
+        cfg: CFGModel | None = None,
         func_args: list[SimVariable] | None = None,
         binop_depth_cutoff: int = 16,
         show_casts=True,
@@ -2811,22 +2878,22 @@ class RustStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis):
         show_local_types=False,
         comment_gotos=False,
         cstyle_null_cmp=True,
-        flavor=None,
-        stmt_comments=None,
-        expr_comments=None,
+        flavor: str | None = None,
+        stmt_comments: dict[int, str] | None = None,
+        expr_comments: dict[int, str] | None = None,
         show_externs=False,
-        externs=None,
-        const_formats=None,
+        externs: set[SimMemoryVariable] | None = None,
+        const_formats: dict[Any, dict[str, Any]] | None = None,
         show_demangled_name=True,
         show_disambiguated_name=True,
-        ail_graph=None,
+        ail_graph: networkx.DiGraph | None = None,
         simplify_else_scope=True,
         cstyle_ifs=True,
         omit_func_header=False,
         display_block_addrs=False,
         display_vvar_ids=False,
         min_data_addr: int = 0x400_000,
-        notes=None,
+        notes: dict[str, DecompilationNote] | None = None,
         display_notes: bool = True,
         max_str_len: int | None = None,
         prettify_thiscall: bool = False,
@@ -4004,7 +4071,14 @@ class RustStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis):
         l.warning("FIXME: Leftover Tmp expressions are found.")
         return self._variable(SimTemporaryVariable(expr.tmp_idx, expr.size), expr.size)
 
-    def _handle_Expr_Const(self, expr, type_=None, reference_values=None, variable=None, **kwargs):
+    def _handle_Expr_Const(
+        self,
+        expr,
+        type_: SimType | None = None,
+        reference_values: dict[SimType, MemoryData | Function | str | int] | None = None,
+        variable: SimVariable | None = None,
+        **kwargs,
+    ):
         inline_string = False
         function_pointer = False
 

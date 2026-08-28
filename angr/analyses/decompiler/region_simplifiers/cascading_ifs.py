@@ -4,6 +4,7 @@ from __future__ import annotations
 from angr import ailment
 from angr.analyses.decompiler.sequence_walker import SequenceWalker
 from angr.analyses.decompiler.structurer_nodes import (
+    BaseNode,
     CascadingConditionNode,
     CodeNode,
     ConditionNode,
@@ -45,7 +46,13 @@ class CascadingIfsRemover(SequenceWalker):
         self.manager = manager
         self.walk(node)
 
-    def _handle_Condition(self, node, parent=None, index=None, **kwargs):
+    def _handle_Condition(
+        self,
+        node,
+        parent: BaseNode | MultiNode | None = None,
+        index: int | None = None,
+        **kwargs,
+    ):
         """
 
         :param ConditionNode node:

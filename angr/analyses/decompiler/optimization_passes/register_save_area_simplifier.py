@@ -53,7 +53,7 @@ class RegisterSaveAreaSimplifier(OptimizationPass):
 
         return bool(info), {"info": info}
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         if cache is None:
             return
 

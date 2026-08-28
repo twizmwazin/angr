@@ -58,7 +58,7 @@ class DetermineLoadSizes(OptimizationPass):
     def _check(self):
         return True, None
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         rewriter = LoadSizeRewriter(self.project)
         for block in self._graph.nodes:
             rewriter.walk(block)

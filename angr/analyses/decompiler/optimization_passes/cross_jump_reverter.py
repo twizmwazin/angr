@@ -46,7 +46,7 @@ class CrossJumpReverter(StructuringOptimizationPass):
     def _check(self):
         return True, None
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         to_update = defaultdict(list)
         for node in self.out_graph.nodes:
             gotos = self._goto_manager.gotos_in_block(node)

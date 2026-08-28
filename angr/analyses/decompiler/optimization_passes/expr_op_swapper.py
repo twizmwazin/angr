@@ -157,7 +157,7 @@ class ExprOpSwapper(SequenceOptimizationPass):
     def _check(self):
         return True, None
 
-    def _analyze(self, cache=None):  # pylint:disable=unused-argument
+    def _analyze(self, cache: dict | None = None):  # pylint:disable=unused-argument
         walker = OuterWalker(self._expr_operators)
         walker.walk(self.seq)
         self.out_seq = self.seq

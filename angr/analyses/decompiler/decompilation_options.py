@@ -20,7 +20,7 @@ class DecompilationOption[T]:
         value_type: type[T],
         cls: str,
         param: str,
-        value_range=None,
+        value_range: tuple[T, T] | None = None,
         category: str = "General",
         default_value: T | None = None,
         clears_cache: bool = True,

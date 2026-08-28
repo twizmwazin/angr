@@ -20,6 +20,7 @@ from .errors import (
 )
 
 if TYPE_CHECKING:
+    from angr.analyses.decompiler.structured_codegen import BaseStructuredCodeGenerator
     from angr.analyses.decompiler.structured_codegen.c import CVariable
     from angr.knowledge_base import KnowledgeBase
     from angr.knowledge_plugins.functions import Function
@@ -295,7 +296,7 @@ def resolve_variable(
     func_addr: int,
     display_name: str,
     *,
-    codegen=None,
+    codegen: BaseStructuredCodeGenerator | None = None,
     flavor: str = DEFAULT_FLAVOR,
 ) -> ResolvedVariable:
     """

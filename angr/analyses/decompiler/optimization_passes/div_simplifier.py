@@ -413,7 +413,7 @@ class DivSimplifier(OptimizationPass):
     def _check(self):
         return True, None
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         for block in list(self._graph.nodes()):
             new_block = block
             old_block = None

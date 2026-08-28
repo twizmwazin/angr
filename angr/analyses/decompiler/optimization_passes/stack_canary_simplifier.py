@@ -38,7 +38,7 @@ class StackCanarySimplifier(OptimizationPass):
 
         return init_stmt is not None, {"init_stmt": init_stmt}
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         init_stmt = None
         if cache is not None:
             init_stmt = cache.get("init_stmt", None)

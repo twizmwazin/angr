@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from angr.ailment.expression import Const, Convert, Extract
 
 from .base import PeepholeOptimizationExprBase
+
+if TYPE_CHECKING:
+    from angr.ailment.block import Block
 
 
 class EvaluateConstConversions(PeepholeOptimizationExprBase):
@@ -13,7 +18,7 @@ class EvaluateConstConversions(PeepholeOptimizationExprBase):
     DESCRIPTION = "Conv(*, C) => C'"
     expr_classes = (Convert, Extract)
 
-    def optimize(self, expr, *, stmt_idx: int | None = None, block=None, **kwargs):
+    def optimize(self, expr, *, stmt_idx: int | None = None, block: Block | None = None, **kwargs):
         if isinstance(expr, Convert):
             inner = expr.operand
             signed = expr.is_signed

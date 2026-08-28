@@ -119,7 +119,7 @@ class ConstantDereferencesSimplifier(OptimizationPass):
     def _check(self):
         return True, None
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         # walk the entire graph and traverse each expression
         walker = AILGraphWalker(self._graph, handler=self._walk_block, replace_nodes=True)
         walker.walk()

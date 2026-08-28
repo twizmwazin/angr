@@ -35,6 +35,7 @@ from .traversal_state import TraversalState, Value, has_conflicting_value_types
 if TYPE_CHECKING:
     from angr.analyses.decompiler import VariableMap
     from angr.analyses.decompiler.ssailification.ssailification import Def, Kind
+    from angr.analyses.stack_pointer_tracker import StackPointerTracker
     from angr.calling_conventions import SimCC
     from angr.project import Project
 
@@ -82,12 +83,12 @@ class SimEngineSSATraversal(SimEngineLightAIL[TraversalState, Value, None, None]
         self,
         project: Project,
         simos,
-        sp_tracker=None,
+        sp_tracker: StackPointerTracker | None = None,
         bp_as_gpr: bool = False,
         stackvars: bool = False,
         use_tmps: bool = False,
         functions: Callable[[int | str], Function | None] | None = None,
-        variable_map=None,
+        variable_map: VariableMap | None = None,
     ):
         super().__init__(project)
         self.simos = simos

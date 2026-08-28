@@ -231,7 +231,7 @@ class PointerNaming(ClinicNamingBase):
                 elif isinstance(stmt, Assignment) and isinstance(stmt.src, Call):
                     self._analyze_call_for_pointers(stmt.src, ret_expr=stmt.dst)
 
-    def _analyze_call_for_pointers(self, call: Call, ret_expr=None) -> None:
+    def _analyze_call_for_pointers(self, call: Call, ret_expr: Expression | None = None) -> None:
         """Analyze a function call for pointer parameters and return values."""
         func_name = self._get_function_name(call)
 

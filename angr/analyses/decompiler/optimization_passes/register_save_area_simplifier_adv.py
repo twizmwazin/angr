@@ -62,7 +62,7 @@ class RegisterSaveAreaSimplifierAdvanced(OptimizationPass):
             block = updated_blocks_[old_block]
         block.statements[stmt_idx_] = None
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         if cache is None:
             return
 

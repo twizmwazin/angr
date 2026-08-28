@@ -87,9 +87,15 @@ from .base import (
 
 if TYPE_CHECKING:
     import archinfo
+    import networkx
 
     import angr
+    from angr.analyses.decompiler.notes import DecompilationNote
+    from angr.knowledge_base import KnowledgeBase
+    from angr.knowledge_plugins.cfg.cfg_model import CFGModel
     from angr.knowledge_plugins.variables.variable_manager import VariableManagerInternal
+    from angr.project import Project
+    from angr.rustylib.ailment import TagsView
 
 
 l = logging.getLogger(name=__name__)
@@ -299,7 +305,12 @@ def _anonymous_struct_union_to_c_repr_chunks(ty, name, name_type, indent_str: st
 
 
 def type_to_c_repr_chunks(
-    ty: SimType, name=None, name_type=None, full=False, indent_str="", indent_delta: int = INDENT_DELTA
+    ty: SimType,
+    name: str | None = None,
+    name_type: CStructFieldNameDef | CVariable | None = None,
+    full=False,
+    indent_str="",
+    indent_delta: int = INDENT_DELTA,
 ):
     """
     Helper generator function to turn a SimType into generated tuples of (C-string, AST node).
@@ -428,7 +439,7 @@ class CConstruct:
 
     __slots__ = ("codegen", "ident", "idx", "tags")
 
-    def __init__(self, codegen, tags=None):
+    def __init__(self, codegen, tags: TagsView | dict[str, Any] | None = None):
         # a CConstruct cannot exist without its owning codegen: ``idx`` (the per-codegen unique node identity) and
         # ``ident`` (a per-class-name display label; NOT unique) are both allocated from it
         assert codegen is not None
@@ -437,7 +448,14 @@ class CConstruct:
         self.ident: str = codegen.next_ident(self.__class__.__name__)
         self.idx: int = codegen.next_node_idx()
 
-    def c_repr(self, initial_pos=0, indent=0, pos_to_node=None, pos_to_addr=None, addr_to_pos=None):
+    def c_repr(
+        self,
+        initial_pos=0,
+        indent=0,
+        pos_to_node: PositionMapping | None = None,
+        pos_to_addr: PositionMapping | None = None,
+        addr_to_pos: InstructionMapping | None = None,
+    ):
         """
         Creates the C representation of the code and displays it by
         constructing a large string. This function is called by each program function that needs to be decompiled.
@@ -582,7 +600,7 @@ class CFunction(CConstruct):  # pylint:disable=abstract-method
         statements,
         variables_in_use,
         variable_manager,
-        demangled_name=None,
+        demangled_name: str | None = None,
         show_demangled_name=True,
         omit_header=False,
         **kwargs,
@@ -975,7 +993,7 @@ class CStatement(CConstruct):  # pylint:disable=abstract-method
     Represents a statement in C.
     """
 
-    def __init__(self, tags=None, *, codegen):
+    def __init__(self, tags: TagsView | dict[str, Any] | None = None, *, codegen):
         super().__init__(codegen=codegen, tags=tags)
 
 
@@ -986,7 +1004,7 @@ class CExpression(CConstruct):
 
     __slots__ = ("_type", "collapsed")
 
-    def __init__(self, collapsed=False, tags=None, *, codegen):
+    def __init__(self, collapsed=False, tags: TagsView | dict[str, Any] | None = None, *, codegen):
         super().__init__(codegen=codegen, tags=tags)
         self._type = None
         self.collapsed = collapsed
@@ -1016,7 +1034,7 @@ class CStatements(CStatement):
         "statements",
     )
 
-    def __init__(self, statements, addr=None, **kwargs):
+    def __init__(self, statements, addr: int | None = None, **kwargs):
         super().__init__(**kwargs)
 
         self.statements = statements
@@ -1228,7 +1246,7 @@ class CIfElse(CStatement):
     def __init__(
         self,
         condition_and_nodes: list[tuple[CExpression, CStatement | None]],
-        else_node=None,
+        else_node: CStatement | CExpression | None = None,
         simplify_else_scope=False,
         cstyle_ifs=True,
         **kwargs,
@@ -1632,7 +1650,7 @@ class CFunctionCall(CExpression):
         args,
         show_demangled_name=True,
         show_disambiguated_name: bool = True,
-        tags=None,
+        tags: TagsView | dict[str, Any] | None = None,
         *,
         codegen,
         **kwargs,
@@ -1957,7 +1975,14 @@ class CVariable(CExpression):
         "vvar_id",
     )
 
-    def __init__(self, variable: SimVariable, unified_variable=None, variable_type=None, vvar_id=None, **kwargs):
+    def __init__(
+        self,
+        variable: SimVariable,
+        unified_variable: SimVariable | None = None,
+        variable_type: SimType | None = None,
+        vvar_id: int | None = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
 
         self.variable: SimVariable = variable
@@ -1992,7 +2017,7 @@ class CIndexedVariable(CExpression):
     Represent a variable (an array) that is indexed.
     """
 
-    def __init__(self, variable: CExpression, index: CExpression, variable_type=None, **kwargs):
+    def __init__(self, variable: CExpression, index: CExpression, variable_type: SimType | None = None, **kwargs):
         super().__init__(**kwargs)
         self.variable = variable
         self.index: CExpression = index
@@ -2519,7 +2544,13 @@ class CConstant(CExpression):
         "value",
     )
 
-    def __init__(self, value, type_: SimType, reference_values=None, **kwargs):
+    def __init__(
+        self,
+        value,
+        type_: SimType,
+        reference_values: dict[SimType | str, Any] | None = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
 
         self.value: int | float | str = value
@@ -2931,7 +2962,7 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
         func,
         sequence,
         indent=0,
-        cfg=None,
+        cfg: CFGModel | None = None,
         func_args: list[SimVariable] | None = None,
         binop_depth_cutoff: int = 16,
         show_casts=True,
@@ -2940,22 +2971,22 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
         show_local_types=True,
         comment_gotos=False,
         cstyle_null_cmp=True,
-        flavor=None,
-        stmt_comments=None,
-        expr_comments=None,
+        flavor: str | None = None,
+        stmt_comments: dict[int, str] | None = None,
+        expr_comments: dict[int, str] | None = None,
         show_externs=True,
-        externs=None,
-        const_formats=None,
+        externs: set[SimMemoryVariable] | None = None,
+        const_formats: dict[IdentType, dict[str, bool]] | None = None,
         show_demangled_name=True,
         show_disambiguated_name=True,
-        ail_graph=None,
+        ail_graph: networkx.DiGraph | None = None,
         simplify_else_scope=True,
         cstyle_ifs=True,
         omit_func_header=False,
         display_block_addrs=False,
         display_vvar_ids=False,
         min_data_addr: int = 0x400_000,
-        notes=None,
+        notes: dict[str, DecompilationNote] | None = None,
         display_notes: bool = True,
         max_str_len: int | None = None,
         prettify_thiscall: bool = False,
@@ -4228,9 +4259,10 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
     def _handle_Expr_Const(
         self,
         expr: Expr.Const,
-        type_=None,
-        reference_values: dict[SimType | str, str | bytes | int | float | Function | CExpression] | None = None,
-        variable=None,
+        type_: SimType | None = None,
+        reference_values: dict[SimType | str, str | bytes | int | float | Function | MemoryData | CExpression]
+        | None = None,
+        variable: SimVariable | None = None,
         likely_signed=True,
         **kwargs,
     ):
@@ -4569,7 +4601,15 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
         return c_serialize.serialize_codegen(self)
 
     @classmethod
-    def parse_from_cmessage(cls, cmsg, *, project=None, kb=None, func=None, **kwargs):
+    def parse_from_cmessage(
+        cls,
+        cmsg,
+        *,
+        project: Project | None = None,
+        kb: KnowledgeBase | None = None,
+        func: Function | None = None,
+        **kwargs,
+    ):
         from . import c_serialize  # pylint:disable=import-outside-toplevel
 
         return c_serialize.parse_codegen(cmsg, project=project, kb=kb, func=func)

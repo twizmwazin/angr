@@ -39,7 +39,7 @@ class ReturnDeduplicator(OptimizationPass):
     def _check(self):
         return True, None
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         graph_updated = False
         if_ret_regions = self._find_if_ret_regions()
         for region_head, true_child, false_child, super_true, super_false in if_ret_regions:

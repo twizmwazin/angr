@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from archinfo import Arch
 
 from angr.analyses.decompiler.optimization_passes.optimization_pass import BaseOptimizationPass
+
+if TYPE_CHECKING:
+    from collections.abc import Collection
 
 
 class DecompilationPreset:
@@ -14,7 +19,13 @@ class DecompilationPreset:
         self.name = name
         self.opt_passes = opt_passes
 
-    def get_optimization_passes(self, arch: Arch | str, platform: str | None, additional_opts=None, disable_opts=None):
+    def get_optimization_passes(
+        self,
+        arch: Arch | str,
+        platform: str | None,
+        additional_opts: list[type[BaseOptimizationPass]] | None = None,
+        disable_opts: Collection[type[BaseOptimizationPass]] | None = None,
+    ):
         if isinstance(arch, Arch):
             arch = arch.name
 

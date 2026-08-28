@@ -14,7 +14,7 @@ class SimplifierAILState:
     The abstract state used in SimplifierAILEngine.
     """
 
-    def __init__(self, arch, variables=None):
+    def __init__(self, arch, variables: dict[int, ailment.expression.Expression] | None = None):
         self.arch = arch
         self._variables = {} if variables is None else variables
 

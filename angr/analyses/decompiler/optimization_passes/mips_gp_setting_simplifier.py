@@ -30,7 +30,7 @@ class MipsGpSettingSimplifier(OptimizationPass):
             return False, {}
         return True, {"gp_stmt": gp_stmt}
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         gp_stmt = None
         if cache is not None:
             gp_stmt = cache.get("gp_stmt", None)

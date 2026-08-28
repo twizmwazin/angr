@@ -1,11 +1,16 @@
 # pylint:disable=arguments-differ,too-many-boolean-expressions
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from angr.ailment import Const
 from angr.ailment.expression import ITE, BinaryOp, Call, Expression, Load, Tmp
 from angr.ailment.statement import CAS, Assignment, ConditionalJump, Statement
 
 from .base import PeepholeOptimizationMultiStmtBase
+
+if TYPE_CHECKING:
+    from angr.ailment.block import Block
 
 _INTRINSICS_NAMES = {
     "xchg8": {"Win32": "InterlockedExchange8", "Linux": "atomic_exchange"},
@@ -68,7 +73,7 @@ class CASIntrinsics(PeepholeOptimizationMultiStmtBase):
     NAME = "Rewrite compare-and-swap instructions into intrinsics."
     stmt_classes = ((CAS, ConditionalJump), (CAS, Statement))
 
-    def optimize(self, stmts: list[Statement], stmt_idx: int | None = None, block=None, **kwargs):
+    def optimize(self, stmts: list[Statement], stmt_idx: int | None = None, block: Block | None = None, **kwargs):
         assert len(stmts) == 2
         cas_stmt = stmts[0]
         next_stmt = stmts[1]

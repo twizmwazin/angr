@@ -58,7 +58,7 @@ class InlinedMemsetSimplifier(OptimizationPass):
     def _check(self):
         return True, None
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         for block in list(self._graph.nodes()):
             new_block = self._optimize_block(block)
             if new_block is not None:

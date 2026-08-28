@@ -34,7 +34,7 @@ class ITERegionConverter(OptimizationPass):
     def _check(self):
         return True, None
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         graph_updated = False
         for _ in range(self._max_updates):
             round_update = False

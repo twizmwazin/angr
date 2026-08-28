@@ -33,7 +33,7 @@ class GraphDephicationVVarMapping(Analysis):  # pylint:disable=abstract-method
         func: Function | str,
         ail_graph,
         ail_manager: Manager,
-        entry=None,
+        entry: Block | None = None,
         vvar_id_start: int = 0,
         arg_vvars: list[VirtualVariable] | None = None,
     ):
