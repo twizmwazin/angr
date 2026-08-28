@@ -10,7 +10,7 @@ class Redirect(angr.SimProcedure):
 
     NO_RET = True
 
-    def run(self, redirect_to=None):
+    def run(self, redirect_to: int | None = None):
         if redirect_to is None:
             raise ValueError("Please specify where you wanna jump to.")
 

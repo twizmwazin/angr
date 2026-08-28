@@ -48,16 +48,17 @@ class FormatString:
             return c
         return sss.concat(c)
 
-    def _get_str_at(self, str_addr, max_length=None):
+    def _get_str_at(self, str_addr, max_length: int | claripy.ast.BV | None = None):
         if max_length is None:
             strlen = self.parser._sim_strlen(str_addr)  # pylint:disable=protected-access
 
             # TODO: we probably could do something more fine-grained here.
 
             # throw away strings which are just the NULL terminator
-            max_length = self.parser.state.solver.max_int(strlen)
-            if max_length == 0:
+            concrete_max_length: int = self.parser.state.solver.max_int(strlen)
+            if concrete_max_length == 0:
                 return claripy.BVV(b"")
+            max_length = concrete_max_length
 
         return self.parser.state.memory.load(str_addr, max_length)
 
@@ -117,7 +118,7 @@ class FormatString:
 
         return sss
 
-    def interpret(self, va_arg, addr=None, simfd=None):
+    def interpret(self, va_arg, addr: int | claripy.ast.BV | None = None, simfd=None):
         """
         implement scanf - extract formatted data from memory or a file according to the stored format
         specifiers and store them into the pointers extracted from `args`.
@@ -581,7 +582,7 @@ class FormatParser(SimProcedure):
         components = self.extract_components(fmt)
         return FormatString(self, components)
 
-    def _sim_atoi_inner(self, str_addr, region, base=10, read_length=None):
+    def _sim_atoi_inner(self, str_addr, region, base=10, read_length: int | None = None):
         """
         Return the result of invoking the atoi simprocedure on `str_addr`.
         """
