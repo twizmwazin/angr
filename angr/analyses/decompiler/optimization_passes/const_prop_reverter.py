@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import itertools
 import logging
+from typing import TYPE_CHECKING
 
 import claripy
 
@@ -15,6 +16,10 @@ from angr.knowledge_plugins.key_definitions.atoms import MemoryLocation
 from angr.knowledge_plugins.key_definitions.constants import OP_BEFORE
 
 from .optimization_pass import OptimizationPass, OptimizationPassStage
+
+if TYPE_CHECKING:
+    from angr.analyses.decompiler.region_identifier import RegionIdentifier
+    from angr.analyses.s_reaching_definitions import SRDAModel
 
 _l = logging.getLogger(__name__)
 
@@ -71,7 +76,13 @@ class ConstPropOptReverter(OptimizationPass):
     NAME = "Revert Constant Propagation Optimizations"
     DESCRIPTION = (__doc__ or "").strip()
 
-    def __init__(self, *args, region_identifier=None, reaching_definitions=None, **kwargs):
+    def __init__(
+        self,
+        *args,
+        region_identifier: RegionIdentifier | None = None,
+        reaching_definitions: SRDAModel | None = None,
+        **kwargs,
+    ):
         self.ri = region_identifier
         self.rd = reaching_definitions
         super().__init__(*args, **kwargs)
@@ -83,7 +94,7 @@ class ConstPropOptReverter(OptimizationPass):
     def _check(self):
         return True, {}
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         self.resolution = False
         self.out_graph = self._graph.copy()
 
