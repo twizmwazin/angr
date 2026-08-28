@@ -16,6 +16,7 @@ if TYPE_CHECKING:
         Assignment,
         ConditionalJump,
         DirtyStatement,
+        Expression,
         Jump,
         Label,
         NoOp,
@@ -115,7 +116,7 @@ else:
             data,
             size,
             endness,
-            guard=None,
+            guard: Expression | None = None,
             **tags,
         ) -> _Statement:
             return _Statement._new_store(idx, addr, data, size, endness, guard=guard, **tags)
@@ -125,7 +126,7 @@ else:
 
         _kind = SK.Jump
 
-        def __new__(cls, idx, target, target_idx=None, **tags) -> _Statement:  # type: ignore[misc]
+        def __new__(cls, idx, target, target_idx: int | None = None, **tags) -> _Statement:  # type: ignore[misc]
             return _Statement._new_jump(idx, target, target_idx=target_idx, **tags)
 
     class ConditionalJump(metaclass=_AilStmtMarkerMeta):
@@ -140,8 +141,8 @@ else:
             true_target,
             false_target,
             *,
-            true_target_idx=None,
-            false_target_idx=None,
+            true_target_idx: int | None = None,
+            false_target_idx: int | None = None,
             **tags,
         ) -> _Statement:
             return _Statement._new_conditional_jump(
@@ -163,8 +164,8 @@ else:
             cls,
             idx,
             expr,
-            ret_expr=None,
-            fp_ret_expr=None,
+            ret_expr: Expression | None = None,
+            fp_ret_expr: Expression | None = None,
             **tags,
         ) -> _Statement:
             return _Statement._new_side_effect_statement(idx, expr, ret_expr=ret_expr, fp_ret_expr=fp_ret_expr, **tags)
@@ -249,7 +250,7 @@ else:
 
         _is_statement_marker = True
 
-        def __init__(self, idx=None, *_extra, **tags):  # pylint:disable=keyword-arg-before-vararg
+        def __init__(self, idx: int | None = None, *_extra, **tags):  # pylint:disable=keyword-arg-before-vararg
             self.idx = idx
             self.tags = tags
 

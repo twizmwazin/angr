@@ -189,7 +189,11 @@ class AILBlockWalker[ExprType, StmtType, BlockType]:
     _default_stmt_funcs_by_pykind: dict
     _default_expr_funcs_by_pykind: dict
 
-    def __init__(self, stmt_handlers=None, expr_handlers=None):
+    def __init__(
+        self,
+        stmt_handlers: dict[type, Callable[[int, Any, Block | None], StmtType]] | None = None,
+        expr_handlers: dict[type, Callable[[int, Any, int, Statement | None, Block | None], ExprType]] | None = None,
+    ):
         self._stmt_handlers: dict[type, Callable[[int, Any, Block | None], StmtType]] | None = stmt_handlers or None
         self._expr_handlers: dict[type, Callable[[int, Any, int, Statement | None, Block | None], ExprType]] | None = (
             expr_handlers or None

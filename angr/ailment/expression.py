@@ -23,6 +23,8 @@ from typing import TYPE_CHECKING, Any
 from angr.rustylib.ailment import ConvertType, VirtualVariableCategory
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     # Static typing story: at runtime every marker below produces (and
     # every ``isinstance`` matches) ``angr.rustylib.ailment.Expression``
     # instances -- the marker classes never appear in an instance's MRO.
@@ -53,6 +55,7 @@ if TYPE_CHECKING:
         Phi,
         Register,
         Reinterpret,
+        RoundingMode,
         RustEnum,
         StackBaseOffset,
         StringLiteral,
@@ -189,8 +192,8 @@ else:
             varid,
             bits,
             category,
-            oident=None,
-            reg_vvars=None,
+            oident: Any | None = None,
+            reg_vvars: Sequence[_Expression] | None = None,
             **tags,
         ) -> _Expression:
             return _Expression._new_virtual_variable(
@@ -213,7 +216,7 @@ else:
             idx,
             op,
             operand,
-            bits=None,
+            bits: int | None = None,
             **tags,
         ) -> _Expression:
             return _Expression._new_unary_op(idx, op, operand, bits=bits, **tags)
@@ -236,9 +239,9 @@ else:
             to_bits,
             is_signed,
             operand,
-            from_type=None,
-            to_type=None,
-            rounding_mode=None,
+            from_type: ConvertType | None = None,
+            to_type: ConvertType | None = None,
+            rounding_mode: RoundingMode | _Expression | None = None,
             **tags,
         ) -> _Expression:
             return _Expression._new_convert(
@@ -317,11 +320,11 @@ else:
             operands,
             signed=False,
             *,
-            bits=None,
+            bits: int | None = None,
             floating_point=False,
-            rounding_mode=None,
-            vector_count=None,
-            vector_size=None,
+            rounding_mode: RoundingMode | _Expression | None = None,
+            vector_count: int | None = None,
+            vector_size: int | None = None,
             **tags,
         ) -> _Expression:
             if bits is None:
@@ -415,9 +418,9 @@ else:
             cls,
             idx,
             target,
-            args=None,
-            bits=None,
-            arg_vvars=None,
+            args: Sequence[_Expression] | None = None,
+            bits: int | None = None,
+            arg_vvars: Sequence[_Expression] | None = None,
             **tags,
         ) -> _Expression:
             return _Expression._new_call(
@@ -485,7 +488,7 @@ else:
             idx,
             name,
             args,
-            bits=None,
+            bits: int | None = None,
             delimiter="()",
             **tags,
         ) -> _Expression:
@@ -502,10 +505,10 @@ else:
             callee,
             operands,
             *,
-            guard=None,
-            mfx=None,
-            maddr=None,
-            msize=None,
+            guard: _Expression | None = None,
+            mfx: str | None = None,
+            maddr: _Expression | None = None,
+            msize: int | None = None,
             bits,
             **tags,
         ) -> _Expression:
@@ -549,8 +552,8 @@ else:
             size,
             endness,
             *,
-            guard=None,
-            alt=None,
+            guard: _Expression | None = None,
+            alt: _Expression | None = None,
             **tags,
         ) -> _Expression:
             return _Expression._new_load(idx, addr, size, endness, guard=guard, alt=alt, **tags)
@@ -610,7 +613,7 @@ if not TYPE_CHECKING:
 
         _is_expression_marker = True
 
-        def __init__(self, idx=None, *_extra, **tags):  # pylint:disable=keyword-arg-before-vararg
+        def __init__(self, idx: int | None = None, *_extra, **tags):  # pylint:disable=keyword-arg-before-vararg
             self.idx = idx
             self.tags = tags
 
