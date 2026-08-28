@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from typing import TYPE_CHECKING
 
 from angr.ailment.statement import Statement
 from angr.analyses.decompiler.structurer_nodes import INDENT_DELTA, BaseNode, SequenceNode
 from angr.rust.sim_type import EnumVariant
+
+if TYPE_CHECKING:
+    from angr.ailment.block import Block
+    from angr.analyses.decompiler.structurer_nodes import MultiNode
 
 
 class PatternMatchNode(BaseNode):
@@ -22,7 +27,7 @@ class PatternMatchNode(BaseNode):
         scrutinee,
         arms: OrderedDict[tuple[EnumVariant, tuple[Statement]], SequenceNode],
         default_node,
-        addr=None,
+        addr: int | None = None,
     ):
         self.scrutinee = scrutinee
         self.arms = arms
@@ -53,8 +58,8 @@ class IfLetNode(BaseNode):
         pattern,
         scrutinee,
         true_node,
-        false_node=None,
-        addr=None,
+        false_node: BaseNode | MultiNode | Block | None = None,
+        addr: int | None = None,
     ):
         self.pattern = pattern
         self.scrutinee = scrutinee
