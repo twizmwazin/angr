@@ -21,6 +21,8 @@ from angr.protos import ail_types_pb2
 from angr.rustylib.ailment import Block, Expression
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from angr.sim_variable import SimVariable
 
 
@@ -163,7 +165,7 @@ def pack_graph(graph: networkx.DiGraph, pool: BlockPool | None = None) -> ail_ty
     return msg
 
 
-def parse_graph(msg: ail_types_pb2.AilGraph, pool_payloads=None) -> networkx.DiGraph:
+def parse_graph(msg: ail_types_pb2.AilGraph, pool_payloads: Sequence[bytes] | None = None) -> networkx.DiGraph:
     graph = networkx.DiGraph()
     if msg.block_refs:
         # pool-backed encoding: a fresh Block per graph occurrence so graphs never share node objects

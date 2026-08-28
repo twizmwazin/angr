@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections import OrderedDict, defaultdict, deque
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from typing import TYPE_CHECKING, Any, cast
 
 import networkx
@@ -378,7 +378,13 @@ class Dominators[T]:
 
     dom: networkx.DiGraph[T]
 
-    def __init__(self, graph: networkx.DiGraph[T], entry_node: T, successors_func=None, reverse=False):
+    def __init__(
+        self,
+        graph: networkx.DiGraph[T],
+        entry_node: T,
+        successors_func: Callable[[networkx.DiGraph[T], T], Iterable[T]] | None = None,
+        reverse=False,
+    ):
         self._l = logging.getLogger("utils.graph.dominators")
         self._graph_successors_func = successors_func
 
@@ -657,7 +663,12 @@ class PostDominators[T](Dominators[T]):
     Describe post-dominators in a graph.
     """
 
-    def __init__(self, graph: networkx.DiGraph[T], entry_node: T, successors_func=None):
+    def __init__(
+        self,
+        graph: networkx.DiGraph[T],
+        entry_node: T,
+        successors_func: Callable[[networkx.DiGraph[T], T], Iterable[T]] | None = None,
+    ):
         super().__init__(graph, entry_node, successors_func=successors_func, reverse=True)
 
     @property
@@ -795,7 +806,7 @@ class GraphUtils:
                 yield node
 
     @staticmethod
-    def reverse_post_order_sort_nodes(graph, nodes=None):
+    def reverse_post_order_sort_nodes(graph, nodes: Iterable | None = None):
         """
         Sort a given set of nodes in reverse post ordering.
 

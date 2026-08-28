@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import ChainMap
-from collections.abc import Callable
+from collections.abc import Callable, MutableMapping
 from typing import Self
 
 _MISSING = object()
@@ -50,7 +50,7 @@ class ChainMapCOW[K, V](ChainMap):
 
     __slots__ = ("_deleted", "collapse_threshold", "dirty", "maps")
 
-    def __init__(self, *args, collapse_threshold=None):
+    def __init__(self, *args, collapse_threshold: int | None = None):
         self.maps = list(args) or [{}]
         self.dirty = False
         self.collapse_threshold = collapse_threshold
@@ -128,7 +128,7 @@ class ChainMapCOW[K, V](ChainMap):
     def __len__(self):
         return len(set().union(*self.maps) - self._deleted)
 
-    def new_child(self, m=None) -> ChainMapCOW[K, V]:
+    def new_child(self, m: MutableMapping[K, V] | None = None) -> ChainMapCOW[K, V]:
         obj = ChainMapCOW.__new__(ChainMapCOW)
         obj.maps = [{} if m is None else m, *self.maps]
         obj.dirty = False
@@ -167,7 +167,7 @@ class DefaultChainMapCOW[K, V](ChainMapCOW):
 
     __slots__ = ("default_factory",)
 
-    def __init__(self, *args, default_factory: Callable, collapse_threshold=None):
+    def __init__(self, *args, default_factory: Callable, collapse_threshold: int | None = None):
         super().__init__(*args, collapse_threshold=collapse_threshold)
         self.default_factory = default_factory
 

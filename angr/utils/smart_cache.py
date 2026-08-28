@@ -10,7 +10,7 @@ class SmartLRUCache(LRUCache):
     An LRU cache that supports an eviction callback.
     """
 
-    def __init__(self, maxsize, getsizeof=None, evict: Callable | None = None):
+    def __init__(self, maxsize, getsizeof: Callable | None = None, evict: Callable | None = None):
         LRUCache.__init__(self, maxsize, getsizeof=getsizeof)
         self._evict = evict
 

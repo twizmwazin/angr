@@ -117,7 +117,7 @@ class InsAddrList:
         addrs = list(self) + list(other)
         self._ins_sizes = bytes([addrs[i + 1] - addrs[i] for i in range(len(addrs) - 1)] + [0])
 
-    def index(self, value, start=0, stop=None):
+    def index(self, value, start=0, stop: int | None = None):
         if stop is None:
             stop = len(self._ins_sizes)
         addr = self._base_addr + sum(self._ins_sizes[:start])
