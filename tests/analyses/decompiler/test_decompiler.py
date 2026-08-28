@@ -59,6 +59,7 @@ from tests.common import (
     WORKER,
     bin_location,
     broken,
+    codegen_text,
     load_project_with_scoped_cfg,
     print_decompilation_result,
     set_decompiler_option,
@@ -150,8 +151,8 @@ class TestDecompiler(unittest.TestCase):
                 "__libc_csu_init",
             }:
                 print_decompilation_result(dec)
-                assert dec.codegen.text is not None
-                assert "(true)" not in dec.codegen.text and "(false)" not in dec.codegen.text
+                code = codegen_text(dec)
+                assert "(true)" not in code and "(false)" not in code
 
     @for_all_structuring_algos
     def test_decompiling_babypwn_i386(self, decompiler_options=None):
@@ -178,11 +179,9 @@ class TestDecompiler(unittest.TestCase):
         cfg = p.analyses[CFGFast].prep()(normalize=True, data_references=True)
         f = cfg.functions["loop"]
         dec = p.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None, f"Failed to decompile function {f!r}."
         print_decompilation_result(dec)
         # it should be properly structured to a while loop with conditional breaks.
-        assert dec.codegen.text is not None
-        assert "break" in dec.codegen.text
+        assert "break" in codegen_text(dec)
 
     @for_all_structuring_algos
     def test_decompiling_all_i386(self, decompiler_options=None):
@@ -264,9 +263,8 @@ class TestDecompiler(unittest.TestCase):
 
         f = cfg.functions["quote_name"]
         dec = p.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None, f"Failed to decompile function {f!r}."
         print_decompilation_result(dec)
-        code = dec.codegen.text
+        code = codegen_text(dec)
         for needed in ("mbrtowc(", "mbsinit(", "wcwidth(", "fwrite_unlocked("):
             assert needed in code, (
                 f"quote_name decompilation is missing {needed!r}; structuring likely produced an incomplete "
@@ -308,10 +306,8 @@ class TestDecompiler(unittest.TestCase):
         f = cfg.functions["main"]
         dec = p.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
 
-        assert dec.codegen is not None, f"Failed to decompile function {f!r}."
         print_decompilation_result(dec)
-        code = dec.codegen.text
-        assert code is not None
+        code = codegen_text(dec)
         assert "switch" in code
         assert "case 1:" in code
         assert "case 2:" in code
@@ -338,10 +334,8 @@ class TestDecompiler(unittest.TestCase):
         dec = p.analyses[Decompiler].prep(fail_fast=True)(
             f, cfg=cfg.model, options=decompiler_options, optimization_passes=all_optimization_passes
         )
-        assert dec.codegen is not None, f"Failed to decompile function {f!r}."
         print_decompilation_result(dec)
-        code = dec.codegen.text
-        assert code is not None
+        code = codegen_text(dec)
         assert "switch" in code
         assert "case 1:" in code
         assert "case 2:" in code
@@ -369,10 +363,8 @@ class TestDecompiler(unittest.TestCase):
         dec = p.analyses[Decompiler].prep(fail_fast=True)(
             f, cfg=cfg.model, options=decompiler_options, optimization_passes=all_optimization_passes
         )
-        assert dec.codegen is not None, f"Failed to decompile function {f!r}."
         print_decompilation_result(dec)
-        code = dec.codegen.text
-        assert code is not None
+        code = codegen_text(dec)
         assert "switch" in code
         assert "case 1:" in code
         assert "case 2:" in code
@@ -406,10 +398,8 @@ class TestDecompiler(unittest.TestCase):
 
         f = cfg.functions[func_addr]
         dec = p.analyses[Decompiler].prep(fail_fast=True)(f, options=decompiler_options)
-        assert dec.codegen is not None, f"Failed to decompile function {f!r}."
         print_decompilation_result(dec)
-        code = dec.codegen.text
-        assert code is not None
+        code = codegen_text(dec)
         # the switch head was recovered as a real switch-case construct rather than crashing structuring
         assert "switch (" in code
         assert "case 0:" in code
@@ -441,10 +431,8 @@ class TestDecompiler(unittest.TestCase):
 
         f = cfg.functions[func_addr]
         dec = p.analyses[Decompiler].prep(fail_fast=True)(f, options=decompiler_options)
-        assert dec.codegen is not None, f"Failed to decompile function {f!r}."
         print_decompilation_result(dec)
-        code = dec.codegen.text
-        assert code is not None
+        code = codegen_text(dec)
         # the switch nested inside the loop was recovered rather than crashing structuring
         assert "switch (" in code
         assert "case 0:" in code
@@ -467,10 +455,8 @@ class TestDecompiler(unittest.TestCase):
 
         f = cfg.functions["process_file"]
         dec = p.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None, f"Failed to decompile function {f!r}."
         print_decompilation_result(dec)
-        code = dec.codegen.text
-        assert code is not None
+        code = codegen_text(dec)
         # the reconstructed switch and its case bodies survive: without the fix, structuring drops the outer switch
         # entirely, leaving only a small fragment (~1.4k chars) that is missing these cases and their bodies.
         assert "switch (" in code
@@ -501,10 +487,8 @@ class TestDecompiler(unittest.TestCase):
         dec = p.analyses[Decompiler].prep(fail_fast=True)(
             f, cfg=cfg.model, options=decompiler_options, optimization_passes=all_optimization_passes
         )
-        assert dec.codegen is not None, f"Failed to decompile function {f!r}."
         print_decompilation_result(dec)
-        code = dec.codegen.text
-        assert code is not None
+        code = codegen_text(dec)
         assert "switch" in code
         assert "case" in code
 
@@ -524,9 +508,8 @@ class TestDecompiler(unittest.TestCase):
         dec = p.analyses[Decompiler].prep(fail_fast=True)(
             f, cfg=cfg.model, options=decompiler_options, optimization_passes=all_optimization_passes
         )
-        assert dec.codegen is not None, f"Failed to decompile function {f!r}."
         print_decompilation_result(dec)
-        code: str = dec.codegen.text
+        code: str = codegen_text(dec)
 
         # constant propagation was failing. see https://github.com/angr/angr/issues/2659
         assert (
@@ -558,10 +541,9 @@ class TestDecompiler(unittest.TestCase):
         dec = p.analyses[Decompiler].prep(show_progressbar=not WORKER)(
             f, cfg=cfg.model, options=decompiler_options, optimization_passes=all_optimization_passes
         )
-        assert dec.codegen is not None, f"Failed to decompile function {f!r}."
         print_decompilation_result(dec)
 
-        assert dec.codegen.text.count("switch (") == 3  # there are three switch-cases in total
+        assert codegen_text(dec).count("switch (") == 3  # there are three switch-cases in total
 
     @for_all_structuring_algos
     def test_decompiling_true_a_x86_64_1(self, decompiler_options=None):
@@ -585,16 +567,16 @@ class TestDecompiler(unittest.TestCase):
             options=set_decompiler_option(decompiler_options, [("cstyle_ifs", False)]),
             optimization_passes=all_optimization_passes,
         )
-        assert dec.codegen is not None, f"Failed to decompile function {f!r}."
         print_decompilation_result(dec)
 
         # the decompilation output should somewhat make sense
-        assert 'getenv("CHARSETALIASDIR");' in dec.codegen.text
-        assert "fscanf(" in dec.codegen.text
-        assert '"%50s %50s"' in dec.codegen.text
+        code = codegen_text(dec)
+        assert 'getenv("CHARSETALIASDIR");' in code
+        assert "fscanf(" in code
+        assert '"%50s %50s"' in code
 
         # make sure all "break;" is followed by a curly brace
-        dec_no_spaces = dec.codegen.text.replace("\n", "").replace(" ", "")
+        dec_no_spaces = code.replace("\n", "").replace(" ", "")
         replaced = dec_no_spaces.replace("break;}", "")
         # TODO: we really should not be making a switch in this function, but the sensitivity needs to be
         #   improved to avoid this. See test_true_a_graph_deduplication to see original source for this func.
@@ -630,17 +612,17 @@ class TestDecompiler(unittest.TestCase):
         dec = p.analyses[Decompiler].prep(fail_fast=True)(
             f, cfg=cfg.model, options=decompiler_options, optimization_passes=all_optimization_passes
         )
-        assert dec.codegen is not None, f"Failed to decompile function {f!r}."
         print_decompilation_result(dec)
         # make sure strings exist
-        assert '"coreutils"' in dec.codegen.text
-        assert '"/usr/local/share/locale"' in dec.codegen.text
-        assert '"--help"' in dec.codegen.text
-        assert '"Jim Meyering"' in dec.codegen.text
+        code = codegen_text(dec)
+        assert '"coreutils"' in code
+        assert '"/usr/local/share/locale"' in code
+        assert '"--help"' in code
+        assert '"Jim Meyering"' in code
         # make sure function calls exist
-        assert "set_program_name(" in dec.codegen.text
-        assert "setlocale(" in dec.codegen.text
-        assert "usage(0);" in dec.codegen.text
+        assert "set_program_name(" in code
+        assert "setlocale(" in code
+        assert "usage(0);" in code
 
     @for_all_structuring_algos
     def test_decompiling_1after909_verify_password(self, decompiler_options=None):
@@ -662,7 +644,7 @@ class TestDecompiler(unittest.TestCase):
         assert dec.codegen is not None, f"Failed to decompile function {f!r}."
         print_decompilation_result(dec)
 
-        code = dec.codegen.text
+        code = codegen_text(dec)
         assert "stack_base" not in code, "Some stack variables are not recognized"
 
         m = re.search(r"strncmp\(a1, \S+, 64\)", code)
@@ -717,11 +699,9 @@ class TestDecompiler(unittest.TestCase):
         dec = p.analyses[Decompiler].prep(fail_fast=True)(
             f, cfg=cfg.model, options=decompiler_options, optimization_passes=optimization_passes
         )
-        assert dec.codegen is not None, f"Failed to decompile function {f!r}."
         print_decompilation_result(dec)
 
-        code = dec.codegen.text
-        assert code is not None
+        code = codegen_text(dec)
         # with ReturnDuplicatorLow applied, there should be no goto!
         assert "goto" not in code.lower(), "Found goto statements. ReturnDuplicator might have failed."
         # with global variables discovered, there should not be any loads of constant addresses.
@@ -788,10 +768,9 @@ class TestDecompiler(unittest.TestCase):
         func = cfg.functions["main"]
 
         dec = p.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None, f"Failed to decompile function {func!r}."
         print_decompilation_result(dec)
         print_decompilation_result(dec)
-        code = dec.codegen.text
+        code = codegen_text(dec)
         decls = code.split("\n\n")[0]
 
         argc_name = " a0"  # update this variable once the decompiler picks up
@@ -820,10 +799,9 @@ class TestDecompiler(unittest.TestCase):
         func.prototype = cca.prototype
 
         dec = p.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None, f"Failed to decompile function {func!r}."
         print_decompilation_result(dec)
 
-        code = dec.codegen.text
+        code = codegen_text(dec)
         # Make sure argument a0 is correctly typed to char*
         lines = code.split("\n")
         assert "local_strlen(char *a0)" in lines[0], f"Argument a0 seems to be incorrectly typed: {lines[0]}"
@@ -842,10 +820,9 @@ class TestDecompiler(unittest.TestCase):
         func.prototype = cca.prototype
 
         dec = p.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None, f"Failed to decompile function {func!r}."
         print_decompilation_result(dec)
 
-        code = dec.codegen.text
+        code = codegen_text(dec)
         # Make sure argument a0 is correctly typed to char*
         lines = code.split("\n")
         assert "local_strcat(char *a0, char *a1)" in lines[0], (
@@ -873,10 +850,9 @@ class TestDecompiler(unittest.TestCase):
         func.prototype = cca.prototype
 
         dec = p.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None, f"Failed to decompile function {func!r}."
         print_decompilation_result(dec)
 
-        code = dec.codegen.text
+        code = codegen_text(dec)
         # Make sure argument a0 is correctly typed to char*
         lines = code.split("\n")
         assert "local_strcat(char *a0, char *a1)" in lines[0], (
@@ -897,10 +873,9 @@ class TestDecompiler(unittest.TestCase):
         opt_selection = [(opt, True)]
         options = opt_selection if not decompiler_options else opt_selection + decompiler_options
         dec = p.analyses[Decompiler].prep(fail_fast=True)(func_0, cfg=cfg.model, options=options)
-        assert dec.codegen is not None, f"Failed to decompile function {func_0!r}."
         print_decompilation_result(dec)
 
-        code = dec.codegen.text
+        code = codegen_text(dec)
         m = re.search(r"v(\d+) = (\(.*\))?strlen\(v(\d+)\);", code)  # e.g., s_428 = (int)strlen(s_418);
         assert m is not None, (
             "The result of strlen() should be directly assigned to a stack variable because of call-expression folding."
@@ -910,13 +885,13 @@ class TestDecompiler(unittest.TestCase):
         func_1 = cfg.functions["strlen_should_not_fold"]
         dec = p.analyses[Decompiler].prep(fail_fast=True)(func_1, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(dec)
-        code = dec.codegen.text
+        code = codegen_text(dec)
         assert code.count("strlen(") == 1
 
         func_2 = cfg.functions["strlen_should_not_fold_into_loop"]
         dec = p.analyses[Decompiler].prep(fail_fast=True)(func_2, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(dec)
-        code = dec.codegen.text
+        code = codegen_text(dec)
         assert code.count("strlen(") == 1
 
     @for_all_structuring_algos
@@ -929,10 +904,9 @@ class TestDecompiler(unittest.TestCase):
 
         func_0 = cfg.functions["version_etc"]
         dec = p.analyses[Decompiler].prep(fail_fast=True)(func_0, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None, f"Failed to decompile function {func_0!r}."
-        l.debug("Decompiled function %s\n%s", repr(func_0), dec.codegen.text)
+        l.debug("Decompiled function %s\n%s", repr(func_0), codegen_text(dec))
 
-        code = dec.codegen.text
+        code = codegen_text(dec)
         assert "version_etc_va(" in code
 
     @for_all_structuring_algos
@@ -948,9 +922,8 @@ class TestDecompiler(unittest.TestCase):
 
         func_0 = cfg.functions["main"]
         dec = p.analyses[Decompiler].prep(fail_fast=True)(func_0, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None, f"Failed to decompile function {func_0!r}."
         print_decompilation_result(dec)
-        code = dec.codegen.text
+        code = codegen_text(dec)
 
         assert "root(" in code
         assert "strlen(" in code  # incorrect call expression folding would
@@ -967,11 +940,10 @@ class TestDecompiler(unittest.TestCase):
         f = proj.kb.functions["find_bind_mount"]
 
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
-        assert d.codegen is not None and d.codegen.text is not None
         print_decompilation_result(d)
 
         # hack: work around the problem that `stat()` is undefiend and thus we consider it as returning long long
-        dec_text = d.codegen.text.replace("(int)stat(", "stat(")
+        dec_text = codegen_text(d).replace("(int)stat(", "stat(")
 
         m = re.search(
             r"if \([^\n]+ == 47 "
@@ -1002,8 +974,9 @@ class TestDecompiler(unittest.TestCase):
         print_decompilation_result(d)
 
         # we structure the giant if-else tree into a switch-case
-        assert "switch (" in d.codegen.text
-        assert "if (" not in d.codegen.text
+        code = codegen_text(d)
+        assert "switch (" in code
+        assert "if (" not in code
 
     @structuring_algo("sailr")
     def test_decompilation_stat_human_fstype_no_eager_returns(self, decompiler_options=None):
@@ -1024,9 +997,10 @@ class TestDecompiler(unittest.TestCase):
         print_decompilation_result(d)
 
         # we structure the giant if-else tree into a switch-case
-        assert "switch (" in d.codegen.text
-        assert "break;" in d.codegen.text
-        assert "if (" not in d.codegen.text
+        code = codegen_text(d)
+        assert "switch (" in code
+        assert "break;" in code
+        assert "if (" not in code
 
     @structuring_algo("sailr")
     def test_decompilation_stat_human_fstype_eager_returns_before_lowered_switch_simplifier(
@@ -1049,9 +1023,10 @@ class TestDecompiler(unittest.TestCase):
         print_decompilation_result(d)
 
         # we structure the giant if-else tree into a switch-case
-        assert "switch (" in d.codegen.text
-        assert "break;" not in d.codegen.text  # eager return has duplicated the switch-case successor. no break exists
-        assert "if (" not in d.codegen.text
+        code = codegen_text(d)
+        assert "switch (" in code
+        assert "break;" not in code  # eager return has duplicated the switch-case successor. no break exists
+        assert "if (" not in code
 
     @for_all_structuring_algos
     def test_decompilation_excessive_condition_removal(self, decompiler_options=None):
@@ -1065,9 +1040,8 @@ class TestDecompiler(unittest.TestCase):
         decompiler_options = decompiler_options or []
         decompiler_options += [("semvar_naming", False), ("loopctr_naming", False)]
         dec = p.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None, f"Failed to decompile function {func!r}."
         print_decompilation_result(dec)
-        code = dec.codegen.text
+        code = codegen_text(dec)
 
         code = code.replace(" ", "").replace("\n", "")
         # s_1a += 1 should not be wrapped inside any if-statements. it is always reachable.
@@ -1083,10 +1057,9 @@ class TestDecompiler(unittest.TestCase):
         func = cfg.functions[0x100003890]
 
         dec = p.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None, f"Failed to decompile function {func!r}."
         print_decompilation_result(dec)
 
-        code = dec.codegen.text
+        code = codegen_text(dec)
 
         assert "goto" not in code
 
@@ -1100,9 +1073,8 @@ class TestDecompiler(unittest.TestCase):
 
         func = cfg.functions["build_date"]
         dec = p.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None, f"Failed to decompile function {func!r}."
         print_decompilation_result(dec)
-        code = dec.codegen.text
+        code = codegen_text(dec)
 
         n = code.count("switch")
         assert n == 2, f"Expect two switch-case constructs, only found {n} instead."
@@ -1119,9 +1091,8 @@ class TestDecompiler(unittest.TestCase):
 
         # no dead memdef removal
         dec = p.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None, f"Failed to decompile function {func!r}."
         print_decompilation_result(dec)
-        code = dec.codegen.text
+        code = codegen_text(dec)
 
         lines = code.split("\n")
         for line in lines:
@@ -1144,9 +1115,8 @@ class TestDecompiler(unittest.TestCase):
         p.kb.decompilations.cached.clear()
         options = [(opt, True)] if not decompiler_options else [(opt, True), *decompiler_options]
         dec = p.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, options=options)
-        assert dec.codegen is not None, f"Failed to decompile function {func!r}."
         print_decompilation_result(dec)
-        code = dec.codegen.text
+        code = codegen_text(dec)
 
         lines = code.split("\n")
         for line in lines:
@@ -1171,9 +1141,8 @@ class TestDecompiler(unittest.TestCase):
         dec = p.analyses[Decompiler].prep(fail_fast=True)(
             func, cfg=cfg.model, options=set_decompiler_option(decompiler_options, [("show_local_types", False)])
         )
-        assert dec.codegen is not None, f"Failed to decompile function {func!r}."
         print_decompilation_result(dec)
-        code = dec.codegen.text
+        code = codegen_text(dec)
 
         # make sure there are no empty code blocks
         code = code.replace(" ", "").replace("\n", "")
@@ -1195,9 +1164,8 @@ class TestDecompiler(unittest.TestCase):
         dec = p.analyses[Decompiler].prep(fail_fast=True)(
             func, cfg=cfg.model, options=decompiler_options, binop_operators=binop_operators
         )
-        assert dec.codegen is not None, f"Failed to decompile function {func!r}."
         print_decompilation_result(dec)
-        code = dec.codegen.text
+        code = codegen_text(dec)
 
         # make sure there are no empty code blocks
         lines = [line.strip(" ") for line in code.split("\n")]
@@ -1228,9 +1196,8 @@ class TestDecompiler(unittest.TestCase):
         func = cfg.functions["main"]
 
         dec = p.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None, f"Failed to decompile function {func!r}."
         print_decompilation_result(dec)
-        code = dec.codegen.text
+        code = codegen_text(dec)
 
         # The function calls must be correctly decompiled
         assert "puts(" in code
@@ -1251,9 +1218,8 @@ class TestDecompiler(unittest.TestCase):
         func = cfg.functions["main"]
 
         dec = p.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None, f"Failed to decompile function {func!r}."
         print_decompilation_result(dec)
-        code = dec.codegen.text
+        code = codegen_text(dec)
 
         # We should not find "__stack_chk_fail" in the code
         assert "__stack_chk_fail" not in code
@@ -1268,9 +1234,8 @@ class TestDecompiler(unittest.TestCase):
         func = cfg.functions["main"]
 
         dec = p.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None, f"Failed to decompile function {func!r}."
         print_decompilation_result(dec)
-        code = dec.codegen.text
+        code = codegen_text(dec)
 
         # it should make somewhat sense
         assert 'printf("[*] flag_buffer = malloc(%d)\\n",' in code
@@ -1293,9 +1258,8 @@ class TestDecompiler(unittest.TestCase):
             cfg=cfg.model,
             options=decompiler_options,
         )
-        assert dec.codegen is not None, f"Failed to decompile function {func!r}."
         print_decompilation_result(dec)
-        code = dec.codegen.text
+        code = codegen_text(dec)
 
         # the call to fileno() should not go missing
         assert code.count("fileno") == 1
@@ -1322,9 +1286,8 @@ class TestDecompiler(unittest.TestCase):
         func = cfg.functions["my_message_callback"]
 
         dec = p.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None, f"Failed to decompile function {func!r}."
         print_decompilation_result(dec)
-        code = dec.codegen.text
+        code = codegen_text(dec)
 
         # we should not propagate generate_random() calls into function arguments without removing the original call
         # statement.
@@ -1343,9 +1306,8 @@ class TestDecompiler(unittest.TestCase):
         func = cfg.functions.function(name="handle__suback", plt=False)
 
         dec = p.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None, f"Failed to decompile function {func!r}."
         print_decompilation_result(dec)
-        code = dec.codegen.text
+        code = codegen_text(dec)
 
         assert "__stack_chk_fail" not in code  # stack canary checks should be removed by default
 
@@ -1368,10 +1330,8 @@ class TestDecompiler(unittest.TestCase):
         func = cfg.functions["main"]
 
         dec = p.analyses[Decompiler].prep(show_progressbar=not WORKER)(func, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None, f"Failed to decompile function {func!r}."
         print_decompilation_result(dec)
-        assert dec.codegen is not None and dec.codegen.text is not None
-        code = dec.codegen.text
+        code = codegen_text(dec)
 
         # return statements should not be wrapped into a for statement
         assert re.search(r"for[^\n]*return[^\n]*;", code) is None
@@ -1386,9 +1346,8 @@ class TestDecompiler(unittest.TestCase):
         func = cfg.functions["main"]
 
         dec = p.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None, f"Failed to decompile function {func!r}."
         print_decompilation_result(dec)
-        code = dec.codegen.text
+        code = codegen_text(dec)
 
         code_without_spaces = code.replace(" ", "").replace("\n", "")
         assert "while(true" not in code_without_spaces
@@ -1449,15 +1408,15 @@ class TestDecompiler(unittest.TestCase):
 
         f = p.kb.functions["usage"]
         d = p.analyses.Decompiler(f, cfg=cfg.model, options=decompiler_options)
-        assert d.codegen is not None and isinstance(d.codegen.text, str)
         print_decompilation_result(d)
 
-        assert '"Usage: %s [OPTION]... [FILE]...\\n"' in d.codegen.text
+        code = codegen_text(d)
+        assert '"Usage: %s [OPTION]... [FILE]...\\n"' in code
         assert (
             '"Write each FILE to standard output, with line numbers added.\\nWith no FILE, or when FILE is -,'
-            ' read standard input.\\n\\n"' in d.codegen.text
+            ' read standard input.\\n\\n"' in code
         )
-        assert "\"For complete documentation, run: info coreutils '%s invocation'\\n\"" in d.codegen.text
+        assert "\"For complete documentation, run: info coreutils '%s invocation'\\n\"" in code
 
     @unittest.skip("Disabled until https://github.com/angr/angr/issues/4406 fixed")
     @for_all_structuring_algos
@@ -1470,12 +1429,11 @@ class TestDecompiler(unittest.TestCase):
 
         f = p.kb.functions["main"]
         d = p.analyses[Decompiler].prep(show_progressbar=not WORKER)(f, cfg=cfg.model, options=decompiler_options)
-        assert d.codegen is not None, f"Failed to decompile function {f!r}."
         print_decompilation_result(d)
 
         # at the very least, it should decompile within a reasonable amount of time...
         # the switch-case must be recovered
-        assert "switch (" in d.codegen.text
+        assert "switch (" in codegen_text(d)
 
     @for_all_structuring_algos
     def test_decompiling_short_circuit_O0_func_1(self, decompiler_options=None):
@@ -1493,10 +1451,9 @@ class TestDecompiler(unittest.TestCase):
         d = p.analyses[Decompiler].prep(fail_fast=True)(
             f, cfg=cfg.model, options=decompiler_options, optimization_passes=all_optimization_passes
         )
-        assert d.codegen is not None, f"Failed to decompile function {f!r}."
         print_decompilation_result(d)
 
-        assert "goto" not in d.codegen.text
+        assert "goto" not in codegen_text(d)
 
     @for_all_structuring_algos
     def test_decompiling_short_circuit_O0_func_2(self, decompiler_options=None):
@@ -1514,10 +1471,9 @@ class TestDecompiler(unittest.TestCase):
         d = p.analyses[Decompiler].prep(fail_fast=True)(
             f, cfg=cfg.model, options=decompiler_options, optimization_passes=all_optimization_passes
         )
-        assert d.codegen is not None, f"Failed to decompile function {f!r}."
         print_decompilation_result(d)
 
-        assert "goto" not in d.codegen.text
+        assert "goto" not in codegen_text(d)
 
     @for_all_structuring_algos
     def test_decompiling_x8664_mv_O2(self, decompiler_options=None):
@@ -1528,12 +1484,12 @@ class TestDecompiler(unittest.TestCase):
 
         f = p.kb.functions["main"]
         d = p.analyses[Decompiler].prep(show_progressbar=not WORKER)(f, cfg=cfg.model, options=decompiler_options)
-        assert d.codegen is not None and isinstance(d.codegen.text, str)
 
         print_decompilation_result(d)
 
-        assert "(False)" not in d.codegen.text
-        assert "None" not in d.codegen.text
+        code = codegen_text(d)
+        assert "(False)" not in code
+        assert "None" not in code
 
     @for_all_structuring_algos
     def test_extern_decl(self, decompiler_options=None):
@@ -1544,13 +1500,13 @@ class TestDecompiler(unittest.TestCase):
 
         f = p.kb.functions["set_globals"]
         d = p.analyses.Decompiler(f, cfg=cfg.model, options=decompiler_options)
-        assert d.codegen is not None and isinstance(d.codegen.text, str)
 
-        l.debug("Decompiled function %s\n%s", repr(f), d.codegen.text)
+        code = codegen_text(d)
+        l.debug("Decompiled function %s\n%s", repr(f), code)
 
-        assert "extern unsigned int a;" in d.codegen.text
-        assert "extern unsigned int b;" in d.codegen.text
-        assert "extern unsigned int c;" in d.codegen.text
+        assert "extern unsigned int a;" in code
+        assert "extern unsigned int b;" in code
+        assert "extern unsigned int c;" in code
 
     @for_all_structuring_algos
     def test_decompiling_amp_challenge_07(self, decompiler_options=None):
@@ -1566,19 +1522,19 @@ class TestDecompiler(unittest.TestCase):
         f.calling_convention = cca.cc
 
         d = proj.analyses.Decompiler(f, cfg=cfg.model, options=decompiler_options)
-        assert d.codegen is not None and isinstance(d.codegen.text, str)
 
         print_decompilation_result(d)
 
         # make sure the types of extern variables are correct
-        assert "extern char num_connections;" in d.codegen.text
-        assert "extern char num_packets;" in d.codegen.text
-        assert "extern char src;" in d.codegen.text
+        code = codegen_text(d)
+        assert "extern char num_connections;" in code
+        assert "extern char num_packets;" in code
+        assert "extern char src;" in code
 
         # make sure there are no unidentified stack variables
-        assert "stack_base" not in d.codegen.text
+        assert "stack_base" not in code
 
-        lines = [line.strip(" ") for line in d.codegen.text.split("\n")]
+        lines = [line.strip(" ") for line in code.split("\n")]
 
         # make sure the line with printf("Recieved packet %d for connection with %d\n"...) does not have
         # "v23->field_5 + 1". otherwise it's an incorrect variable folding result
@@ -1593,7 +1549,7 @@ class TestDecompiler(unittest.TestCase):
 
         # make sure all "connection_infos" are followed by a square bracket
         # we don't allow bizarre expressions like (&connection_infos)[1234]...
-        assert "connection_infos" in d.codegen.text
+        assert "connection_infos" in code
         for line in lines:
             if line.startswith("extern "):
                 continue
@@ -1616,14 +1572,14 @@ class TestDecompiler(unittest.TestCase):
         f.calling_convention = cca.cc
 
         d = proj.analyses.Decompiler(f, cfg=cfg.model, options=decompiler_options)
-        assert d.codegen is not None and isinstance(d.codegen.text, str)
 
         print_decompilation_result(d)
 
         # bitshifts should be properly simplified into signed divisions
-        assert "/ 8" in d.codegen.text
-        assert "* 8" in d.codegen.text
-        assert ">>" not in d.codegen.text
+        code = codegen_text(d)
+        assert "/ 8" in code
+        assert "* 8" in code
+        assert ">>" not in code
 
     @structuring_algo("sailr")
     def test_decompiling_fmt_get_space(self, decompiler_options=None):
@@ -1643,13 +1599,13 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses.Decompiler(
             f, cfg=cfg.model, options=decompiler_options, optimization_passes=all_optimization_passes
         )
-        assert d.codegen is not None and isinstance(d.codegen.text, str)
 
         print_decompilation_result(d)
 
-        assert re.search(r"if \([^v]*v1 [=!]= 32\)", d.codegen.text) is not None
-        assert re.search(r"if \([^v]*v1 [=!]= 9\)", d.codegen.text) is not None
-        assert d.codegen.text.count("return v1;") == 1
+        code = codegen_text(d)
+        assert re.search(r"if \([^v]*v1 [=!]= 32\)", code) is not None
+        assert re.search(r"if \([^v]*v1 [=!]= 9\)", code) is not None
+        assert code.count("return v1;") == 1
 
     @for_all_structuring_algos
     def test_decompiling_fmt_main(self, decompiler_options=None):
@@ -1673,30 +1629,25 @@ class TestDecompiler(unittest.TestCase):
         f.calling_convention = cca.cc
 
         d = proj.analyses.Decompiler(f, cfg=cfg.model, options=decompiler_options)
-        assert d.codegen is not None and isinstance(d.codegen.text, str)
 
         print_decompilation_result(d)
 
         # function arguments must be a0 and a1. they cannot be renamed
-        assert re.search(r"int main\([\s\S]+ a0, [\s\S]+a1[\S]*\)", d.codegen.text) is not None
+        code = codegen_text(d)
+        assert re.search(r"int main\([\s\S]+ a0, [\s\S]+a1[\S]*\)", code) is not None
 
         assert (
-            "max_width = (int)xdectoumax(" in d.codegen.text
-            or "max_width = xdectoumax(" in d.codegen.text
-            or re.search(r"(\w+) = xdectoumax[^;]+;\s*max_width = \1;", d.codegen.text)
+            "max_width = (int)xdectoumax(" in code
+            or "max_width = xdectoumax(" in code
+            or re.search(r"(\w+) = xdectoumax[^;]+;\s*max_width = \1;", code)
         )
-        assert "goal_width = xdectoumax(" in d.codegen.text or re.search(
-            r"(\w+) = xdectoumax[^;]+;\s*goal_width = \1;", d.codegen.text
-        )
-        assert (
-            "max_width = goal_width + 10;" in d.codegen.text
-            or "max_width = ((int)(goal_width + 10));" in d.codegen.text
-        )
+        assert "goal_width = xdectoumax(" in code or re.search(r"(\w+) = xdectoumax[^;]+;\s*goal_width = \1;", code)
+        assert "max_width = goal_width + 10;" in code or "max_width = ((int)(goal_width + 10));" in code
 
         # by default, largest_successor_tree_outside_loop in RegionIdentifier is set to True, which means the
         # getopt_long() == -1 case should be entirely left outside the loop. by ensuring the call to error(0x1) is
         # within the last few lines of decompilation output, we ensure the -1 case is indeed outside the loop.
-        last_lines = "\n".join(line.strip(" ") for line in d.codegen.text.split("\n")[-10:])
+        last_lines = "\n".join(line.strip(" ") for line in code.split("\n")[-10:])
         assert 'error(1, *(__errno_location()), "%s");' in last_lines or re.search(
             r"(\w+) = __errno_location\(\);\s*error\(1, \*\(\1\), \"%s\"\);", last_lines
         )
@@ -1715,9 +1666,8 @@ class TestDecompiler(unittest.TestCase):
         f.calling_convention = cca.cc
 
         d = proj.analyses.Decompiler(f, cfg=cfg.model, options=decompiler_options)
-        assert d.codegen is not None and isinstance(d.codegen.text, str)
 
-        code = d.codegen.text
+        code = codegen_text(d)
 
         # the inner loop should be a do-while, not while(true)
         assert "} while (" in code, "Inner loop should be structured as do-while"
@@ -1742,7 +1692,7 @@ class TestDecompiler(unittest.TestCase):
         print_decompilation_result(d)
 
         # ensure the default case node is not duplicated
-        cases = set(re.findall(r"case \d+:", d.codegen.text))
+        cases = set(re.findall(r"case \d+:", codegen_text(d)))
         assert cases.issuperset(
             {"case 99:", "case 103:", "case 112:", "case 115:", "case 116:", "case 117:", "case 119:"}
         )
@@ -1754,16 +1704,17 @@ class TestDecompiler(unittest.TestCase):
 
         proj.analyses.CFGFast(normalize=True)
         d = proj.analyses.Decompiler(proj.kb.functions["main"], options=decompiler_options, expr_collapse_depth=5)
-        assert d.codegen is not None and isinstance(d.codegen.text, str) and d.codegen.map_pos_to_node is not None
+        assert d.codegen is not None and d.codegen.map_pos_to_node is not None
 
-        assert "..." in d.codegen.text, "codegen should have a too-deep expression replaced with '...'"
-        collapsed = d.codegen.map_pos_to_node.get_node(d.codegen.text.find("..."))
+        text = codegen_text(d)
+        assert "..." in text, "codegen should have a too-deep expression replaced with '...'"
+        collapsed = d.codegen.map_pos_to_node.get_node(text.find("..."))
         assert collapsed is not None, "collapsed node should appear in map"
         assert collapsed.collapsed, "collapsed node should be marked as collapsed"
         collapsed.collapsed = False
-        old_len = len(d.codegen.text)
+        old_len = len(text)
         d.codegen.regenerate_text()
-        new_len = len(d.codegen.text)
+        new_len = len(codegen_text(d))
         assert new_len > old_len, "un-collapsing node should expand decompilation output"
 
     @for_all_structuring_algos
@@ -1778,7 +1729,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        assert "__CFADD__" in d.codegen.text
+        assert "__CFADD__" in codegen_text(d)
 
     @for_all_structuring_algos
     def test_decompiling_division3(self, decompiler_options=None):
@@ -1794,13 +1745,12 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses.Decompiler(
             proj.kb.functions["division3"], optimization_passes=all_optimization_passes, options=decompiler_options
         )
-        assert d.codegen is not None and isinstance(d.codegen.text, str)
 
         print_decompilation_result(d)
 
         # get the returned expression from the return statement
         # e.g., retexpr will be "v2" if the return statement is "  return v2;"
-        lines = d.codegen.text.split("\n")
+        lines = codegen_text(d).split("\n")
         retexpr = next(line for line in lines if "return " in line).strip(" ;")[7:]
 
         # find the statement "v2 = v0 / 3"
@@ -1817,10 +1767,9 @@ class TestDecompiler(unittest.TestCase):
         proj.analyses.CFGFast(normalize=True)
 
         d = proj.analyses.Decompiler(proj.kb.functions["lehmer_rng"], options=decompiler_options)
-        assert d.codegen is not None and isinstance(d.codegen.text, str)
 
         print_decompilation_result(d)
-        assert re.search(r"\([av]\d \* 48271\) % 0x7fffffff;", d.codegen.text) is not None
+        assert re.search(r"\([av]\d \* 48271\) % 0x7fffffff;", codegen_text(d)) is not None
 
     # @for_all_structuring_algos
     @structuring_algo("dream")
@@ -1843,11 +1792,10 @@ class TestDecompiler(unittest.TestCase):
         proj.analyses.CFGFast(normalize=True)
 
         d = proj.analyses.Decompiler(proj.kb.functions["encrypt"], options=decompiler_options)
-        assert d.codegen is not None and isinstance(d.codegen.text, str)
 
         print_decompilation_result(d)
 
-        assert "% 61" in d.codegen.text, "Modulo simplification failed."
+        assert "% 61" in codegen_text(d), "Modulo simplification failed."
 
     @for_all_structuring_algos
     def test_struct_access(self, decompiler_options=None):
@@ -1920,16 +1868,16 @@ class TestDecompiler(unittest.TestCase):
             options=decompiler_options,
             regen_clinic=True,
         )
-        assert d.codegen is not None and isinstance(d.codegen.text, str)
 
         print_decompilation_result(d)
 
         # TODO c_val
-        assert "b_ptr = &c_ptr->c2[argc];" in d.codegen.text
-        assert "c_ptr->c3[argc] = argc;" in d.codegen.text
-        assert "c_ptr->c2[argc].b2.a2 = argc;" in d.codegen.text
-        assert "b_ptr += 1;" in d.codegen.text
-        assert "return c_ptr->c4->c2[argc].b2.a2;" in d.codegen.text
+        code = codegen_text(d)
+        assert "b_ptr = &c_ptr->c2[argc];" in code
+        assert "c_ptr->c3[argc] = argc;" in code
+        assert "c_ptr->c2[argc].b2.a2 = argc;" in code
+        assert "b_ptr += 1;" in code
+        assert "return c_ptr->c4->c2[argc].b2.a2;" in code
 
     @for_all_structuring_algos
     def test_call_return_variable_folding(self, decompiler_options=None):
@@ -1943,12 +1891,12 @@ class TestDecompiler(unittest.TestCase):
         proj.analyses.CompleteCallingConventions(cfg=cfg, prioritize_func_addrs=funcs, skip_other_funcs=True)
 
         dec = proj.analyses.Decompiler(proj.kb.functions["print_long_format"], options=decompiler_options)
-        assert dec.codegen is not None and isinstance(dec.codegen.text, str)
 
         print_decompilation_result(dec)
 
-        assert "if (timespec_cmp(" in dec.codegen.text or "if ((int)timespec_cmp(" in dec.codegen.text
-        assert "&& localtime_rz(" in dec.codegen.text
+        code = codegen_text(dec)
+        assert "if (timespec_cmp(" in code or "if ((int)timespec_cmp(" in code
+        assert "&& localtime_rz(" in code
 
     @structuring_algo("sailr")
     def test_cascading_boolean_and(self, decompiler_options=None):
@@ -1965,9 +1913,8 @@ class TestDecompiler(unittest.TestCase):
         dec = proj.analyses.Decompiler(
             proj.kb.functions["foo"], cfg=cfg, options=decompiler_options, optimization_passes=all_optimization_passes
         )
-        assert dec.codegen is not None and isinstance(dec.codegen.text, str)
         print_decompilation_result(dec)
-        assert dec.codegen.text.count("goto") == 1  # should have only one goto
+        assert codegen_text(dec).count("goto") == 1  # should have only one goto
 
     @for_all_structuring_algos
     def test_decompiling_tee_O2_x2nrealloc(self, decompiler_options=None):
@@ -1992,7 +1939,7 @@ class TestDecompiler(unittest.TestCase):
         print_decompilation_result(d)
 
         # ensure xalloc_die() is within its own block
-        lines = [line.strip("\n ") for line in d.codegen.text.split("\n")]
+        lines = [line.strip("\n ") for line in codegen_text(d).split("\n")]
         for i, line in enumerate(lines):
             if line.startswith("xalloc_die();"):
                 assert lines[i - 1].strip().startswith("if")
@@ -2033,7 +1980,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        assert d.codegen.text.count("for (") == 2  # two loops
+        assert codegen_text(d).count("for (") == 2  # two loops
 
     @for_all_structuring_algos
     def test_decompiling_tee_O2_tail_jumps(self, decompiler_options=None):
@@ -2046,14 +1993,15 @@ class TestDecompiler(unittest.TestCase):
         f = proj.kb.functions["__argmatch_die"]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
-        assert "usage(" in d.codegen.text
+        assert "usage(" in codegen_text(d)
 
         # setlocale_null_androidfix
         f = proj.kb.functions["setlocale_null_androidfix"]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
-        assert "setlocale(" in d.codegen.text
-        assert "NULL);" in d.codegen.text, "The arguments for setlocale() are missing"
+        code = codegen_text(d)
+        assert "setlocale(" in code
+        assert "NULL);" in code, "The arguments for setlocale() are missing"
 
     @for_all_structuring_algos
     def test_decompiling_du_di_set_alloc(self, decompiler_options=None):
@@ -2074,7 +2022,7 @@ class TestDecompiler(unittest.TestCase):
         print_decompilation_result(d)
 
         # addresses in function pointers should be correctly resolved into function pointers
-        assert "di_ent_hash, di_ent_compare, di_ent_free" in d.codegen.text
+        assert "di_ent_hash, di_ent_compare, di_ent_free" in codegen_text(d)
 
     @for_all_structuring_algos
     def test_decompiling_du_humblock_missing_conditions(self, decompiler_options=None):
@@ -2090,8 +2038,9 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        assert d.codegen.text.count("goto") == 0
-        assert d.codegen.text.count("break;") > 0
+        code = codegen_text(d)
+        assert code.count("goto") == 0
+        assert code.count("break;") > 0
 
     @structuring_algo("sailr")
     def test_decompiling_setb(self, decompiler_options=None):
@@ -2105,7 +2054,7 @@ class TestDecompiler(unittest.TestCase):
         print_decompilation_result(d)
 
         assert f.prototype is not None and f.prototype.returnty is not None and f.prototype.returnty.size == 8
-        assert "a0 - 65 < 26;" in d.codegen.text
+        assert "a0 - 65 < 26;" in codegen_text(d)
 
     @for_all_structuring_algos
     def test_decompiling_tac_base_len(self, decompiler_options=None):
@@ -2119,7 +2068,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        spaceless_text = d.codegen.text.replace(" ", "").replace("\n", "")
+        spaceless_text = codegen_text(d).replace(" ", "").replace("\n", "")
         assert "==47" in spaceless_text or "!=47" in spaceless_text
 
     @for_all_structuring_algos
@@ -2145,7 +2094,7 @@ class TestDecompiler(unittest.TestCase):
         print_decompilation_result(d)
 
         # break should always be followed by a curly brace, not another statement
-        t = d.codegen.text.replace(" ", "").replace("\n", "")
+        t = codegen_text(d).replace(" ", "").replace("\n", "")
         if "break;" in t:
             assert "break;}" in t
             t = t.replace("break;}", "")
@@ -2172,7 +2121,7 @@ class TestDecompiler(unittest.TestCase):
         print_decompilation_result(d)
 
         # return should always be followed by a curly brace, not another statement
-        t = d.codegen.text.replace(" ", "").replace("\n", "")
+        t = codegen_text(d).replace(" ", "").replace("\n", "")
         return_stmt_ctr = 0
         for m in re.finditer(r"return[^;]+;", t):
             return_stmt_ctr += 1
@@ -2205,31 +2154,31 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(
             f, cfg=cfg.model, options=decompiler_options, optimization_passes=all_optimization_passes
         )
-        assert d.codegen is not None and d.codegen.text is not None
         print_decompilation_result(d)
 
-        assert "faccessat(" in d.codegen.text
+        code = codegen_text(d)
+        assert "faccessat(" in code
         if decompiler_options:
             if decompiler_options[-1][-1] == SAILRStructurer.NAME:
                 # make sure there is one label
                 all_labels = set()
                 all_gotos = set()
-                for m in re.finditer(r"LABEL_[^:;]+:", d.codegen.text):
+                for m in re.finditer(r"LABEL_[^:;]+:", code):
                     all_labels.add(m.group(0)[:-1])
-                for m in re.finditer(r"goto ([^;]+);", d.codegen.text):
+                for m in re.finditer(r"goto ([^;]+);", code):
                     all_gotos.add(m.group(1))
                 assert len(all_labels) == 2
                 assert len(all_gotos) == 2
                 assert all_labels == all_gotos
             else:
                 # dream
-                assert "LABEL_" not in d.codegen.text
-                assert "goto" not in d.codegen.text
+                assert "LABEL_" not in code
+                assert "goto" not in code
 
             # ensure all return values are still there
-            assert "1;" in d.codegen.text
-            assert "0;" in d.codegen.text
-            assert "-1;" in d.codegen.text or "0xffffffff" in d.codegen.text
+            assert "1;" in code
+            assert "0;" in code
+            assert "-1;" in code or "0xffffffff" in code
 
     @structuring_algo("sailr")
     def test_decompiling_split_lines_split(self, decompiler_options=None):
@@ -2245,7 +2194,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        assert d.codegen.text.count("goto ") == 1
+        assert codegen_text(d).count("goto ") == 1
 
     @structuring_algo("sailr")
     def test_decompiling_ptx_fix_output_parameters(self, decompiler_options=None):
@@ -2261,7 +2210,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        assert len(list(re.findall(r"LABEL_[^;:]+:", d.codegen.text))) in {1, 2}
+        assert len(list(re.findall(r"LABEL_[^;:]+:", codegen_text(d)))) in {1, 2}
 
     @structuring_algo("sailr")
     def test_decompiling_dd_advance_input_after_read_error(self, decompiler_options=None):
@@ -2286,7 +2235,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        condensed = d.codegen.text.replace(" ", "").replace("\n", "")
+        condensed = codegen_text(d).replace(" ", "").replace("\n", "")
         #         if (*((int *)&input_seek_errno) == 29)
         #             return 1;
         #         v1 = __errno_location();
@@ -2308,8 +2257,9 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        assert "amd64g_calculate_condition" not in d.codegen.text  # we should rewrite the ccall to expr == 0
-        assert "a1 == a1" not in d.codegen.text
+        code = codegen_text(d)
+        assert "amd64g_calculate_condition" not in code  # we should rewrite the ccall to expr == 0
+        assert "a1 == a1" not in code
 
     @structuring_algo("sailr")
     def test_decompiling_uname_main(self, decompiler_options=None):
@@ -2324,7 +2274,7 @@ class TestDecompiler(unittest.TestCase):
         print_decompilation_result(d)
 
         # the ternary expression should not be propagated, if a ternary expression exists at all.
-        assert d.codegen.text.count("?") in {0, 1}
+        assert codegen_text(d).count("?") in {0, 1}
 
     @for_all_structuring_algos
     def test_decompiling_prototype_recovery_two_blocks(self, decompiler_options=None):
@@ -2341,7 +2291,7 @@ class TestDecompiler(unittest.TestCase):
         assert proj.kb.functions["xstrtol"].prototype is not None
         assert proj.kb.functions["xstrtol"].prototype.args is not None
         assert len(proj.kb.functions["xstrtol"].prototype.args) == 5
-        assert re.search(r"xstrtol\([^\n,]+, [^\n,]+, [^\n,]+, [^\n,]+, [^\n,]+\)", d.codegen.text) is not None
+        assert re.search(r"xstrtol\([^\n,]+, [^\n,]+, [^\n,]+, [^\n,]+, [^\n,]+\)", codegen_text(d)) is not None
 
     @structuring_algo("sailr")
     def test_decompiling_rewrite_negated_cascading_logical_conjunction_expressions(self, decompiler_options=None):
@@ -2362,8 +2312,9 @@ class TestDecompiler(unittest.TestCase):
 
         # expected: if (*(v4) || *((char *)*((long long *)a1)) != (char)a3 || a0 == *((long long *)a1) || (v5 & -0x100))
         # also acceptable: if (!v3 && *(a1)->field_0 == a3 && a0 != *(a1) && !(v2 & 0xffffffffffffff00))
-        and_count = d.codegen.text.count("&&")
-        or_count = d.codegen.text.count("||")
+        code = codegen_text(d)
+        and_count = code.count("&&")
+        or_count = code.count("||")
         assert (or_count == 3 and and_count == 0) or (and_count == 3 and or_count == 0)
 
     @for_all_structuring_algos
@@ -2380,8 +2331,9 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        assert "finish_and_exit(" in d.codegen.text
-        assert "goto" not in d.codegen.text
+        code = codegen_text(d)
+        assert "finish_and_exit(" in code
+        assert "goto" not in code
 
     @structuring_algo("sailr")
     def test_decompiling_sort_specify_nmerge(self, decompiler_options=None):
@@ -2393,7 +2345,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        assert "goto" not in d.codegen.text
+        assert "goto" not in codegen_text(d)
 
     @structuring_algo("sailr")
     def test_decompiling_ls_print_many_per_line(self, decompiler_options=None):
@@ -2408,8 +2360,9 @@ class TestDecompiler(unittest.TestCase):
         print_decompilation_result(d)
 
         # it should make somewhat sense
-        assert "calculate_columns(" in d.codegen.text
-        assert "putchar_unlocked(eolbyte)" in d.codegen.text
+        code = codegen_text(d)
+        assert "calculate_columns(" in code
+        assert "putchar_unlocked(eolbyte)" in code
 
     @structuring_algo("sailr")
     def test_who_condensing_opt_reversion(self, decompiler_options=None):
@@ -2434,7 +2387,7 @@ class TestDecompiler(unittest.TestCase):
         )
         print_decompilation_result(d)
 
-        assert d.codegen.text.count("goto ") == 0
+        assert codegen_text(d).count("goto ") == 0
 
     @structuring_algo("sailr")
     def test_decompiling_tr_build_spec_list(self, decompiler_options=None):
@@ -2457,7 +2410,7 @@ class TestDecompiler(unittest.TestCase):
         )
         print_decompilation_result(d)
 
-        assert d.codegen.text.count("goto") == 0
+        assert codegen_text(d).count("goto") == 0
 
     @structuring_algo("sailr")
     def test_decompiling_sha384sum_digest_bsd_split_3(self, decompiler_options=None):
@@ -2478,7 +2431,7 @@ class TestDecompiler(unittest.TestCase):
         print_decompilation_result(d)
 
         # there should be two goto statements when only high return duplication is available
-        assert d.codegen.text.count("goto ") == 2
+        assert codegen_text(d).count("goto ") == 2
 
     @for_all_structuring_algos
     def test_eliminating_stack_canary_reused_stack_chk_fail_call(self, decompiler_options=None):
@@ -2490,8 +2443,9 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        assert "return " in d.codegen.text
-        assert "stack_chk_fail" not in d.codegen.text
+        code = codegen_text(d)
+        assert "return " in code
+        assert "stack_chk_fail" not in code
 
     @structuring_algo("sailr")
     def test_decompiling_tr_card_of_complement(self, decompiler_options=None):
@@ -2506,7 +2460,7 @@ class TestDecompiler(unittest.TestCase):
             f, cfg=cfg.model, options=decompiler_options, optimization_passes=all_optimization_passes
         )
         print_decompilation_result(d)
-        assert "goto " not in d.codegen.text
+        assert "goto " not in codegen_text(d)
 
     @structuring_algo("sailr")
     def test_decompiling_printenv_main(self, decompiler_options=None):
@@ -2519,7 +2473,7 @@ class TestDecompiler(unittest.TestCase):
         f = proj.kb.functions["main"]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
-        assert "goto " not in d.codegen.text
+        assert "goto " not in codegen_text(d)
 
     @structuring_algo("sailr")
     def test_decompiling_ls_ubuntu2204_sub_414cb0(self, decompiler_options=None):
@@ -2533,9 +2487,8 @@ class TestDecompiler(unittest.TestCase):
         cfg = proj.analyses.CFGFast(normalize=True)
         f = proj.kb.functions[0x414CB0]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
-        assert d.codegen is not None and d.codegen.text is not None
         print_decompilation_result(d)
-        code = d.codegen.text
+        code = codegen_text(d)
         for needed in ("iswprint(", "mbsinit(", "memcmp(", "dcgettext(", "strlen("):
             assert needed in code, (
                 f"sub_414cb0 decompilation is missing {needed!r}; structuring likely discarded most of the "
@@ -2555,7 +2508,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        cgc_allocate_call = re.search(r"cgc_allocate\(([^\n]+)\)", d.codegen.text)
+        cgc_allocate_call = re.search(r"cgc_allocate\(([^\n]+)\)", codegen_text(d))
         assert cgc_allocate_call is not None, "Expect a call to cgc_allocate(), found None"
         comma_count = cgc_allocate_call.group(1).count(",")
         assert comma_count == 2, f"Expect cgc_allocate() to have three arguments, found {comma_count + 1}"
@@ -2580,22 +2533,23 @@ class TestDecompiler(unittest.TestCase):
         )
         print_decompilation_result(d)
 
-        assert "switch" in d.codegen.text
-        assert "case 10:" in d.codegen.text
-        assert "case 13:" in d.codegen.text
-        assert "case 92:" in d.codegen.text
-        assert "default:" in d.codegen.text
-        assert "goto" not in d.codegen.text
-        assert "continue;" in d.codegen.text
+        code = codegen_text(d)
+        assert "switch" in code
+        assert "case 10:" in code
+        assert "case 13:" in code
+        assert "case 92:" in code
+        assert "default:" in code
+        assert "goto" not in code
+        assert "continue;" in code
 
         # ensure continue appears in between case 92: and default:
-        case_92_index = d.codegen.text.find("case 92:")
-        continue_index = d.codegen.text.find("continue;")
-        default_index = d.codegen.text.find("default:")
+        case_92_index = code.find("case 92:")
+        continue_index = code.find("continue;")
+        default_index = code.find("default:")
         assert case_92_index < continue_index < default_index
 
         # ensure the logic after switch-case remains (incorrect structuring may drop it)
-        lines = [line.strip(" \n") for line in d.codegen.text.split("\n")]
+        lines = [line.strip(" \n") for line in code.split("\n")]
         default_line = next((i for i, line in enumerate(lines) if line == "default:"), None)
         assert default_line is not None, "default case not found"
         end_switch_line = next((i for i, line in enumerate(lines[default_line:]) if line == "}"), None)
@@ -2637,8 +2591,9 @@ class TestDecompiler(unittest.TestCase):
         )
         print_decompilation_result(d)
 
-        assert "case 4294967165:" in d.codegen.text
-        assert "case 4294967166:" in d.codegen.text
+        code = codegen_text(d)
+        assert "case 4294967165:" in code
+        assert "case 4294967166:" in code
 
     @structuring_algo("sailr")
     def test_reverting_switch_lowering_filename_unescape(self, decompiler_options=None):
@@ -2657,17 +2612,18 @@ class TestDecompiler(unittest.TestCase):
         )
         print_decompilation_result(d)
 
-        assert d.codegen.text.count("switch ") == 2
-        assert d.codegen.text.count("case 92:") == 2
-        assert d.codegen.text.count("case 0:") == 1
+        code = codegen_text(d)
+        assert code.count("switch ") == 2
+        assert code.count("case 92:") == 2
+        assert code.count("case 0:") == 1
         # TODO: structuring failed when removing this goto with ReturnDuplicatorLow.
         #  Fix in: https://github.com/angr/angr/issues/4252
-        # assert "goto" not in d.codegen.text
+        # assert "goto" not in code
         # TODO: the following check requires angr decompiler to implement assignment de-duplication
-        # assert d.codegen.text.count("case 110:") == 1
+        # assert code.count("case 110:") == 1
         # TODO: the following check requires angr decompiler correctly support rewriting gotos inside nested loops and
         # switch-cases into break nodes.
-        # assert d.codegen.text.count("break;") == 5
+        # assert code.count("break;") == 5
 
     @structuring_algo("sailr")
     def test_reverting_switch_lowering_range_check_unzip(self, decompiler_options=None):
@@ -2723,7 +2679,7 @@ class TestDecompiler(unittest.TestCase):
         )
         print_decompilation_result(d)
 
-        assert d.codegen.text.count("switch (") == 1
+        assert codegen_text(d).count("switch (") == 1
         # FIXME: Test default case handling
 
     @structuring_algo("sailr")
@@ -2744,17 +2700,18 @@ class TestDecompiler(unittest.TestCase):
         )
         print_decompilation_result(d)
 
-        assert d.codegen.text.count("switch (") == 1
-        assert "case 65:" in d.codegen.text
-        assert "case 69:" in d.codegen.text
-        assert "case 84:" in d.codegen.text
-        assert "case 98:" in d.codegen.text
-        assert "case 101:" in d.codegen.text
-        assert "case 110:" in d.codegen.text
-        assert "case 115:" in d.codegen.text
-        assert "case 116:" in d.codegen.text
-        assert "case 117:" in d.codegen.text
-        assert "case 118:" in d.codegen.text
+        code = codegen_text(d)
+        assert code.count("switch (") == 1
+        assert "case 65:" in code
+        assert "case 69:" in code
+        assert "case 84:" in code
+        assert "case 98:" in code
+        assert "case 101:" in code
+        assert "case 110:" in code
+        assert "case 115:" in code
+        assert "case 116:" in code
+        assert "case 117:" in code
+        assert "case 118:" in code
         # FIXME: Test default case handling
 
     @structuring_algo("sailr")
@@ -2775,7 +2732,8 @@ class TestDecompiler(unittest.TestCase):
         )
         print_decompilation_result(d)
 
-        assert d.codegen.text.count("switch (") == 1
+        code = codegen_text(d)
+        assert code.count("switch (") == 1
         cases = [
             112,
             116,
@@ -2788,11 +2746,11 @@ class TestDecompiler(unittest.TestCase):
             103,
         ]
         for case_ in cases:
-            assert f"case {case_}:" in d.codegen.text
-        assert "default:" in d.codegen.text
+            assert f"case {case_}:" in code
+        assert "default:" in code
 
         # ensure "v14 = fmt(stdin, "-");" shows up before "optind < a0"
-        lines = d.codegen.text.split("\n")
+        lines = code.split("\n")
         a0_assignment_line = next(line for line in lines if " = a0;" in line)
         a0_var = a0_assignment_line.split(" = ")[0].strip()
         fmt_line = next(i for i, line in enumerate(lines) if 'fmt(stdin, "-");' in line)
@@ -2819,7 +2777,8 @@ class TestDecompiler(unittest.TestCase):
         )
         print_decompilation_result(d)
 
-        assert d.codegen.text.count("switch (") == 1
+        code = codegen_text(d)
+        assert code.count("switch (") == 1
         cases = [
             102,
             116,
@@ -2834,8 +2793,8 @@ class TestDecompiler(unittest.TestCase):
             98,
         ]
         for case_ in cases:
-            assert f"case {case_}:" in d.codegen.text
-        assert "default:" in d.codegen.text
+            assert f"case {case_}:" in code
+        assert "default:" in code
 
         # we test a few other things
         # 1. after proper structuring, the function should end with a return statement; the return statement uses a
@@ -2843,7 +2802,7 @@ class TestDecompiler(unittest.TestCase):
         #        v55 &= do_move(v1, v58, v5, *((long long *)&v6), v3);
         #    The assignment of v55 could have been removed due to the incorrect logic in
         #    _find_cyclic_dependent_phis_and_dirty_vvars()
-        lines = [line.strip() for line in d.codegen.text.split("\n") if line.strip()]
+        lines = [line.strip() for line in code.split("\n") if line.strip()]
         assert lines[-1] == "}"
         assert lines[-2].startswith("return ")
         assert lines[-2].endswith(";")
@@ -2881,12 +2840,12 @@ class TestDecompiler(unittest.TestCase):
         # 3. there are no var_xxx in the decompilation output; all virtual variables must be converted to variables
         #    this bug was caused by the incorrect logic in _find_cyclic_dependent_phis_and_dirty_vvars, where
         #    the two assignments above the last do-while loop were incorrectly removed.
-        assert "vvar_" not in d.codegen.text
+        assert "vvar_" not in code
 
         # 4. there are no existence of "& 0xffffffff00000000". these masking expressions were the result of redundant
         #    full stack variables that were created during SSA and previously not eliminated only because they were
         #    stack variables.
-        assert "0xffffffff00000000" not in d.codegen.text
+        assert "0xffffffff00000000" not in code
 
     @structuring_algo("sailr")
     def test_comma_separated_statement_expression_whoami(self, decompiler_options=None):
@@ -2901,12 +2860,13 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        assert "goto" not in d.codegen.text
+        code = codegen_text(d)
+        assert "goto" not in code
         assert (
-            re.search(r"if \(\w+ != 0xffffffff \|\| \(\w+ = NULL, !\*\(\(int \*\)\w+\)\)\)", d.codegen.text) is not None
-            or re.search(r"if \(\w+ != 0xffffffff \|\| \(\w+ = NULL, !\*\(\w+\)\)\)", d.codegen.text) is not None
-            or re.search(r"if \(\w+ != -1 \|\| \(\w+ = NULL, !\*\(\(int \*\)\w+\)\)\)", d.codegen.text) is not None
-            or re.search(r"if \(\w+ != -1 \|\| \(\w+ = NULL, !\*\(\w+\)\)\)", d.codegen.text) is not None
+            re.search(r"if \(\w+ != 0xffffffff \|\| \(\w+ = NULL, !\*\(\(int \*\)\w+\)\)\)", code) is not None
+            or re.search(r"if \(\w+ != 0xffffffff \|\| \(\w+ = NULL, !\*\(\w+\)\)\)", code) is not None
+            or re.search(r"if \(\w+ != -1 \|\| \(\w+ = NULL, !\*\(\(int \*\)\w+\)\)\)", code) is not None
+            or re.search(r"if \(\w+ != -1 \|\| \(\w+ = NULL, !\*\(\w+\)\)\)", code) is not None
         )
 
     @for_all_structuring_algos
@@ -2927,14 +2887,15 @@ class TestDecompiler(unittest.TestCase):
 
         # The highest level symptom here is that two variable used are
         # confused and this shows up in the addition types.
-        assert "Other Possible Types" not in d.codegen.text
+        code = codegen_text(d)
+        assert "Other Possible Types" not in code
 
         # check that the variable used in free is different from the one used in atoi
-        m = re.search(r"free\([^v]*([^)]+)", d.codegen.text)
+        m = re.search(r"free\([^v]*([^)]+)", code)
         assert m
 
         var_name = m.group(1)
-        assert not re.search(f"atoi.*{var_name}", d.codegen.text)
+        assert not re.search(f"atoi.*{var_name}", code)
 
     @for_all_structuring_algos
     def test_switch_case_shared_case_nodes_b2sum_digest(self, decompiler_options=None):
@@ -2952,11 +2913,11 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(
             f, cfg=cfg.model, options=decompiler_options, optimization_passes=all_optimization_passes
         )
-        assert d.codegen is not None and d.codegen.text is not None
         print_decompilation_result(d)
 
-        assert d.codegen.text.count("switch") == 1
-        assert d.codegen.text.count("while ") == 2, "Expect two loops"
+        code = codegen_text(d)
+        assert code.count("switch") == 1
+        assert code.count("while ") == 2, "Expect two loops"
 
     @for_all_structuring_algos
     def test_no_switch_case_touch_touch(self, decompiler_options=None):
@@ -2977,7 +2938,7 @@ class TestDecompiler(unittest.TestCase):
         )
         print_decompilation_result(d)
 
-        assert d.codegen.text.count("switch") == 0
+        assert codegen_text(d).count("switch") == 0
 
     @structuring_algo("sailr")
     def disabled_test_continuous_small_switch_cluster(self, decompiler_options=None):
@@ -2998,7 +2959,7 @@ class TestDecompiler(unittest.TestCase):
             f, cfg=cfg.model, options=decompiler_options, optimization_passes=all_optimization_passes
         )
         print_decompilation_result(d)
-        text = d.codegen.text
+        text = codegen_text(d)
         text = text.replace("4294967166", "-130")
         text = text.replace("4294967165", "-131")
 
@@ -3015,11 +2976,12 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        assert "default:" in d.codegen.text
-        assert "case 49:" in d.codegen.text
-        assert "case 50:" not in d.codegen.text
-        assert "case 51:" not in d.codegen.text
-        assert "case 52:" not in d.codegen.text
+        code = codegen_text(d)
+        assert "default:" in code
+        assert "case 49:" in code
+        assert "case 50:" not in code
+        assert "case 51:" not in code
+        assert "case 52:" not in code
 
     @structuring_algo("sailr")
     def test_codegen_accessing_negative_offsets(self, decompiler_options=None):
@@ -3028,11 +2990,10 @@ class TestDecompiler(unittest.TestCase):
         _ = proj.analyses.CFGFast(normalize=True, regions=[(0x410FC0, 0x410FC0 + 1000)])
         f = proj.kb.functions[0x410FC0]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, options=decompiler_options)
-        assert d.codegen is not None and d.codegen.text is not None
         print_decompilation_result(d)
 
         # Find `iter = (char *)iter - 1;``
-        m = re.search(r"([\S]+) = \(char \*\)([\S]+) \- 1;", d.codegen.text)
+        m = re.search(r"([\S]+) = \(char \*\)([\S]+) \- 1;", codegen_text(d))
         assert m is not None
         assert m.group(1) == m.group(2)
 
@@ -3043,7 +3004,6 @@ class TestDecompiler(unittest.TestCase):
         _ = proj.analyses.CFGFast(normalize=True, regions=[(0x416C60, 0x416C60 + 1000)])
         f = proj.kb.functions["_obstack_memory_used"]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, options=decompiler_options)
-        assert d.codegen is not None and d.codegen.text is not None
         print_decompilation_result(d)
 
         # there is a loop in this function. if the loop is discovered as `do { } while (cond);`, the condition must be
@@ -3082,7 +3042,7 @@ class TestDecompiler(unittest.TestCase):
         # loop body will be shorter.
 
         # find the loop
-        loop_match = re.search(r"do\s*\{([^}]*)\}\s*while\s*\(([^)]*)\);", d.codegen.text, re.MULTILINE)
+        loop_match = re.search(r"do\s*\{([^}]*)\}\s*while\s*\(([^)]*)\);", codegen_text(d), re.MULTILINE)
         assert loop_match is not None, "Cannot find the do-while loop in the decompilation output."
         loop_body = loop_match.group(1)
         loop_condition = loop_match.group(2)
@@ -3118,9 +3078,10 @@ class TestDecompiler(unittest.TestCase):
         print_decompilation_result(d)
 
         # ITE expressions should not exist. we convert them to if-then-else properly.
-        assert "?" not in d.codegen.text
+        code = codegen_text(d)
+        assert "?" not in code
         # ensure there are no empty scopes
-        assert "{}" not in d.codegen.text.replace(" ", "").replace("\n", "")
+        assert "{}" not in code.replace(" ", "").replace("\n", "")
 
     @structuring_algo("sailr")
     def test_od_else_simplification(self, decompiler_options=None):
@@ -3133,7 +3094,7 @@ class TestDecompiler(unittest.TestCase):
         )
         print_decompilation_result(d)
 
-        text = d.codegen.text
+        text = codegen_text(d)
         # find an if-stmt that has the following properties:
         # 1. Condition: (!a0)
         # 2. Has a scope ending in a return
@@ -3172,7 +3133,7 @@ class TestDecompiler(unittest.TestCase):
             f1, cfg=cfg.model, options=decompiler_options, optimization_passes=all_optimization_passes
         )
         print_decompilation_result(d)
-        assert d.codegen.text.count("goto ") == 0
+        assert codegen_text(d).count("goto ") == 0
 
         # eager returns should not trigger here
         f2 = proj.kb.functions["foo"]
@@ -3180,7 +3141,7 @@ class TestDecompiler(unittest.TestCase):
             f2, cfg=cfg.model, options=decompiler_options, optimization_passes=all_optimization_passes
         )
         print_decompilation_result(d)
-        assert d.codegen.text.count("goto ") == 1
+        assert codegen_text(d).count("goto ") == 1
 
     @for_all_structuring_algos
     def test_proper_argument_simplification(self, decompiler_options=None):
@@ -3216,7 +3177,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler](f, cfg=cfg.model, options=decompiler_options)
 
         print_decompilation_result(d)
-        text = d.codegen.text
+        text = codegen_text(d)
         # all scopes in the program should never be followed by code or tabs
         for i in re.finditer("{", text):
             idx = i.start()
@@ -3233,7 +3194,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler](f, cfg=cfg.model, options=decompiler_options)
 
         print_decompilation_result(d)
-        text = d.codegen.text
+        text = codegen_text(d)
         assert re.search(r"\[read_packet\([^)]*\)\] = 0;", text) is not None
 
     @structuring_algo("sailr")
@@ -3251,7 +3212,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler](f, cfg=cfg.model, options=decompiler_options)
 
         print_decompilation_result(d)
-        text = d.codegen.text
+        text = codegen_text(d)
         text = text.replace(" ", "").replace("\n", "")
         # Incorrect:
         #     while (true)
@@ -3295,7 +3256,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler](f, cfg=cfg.model, options=decompiler_options)
 
         print_decompilation_result(d)
-        text = d.codegen.text
+        text = codegen_text(d)
         # there should be a ternary assignment in the code: x = (c ? a : b);
         assert re.search(r".+ = \(.+\?.+:.+\);", text) is not None
 
@@ -3315,7 +3276,7 @@ class TestDecompiler(unittest.TestCase):
         )
 
         print_decompilation_result(d)
-        text = d.codegen.text
+        text = codegen_text(d)
         # there should be at least 1 ternary in the code: (c ? a : b);
         assert re.search(r"\(.+\?.+:.+\);", text) is not None
 
@@ -3338,7 +3299,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler](f, cfg=cfg.model, options=decompiler_options)
 
         print_decompilation_result(d)
-        text = d.codegen.text
+        text = codegen_text(d)
         # all ternary assignments should be destroyed
         assert re.search(r".+ = \(.+\?.+:.+\);", text) is None
 
@@ -3384,7 +3345,7 @@ class TestDecompiler(unittest.TestCase):
         )
 
         print_decompilation_result(d)
-        text = d.codegen.text
+        text = codegen_text(d)
         # all ternary assignments should be destroyed
         assert re.search(r".+ = \(.+\?.+:.+\);", text) is None
 
@@ -3401,10 +3362,9 @@ class TestDecompiler(unittest.TestCase):
         proj.analyses.CompleteCallingConventions(cfg=cfg, analyze_callsites=True)
         f = proj.kb.functions["record_relation"]
         d = proj.analyses[Decompiler](f, cfg=cfg.model, options=decompiler_options)
-        assert d.codegen is not None and d.codegen.text is not None
 
         print_decompilation_result(d)
-        text = d.codegen.text
+        text = codegen_text(d)
 
         assert text.count("return") == 1
 
@@ -3423,7 +3383,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler](f, cfg=cfg.model, options=decompiler_options)
 
         print_decompilation_result(d)
-        text = d.codegen.text
+        text = codegen_text(d)
 
         text = text.replace(" ", "").replace("\n", "")
         # Incorrect:
@@ -3462,7 +3422,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler](f, cfg=cfg.model, options=decompiler_options)
 
         print_decompilation_result(d)
-        text = d.codegen.text
+        text = codegen_text(d)
 
         text = text.replace(" ", "").replace("\n", "")
         # Incorrect:
@@ -3493,7 +3453,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler](f, cfg=cfg.model, options=decompiler_options)
 
         print_decompilation_result(d)
-        text = d.codegen.text
+        text = codegen_text(d)
 
         text = text.replace(" ", "").replace("\n", "")
         # Incorrect:
@@ -3554,6 +3514,7 @@ class TestDecompiler(unittest.TestCase):
         f = cfg.functions["authenticate"]
 
         codegen = p.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options).codegen
+        assert codegen is not None and codegen.map_pos_to_node is not None
 
         assert len(codegen.cfunc.arg_list) == 2
         elements = {n.obj for _, n in codegen.map_pos_to_node.items()}
@@ -3575,9 +3536,8 @@ class TestDecompiler(unittest.TestCase):
         f.calling_convention = default_cc(p.arch.name)(p.arch)
 
         d = p.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
-        assert d.codegen is not None and d.codegen.text is not None
         print_decompilation_result(d)
-        assert cproto in d.codegen.text
+        assert cproto in codegen_text(d)
 
     @for_all_structuring_algos
     def test_adjustable_indent_width(self, decompiler_options=None):
@@ -3592,9 +3552,8 @@ class TestDecompiler(unittest.TestCase):
 
         # default (no indent_size option) uses a 4-space indentation
         d = p.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
-        assert d.codegen is not None and d.codegen.text is not None
         print_decompilation_result(d)
-        levels = indent_levels(d.codegen.text)
+        levels = indent_levels(codegen_text(d))
         assert min(levels) == 4
         assert 8 in levels  # a nested (2x) statement exists at the default width
 
@@ -3603,8 +3562,7 @@ class TestDecompiler(unittest.TestCase):
             # indent_size is a codegen display option, not a cache-validity parameter; force a fresh decompilation
             # so the new width is applied instead of reusing the cached codegen.
             d = p.analyses[Decompiler].prep(fail_fast=True)(f, options=options, regen_clinic=True)
-            assert d.codegen is not None and d.codegen.text is not None
-            levels = indent_levels(d.codegen.text)
+            levels = indent_levels(codegen_text(d))
             # every indentation level is a whole multiple of the configured width
             assert all(level % width == 0 for level in levels), (
                 f"indent_size={width}: got non-multiple indentation levels {sorted(levels)}"
@@ -3647,7 +3605,7 @@ class TestDecompiler(unittest.TestCase):
         #                       v1 &= check_and_close(*(__errno_location())) & open_next_file(),
         #                       *(&in_stream)));
 
-        text = dec.codegen.text
+        text = codegen_text(dec)
         while_offset = text.find("while (")
         while_line = text[while_offset : text.find("\n", while_offset)]
         for substr in ["in_stream", "check_and_close(", "open_next_file("]:
@@ -3663,11 +3621,12 @@ class TestDecompiler(unittest.TestCase):
             f, cfg=cfg.model, options=decompiler_options_1, optimization_passes=all_optimization_passes
         )
         print_decompilation_result(dec)
-        assert re.search(r"\w+ = [^\n]*in_stream[^\n]*;", dec.codegen.text)
-        assert re.search(r"check_and_close[^;,]+;", dec.codegen.text)
-        assert re.search(r"open_next_file[^;,]+;", dec.codegen.text)
+        code = codegen_text(dec)
+        assert re.search(r"\w+ = [^\n]*in_stream[^\n]*;", code)
+        assert re.search(r"check_and_close[^;,]+;", code)
+        assert re.search(r"open_next_file[^;,]+;", code)
 
-        saved = dec.codegen.text
+        saved = codegen_text(dec)
 
         # less than one call statement/expression
         decompiler_options_2 = [
@@ -3678,9 +3637,8 @@ class TestDecompiler(unittest.TestCase):
         dec = p.analyses[Decompiler].prep(fail_fast=True)(
             f, cfg=cfg.model, options=decompiler_options_2, optimization_passes=all_optimization_passes
         )
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
-        assert dec.codegen.text == saved
+        assert codegen_text(dec) == saved
 
     @for_all_structuring_algos
     def test_function_pointer_identification(self, decompiler_options=None):
@@ -3696,8 +3654,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler](f, cfg=cfg.model, options=decompiler_options)
 
         print_decompilation_result(d)
-        assert d.codegen is not None and d.codegen.text is not None
-        text = d.codegen.text
+        text = codegen_text(d)
         assert "extern" not in text
         assert "std::rt::lang_start(rust_hello_world::main" in text
 
@@ -3716,7 +3673,7 @@ class TestDecompiler(unittest.TestCase):
 
         # incorrect region replacement was causing the while loop be duplicated, so we would end up with four while
         # loops. In the original source, there is only a single while loop.
-        assert d.codegen.text.count("while (") == 1
+        assert codegen_text(d).count("while (") == 1
 
     @structuring_algo("sailr")
     def test_decompiling_function_with_long_cascading_data_flows(self, decompiler_options=None):
@@ -3731,7 +3688,7 @@ class TestDecompiler(unittest.TestCase):
         print_decompilation_result(d)
 
         # each line as at most one __ROL__ or __ROR__
-        lines = d.codegen.text.split("\n")
+        lines = codegen_text(d).split("\n")
         rol_count = 0
         ror_count = 0
         for line in lines:
@@ -3759,8 +3716,9 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        assert 'L"\\\\Registry\\\\Machine\\\\SYSTEM\\\\CurrentControlSet\\\\Control\\\\WinApi"' in d.codegen.text
-        assert 'L"WinDeviceAddress"' in d.codegen.text
+        code = codegen_text(d)
+        assert 'L"\\\\Registry\\\\Machine\\\\SYSTEM\\\\CurrentControlSet\\\\Control\\\\WinApi"' in code
+        assert 'L"WinDeviceAddress"' in code
 
     @structuring_algo("sailr")
     def test_ifelseflatten_iplink_bridge(self, decompiler_options=None):
@@ -3775,7 +3733,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler](f, cfg=cfg.model, options=decompiler_options)
 
         print_decompilation_result(d)
-        text = d.codegen.text
+        text = codegen_text(d)
         # bridge_print_opt is void; do not accept a stack-canary comparison as its return value.
         good_if_return_pattern = r"if \(\!a2\)\s+return;"
         good_if_return = re.search(good_if_return_pattern, text)
@@ -3804,7 +3762,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler](f, cfg=cfg.model, options=decompiler_options)
 
         print_decompilation_result(d)
-        text = d.codegen.text.replace("\n", " ")
+        text = codegen_text(d).replace("\n", " ")
         first_if_location = text.find("if (")
         # the very first if-stmt in this function should be a single scope with a return.
         # there should be no else scope as well.
@@ -3823,11 +3781,10 @@ class TestDecompiler(unittest.TestCase):
         proj.analyses.CompleteCallingConventions(cfg=cfg, analyze_callsites=True)
         f = proj.kb.functions["flush_rule"]
         d = proj.analyses[Decompiler](f, cfg=cfg.model, options=decompiler_options)
-        assert d.codegen is not None and d.codegen.text is not None
         print_decompilation_result(d)
 
         # XXX: this a hack that should be fixed in some other place
-        text = d.codegen.text.replace("0xffffffff", "-1")
+        text = codegen_text(d).replace("0xffffffff", "-1")
         text = text.replace("0xfffffffe", "-2")
         text = text.replace("\n", " ")
 
@@ -3849,9 +3806,8 @@ class TestDecompiler(unittest.TestCase):
         proj.analyses.CompleteCallingConventions(cfg=cfg, analyze_callsites=True)
         f = proj.kb.functions["client_request_tun_fwd"]
         d = proj.analyses[Decompiler](f, cfg=cfg.model, options=decompiler_options)
-        assert d.codegen is not None and d.codegen.text is not None
         print_decompilation_result(d)
-        text = d.codegen.text
+        text = codegen_text(d)
 
         # find all ifs
         all_if_stmts = list(re.finditer("if \\(.*?\\)", text))
@@ -3883,7 +3839,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler](f, cfg=cfg.model, options=decompiler_options)
 
         print_decompilation_result(d)
-        text = d.codegen.text
+        text = codegen_text(d)
 
         # If any incorrect if-else flipping occurs, then there will be an if-stmt inside an if-stmt.
         # In the correct output, there should only ever be 2 scopes (the function, and a single if-scope) of
@@ -3911,7 +3867,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler](f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        text = d.codegen.text
+        text = codegen_text(d)
         assert text.count("goto") == 0
 
         total_ifs = text.count("if")
@@ -3933,7 +3889,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        line_count = d.codegen.text.count("\n")
+        line_count = codegen_text(d).count("\n")
         assert line_count > 20  # there should be at least 20 lines of code. it was failing structuring
 
     @structuring_algo("sailr")
@@ -3947,7 +3903,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        assert 'DbgPrint("SIOCTL.SYS: ");' in d.codegen.text
+        assert 'DbgPrint("SIOCTL.SYS: ");' in codegen_text(d)
 
     @structuring_algo("sailr")
     def test_decompiling_devinv_18001722c_ccall_dce(self, decompiler_options=None):
@@ -3963,10 +3919,9 @@ class TestDecompiler(unittest.TestCase):
         proj, cfg = load_project_with_scoped_cfg(bin_path, 0x18001722C)
         f = proj.kb.functions[0x18001722C]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
-        assert d.codegen is not None and d.codegen.text is not None
         print_decompilation_result(d)
 
-        text = d.codegen.text
+        text = codegen_text(d)
         for token in ("cc_op", "cc_dep1", "cc_dep2", "cc_ndep", "_ccall"):
             assert token not in text, f"leaked condition-code token {token!r} in decompilation output"
 
@@ -3982,10 +3937,9 @@ class TestDecompiler(unittest.TestCase):
         )
         f = proj.kb.functions[0x18002B1B8]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
-        assert d.codegen is not None and d.codegen.text is not None
         print_decompilation_result(d)
 
-        text = d.codegen.text
+        text = codegen_text(d)
 
         # Locate every emitted `typedef struct NAME { ... } NAME;` block.
         typedef_blocks = {}
@@ -4024,16 +3978,16 @@ class TestDecompiler(unittest.TestCase):
         f = proj.kb.functions[0x132B0]
         assert f.info.get("bp_as_gpr", None) is True
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, options=decompiler_options)
-        assert d.codegen is not None and d.codegen.text is not None
         print_decompilation_result(d)
 
-        assert "unsupported instruction" not in d.codegen.text
+        code = codegen_text(d)
+        assert "unsupported instruction" not in code
 
         # The shrink-wrapped callee-saved spill previously showed up as a run of four consecutive dead
         # "vX = vY;" register-copy statements. After the fix no such spill block survives.
         copy_re = re.compile(r"^\s*v\d+ = v\d+;\s*$")
         max_run = run = 0
-        for line in d.codegen.text.splitlines():
+        for line in code.splitlines():
             run = run + 1 if copy_re.match(line) else 0
             max_run = max(max_run, run)
         assert max_run < 3, f"a callee-saved register spill block survived: {max_run} consecutive copy statements"
@@ -4045,7 +3999,7 @@ class TestDecompiler(unittest.TestCase):
         proj.analyses.CompleteCallingConventions(cfg=cfg)
         f = proj.kb.functions["binop"]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
-        text = d.codegen.text
+        text = codegen_text(d)
 
         assert "{\n}" not in text
         # TODO: although there is no gotos, there are way too many returns. This code should be fixed to be a single
@@ -4059,7 +4013,7 @@ class TestDecompiler(unittest.TestCase):
         proj.analyses.CompleteCallingConventions(cfg=cfg)
         f = proj.kb.functions["tail_bytes"]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
-        text = d.codegen.text
+        text = codegen_text(d)
 
         assert "{\n}" not in text
         # TODO: and our virtualization choice is not optimal
@@ -4072,9 +4026,8 @@ class TestDecompiler(unittest.TestCase):
         proj.analyses.CompleteCallingConventions(cfg=cfg)
         f = proj.kb.functions["iread"]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
-        assert d.codegen is not None and d.codegen.text is not None
         print_decompilation_result(d)
-        text = d.codegen.text
+        text = codegen_text(d)
 
         assert "{\n}" not in text
         assert "goto" not in text
@@ -4089,7 +4042,7 @@ class TestDecompiler(unittest.TestCase):
         f = proj.kb.functions["recover_mode"]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
-        text = d.codegen.text
+        text = codegen_text(d)
 
         # all calls should still be there
         assert "strtoul_tcflag_t" in text
@@ -4111,7 +4064,7 @@ class TestDecompiler(unittest.TestCase):
 
         func = proj.kb.functions.function(name="puts", plt=True)
         d = proj.analyses[Decompiler](func, cfg=cfg.model)
-        assert "PLT stub" in d.codegen.text
+        assert "PLT stub" in codegen_text(d)
 
     def test_name_disambiguation(self):
         bin_path = os.path.join(test_location, "x86_64", "fauxware")
@@ -4121,24 +4074,26 @@ class TestDecompiler(unittest.TestCase):
 
         # Test function has same name as local variable
         d = proj.analyses[Decompiler]("main", cfg=cfg.model)
+        assert d.codegen is not None
         vars_in_use = list(d.codegen.cfunc.variables_in_use.values())
         vars_in_use[0].unified_variable.name = "puts"
         vars_in_use[0].unified_variable.renamed = True
         d.codegen.regenerate_text()
         print_decompilation_result(d)
-        assert "::puts" in d.codegen.text
+        assert "::puts" in codegen_text(d)
 
         # Test function has same name as another function
         d = proj.analyses[Decompiler]("main", cfg=cfg.model)
+        assert d.codegen is not None
         proj.kb.functions["authenticate"].name = "puts"
         d.codegen.regenerate_text()
         print_decompilation_result(d)
-        assert "::0x400510::puts" in d.codegen.text
+        assert "::0x400510::puts" in codegen_text(d)
 
         # Test function has same name as calling function (PLT stub)
         d = proj.analyses[Decompiler](proj.kb.functions.function(name="puts", plt=True), cfg=cfg.model)
         print_decompilation_result(d)
-        assert "::libc.so.0::puts" in d.codegen.text
+        assert "::libc.so.0::puts" in codegen_text(d)
 
     @unittest.skip("This test is disabled until CodeMotion is reimplemented")
     @for_all_structuring_algos
@@ -4150,7 +4105,7 @@ class TestDecompiler(unittest.TestCase):
         f = proj.kb.functions["main"]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
-        text = d.codegen.text
+        text = codegen_text(d)
 
         assert text.count("v2 = 2") == 1
         assert text.count("v3 = 3") == 1
@@ -4168,10 +4123,9 @@ class TestDecompiler(unittest.TestCase):
         proj.analyses.CompleteCallingConventions(cfg=cfg)
         f = proj.kb.functions["science_process"]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
-        assert d.codegen is not None and d.codegen.text is not None
         print_decompilation_result(d)
 
-        text = d.codegen.text
+        text = codegen_text(d)
         text = text.replace("4294967295", "-1")
 
         assert "-1" in text or "0xffffffff" in text
@@ -4186,8 +4140,7 @@ class TestDecompiler(unittest.TestCase):
         f = proj.kb.functions["main"]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
 
-        assert d.codegen is not None
-        assert "while (1)" in d.codegen.text
+        assert "while (1)" in codegen_text(d)
 
     @structuring_algo("sailr")
     def test_ail_graph_access(self, decompiler_options=None):
@@ -4240,7 +4193,7 @@ class TestDecompiler(unittest.TestCase):
         )
 
         print_decompilation_result(d)
-        text = d.codegen.text
+        text = codegen_text(d)
         # *((unsigned short *)&v5[v26]) = v5[v26] ^ 145 + (unsigned short)v26;
 
         m1 = re.search(r"\*\(\(unsigned short \*\)&\w+\[\w+\]\) = \w+\[\w+\] \^ 145 \+ [^;\n]*\w+;", text)
@@ -4255,7 +4208,7 @@ class TestDecompiler(unittest.TestCase):
         f = proj.kb.functions["science_process"]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
 
-        text = d.codegen.text
+        text = codegen_text(d)
         text = text.replace("4294967295", "-1")
         assert text.count("return -1;") <= 2
 
@@ -4269,7 +4222,7 @@ class TestDecompiler(unittest.TestCase):
         f = proj.kb.functions[0x140005980]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
-        text = d.codegen.text
+        text = codegen_text(d)
         # should not crash!
         assert text.count("407710288") == 1 or text.count("0x184d2a50") == 1
 
@@ -4282,11 +4235,11 @@ class TestDecompiler(unittest.TestCase):
         f = proj.kb.functions["main"]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
 
-        assert d.codegen is not None and d.codegen.text is not None
         print_decompilation_result(d)
 
+        code = codegen_text(d)
         for case_no in [63, 65, 70, 73, 86, 97, 98, 100, 102, 104, 105, 115, 121]:
-            assert f"case {case_no}:" in d.codegen.text
+            assert f"case {case_no}:" in code
 
     def test_call_with_pointer_write_side_effect_not_folded(self, decompiler_options=None):
         # Regression test: a call that fills a stack buffer through a pointer argument (a side-effect write captured
@@ -4322,7 +4275,7 @@ class TestDecompiler(unittest.TestCase):
         f = proj.kb.functions[0x40D450]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
-        text = d.codegen.text
+        text = codegen_text(d)
         # should not simplify away the bitwise-or operation
         assert text.count(" |= ") == 1 or text.count("0x5e20000 | a") == 1
 
@@ -4335,13 +4288,13 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        assert d.codegen is not None
-        assert "IoDriverObjectType" in d.codegen.text
-        assert "wcsncpy(" in d.codegen.text
-        assert "ObMakeTemporaryObject" in d.codegen.text
+        code = codegen_text(d)
+        assert "IoDriverObjectType" in code
+        assert "wcsncpy(" in code
+        assert "ObMakeTemporaryObject" in code
         # ensure the stack canary is removed
-        assert "_security_check_cookie" not in d.codegen.text
-        assert " ^ " not in d.codegen.text
+        assert "_security_check_cookie" not in code
+        assert " ^ " not in code
 
     @structuring_algo("sailr")
     def test_win_security_cookie_removal_with_interleaved_ip_writes(self, decompiler_options=None):
@@ -4356,10 +4309,10 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, options=decompiler_options)
         print_decompilation_result(d)
 
-        assert d.codegen is not None and d.codegen.text is not None
         # the /GS cookie load/xor and the epilogue check call must be stripped
-        assert "_security_check_cookie" not in d.codegen.text
-        assert "security_cookie" not in d.codegen.text
+        code = codegen_text(d)
+        assert "_security_check_cookie" not in code
+        assert "security_cookie" not in code
 
     @structuring_algo("sailr")
     def test_win_security_cookie_removal_with_fp_relative_reload(self, decompiler_options=None):
@@ -4375,10 +4328,9 @@ class TestDecompiler(unittest.TestCase):
 
         f = proj.kb.functions[0x18003786C]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, options=decompiler_options)
-        assert d.codegen is not None and d.codegen.text is not None
         print_decompilation_result(d)
 
-        text = d.codegen.text
+        text = codegen_text(d)
         # the /GS cookie check call and the cookie-init xor idiom must be fully stripped
         assert "_security_check_cookie" not in text
         assert "__security_check_cookie" not in text
@@ -4407,7 +4359,8 @@ class TestDecompiler(unittest.TestCase):
         )
         print_decompilation_result(d)
 
-        assert d.codegen.text.count("break;") == 2 or d.codegen.text.count("goto LABEL_402417;") == 1
+        code = codegen_text(d)
+        assert code.count("break;") == 2 or code.count("goto LABEL_402417;") == 1
 
     @structuring_algo("sailr")
     def test_ternary_expression_over_propagation(self, decompiler_options=None):
@@ -4421,7 +4374,7 @@ class TestDecompiler(unittest.TestCase):
 
         # the ITE expression should not be propagated into the dst of an assignment
         # the original assignment (rax = memcmp(xxx)? 0, 1) should be removed as well
-        assert d.codegen.text.count('"Welcome to the admin console, trusted user!"') == 1
+        assert codegen_text(d).count('"Welcome to the admin console, trusted user!"') == 1
 
     @for_all_structuring_algos
     def test_const_prop_reverter_fmt(self, decompiler_options=None):
@@ -4438,7 +4391,7 @@ class TestDecompiler(unittest.TestCase):
             f, cfg=cfg.model, options=decompiler_options, optimization_passes=all_optimization_passes
         )
         print_decompilation_result(d)
-        text = d.codegen.text
+        text = codegen_text(d)
 
         xdectoumax_calls = re.findall("xdectoumax(.+?,.+?,(.+?),.+)", text)
         assert len(xdectoumax_calls) > 0
@@ -4472,11 +4425,10 @@ class TestDecompiler(unittest.TestCase):
             function.normalize()
             # re-create decompilation
             decomp = proj.analyses.Decompiler(func=function, cfg=cfg, options=[(PARAM_TO_OPTION["show_casts"], False)])
-            assert decomp.codegen is not None
             if first is None:
-                first = decomp.codegen.text
+                first = codegen_text(decomp)
             else:
-                assert first == decomp.codegen.text, "Decompilation is not deterministic"
+                assert first == codegen_text(decomp), "Decompilation is not deterministic"
 
     @for_all_structuring_algos
     def test_stop_iteration_in_canary_init_stmt(self, decompiler_options=None):
@@ -4508,7 +4460,7 @@ class TestDecompiler(unittest.TestCase):
         )
         print_decompilation_result(d)
 
-        text = d.codegen.text
+        text = codegen_text(d)
 
         # there should be a singular goto that jumps to the end of the function (the LABEL)
         assert text.count("goto") == 1
@@ -4531,7 +4483,7 @@ class TestDecompiler(unittest.TestCase):
             f, cfg=cfg.model, options=decompiler_options, preset=DECOMPILATION_PRESETS["full"]
         )
         print_decompilation_result(d)
-        text = d.codegen.text
+        text = codegen_text(d)
 
         assert text.count("invalid width") == 2
         assert text.count("xdectoumax") == 2
@@ -4557,7 +4509,7 @@ class TestDecompiler(unittest.TestCase):
         )
         print_decompilation_result(d)
 
-        text = d.codegen.text
+        text = codegen_text(d)
         assert text.count("malloc") == 2
         # TODO: there is some inconsistency in generating the conditions to bound the successors of this region
         #   so this can most-likely be re-enabled with virtual variable insertion
@@ -4576,7 +4528,7 @@ class TestDecompiler(unittest.TestCase):
         f = proj.kb.functions["split_3"]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
-        text = d.codegen.text
+        text = codegen_text(d)
 
         # If this testcase should fail in finding this assignment in the decompilation than do a search for
         # anywhere that algorithm_bits is used. It's possible we messed up the regex here.
@@ -4613,8 +4565,9 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        assert d.codegen.text.count("goto ") == 0
-        assert d.codegen.text.count("star_digits_closebracket") == 1
+        code = codegen_text(d)
+        assert code.count("goto ") == 0
+        assert code.count("star_digits_closebracket") == 1
 
     def test_decompiling_sp_altering_function(self, decompiler_options=None):
         # function 4011de has a loop that subtracts constants from esp. ensure SPTracker reaches a fixed point in this
@@ -4632,7 +4585,7 @@ class TestDecompiler(unittest.TestCase):
         print_decompilation_result(d)
 
         # basic check to ensure the output is not nothing
-        assert "sub_40dbca(" in d.codegen.text
+        assert "sub_40dbca(" in codegen_text(d)
 
     def test_decompiling_no_phivar_in_call_statements(self, decompiler_options=None):
         # Phi variables should never be folded into call statements
@@ -4649,9 +4602,10 @@ class TestDecompiler(unittest.TestCase):
         print_decompilation_result(d)
 
         # basic check to ensure the output is not nothing; crashes didn't happen during decompilation
-        assert 'RegisterWindowMessageA("ISDEL_MSG_DELDONE32");' in d.codegen.text
-        assert "𝜙" not in d.codegen.text
-        assert "Phi" not in d.codegen.text
+        code = codegen_text(d)
+        assert 'RegisterWindowMessageA("ISDEL_MSG_DELDONE32");' in code
+        assert "𝜙" not in code
+        assert "Phi" not in code
 
     def test_decompiling_phoenix_natural_loop_region_head_in_body(self, decompiler_options=None):
         # region head should not be the second node (or onwards) in the body (the sequence node) of a loop
@@ -4676,7 +4630,7 @@ class TestDecompiler(unittest.TestCase):
 
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
-        assert d.codegen.text.count("wcscat(") == 6
+        assert codegen_text(d).count("wcscat(") == 6
 
     def test_decompiling_reused_entries_between_switch_cases(self, decompiler_options=None):
         bin_path = os.path.join(
@@ -4695,7 +4649,7 @@ class TestDecompiler(unittest.TestCase):
 
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
-        assert d.codegen.text.count("switch") == 8
+        assert codegen_text(d).count("switch") == 8
 
     def test_decompiling_abnormal_switch_case_within_a_loop_case_1(self, decompiler_options=None):
         bin_path = os.path.join(
@@ -4706,15 +4660,15 @@ class TestDecompiler(unittest.TestCase):
         cfg = proj.analyses.CFGFast(force_smart_scan=False, normalize=True)
         f = proj.kb.functions[0x41D560]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
-        assert d.codegen is not None and d.codegen.text is not None
         print_decompilation_result(d)
         # should not crash, and should generate a switch-case construct
-        assert d.codegen.text.count("switch") == 1
+        code = codegen_text(d)
+        assert code.count("switch") == 1
         for i in range(10):
-            assert f"case {i}:" in d.codegen.text
+            assert f"case {i}:" in code
         # this function triggers ReturnDuplicatorLow; phi source vvars in duplicated blocks should have variables
         # associated with them
-        assert "{reg" not in d.codegen.text
+        assert "{reg" not in code
 
     def test_decompiling_abnormal_switch_case_within_a_loop_case_2(self, decompiler_options=None):
         bin_path = os.path.join(
@@ -4725,12 +4679,12 @@ class TestDecompiler(unittest.TestCase):
         cfg = proj.analyses.CFGFast(force_smart_scan=False, normalize=True)
         f = proj.kb.functions[0x41DCE0]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
-        assert d.codegen is not None and d.codegen.text is not None
         print_decompilation_result(d)
         # should not crash, and should generate two switch-case constructs
-        assert d.codegen.text.count("switch") == 2
+        code = codegen_text(d)
+        assert code.count("switch") == 2
         for i in range(10):
-            assert f"case {i}:" in d.codegen.text
+            assert f"case {i}:" in code
 
     def test_decompiling_optimized_memcpy(self, decompiler_options=None):
         bin_path = os.path.join(
@@ -4744,10 +4698,9 @@ class TestDecompiler(unittest.TestCase):
         )
         f = proj.kb.functions[0x42CCA0]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
-        assert d.codegen is not None and d.codegen.text is not None
         print_decompilation_result(d)
         # should not crash, and should generate at least six switch-case contructs
-        assert d.codegen.text.count("switch") == 7
+        assert codegen_text(d).count("switch") == 7
 
     def test_decompiling_abnormal_switch_case_case3(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "windows", "msvcr120.dll")
@@ -4759,13 +4712,14 @@ class TestDecompiler(unittest.TestCase):
         f = proj.kb.functions[0x18003C330]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
-        assert d.codegen.text.count("switch") == 1
-        # assert d.codegen.text.count("goto LABEL_18003c3fc;") == 2
-        # assert d.codegen.text.count("LABEL_18003c3fc:") == 1
+        code = codegen_text(d)
+        assert code.count("switch") == 1
+        # assert code.count("goto LABEL_18003c3fc;") == 2
+        # assert code.count("LABEL_18003c3fc:") == 1
         # 16 cases without a default case
         for i in range(16):
-            assert f"case {i}:" in d.codegen.text
-        assert "default:" not in d.codegen.text
+            assert f"case {i}:" in code
+        assert "default:" not in code
 
         # a0 should be an integer and a1 should be a char pointer
         assert len(d.codegen.cfunc.arg_list) == 3
@@ -4791,10 +4745,11 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
         # should not crash, and should generate at least one switch-case construct
-        assert d.codegen.text.count("switch") >= 1
+        code = codegen_text(d)
+        assert code.count("switch") >= 1
         for i in range(10):
-            assert f"case {i}:" in d.codegen.text
-        assert "default:" in d.codegen.text
+            assert f"case {i}:" in code
+        assert "default:" in code
 
     def test_decompiling_ite_function_arguments_missing_assignments(self, decompiler_options=None):
         # https://github.com/angr/angr/issues/5077
@@ -4805,7 +4760,7 @@ class TestDecompiler(unittest.TestCase):
         f = proj.kb.functions["test"]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
-        lines = [line.strip(" ") for line in d.codegen.text.split("\n")]
+        lines = [line.strip(" ") for line in codegen_text(d).split("\n")]
         start_pos = lines.index("{")
         assert (
             lines[start_pos + 1 :][:4]
@@ -4840,11 +4795,12 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        assert "linux_encryptor::files::create_note" in d.codegen.text
-        assert "Luna.ini.exe.dll.lnk" in d.codegen.text  # sanity check
-        assert "probe_stack" not in d.codegen.text
+        code = codegen_text(d)
+        assert "linux_encryptor::files::create_note" in code
+        assert "Luna.ini.exe.dll.lnk" in code  # sanity check
+        assert "probe_stack" not in code
         # "{reg 48}" would show up if SPTracker does not understand __rust_probestack
-        assert "{reg " not in d.codegen.text
+        assert "{reg " not in code
 
     def test_decompiling_amd64_single_block_jumptable(self, decompiler_options=None):
         bin_path = os.path.join(
@@ -4857,7 +4813,7 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        assert d.codegen.text.count("switch") == 2
+        assert codegen_text(d).count("switch") == 2
 
     def test_decompiling_lighttpd_expression_over_folding(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "decompiler", "lighttpd")
@@ -4871,8 +4827,9 @@ class TestDecompiler(unittest.TestCase):
         )
         print_decompilation_result(d)
 
-        assert "chunkqueue_compact_mem(" in d.codegen.text
-        lines = [line.strip(" ") for line in d.codegen.text.split("\n")]
+        code = codegen_text(d)
+        assert "chunkqueue_compact_mem(" in code
+        lines = [line.strip(" ") for line in code.split("\n")]
         line_idx, the_line = next(
             iter((idx, line) for idx, line in enumerate(lines) if "chunkqueue_compact_mem(" in line)
         )
@@ -4886,7 +4843,7 @@ class TestDecompiler(unittest.TestCase):
 
         # there can be at most 5 variables (we no longer under-propagate)
         for i in range(6, 100):
-            assert f"v{i}" not in d.codegen.text
+            assert f"v{i}" not in code
 
     def test_decompiling_armhf_float_int_conversion(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "armhf", "float_int_conversion.elf")
@@ -4898,13 +4855,14 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        assert '"current_angle_int: %d\\n"' in d.codegen.text
-        assert "10.0" in d.codegen.text
-        assert re.search(r"int_to_float\(\w+\)", d.codegen.text) is not None
-        assert re.search(r"increment_float\(current_angle, 10.0\)", d.codegen.text) is not None
-        assert re.search(r"increment_float\(prev_angle, 8.0\)", d.codegen.text) is not None
-        assert "if (!compare_floats(30, current_angle, prev_angle))" in d.codegen.text or re.search(
-            r"(\w+) = compare_floats\(30, current_angle, prev_angle\);\s*if \(!\1\)", d.codegen.text
+        code = codegen_text(d)
+        assert '"current_angle_int: %d\\n"' in code
+        assert "10.0" in code
+        assert re.search(r"int_to_float\(\w+\)", code) is not None
+        assert re.search(r"increment_float\(current_angle, 10.0\)", code) is not None
+        assert re.search(r"increment_float\(prev_angle, 8.0\)", code) is not None
+        assert "if (!compare_floats(30, current_angle, prev_angle))" in code or re.search(
+            r"(\w+) = compare_floats\(30, current_angle, prev_angle\);\s*if \(!\1\)", code
         )
 
     def test_decompiling_msvcrt_IsExceptionObjectToBeDestroyed(self, decompiler_options=None):
@@ -4920,9 +4878,10 @@ class TestDecompiler(unittest.TestCase):
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
-        assert "for (" in d.codegen.text
-        assert "return 1;" in d.codegen.text  # ConditionConstantPropagation must run
-        assert "return 0;" in d.codegen.text
+        code = codegen_text(d)
+        assert "for (" in code
+        assert "return 1;" in code  # ConditionConstantPropagation must run
+        assert "return 0;" in code
 
     def test_decompiling_msvcrt_fclose_nolock_internal(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "decompiler", "vcruntime_test.exe")
@@ -4939,7 +4898,8 @@ class TestDecompiler(unittest.TestCase):
 
         # x | 0xffff_ffff   ==>   0xffff_ffff
         # ReturnDuplicatorHigh must run before the last run of function simplification for proper constant propagation
-        assert "return -1;" in d.codegen.text or "return 0xffffffff;" in d.codegen.text
+        code = codegen_text(d)
+        assert "return -1;" in code or "return 0xffffffff;" in code
 
     def test_decompiling_msvcrt_setsbuplow(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "decompiler", "vcruntime_test.exe")
@@ -4964,7 +4924,7 @@ class TestDecompiler(unittest.TestCase):
         #       v11 += 1;
         #       v12 += 1;
         #   } while (v11 < 0x100);
-        lines = [line.strip(" ") for line in d.codegen.text.split("\n")]
+        lines = [line.strip(" ") for line in codegen_text(d).split("\n")]
         while True:
             # find the do-while loop
             try:
@@ -4998,7 +4958,7 @@ class TestDecompiler(unittest.TestCase):
         print_decompilation_result(d)
 
         # printf has eight arguments, and the last seven are assigned to before the call
-        lines = [line.strip(" ") for line in d.codegen.text.split("\n")]
+        lines = [line.strip(" ") for line in codegen_text(d).split("\n")]
         printf_line_idx = next(iter(idx for idx, line in enumerate(lines) if "printf(" in line))
         # extract printf args
         printf_args = [
@@ -5039,7 +4999,7 @@ class TestDecompiler(unittest.TestCase):
 
         # there is only one variable
         # it's a char buffer of 256 bytes; it should not overlap with the stored base pointer
-        assert d.codegen is not None and d.codegen.cfunc is not None and d.codegen.text is not None
+        assert d.codegen is not None and d.codegen.cfunc is not None
         local_vars = [v for v in d.codegen.cfunc.variables_in_use.values() if v.variable.ident.startswith("is")]
         assert len(local_vars) == 1
         variable = local_vars[0]
@@ -5053,7 +5013,7 @@ class TestDecompiler(unittest.TestCase):
         assert 0 in d.clinic.stack_items and d.clinic.stack_items[0].name == "ret_addr"
         # also check we are accessing the variable by indexing into it
         variable_name = variable.name
-        assert f"{variable_name}[strcspn(" in d.codegen.text
+        assert f"{variable_name}[strcspn(" in codegen_text(d)
 
     @for_all_structuring_algos
     def test_call_expr_folding_call_order(self, decompiler_options=None):
@@ -5063,8 +5023,7 @@ class TestDecompiler(unittest.TestCase):
         cfg = p.analyses.CFGFast(normalize=True)
         p.analyses.CompleteCallingConventions()
         dec = p.analyses.Decompiler(p.kb.functions[p.entry], cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and isinstance(dec.codegen.text, str)
-        text = dec.codegen.text
+        text = codegen_text(dec)
 
         # Ensure f1 is called before f2
         expected = """
@@ -5081,8 +5040,7 @@ class TestDecompiler(unittest.TestCase):
         cfg = p.analyses.CFGFast(normalize=True)
         p.analyses.CompleteCallingConventions()
         dec = p.analyses.Decompiler(p.kb.functions[p.entry], cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and isinstance(dec.codegen.text, str)
-        text = dec.codegen.text
+        text = codegen_text(dec)
 
         # Ensure call is made before global is read
         expected = """
@@ -5100,8 +5058,7 @@ class TestDecompiler(unittest.TestCase):
         cfg = p.analyses.CFGFast(normalize=True)
         p.analyses.CompleteCallingConventions()
         dec = p.analyses.Decompiler(p.kb.functions[p.entry], cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and isinstance(dec.codegen.text, str)
-        text = dec.codegen.text
+        text = codegen_text(dec)
 
         # Ensure store 0 happens before call happens before store 1
         expected = """
@@ -5131,9 +5088,8 @@ class TestDecompiler(unittest.TestCase):
         decompiler_options = decompiler_options or []
         decompiler_options += [("semvar_naming", False), ("loopctr_naming", False)]
         dec = p.analyses.Decompiler(entry, cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and isinstance(dec.codegen.text, str)
         print_decompilation_result(dec)
-        text = dec.codegen.text
+        text = codegen_text(dec)
 
         # Ensure call to f1 is not moved out of loop
         expected = """
@@ -5154,8 +5110,7 @@ class TestDecompiler(unittest.TestCase):
         cfg = p.analyses.CFGFast(normalize=True)
         p.analyses.CompleteCallingConventions()
         dec = p.analyses.Decompiler(p.kb.functions[p.entry], cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and isinstance(dec.codegen.text, str)
-        text = dec.codegen.text
+        text = codegen_text(dec)
 
         # Ensure call to f2 is not moved beyond the condition
         expected = """
@@ -5186,8 +5141,7 @@ class TestDecompiler(unittest.TestCase):
         entry.prototype_source = PrototypeSource.USER
 
         dec = p.analyses.Decompiler(entry, cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and isinstance(dec.codegen.text, str)
-        text = dec.codegen.text
+        text = codegen_text(dec)
 
         # Ensure call to f2 is not moved outside the condition
         expected = """
@@ -5214,18 +5168,19 @@ class TestDecompiler(unittest.TestCase):
         print_decompilation_result(d)
 
         # there are only three variables (two when _fold_call_exprs is fixed re-enabled)
-        all_vars = set(re.findall(r" \w+;  // ", d.codegen.text))
+        code = codegen_text(d)
+        all_vars = set(re.findall(r" \w+;  // ", code))
         assert len(all_vars) == 2
         # the function is a void function
-        assert "void " in d.codegen.text
+        assert "void " in code
         # the function has a for loop
-        assert "for (" in d.codegen.text
+        assert "for (" in code
         # return is duplicated and appears five times
-        assert d.codegen.text.count("return;\n") == 5
+        assert code.count("return;\n") == 5
         # the puts statement is duplicated as well
-        assert d.codegen.text.count('puts("Out of bounds");\n') == 2
+        assert code.count('puts("Out of bounds");\n') == 2
         # there are five break statements
-        assert d.codegen.text.count("break;\n") == 5
+        assert code.count("break;\n") == 5
         # all cases
         case_numbers = [
             63,
@@ -5236,8 +5191,8 @@ class TestDecompiler(unittest.TestCase):
             120,
         ]
         for case_number in case_numbers:
-            assert f"case {case_number}:" in d.codegen.text
-        assert "default:" in d.codegen.text
+            assert f"case {case_number}:" in code
+        assert "default:" in code
 
     def test_decompiling_stack_argument_propagation(self, decompiler_options=None):
         bin_path = os.path.join(
@@ -5255,8 +5210,7 @@ class TestDecompiler(unittest.TestCase):
 
         # all arguments of CreateFileA should have been propagated to inside the call statement, so CreateFileA()
         # should be within a single scope
-        assert d.codegen is not None
-        assert normalize_whitespace("{ CreateFileA(") in normalize_whitespace(d.codegen.text)
+        assert normalize_whitespace("{ CreateFileA(") in normalize_whitespace(codegen_text(d))
 
     @structuring_algo("sailr")
     def test_boolean_no_flip_fmt_main(self, decompiler_options=None):
@@ -5275,9 +5229,8 @@ class TestDecompiler(unittest.TestCase):
             f, cfg=cfg.model, options=decompiler_options, optimization_passes=all_optimization_passes
         )
         print_decompilation_result(d)
-        assert d.codegen is not None and isinstance(d.codegen.text, str)
 
-        code = d.codegen.text.replace("\n", " ")
+        code = codegen_text(d).replace("\n", " ")
         # The original way we would output the if statement would be:
         #
         # """
@@ -5313,9 +5266,8 @@ class TestDecompiler(unittest.TestCase):
 
         f = proj.kb.functions["main"]
         dec = proj.analyses.Decompiler(f, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None
         print_decompilation_result(dec)
-        out_0 = dec.codegen.text
+        out_0 = codegen_text(dec)
 
         assert f.prototype is not None
         assert len(f.prototype.args) == 2
@@ -5323,7 +5275,7 @@ class TestDecompiler(unittest.TestCase):
         dec.reflow_variable_types(dec.cache)
 
         print_decompilation_result(dec)
-        out_1 = dec.codegen.text
+        out_1 = codegen_text(dec)
 
         assert out_0 == out_1
 
@@ -5384,11 +5336,10 @@ class TestDecompiler(unittest.TestCase):
         decompiler_options = decompiler_options or []
         decompiler_options += [("semvar_naming", False), ("loopctr_naming", False)]
         dec = proj.analyses.Decompiler(f, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
 
         # rep stosq are transformed into for-loops. check the existence of them
-        lines = [line.strip() for line in dec.codegen.text.split("\n")]
+        lines = [line.strip() for line in codegen_text(dec).split("\n")]
         # first loop
         assert _check_rep_stosq(lines, 48, r"= &\w+\->Anonymous")
         # second loop
@@ -5411,7 +5362,7 @@ class TestDecompiler(unittest.TestCase):
 
         f = proj.kb.functions[0x402EE0]
         dec = proj.analyses.Decompiler(f, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None and dec.codegen.cfunc is not None
+        assert dec.codegen is not None and dec.codegen.cfunc is not None
 
         # there are only two variables in the decompilation; more variables probably means RegisterSaveAreaSimplifier
         # failed, and we kept xmm-spilling statements around.
@@ -5439,10 +5390,11 @@ class TestDecompiler(unittest.TestCase):
             '"Partial loss of significance (PLOSS)"',
             '"Unknown error"',
         ]
-        assert "fprintf(" in dec.codegen.text
+        code = codegen_text(dec)
+        assert "fprintf(" in code
         # strings would have gone missing if we could not correctly resolve the prototype of fprintf
         for s in all_strings:
-            assert s in dec.codegen.text
+            assert s in code
 
     def test_decompiling_vcstdlib_test_condjump_to_jump(self, decompiler_options=None):
         bin_path = os.path.join(
@@ -5455,7 +5407,6 @@ class TestDecompiler(unittest.TestCase):
         cfg = proj.analyses.CFGFast(normalize=True)
         func = proj.kb.functions[0x14001B6B0]
         dec = proj.analyses.Decompiler(func, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
 
         # bad output:
@@ -5472,8 +5423,9 @@ class TestDecompiler(unittest.TestCase):
         #     {
         #         return GetCurrentThreadId();
         #     }
-        assert "None" not in dec.codegen.text
-        assert "return GetCurrentThreadId();" in dec.codegen.text
+        code = codegen_text(dec)
+        assert "None" not in code
+        assert "return GetCurrentThreadId();" in code
 
     def test_decompiling_many_consecutive_regions(self, decompiler_options=None):
         bin_path = os.path.join(
@@ -5488,7 +5440,7 @@ class TestDecompiler(unittest.TestCase):
         start = time.time()
         dec = proj.analyses.Decompiler(func, cfg=cfg.model, options=decompiler_options)
         elapsed = time.time() - start
-        assert dec.codegen is not None and dec.codegen.text is not None
+        assert dec.codegen is not None and codegen_text(dec) is not None
         print_decompilation_result(dec)
         assert elapsed <= 90, f"Decompiling the main function took {elapsed} seconds, which is longer than expected"
 
@@ -5503,9 +5455,8 @@ class TestDecompiler(unittest.TestCase):
         dec = proj.analyses.Decompiler(
             proj.kb.functions["fastfail_with_code_if_lt_10"], cfg=cfg, options=decompiler_options
         )
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
-        assert "__fastfail(a0)" in dec.codegen.text
+        assert "__fastfail(a0)" in codegen_text(dec)
 
     def test_decompiling_48460c9633d06cad3e3b41c87de04177d129906610c5bbdebc7507a211100e98_winmain(
         self, decompiler_options=None
@@ -5518,38 +5469,35 @@ class TestDecompiler(unittest.TestCase):
         proj.analyses.CompleteCallingConventions()
         func = proj.kb.functions[0x4106F0]
         dec = proj.analyses.Decompiler(func, cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
 
         # ensure cdq; sub eax, edx; sar eax, 1 is properly optimized into a division
-        assert "/ 2 - 305" in dec.codegen.text
-        assert "/ 2 - 200" in dec.codegen.text
+        code = codegen_text(dec)
+        assert "/ 2 - 305" in code
+        assert "/ 2 - 200" in code
         # the WNDCLASSEXA variable on the stack must be correctly inferred
-        assert "WNDCLASSEXA " in dec.codegen.text
-        wndclass_var = re.findall(r"WNDCLASSEXA (\w+);", dec.codegen.text)[0]
-        assert f"{wndclass_var}.cbSize = 48;" in dec.codegen.text
-        assert (
-            f"{wndclass_var}.style = 3;" in dec.codegen.text
-            or f"*((unsigned int *)&{wndclass_var}.style) = 3;" in dec.codegen.text
-        )
-        assert f"{wndclass_var}.lpfnWndProc = sub_410880;" in dec.codegen.text
-        assert f"{wndclass_var}.cbClsExtra = 0;" in dec.codegen.text
-        assert f"{wndclass_var}.cbWndExtra = 0;" in dec.codegen.text
-        assert f"{wndclass_var}.hInstance = " in dec.codegen.text
-        assert f"{wndclass_var}.hIcon = LoadIconA(" in dec.codegen.text
-        assert f"{wndclass_var}.hCursor = LoadCursorA(" in dec.codegen.text
-        assert f"{wndclass_var}.hbrBackground = GetStockObject(BLACK_BRUSH);" in dec.codegen.text
-        assert f"{wndclass_var}.lpszMenuName = 109;" in dec.codegen.text
-        assert f'{wndclass_var}.lpszClassName = "BOLHAS";' in dec.codegen.text
-        assert f"{wndclass_var}.hIconSm = 0;" in dec.codegen.text
-        assert f"if (!RegisterClassExA(&{wndclass_var}))" in dec.codegen.text
+        assert "WNDCLASSEXA " in code
+        wndclass_var = re.findall(r"WNDCLASSEXA (\w+);", code)[0]
+        assert f"{wndclass_var}.cbSize = 48;" in code
+        assert f"{wndclass_var}.style = 3;" in code or f"*((unsigned int *)&{wndclass_var}.style) = 3;" in code
+        assert f"{wndclass_var}.lpfnWndProc = sub_410880;" in code
+        assert f"{wndclass_var}.cbClsExtra = 0;" in code
+        assert f"{wndclass_var}.cbWndExtra = 0;" in code
+        assert f"{wndclass_var}.hInstance = " in code
+        assert f"{wndclass_var}.hIcon = LoadIconA(" in code
+        assert f"{wndclass_var}.hCursor = LoadCursorA(" in code
+        assert f"{wndclass_var}.hbrBackground = GetStockObject(BLACK_BRUSH);" in code
+        assert f"{wndclass_var}.lpszMenuName = 109;" in code
+        assert f'{wndclass_var}.lpszClassName = "BOLHAS";' in code
+        assert f"{wndclass_var}.hIconSm = 0;" in code
+        assert f"if (!RegisterClassExA(&{wndclass_var}))" in code
         # ensure the bp saving statement is removed; as a result, the very first statement of this function should be
         # "v4.cbSize = 48;"
-        assert f"\n\n    {wndclass_var}.cbSize = 48;" in dec.codegen.text
+        assert f"\n\n    {wndclass_var}.cbSize = 48;" in code
         # ensure the return statement is returning a field of v0
         # this demonstrates the correct struct field inference of stack variables that we do not see during
         # Ssalification Pass 1
-        assert re.search(r"return \S+.wParam;", dec.codegen.text) is not None
+        assert re.search(r"return \S+.wParam;", code) is not None
 
     def test_decompiling_48460c9633d06cad3e3b41c87de04177d129906610c5bbdebc7507a211100e98_sub_401240(
         self, decompiler_options=None
@@ -5562,13 +5510,13 @@ class TestDecompiler(unittest.TestCase):
         proj.analyses.CompleteCallingConventions()
         func = proj.kb.functions[0x401240]
         dec = proj.analyses.Decompiler(func, cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
 
         # ensure we do not have redundant masking
-        assert "& 0xff & 0xff" not in dec.codegen.text and "& 255 & 255" not in dec.codegen.text
+        code = codegen_text(dec)
+        assert "& 0xff & 0xff" not in code and "& 255 & 255" not in code
         # ensure that we do not have multi-statement expressions in while-loops
-        for line in dec.codegen.text.split("\n"):
+        for line in code.split("\n"):
             if "while" in line:
                 assert line.count(";") <= 1, f"Multiple statements in while-loop: {line}"
 
@@ -5586,42 +5534,42 @@ class TestDecompiler(unittest.TestCase):
         decompiler_options = decompiler_options or []
         decompiler_options += [("prettify_thiscall", True)]
         dec = proj.analyses.Decompiler(func, cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
 
         # ensure the call to _security_check_cookie is removed
-        assert "security_check_cookie" not in dec.codegen.text
-        assert " ^ " not in dec.codegen.text
+        code = codegen_text(dec)
+        assert "security_check_cookie" not in code
+        assert " ^ " not in code
         # ensure the strings are around
         assert (
             '"MtBb9zH8LtvuilOPN7q0luBa32ie0ohB2WVuPjWlto0YtgeMoImVy94sugMFRTcv3UCf23PP0/2ScOrYYXc9du431l3/Dy'
             "4iV2xF69IrlscgUbjkwZALua+XmiR2pagfb+oqBnYgncF/9b5mHA1oqZGgwALG3EIDzu+Rp20iLCVfVnNT3pWvqCKBfwTlpy"
             "76nxrsA5DhQJC97MLOwGWdvnzSqHmqlR"
-        ) in dec.codegen.text
+        ) in code
         assert (
             "N+Q4bkoREDIQBXhd/wLjapNMJePuge+m5sf3vaATritf3gk0n59QcuHY4yv+lSxhuxVY/n/M0XZyrTq1hmoHsw6mPN"
             "H2ot1U3SZjpj3baesq82nSl0yeBzkR9uK2fQX0ltDWq4pFB+ZW8A5jrjdaJWpR/lHjop1mbh74i5ptEpO/7EvXtxZWMZP"
             "evNqGU9fDnzPVPIo6EY3FMe5ckwJmYpyOjmbZ05"
-        ) in dec.codegen.text
+        ) in code
         # assert C++ class methods are properly rewritten
-        m = re.search(r"([^\s=]+)\.size\(\);", dec.codegen.text)
+        m = re.search(r"([^\s=]+)\.size\(\);", code)
         assert m is not None
         str_name = m.group(1)
-        assert f"{str_name}();" in dec.codegen.text
-        assert f"{str_name}.c_str()" in dec.codegen.text
+        assert f"{str_name}();" in code
+        assert f"{str_name}.c_str()" in code
         # assert there exists a stack-based buffer that is 12-byte long
         # this is to test the type hint that strncpy provides
-        m = re.search(r"char (\w+)\[16];", dec.codegen.text)
+        m = re.search(r"char (\w+)\[16];", code)
         assert m is not None
         bufvar = m.group(1)
-        assert f'strncpy({bufvar}, "FWe#JID%WkOCZy7", 15);' in dec.codegen.text
+        assert f'strncpy({bufvar}, "FWe#JID%WkOCZy7", 15);' in code
         # ensure the stack argument for sub_401a90 is correct
-        assert "sub_401a90(-1888440072);" in dec.codegen.text
+        assert "sub_401a90(-1888440072);" in code
         # ensure the stack argument for the first indirect call is incorrect
-        m = re.search(r"(\w+) = [^;]*sub_401a90\(", dec.codegen.text)
+        m = re.search(r"(\w+) = [^;]*sub_401a90\(", code)
         assert m is not None
         indir_v = m.group(1)
-        the_line = next(iter(line for line in dec.codegen.text.split("\n") if f"{indir_v}(" in line), None)
+        the_line = next(iter(line for line in code.split("\n") if f"{indir_v}(" in line), None)
         assert the_line is not None
         assert the_line.count(",") == 2
 
@@ -5632,10 +5580,9 @@ class TestDecompiler(unittest.TestCase):
         proj.analyses.CompleteCallingConventions()
         func = proj.kb.functions["print_hello_world"]
         dec = proj.analyses.Decompiler(func, cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
 
-        text = normalize_whitespace(dec.codegen.text)
+        text = normalize_whitespace(codegen_text(dec))
         expected = normalize_whitespace(r"""
             unsigned int print_hello_world(void)
             {
@@ -5653,11 +5600,10 @@ class TestDecompiler(unittest.TestCase):
         proj.analyses.CompleteCallingConventions()
         func = proj.kb.functions["f"]
         dec = proj.analyses.Decompiler(func, cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
 
         # Ensure v0 <= 1000 branch is not flipped
-        text = normalize_whitespace(dec.codegen.text)
+        text = normalize_whitespace(codegen_text(dec))
         expected = normalize_whitespace(r"""
             (\w+) = 10;
             if \(\1 <= 1000\) \{
@@ -5683,12 +5629,12 @@ class TestDecompiler(unittest.TestCase):
         proj.analyses.CompleteCallingConventions()
         func = proj.kb.functions[0x140001000]
         dec = proj.analyses.Decompiler(func, cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
 
         assert proj.kb.functions[0x1400021E0].info.get("jmp_rax", False) is True  # guard_dispatch_icall_fptr
-        assert "1400021e0" not in dec.codegen.text.lower()
-        assert "140005670(" in dec.codegen.text
+        code = codegen_text(dec)
+        assert "1400021e0" not in code.lower()
+        assert "140005670(" in code
 
     def test_decompiling_rust_fmt_main(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "decompiler", "fmt_rust")
@@ -5702,7 +5648,6 @@ class TestDecompiler(unittest.TestCase):
         decompiler_options = decompiler_options or []
         decompiler_options += [("prettify_thiscall", True)]
         dec = proj.analyses.Decompiler(func, cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
 
         # expect the following snippet to exist
@@ -5715,7 +5660,7 @@ class TestDecompiler(unittest.TestCase):
         #       v24.with_capacity(0x2000, std::io::stdio::stdout());
         #       ...
         #   }
-        lines = [line.strip(" ") for line in dec.codegen.text.split("\n")]
+        lines = [line.strip(" ") for line in codegen_text(dec).split("\n")]
         from_matches_line_no = next(iter(i for i, line in enumerate(lines) if ".from_matches(" in line), None)
         assert from_matches_line_no is not None
         from_matches_line = lines[from_matches_line_no]
@@ -5760,13 +5705,13 @@ class TestDecompiler(unittest.TestCase):
         )
         func = proj.kb.functions[0x4BC130]
         dec = proj.analyses.Decompiler(func, cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
 
         # Check if Reference(reg_vvar) exists
         # In this case, &vvar_3 and vvar_3 shouldn't exist in decompilation
-        assert re.search(r"vvar_\d+", dec.codegen.text) is None
-        assert re.search(r"&a[1-5]", dec.codegen.text) is None
+        code = codegen_text(dec)
+        assert re.search(r"vvar_\d+", code) is None
+        assert re.search(r"&a[1-5]", code) is None
         # FIXME: we generate &a0->field_8, which is a bug that will be fixed at a later time
 
     def test_decompiling_function_incorrect_one_use_expr_folding(self, decompiler_options=None):
@@ -5775,11 +5720,10 @@ class TestDecompiler(unittest.TestCase):
         cfg = proj.analyses.CFG(normalize=True)
         func = proj.kb.functions["foo"]
         dec = proj.analyses.Decompiler(func, cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
 
         # ensure none of the return statements include calls to init
-        lines = dec.codegen.text.split("\n")
+        lines = codegen_text(dec).split("\n")
         for line in lines:
             if "return" in line:
                 assert "init(" not in line, f"Found a return statement with init: {line}"
@@ -5797,11 +5741,10 @@ class TestDecompiler(unittest.TestCase):
         decompiler_options = decompiler_options or []
         decompiler_options += [("semvar_naming", False), ("loopctr_naming", False)]
         dec = proj.analyses.Decompiler(func, cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
 
         # we expect no redundant assignments like "v4 = v4;"
-        lines = dec.codegen.text.split("\n")
+        lines = codegen_text(dec).split("\n")
         for line in lines:
             line = line.strip(" ")
             m = re.match(r"v(\d+) = v(\d+);", line)
@@ -5825,12 +5768,10 @@ class TestDecompiler(unittest.TestCase):
 
         f = proj.kb.functions[0x140001AC0]
         dec = proj.analyses.Decompiler(f, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
 
         # BlockSimplifier should not remove statements with calls inside
-        assert dec.codegen is not None and dec.codegen.text is not None
-        assert "InterlockedExchange64(" in dec.codegen.text
+        assert "InterlockedExchange64(" in codegen_text(dec)
 
     def test_tail_calls(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "decompiler", "tail_calls.o")
@@ -5845,61 +5786,56 @@ class TestDecompiler(unittest.TestCase):
 
         func = proj.kb.functions["test_tailcall"]
         dec = proj.analyses.Decompiler(func, cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
         a0 = dec.clinic.kb.dec_variables[dec.func.addr].unified_variable(dec.clinic.arg_list[0]).name
-        assert f"return test_tailcall_callee({a0} + 1);" in normalize_whitespace(dec.codegen.text)
+        assert f"return test_tailcall_callee({a0} + 1);" in normalize_whitespace(codegen_text(dec))
 
         func = proj.kb.functions["test_noreturn_tailcall"]
         dec = proj.analyses.Decompiler(func, cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
         a0 = dec.clinic.kb.dec_variables[dec.func.addr].unified_variable(dec.clinic.arg_list[0]).name
-        assert f"test_noreturn_tailcall_callee({a0} + 1); /* do not return */" in normalize_whitespace(dec.codegen.text)
+        code = normalize_whitespace(codegen_text(dec))
+        assert f"test_noreturn_tailcall_callee({a0} + 1); /* do not return */" in code
 
         func = proj.kb.functions["test_cond_tailcall_jmp"]
         dec = proj.analyses.Decompiler(func, cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
         a0 = dec.clinic.kb.dec_variables[dec.func.addr].unified_variable(dec.clinic.arg_list[0]).name
         assert normalize_whitespace(f"""
                 if ((unsigned int){a0})
                     return test_cond_tailcall_jmp_callee({a0});
                 return (unsigned int){a0} - 1;
-                """) in normalize_whitespace(dec.codegen.text)
+                """) in normalize_whitespace(codegen_text(dec))
 
         func = proj.kb.functions["test_cond_noreturn_tailcall_jmp"]
         dec = proj.analyses.Decompiler(func, cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
         a0 = dec.clinic.kb.dec_variables[dec.func.addr].unified_variable(dec.clinic.arg_list[0]).name
         assert normalize_whitespace(f"""
                 if ({a0})
                     test_cond_noreturn_tailcall_jmp_callee(); /* do not return */
                 return {a0} - 1;
-                """) in normalize_whitespace(dec.codegen.text)
+                """) in normalize_whitespace(codegen_text(dec))
 
         func = proj.kb.functions["test_cond_tailcall_cjmp"]
         dec = proj.analyses.Decompiler(func, cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
         a0 = dec.clinic.kb.dec_variables[dec.func.addr].unified_variable(dec.clinic.arg_list[0]).name
         assert normalize_whitespace(f"""
                 if ((unsigned int){a0})
                     return test_cond_tailcall_cjmp_callee({a0});
                 return (unsigned int){a0} - 1;
-                """) in normalize_whitespace(dec.codegen.text)
+                """) in normalize_whitespace(codegen_text(dec))
 
         func = proj.kb.functions["test_cond_noreturn_tailcall_cjmp"]
         dec = proj.analyses.Decompiler(func, cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
         a0 = dec.clinic.kb.dec_variables[dec.func.addr].unified_variable(dec.clinic.arg_list[0]).name
         assert normalize_whitespace(f"""
                 if ({a0})
                     test_cond_noreturn_tailcall_cjmp_callee(); /* do not return */
                 return {a0} - 1;
-                """) in normalize_whitespace(dec.codegen.text)
+                """) in normalize_whitespace(codegen_text(dec))
 
     def test_decompiling_arduino_giga_flash_webhandler_switch_case(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "armhf", "decompiler", "06aa650f61d71744c6709c7c092d9169.hex")
@@ -5908,13 +5844,13 @@ class TestDecompiler(unittest.TestCase):
         proj.analyses.CompleteCallingConventions(analyze_callsites=False)
         func = proj.kb.functions[0x8040F69]
         dec = proj.analyses.Decompiler(func, cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
 
         # we should be properly structuring the switch-case inside this function
-        assert "switch (g_24000e6b)" in dec.codegen.text
+        code = codegen_text(dec)
+        assert "switch (g_24000e6b)" in code
         for case_no in [0, 2, 3, 4, 5]:
-            assert f"case {case_no}:" in dec.codegen.text
+            assert f"case {case_no}:" in code
 
     def test_decompiling_assign_ite(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "decompiler", "ite.o")
@@ -5925,13 +5861,13 @@ class TestDecompiler(unittest.TestCase):
         decompiler_options = decompiler_options or []
         decompiler_options += [("semvar_naming", False), ("loopctr_naming", False)]
         dec = proj.analyses.Decompiler(func, cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
 
-        assert "char * assign_ite(unsigned int a0, char *a1, char *a2)" in dec.codegen.text
-        assert "char *v0" in dec.codegen.text
-        assert "v0 = (!a0 ? a2 : a1)" in dec.codegen.text
-        assert "return v0" in dec.codegen.text
+        code = codegen_text(dec)
+        assert "char * assign_ite(unsigned int a0, char *a1, char *a2)" in code
+        assert "char *v0" in code
+        assert "v0 = (!a0 ? a2 : a1)" in code
+        assert "return v0" in code
 
     def test_decompiling_ioport_intrinsics(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "decompiler", "intrinsics.o")
@@ -5944,9 +5880,8 @@ class TestDecompiler(unittest.TestCase):
             nonlocal dec
             func = proj.kb.functions[func_name]
             dec = proj.analyses.Decompiler(func, cfg=cfg, options=decompiler_options)
-            assert dec.codegen is not None and dec.codegen.text is not None
             print_decompilation_result(dec)
-            return normalize_whitespace(dec.codegen.text)
+            return normalize_whitespace(codegen_text(dec))
 
         assert "__outbyte(233, a0);" in decomp("test_io_outb")
         assert "return __inbyte(233);" in decomp("test_io_inb")
@@ -5974,11 +5909,10 @@ class TestDecompiler(unittest.TestCase):
 
         func = proj.kb.functions["G_DoWorldDone"]
         dec = proj.analyses.Decompiler(func, cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
 
         # Check that the function definition has (void) not ()
-        assert "G_DoWorldDone(void)" in dec.codegen.text, "Function definition should have (void) parameter"
+        assert "G_DoWorldDone(void)" in codegen_text(dec), "Function definition should have (void) parameter"
 
         # Check that callee prototypes with no args also have (void)
         callee = proj.kb.functions["G_DoLoadLevel"]
@@ -5996,11 +5930,10 @@ class TestDecompiler(unittest.TestCase):
 
         func = proj.kb.functions["F_CastResponder"]
         dec = proj.analyses.Decompiler(func, cfg=cfg, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
 
         # Check that extern variables with proper size hints are resolved
-        assert "g_5000e0" in dec.codegen.text, "Extern variable g_5000e0 should be present"
+        assert "g_5000e0" in codegen_text(dec), "Extern variable g_5000e0 should be present"
 
     @structuring_algo("sailr")
     def test_call_retval_not_dropped_when_stored_in_reused_stackarg_slot(self, decompiler_options=None):
@@ -6018,10 +5951,9 @@ class TestDecompiler(unittest.TestCase):
 
         f = proj.kb.functions[0x18000CFD4]
         d = proj.analyses[Decompiler](f, options=decompiler_options)
-        assert d.codegen is not None and d.codegen.text is not None
         print_decompilation_result(d)
 
-        text = d.codegen.text
+        text = codegen_text(d)
         assert "GetCurrentThreadId" in text
         # the return value must be preserved as an assignment, not discarded as a bare statement
         assert re.search(r"\b\w+\s*=\s*GetCurrentThreadId\(\)\s*;", text), (
@@ -6047,11 +5979,10 @@ class TestDecompiler(unittest.TestCase):
 
         # decompile
         d = proj.analyses[Decompiler](f, options=decompiler_options)
-        assert d.codegen is not None and d.codegen.text is not None
         print_decompilation_result(d)
 
         # make sure the first line of code is memset(&buf, 0, 152);
-        text = d.codegen.text
+        text = codegen_text(d)
         assert re.search(r"\n\s+memset\(&?[0-9a-z]+, 0, 152\);", text) is not None, (
             "First line of code is not memset(&buf, 0, 152);"
         )
@@ -6118,13 +6049,12 @@ class TestDecompiler(unittest.TestCase):
         # guard against the scoped CFG window silently truncating the function under test
         assert f.size >= 0x3F5, f"sub_74d6a1 was truncated by the scoped CFG: size {f.size:#x}."
         dec = proj.analyses[Decompiler].prep(fail_fast=True)(f, options=decompiler_options)
-        assert dec.codegen is not None and dec.codegen.text is not None, f"Failed to decompile function {f!r}."
         print_decompilation_result(dec)
 
         # Both SUBB-flavored condition ccalls must have been rewritten (and their operands narrowed to byte
         # width): "cmp cl, 8; cmovb ..." at 0x74d7ed and "cmp al, byte ptr [esi + 0x142]; jbe" at 0x74d9b9.
         # Before the fix, the rewriter returned a 1-bit expression for a 32-bit ccall and decompilation crashed.
-        text = dec.codegen.text
+        text = codegen_text(dec)
         assert re.search(r"\bv\d+ < 8\b", text), "the CondB SUBB ccall was not rewritten into a byte comparison"
         assert re.search(r"> \(char\)", text), "the CondBE SUBB ccall operands were not narrowed to byte width"
 
@@ -6163,11 +6093,9 @@ class TestDecompiler(unittest.TestCase):
         p.analyses[CompleteCallingConventionsAnalysis].prep()()
         f = cfg.functions[0x4051D0]
         dec = p.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
-        assert dec.codegen is not None, f"Failed to decompile function {f!r}."
         print_decompilation_result(dec)
 
-        text = dec.codegen.text
-        assert text is not None
+        text = codegen_text(dec)
         # the VLA is recovered as an array declaration with a runtime dimension, tagged `// alloca`.
         # the dimension may itself contain brackets or parens (e.g. `(int)v8[4]`), so match to end of line.
         m = re.search(r"uint8_t (\w+)\[(.+)\];\s*// alloca", text)
