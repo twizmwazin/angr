@@ -33,6 +33,9 @@ from .behavior import BehaviorFactory
 
 if TYPE_CHECKING:
     from pypcode import Context, PcodeOp
+    from pyvex import IRTypeEnv
+
+    from angr.project import Project
 
 
 l = logging.getLogger(__name__)
@@ -237,7 +240,7 @@ class IRSB:
         addr: int,
         statements: Sequence | None = None,
         nxt: int | None = None,
-        tyenv=None,  # Unused, kept for compatibility
+        tyenv: IRTypeEnv | None = None,  # Unused, kept for compatibility
         jumpkind: str | None = None,
         direct_next: bool | None = None,
         size: int | None = None,
@@ -462,7 +465,7 @@ class IRSB:
         self: IRSB,
         statements: Iterable | None = None,
         nxt: int | Const | None = None,
-        tyenv=None,  # Unused, kept for compatibility
+        tyenv: IRTypeEnv | None = None,  # Unused, kept for compatibility
         jumpkind: str | None = None,
         direct_next: bool | None = None,
         size: int | None = None,
@@ -1013,7 +1016,7 @@ class PcodeLifterEngineMixin(SimEngine):
 
     def __init__(
         self,
-        project=None,
+        project: Project,
         use_cache: bool | None = None,
         cache_size: int = 50000,
         default_opt_level: int = 1,
