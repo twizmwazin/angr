@@ -32,7 +32,7 @@ class SRDAMixin:
                 break
         return self.srda_view.get_vvar_value(vvar)
 
-    def get_terminal_vvar_values(self, vvar, visited=None):
+    def get_terminal_vvar_values(self, vvar, visited: set[Expression] | None = None):
         visited = visited or set()
         value = vvar
         visited.add(value)
@@ -48,10 +48,10 @@ class SRDAMixin:
             return {value}
         return set()
 
-    def get_terminal_vvar_value(self, vvar, visited=None):
+    def get_terminal_vvar_value(self, vvar, visited: set[int] | None = None):
         return self.get_vvar_value(self.get_terminal_vvar(vvar, visited))
 
-    def get_terminal_vvar(self, vvar, visited=None):
+    def get_terminal_vvar(self, vvar, visited: set[int] | None = None):
         visited = visited or set()  # set of varid ints
         if isinstance(vvar, VirtualVariable) and vvar.varid in self._gtv_cache:
             return self._gtv_cache[vvar.varid]
@@ -86,7 +86,7 @@ class SRDAMixin:
         return cur_vvar
 
     def get_stack_vvar_by_insn(
-        self, stack_offset: int, addr: int, block_idx: int | None = None, size=None, op_type=OP_BEFORE
+        self, stack_offset: int, addr: int, block_idx: int | None = None, size: int | None = None, op_type=OP_BEFORE
     ) -> VirtualVariable | None:
         vvars = set()
 

@@ -2,11 +2,15 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from angr.ailment import Assignment, Block, Expression, Statement, UnaryOp
 from angr.ailment.expression import BasePointerOffset, BinaryOp, Const, Load, StackBaseOffset, VirtualVariable
 from angr.ailment.statement import Store
 from angr.rust.utils.ail import CallFinder, unwrap_stack_vvar_reference
+
+if TYPE_CHECKING:
+    import networkx
 
 
 @dataclass
@@ -24,7 +28,7 @@ class DFAMixin:
     Data Flow Analysis Helper
     """
 
-    def __init__(self, graph=None):
+    def __init__(self, graph: networkx.DiGraph[Block] | None = None):
         self.graph = graph
 
     @staticmethod
