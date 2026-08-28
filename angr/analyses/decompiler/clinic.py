@@ -396,7 +396,7 @@ class Clinic(Analysis, Serializable):
         # intermediate variables used during decompilation
         #
 
-        self._ail_graph: networkx.DiGraph = None  # type: ignore
+        self._ail_graph: networkx.DiGraph | None = None
         self._spt = None
         self._preserve_vvar_ids: set[int] = set()
         self._type_hints: list[tuple[atoms.VirtualVariable | atoms.MemoryLocation, str]] = []
@@ -852,6 +852,7 @@ class Clinic(Analysis, Serializable):
                 continue
             stages[stage]()
 
+        assert self._ail_graph is not None
         # remove empty nodes from the graph
         self._ail_graph = self.remove_empty_nodes(self._ail_graph)
         # note that there are still edges to remove before we can structure this graph!
@@ -861,6 +862,7 @@ class Clinic(Analysis, Serializable):
 
     def _stage_make_return_sites(self) -> None:
         self._update_progress(30.0, text="Making return sites")
+        assert self._ail_graph is not None
         if self.function.prototype is None or not isinstance(self.function.prototype.returnty, SimTypeBottom):
             self._ail_graph = self._make_returns(self._ail_graph)
         _, self._ail_graph = self._run_simplification_passes(
@@ -874,6 +876,7 @@ class Clinic(Analysis, Serializable):
         self.func_args = {arg_vvar for arg_vvar, _ in self.arg_vvars.values()}
 
     def _stage_pre_ssa_level0_fixups(self) -> None:
+        assert self._ail_graph is not None
         # duplicate orphaned conditional jump blocks
         self._ail_graph = self._duplicate_orphaned_cond_jumps(self._ail_graph)
         # rewrite jmp_rax function calls
@@ -881,6 +884,7 @@ class Clinic(Analysis, Serializable):
 
     def _stage_transform_to_ssa_level0(self) -> None:
         self._update_progress(35.0, text="Transforming to partial-SSA form (registers)")
+        assert self._ail_graph is not None
         assert self.func_args is not None
         self._ail_graph = self._transform_to_ssa_level0(self._ail_graph, self.func_args)
 
@@ -904,6 +908,7 @@ class Clinic(Analysis, Serializable):
     def _stage_transform_to_ssa_level1(self) -> None:
         self._update_progress(37.0, text="Transforming to partial-SSA form (stack variables)")
         # rewrite (qualified) stack variables into SSA form
+        assert self._ail_graph is not None
         assert self.func_args is not None
         self._ail_graph = self._transform_to_ssa_level1(self._ail_graph, self.func_args)
 
@@ -923,6 +928,7 @@ class Clinic(Analysis, Serializable):
         # we never remove dead memory definitions before making callsites. otherwise stack arguments may go missing
         # before they are recognized as stack arguments.
         self._update_progress(38.0, text="Simplifying blocks 1")
+        assert self._ail_graph is not None
         self._ail_graph = self._simplify_blocks(
             self._ail_graph,
             stack_pointer_tracker=self._spt,
@@ -1117,6 +1123,7 @@ class Clinic(Analysis, Serializable):
             return
 
         self._update_progress(91.0, text="Applying semantic variable naming")
+        assert self._ail_graph is not None
 
         # Get the variable manager for this function
         var_manager = self.kb.dec_variables[self.function.addr]
@@ -4547,6 +4554,7 @@ class Clinic(Analysis, Serializable):
             w.expr_handlers[ailment.Expr.Call] = _handle_Call
             w.walk(node)
 
+        assert self._ail_graph is not None
         AILGraphWalker(self._ail_graph, _visit_ail_node).walk()
 
         return dict(func_proto_candidates)

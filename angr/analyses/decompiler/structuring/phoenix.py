@@ -144,7 +144,8 @@ class PhoenixStructurer(StructurerBase):
         # TestDecompiler.test_decompiling_abnormal_switch_case_within_a_loop_with_redundant_jump captures this case.
         self._matched_incomplete_switch_case_addrs: set[int] = set()
 
-        self._graph_helper: DirectedGraphHelper[Block | BaseNode] = None  # type: ignore[assignment]
+        # initialized at the top of _analyze(), which __init__ always runs before anything can read the helper
+        self._graph_helper: DirectedGraphHelper[Block | BaseNode]
 
         self._use_multistmtexprs = use_multistmtexprs
         self._multistmtexpr_stmt_threshold = multistmtexpr_stmt_threshold
