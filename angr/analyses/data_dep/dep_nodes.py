@@ -30,7 +30,7 @@ class BaseDepNode:
         self.ins_addr = sim_act.ins_addr
         self.stmt_idx = sim_act.stmt_idx
         self.action_id: int = sim_act.id
-        self.value: int | None = None
+        self.value: int  # always assigned by the node's creator right after construction
         self._value_ast: BV | None = None
 
     def value_tuple(self) -> tuple[BV, int]:
