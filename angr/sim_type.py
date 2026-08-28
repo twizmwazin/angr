@@ -7,7 +7,7 @@ import enum
 import logging
 import re
 from collections import ChainMap, OrderedDict, defaultdict
-from collections.abc import Iterable, MutableMapping
+from collections.abc import Iterable, Mapping, MutableMapping
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
@@ -50,7 +50,7 @@ class SimType:
     _ident: str = "simtype"
     base: bool = True
 
-    def __init__(self, label=None, qualifier: Iterable[str] | None = None):
+    def __init__(self, label: str | None = None, qualifier: Iterable[str] | None = None):
         """
         :param label: the type label.
         """
@@ -66,7 +66,7 @@ class SimType:
             return True
         return self_type.__eq__(other, avoid=avoid)  # pylint:disable=unnecessary-dunder-call
 
-    def __eq__(self, other, avoid=None):
+    def __eq__(self, other, avoid: dict[str, set[int]] | None = None):
         if type(self) is not type(other):
             return False
 
@@ -149,7 +149,14 @@ class SimType:
     def _init_str(self):
         return f"NotImplemented({self.__class__.__name__})"
 
-    def c_repr(self, name=None, full=0, memo=None, indent: int | None = 0, name_parens: bool = True):  # pylint: disable=unused-argument
+    def c_repr(
+        self,
+        name: str | None = None,
+        full=0,
+        memo: tuple[SimType, ...] | None = None,
+        indent: int | None = 0,
+        name_parens: bool = True,
+    ):  # pylint: disable=unused-argument
         out = f"{str(self) if self.label is None else self.label} {name}"
         if self.qualifier:
             out = f"{' '.join(self.qualifier)} {out}"
@@ -294,7 +301,7 @@ class TypeRef(SimType):
         """
         return self._name
 
-    def __eq__(self, other, avoid=None):
+    def __eq__(self, other, avoid: dict[str, set[int]] | None = None):
         return type(other) is TypeRef and self.type == other.type
 
     def __hash__(self):
@@ -316,7 +323,14 @@ class TypeRef(SimType):
         self._arch = arch
         return self
 
-    def c_repr(self, name=None, full=0, memo=None, indent=0, name_parens: bool = True):  # pylint: disable=unused-argument
+    def c_repr(
+        self,
+        name: str | None = None,
+        full=0,
+        memo: tuple[SimType, ...] | None = None,
+        indent=0,
+        name_parens: bool = True,
+    ):  # pylint: disable=unused-argument
         if not full:
             base_name = self.name
             if self.qualifier:
@@ -375,7 +389,14 @@ class SimTypeBottom(SimType):
     def __repr__(self):
         return self.label or "BOT"
 
-    def c_repr(self, name=None, full=0, memo=None, indent=0, name_parens: bool = True):  # pylint: disable=unused-argument
+    def c_repr(
+        self,
+        name: str | None = None,
+        full=0,
+        memo: tuple[SimType, ...] | None = None,
+        indent=0,
+        name_parens: bool = True,
+    ):  # pylint: disable=unused-argument
         if name is None:
             return "int" if self.label is None else self.label
         return f"{'int' if self.label is None else self.label} {name}"
@@ -396,7 +417,7 @@ class SimTypeTop(SimType):
     _args = ("size", "label", "qualifier")
     _ident = "top"
 
-    def __init__(self, size: int | None = None, label=None, qualifier: Iterable | None = None):
+    def __init__(self, size: int | None = None, label: str | None = None, qualifier: Iterable | None = None):
         SimType.__init__(self, label)
         self._size = size
         self.qualifier = qualifier
@@ -417,7 +438,7 @@ class SimTypeReg(SimType):
     _args = ("size", "label", "qualifier")
     _ident = "reg"
 
-    def __init__(self, size: int | None, label=None, qualifier: Iterable | None = None):
+    def __init__(self, size: int | None, label: str | None = None, qualifier: Iterable | None = None):
         """
         :param label: the type label.
         :param size: the size of the type (e.g. 32bit, 8bit, etc.).
@@ -459,7 +480,7 @@ class SimTypeNum(SimType):
     _args = ("size", "signed", "label", "qualifier")
     _ident = "num"
 
-    def __init__(self, size: int, signed=True, label=None, qualifier: Iterable | None = None):
+    def __init__(self, size: int, signed=True, label: str | None = None, qualifier: Iterable | None = None):
         """
         :param size:        The size of the integer, in bits
         :param signed:      Whether the integer is signed or not
@@ -522,7 +543,7 @@ class SimTypeInt(SimTypeReg):
     _base_name = "int"
     _ident = "int"
 
-    def __init__(self, signed=True, label=None, qualifier: Iterable | None = None):
+    def __init__(self, signed=True, label: str | None = None, qualifier: Iterable | None = None):
         """
         :param signed:  True if signed, False if unsigned
         :param label:   The type label
@@ -540,7 +561,14 @@ class SimTypeInt(SimTypeReg):
             d.pop("q")
         return d
 
-    def c_repr(self, name=None, full=0, memo=None, indent=0, name_parens: bool = True):  # pylint: disable=unused-argument
+    def c_repr(
+        self,
+        name: str | None = None,
+        full=0,
+        memo: tuple[SimType, ...] | None = None,
+        indent=0,
+        name_parens: bool = True,
+    ):  # pylint: disable=unused-argument
         out = self._base_name
         if not self.signed:
             out = "unsigned " + out
@@ -637,9 +665,9 @@ class SimTypeFixedSizeInt(SimTypeInt):
 
     def c_repr(
         self,
-        name=None,
+        name: str | None = None,
         full=0,
-        memo=None,
+        memo: tuple[SimType, ...] | None = None,
         indent: int | None = 0,
         name_parens: bool = True,  # pylint:disable=unused-argument
     ):
@@ -693,7 +721,7 @@ class SimTypeChar(SimTypeReg):
     _args = ("signed", "label", "qualifier")
     _ident = "char"
 
-    def __init__(self, signed=True, label=None, qualifier: Iterable | None = None):
+    def __init__(self, signed=True, label: str | None = None, qualifier: Iterable | None = None):
         """
         :param label: the type label.
         """
@@ -750,7 +778,9 @@ class SimTypeWideChar(SimTypeReg):
     _base_name = "char"
     _ident = "wchar"
 
-    def __init__(self, signed=True, label=None, endness: Endness = Endness.BE, qualifier: Iterable | None = None):
+    def __init__(
+        self, signed=True, label: str | None = None, endness: Endness = Endness.BE, qualifier: Iterable | None = None
+    ):
         """
         :param label: the type label.
         """
@@ -802,7 +832,7 @@ class SimTypeBool(SimTypeReg):
     _base_name = "bool"
     _ident = "bool"
 
-    def __init__(self, signed=True, label=None, qualifier: Iterable | None = None):
+    def __init__(self, signed=True, label: str | None = None, qualifier: Iterable | None = None):
         """
         :param label: the type label.
         """
@@ -846,7 +876,7 @@ class SimTypeFd(SimTypeReg):
     _args = ("label", "qualifier")
     _ident = "fd"
 
-    def __init__(self, label=None, qualifier: Iterable | None = None):
+    def __init__(self, label: str | None = None, qualifier: Iterable | None = None):
         """
         :param label: the type label
         """
@@ -909,7 +939,7 @@ class SimTypePointer(SimTypeReg):
     def __init__(
         self,
         pts_to: SimType,
-        label=None,
+        label: str | None = None,
         offset=0,
         qualifier: Iterable[str] | None = None,
         disposition: PointerDisposition | int = PointerDisposition.UNKNOWN,
@@ -941,7 +971,14 @@ class SimTypePointer(SimTypeReg):
     def __repr__(self):
         return f"{self.pts_to}*" if not self.label else self.label
 
-    def c_repr(self, name=None, full=0, memo=None, indent=0, name_parens: bool = True):  # pylint: disable=unused-argument
+    def c_repr(
+        self,
+        name: str | None = None,
+        full=0,
+        memo: tuple[SimType, ...] | None = None,
+        indent=0,
+        name_parens: bool = True,
+    ):  # pylint: disable=unused-argument
         # if pts_to is SimTypeBottom, we return a void*
         if self.label is not None and name is not None:
             return super().c_repr(name=name, full=full, memo=memo, indent=indent, name_parens=name_parens)
@@ -1018,14 +1055,21 @@ class SimTypeReference(SimTypeReg):
     _args = ("refs", "label", "qualifier")
     _ident = "ref"
 
-    def __init__(self, refs, label=None, qualifier: Iterable | None = None):
+    def __init__(self, refs, label: str | None = None, qualifier: Iterable | None = None):
         super().__init__(None, label=label, qualifier=qualifier)
         self.refs: SimType = refs
 
     def __repr__(self):
         return f"{self.refs}&"
 
-    def c_repr(self, name=None, full=0, memo=None, indent=0, name_parens: bool = True):  # pylint: disable=unused-argument
+    def c_repr(
+        self,
+        name: str | None = None,
+        full=0,
+        memo: tuple[SimType, ...] | None = None,
+        indent=0,
+        name_parens: bool = True,
+    ):  # pylint: disable=unused-argument
         name = "&" if name is None else f"&{name}"
         out = self.refs.c_repr(name, full, memo, indent)
         if self.qualifier:
@@ -1083,7 +1127,9 @@ class SimTypeArray(SimType):
     _args = ("elem_type", "length", "label", "qualifier")
     _ident = "array"
 
-    def __init__(self, elem_type, length=None, label=None, qualifier: Iterable | None = None):
+    def __init__(
+        self, elem_type, length: int | None = None, label: str | None = None, qualifier: Iterable | None = None
+    ):
         """
         :param label:       The type label.
         :param elem_type:   The type of each element in the array.
@@ -1097,7 +1143,14 @@ class SimTypeArray(SimType):
     def __repr__(self):
         return "{}[{}]".format(self.elem_type, "" if self.length is None else self.length)
 
-    def c_repr(self, name=None, full=0, memo=None, indent=0, name_parens: bool = True):  # pylint: disable=unused-argument
+    def c_repr(
+        self,
+        name: str | None = None,
+        full=0,
+        memo: tuple[SimType, ...] | None = None,
+        indent=0,
+        name_parens: bool = True,
+    ):  # pylint: disable=unused-argument
         if name is None:
             return repr(self)
 
@@ -1180,7 +1233,11 @@ class SimTypeString(NamedTypeMixin, SimType):
     _ident = "str"
 
     def __init__(
-        self, length: int | None = None, label=None, name: str | None = None, qualifier: Iterable | None = None
+        self,
+        length: int | None = None,
+        label: str | None = None,
+        name: str | None = None,
+        qualifier: Iterable | None = None,
     ):
         """
         :param label:   The type label.
@@ -1194,7 +1251,14 @@ class SimTypeString(NamedTypeMixin, SimType):
     def __repr__(self):
         return "string_t"
 
-    def c_repr(self, name=None, full=0, memo=None, indent=0, name_parens: bool = True):  # pylint: disable=unused-argument
+    def c_repr(
+        self,
+        name: str | None = None,
+        full=0,
+        memo: tuple[SimType, ...] | None = None,
+        indent=0,
+        name_parens: bool = True,
+    ):  # pylint: disable=unused-argument
         if name is None:
             return repr(self)
 
@@ -1268,7 +1332,11 @@ class SimTypeWString(NamedTypeMixin, SimType):
     _ident = "wstr"
 
     def __init__(
-        self, length: int | None = None, label=None, name: str | None = None, qualifier: Iterable | None = None
+        self,
+        length: int | None = None,
+        label: str | None = None,
+        name: str | None = None,
+        qualifier: Iterable | None = None,
     ):
         super().__init__(label=label, name=name)
         self.elem_type = SimTypeNum(16, False)
@@ -1278,7 +1346,14 @@ class SimTypeWString(NamedTypeMixin, SimType):
     def __repr__(self):
         return "wstring_t"
 
-    def c_repr(self, name=None, full=0, memo=None, indent=0, name_parens: bool = True):  # pylint: disable=unused-argument
+    def c_repr(
+        self,
+        name: str | None = None,
+        full=0,
+        memo: tuple[SimType, ...] | None = None,
+        indent=0,
+        name_parens: bool = True,
+    ):  # pylint: disable=unused-argument
         if name is None:
             return repr(self)
 
@@ -1358,7 +1433,7 @@ class SimTypeFunction(SimType):
         self,
         args: Iterable[SimType],
         returnty: SimType | None,
-        label=None,
+        label: str | None = None,
         arg_names: Iterable[str] | None = None,
         variadic=False,
     ):
@@ -1391,7 +1466,15 @@ class SimTypeFunction(SimType):
             argstrs.append("...")
         return "({}) -> {}".format(", ".join(argstrs), self.returnty)
 
-    def c_repr(self, name=None, full=0, memo=None, indent=0, name_parens: bool = True, show_void: bool = True):  # type: ignore[override]
+    def c_repr(
+        self,
+        name: str | None = None,
+        full=0,
+        memo: tuple[SimType, ...] | None = None,
+        indent: int | None = 0,
+        name_parens: bool = True,
+        show_void: bool = True,
+    ):
         formatted_args = [
             a.c_repr(n, max(full - 1, 0), memo, indent)
             for a, n in zip(self.args, self.arg_names if self.arg_names and full else (None,) * len(self.args))
@@ -1456,7 +1539,7 @@ class SimTypeCppFunction(SimTypeFunction):
         self,
         args,
         returnty,
-        label=None,
+        label: str | None = None,
         arg_names: Iterable[str] | None = None,
         ctor: bool = False,
         dtor: bool = False,
@@ -1519,7 +1602,7 @@ class SimTypeLength(SimTypeLong):
     _args = ("signed", "addr", "length", "label")
     _ident = "len"
 
-    def __init__(self, signed=False, addr=None, length=None, label=None):
+    def __init__(self, signed=False, addr=None, length=None, label: str | None = None):
         """
         :param signed:  Whether the value is signed or not
         :param label:   The type label.
@@ -1555,7 +1638,7 @@ class SimTypeFloat(SimTypeReg):
     _args = ("label", "qualifier")
     _ident = "float"
 
-    def __init__(self, size=32, label=None, qualifier: Iterable | None = None):
+    def __init__(self, size=32, label: str | None = None, qualifier: Iterable | None = None):
         super().__init__(size, label=label, qualifier=qualifier)
 
     sort = claripy.FSORT_FLOAT
@@ -1597,7 +1680,7 @@ class SimTypeDouble(SimTypeFloat):
     _args = ("align_double", "label", "qualifier")
     _ident = "double"
 
-    def __init__(self, align_double=True, label=None, qualifier: Iterable | None = None):
+    def __init__(self, align_double=True, label: str | None = None, qualifier: Iterable | None = None):
         self.align_double = align_double
         super().__init__(64, label=label)
         self.qualifier = qualifier
@@ -1631,9 +1714,9 @@ class SimStruct(NamedTypeMixin, SimType):
     def __init__(
         self,
         fields: dict[str, SimType] | OrderedDict[str, SimType],
-        name=None,
+        name: str | None = None,
         pack=False,
-        align=None,
+        align: int | None = None,
         anonymous: bool = False,
         qualifier: Iterable | None = None,
         def_order: int | None = None,
@@ -1769,7 +1852,14 @@ class SimStruct(NamedTypeMixin, SimType):
     def __repr__(self):
         return f"struct {self.name}"
 
-    def c_repr(self, name=None, full=0, memo=None, indent=0, name_parens: bool = True):  # pylint: disable=unused-argument
+    def c_repr(
+        self,
+        name: str | None = None,
+        full=0,
+        memo: tuple[SimType, ...] | None = None,
+        indent=0,
+        name_parens: bool = True,
+    ):  # pylint: disable=unused-argument
         if not full or (memo is not None and self in memo):
             return super().c_repr(name, full, memo, indent)
 
@@ -1912,7 +2002,7 @@ class SimStructValue:
     A SimStruct type paired with some real values
     """
 
-    def __init__(self, struct, values=None):
+    def __init__(self, struct, values: Mapping[str, Any] | Iterable[Any] | None = None):
         """
         :param struct:      A SimStruct instance describing the type of this struct
         :param values:      A mapping from struct fields to values
@@ -1969,7 +2059,13 @@ class SimUnion(NamedTypeMixin, SimType):
     _args = ("members", "name", "label", "qualifier")
     _ident = "union"
 
-    def __init__(self, members: dict[str, SimType], name=None, label=None, qualifier: Iterable | None = None):
+    def __init__(
+        self,
+        members: dict[str, SimType],
+        name: str | None = None,
+        label: str | None = None,
+        qualifier: Iterable | None = None,
+    ):
         """
         :param members:     The members of the union, as a mapping name -> type
         :param name:        The name of the union
@@ -2056,7 +2152,14 @@ class SimUnion(NamedTypeMixin, SimType):
             self.name, "\n\t".join(f"{name} {ty!s};" for name, ty in self.members.items())
         )
 
-    def c_repr(self, name=None, full=0, memo=None, indent=0, name_parens: bool = True):  # pylint: disable=unused-argument
+    def c_repr(
+        self,
+        name: str | None = None,
+        full=0,
+        memo: tuple[SimType, ...] | None = None,
+        indent=0,
+        name_parens: bool = True,
+    ):  # pylint: disable=unused-argument
         if not full or (memo is not None and self in memo):
             return super().c_repr(name, full, memo, indent)
 
@@ -2102,7 +2205,7 @@ class SimUnionValue:
     A SimStruct type paired with some real values
     """
 
-    def __init__(self, union, values=None):
+    def __init__(self, union, values: Mapping[str, Any] | None = None):
         """
         :param union:      A SimUnion instance describing the type of this union
         :param values:      A mapping from union members to values
@@ -2198,7 +2301,14 @@ class SimTypeEnum(NamedTypeMixin, SimType):
     def __repr__(self):
         return f"enum {self._name}"
 
-    def c_repr(self, name=None, full=0, memo=None, indent=0, name_parens: bool = True):  # pylint: disable=unused-argument
+    def c_repr(
+        self,
+        name: str | None = None,
+        full=0,
+        memo: tuple[SimType, ...] | None = None,
+        indent=0,
+        name_parens: bool = True,
+    ):  # pylint: disable=unused-argument
         if not full or (memo is not None and self in memo):
             out = f"enum {self._name}"
             if self.qualifier:
@@ -2361,7 +2471,14 @@ class SimTypeBitfield(NamedTypeMixin, SimType):
     def __repr__(self):
         return f"bitfield {self._name}"
 
-    def c_repr(self, name=None, full=0, memo=None, indent=0, name_parens: bool = True):  # pylint: disable=unused-argument
+    def c_repr(
+        self,
+        name: str | None = None,
+        full=0,
+        memo: tuple[SimType, ...] | None = None,
+        indent=0,
+        name_parens: bool = True,
+    ):  # pylint: disable=unused-argument
         # Bitfields are rendered similarly to enums in C
         if not full or (memo is not None and self in memo):
             out = f"enum {self._name}"  # Use enum syntax since C doesn't have bitfield types
@@ -2429,9 +2546,9 @@ class SimCppClass(SimStruct):
         name: str | None = None,
         members: dict[str, SimType] | None = None,
         function_members: dict[str, SimTypeCppFunction] | None = None,
-        vtable_ptrs=None,
+        vtable_ptrs: list[int] | None = None,
         pack: bool = False,
-        align=None,
+        align: int | None = None,
         size: int | None = None,
         anonymous: bool = False,
         def_order: int | None = None,
@@ -2614,7 +2731,7 @@ class SimTypeNumOffset(SimTypeNum):
     _args = ("size", "signed", "label", "offset", "qualifier")
     _ident = "numoff"
 
-    def __init__(self, size, signed=True, label=None, offset=0, qualifier: Iterable | None = None):
+    def __init__(self, size, signed=True, label: str | None = None, offset=0, qualifier: Iterable | None = None):
         super().__init__(size, signed, label, qualifier=qualifier)
         self.offset = offset
 
@@ -2678,7 +2795,14 @@ class SimTypeRef(SimType):
         prefix = "struct " if self.original_type is SimStruct else ""
         return f"{prefix}{self.name}"
 
-    def c_repr(self, name=None, full=0, memo=None, indent=0, name_parens: bool = True) -> str:  # pylint: disable=unused-argument
+    def c_repr(
+        self,
+        name: str | None = None,
+        full=0,
+        memo: tuple[SimType, ...] | None = None,
+        indent=0,
+        name_parens: bool = True,
+    ) -> str:  # pylint: disable=unused-argument
         prefix = "unknown"
         if self.original_type is SimStruct:
             prefix = "struct "
@@ -3796,7 +3920,7 @@ GLIBC_TYPES = {
 ALL_TYPES.update(GLIBC_TYPES)
 
 
-def _make_scope(predefined_types=None):
+def _make_scope(predefined_types: dict[Any, SimType] | None = None) -> list[dict[str, bool]]:
     """
     Generate CParser scope_stack argument to parse method
     """
@@ -3840,7 +3964,9 @@ def register_types(types):
         ALL_TYPES.update(types)
 
 
-def parse_signature(defn, predefined_types=None, arch=None) -> SimTypeFunction:
+def parse_signature(
+    defn, predefined_types: dict[Any, SimType] | None = None, arch: Arch | None = None
+) -> SimTypeFunction:
     """
     Parse a single function prototype and return its type
     """
@@ -3853,14 +3979,18 @@ def parse_signature(defn, predefined_types=None, arch=None) -> SimTypeFunction:
         raise ValueError("No declarations found") from e
 
 
-def parse_defns(defn, predefined_types=None, arch=None) -> dict[str, SimType]:
+def parse_defns(
+    defn, predefined_types: dict[Any, SimType] | None = None, arch: Arch | None = None
+) -> dict[str, SimType]:
     """
     Parse a series of C definitions, returns a mapping from variable name to variable type object
     """
     return parse_file(defn, predefined_types=predefined_types, arch=arch)[0]
 
 
-def parse_types(defn, predefined_types=None, arch=None) -> dict[str, SimType]:
+def parse_types(
+    defn, predefined_types: dict[Any, SimType] | None = None, arch: Arch | None = None
+) -> dict[str, SimType]:
     """
     Parse a series of C definitions, returns a mapping from type name to type object
     """
@@ -3873,7 +4003,7 @@ _include_re = re.compile(r"^\s*#include")
 def parse_file(
     defn,
     predefined_types: dict[Any, SimType] | None = None,
-    arch=None,
+    arch: Arch | None = None,
     side_effect_types: dict[Any, SimType] | None = None,
 ) -> tuple[dict[str, SimType], dict[str, SimType]]:
     """
@@ -3937,7 +4067,7 @@ def type_parser_singleton() -> pycparser.CParser:
     return _type_parser_singleton
 
 
-def parse_type(defn, predefined_types=None, arch=None):  # pylint:disable=unused-argument
+def parse_type(defn, predefined_types: dict[Any, SimType] | None = None, arch: Arch | None = None):  # pylint:disable=unused-argument
     """
     Parse a simple type expression into a SimType
 
@@ -3950,7 +4080,7 @@ def parse_type_with_name(
     defn,
     preprocess=True,
     predefined_types: dict[Any, SimType] | None = None,
-    arch=None,
+    arch: Arch | None = None,
     side_effect_types: dict[Any, SimType] | None = None,
 ):  # pylint:disable=unused-argument
     """
@@ -3980,7 +4110,7 @@ def _accepts_scope_stack():
     pycparser hack to include scope_stack as parameter in CParser parse method
     """
 
-    def parse(self, text, filename="", debug=False, scope_stack=None):  # pylint:disable=unused-argument
+    def parse(self, text, filename="", debug=False, scope_stack: list[dict[str, bool]] | None = None):  # pylint:disable=unused-argument
         # debug is not used and only kept for backward compatibility as in pycparser >= 3.0
 
         self.clex._filename = filename
@@ -3996,7 +4126,9 @@ def _accepts_scope_stack():
             self._parse_error(f"before: {tok.value}", self._tok_coord(tok))
         return ast
 
-    def parse_type_with_name(self, text, filename="", scope_stack=None) -> c_ast.Typename:
+    def parse_type_with_name(
+        self, text, filename="", scope_stack: list[dict[str, bool]] | None = None
+    ) -> c_ast.Typename:
         self.clex._filename = filename
         self.clex._lineno = 1
         self._scope_stack = [{}] if scope_stack is None else scope_stack
@@ -4011,7 +4143,10 @@ def _accepts_scope_stack():
 
 
 def _decl_to_type(
-    decl, extra_types: MutableMapping[str, SimType] | None = None, bitsize=None, arch: Arch | None = None
+    decl,
+    extra_types: MutableMapping[str, SimType] | None = None,
+    bitsize: c_ast.Constant | None = None,
+    arch: Arch | None = None,
 ) -> SimType:
     if extra_types is None:
         extra_types = {}
@@ -4244,7 +4379,7 @@ def _decl_to_type(
     raise ValueError("Unknown type!")
 
 
-def _parse_const(c, arch=None, extra_types=None):
+def _parse_const(c, arch: Arch | None = None, extra_types: MutableMapping[str, SimType] | None = None):
     if type(c) is c_ast.Constant:
         return int(c.value, base=0)
     if type(c) is c_ast.BinaryOp:
