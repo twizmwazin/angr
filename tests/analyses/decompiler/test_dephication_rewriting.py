@@ -48,7 +48,9 @@ class TestDephicationRewriting(unittest.TestCase):
 
         out = engine._handle_stmt_Assignment(stmt)
         assert isinstance(out, Assignment)
-        assert out.dst.varid == 1330
+        dst = out.dst
+        assert isinstance(dst, VirtualVariable)
+        assert dst.varid == 1330
 
     def test_remapped_dst_survives_const_src(self):
         proj, engine = self._engine({7: 3})
@@ -62,7 +64,9 @@ class TestDephicationRewriting(unittest.TestCase):
 
         out = engine._handle_stmt_Assignment(stmt)
         assert isinstance(out, Assignment)
-        assert out.dst.varid == 3
+        dst = out.dst
+        assert isinstance(dst, VirtualVariable)
+        assert dst.varid == 3
 
     def test_self_assignment_is_still_dropped(self):
         # the reason the return used to sit behind the both-sides-are-vvars guard: once both sides map onto the same
@@ -104,9 +108,13 @@ class TestDephicationRewriting(unittest.TestCase):
         # only the condition is remapped, so the rebuild is driven purely by the new condition
         out = engine._handle_expr_ITE(expr)
         assert isinstance(out, ITE)
-        assert out.cond.varid == 6
-        assert out.iftrue.value == 0x11
-        assert out.iffalse.value == 0xFFFFFFFF
+        out_cond, out_iftrue, out_iffalse = out.cond, out.iftrue, out.iffalse
+        assert isinstance(out_cond, VirtualVariable)
+        assert isinstance(out_iftrue, Const)
+        assert isinstance(out_iffalse, Const)
+        assert out_cond.varid == 6
+        assert out_iftrue.value == 0x11
+        assert out_iffalse.value == 0xFFFFFFFF
 
     def test_bbbq_rust_flavor_keeps_string_constants(self):
         """
