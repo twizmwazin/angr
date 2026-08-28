@@ -19,7 +19,6 @@ class error(angr.SimProcedure):
 
     def dynamic_returns(self, blocks, **kwargs) -> bool | None:
         # the caller (CFG recovery) sets self.project before calling this method
-        assert self.project is not None
         # Execute those blocks with a blank state, and then dump the arguments
         blank_state = angr.SimState(
             project=self.project,

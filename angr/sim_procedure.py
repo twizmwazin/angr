@@ -70,7 +70,9 @@ class SimProcedure:
 
     The following instance variables are available when working with simprocedures from the inside or the outside:
 
-    :ivar project:          The associated angr project
+    :ivar project:          The associated angr project. Catalog instances are constructed without one; it is bound
+                            before the procedure runs (``execute()`` back-fills it from the state; CFG recovery and
+                            the unicorn engine assign it before invoking procedure methods directly)
     :ivar arch:             The associated architecture
     :ivar addr:             The linear address at which the procedure is executing
     :ivar cc:               The calling convention in use for engaging with the ABI
@@ -114,6 +116,7 @@ class SimProcedure:
     """
 
     state: SimState
+    project: angr.Project
 
     def __init__(
         self,
@@ -131,7 +134,7 @@ class SimProcedure:
         **kwargs,
     ):
         # WE'LL FIGURE IT OUT
-        self.project = project
+        self.project = project  # type: ignore
         self.arch = project.arch if project is not None else None
         self.addr = None
         self.cc = cc
@@ -214,9 +217,7 @@ class SimProcedure:
             if self.arch.name in DEFAULT_CC:
                 cc_cls = default_cc(
                     self.arch.name,
-                    platform=(
-                        self.project.simos.name if self.project is not None and self.project.simos is not None else None
-                    ),
+                    platform=self.project.simos.name if self.project.simos is not None else None,
                 )
                 assert cc_cls is not None
                 self.cc = cc_cls(self.arch)
@@ -327,7 +328,6 @@ class SimProcedure:
     def make_continuation(self, name):
         # make a copy of the canon copy, customize it for the specific continuation, then hook it
         if name not in self.canonical.continuations:
-            assert self.project is not None
             cont = copy.copy(self.canonical)
             target_name = f"{self.display_name}.{name}"
             should_be_none = self.project.loader.extern_object.get_symbol(target_name)
