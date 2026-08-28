@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from typing import TYPE_CHECKING
 
 import claripy
 import networkx
@@ -17,6 +18,12 @@ from angr.sim_variable import (
     SimStackVariable,
     SimTemporaryVariable,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Collection, Iterable
+
+    from archinfo import Arch
+
 
 l = logging.getLogger(name=__name__)
 
@@ -55,7 +62,7 @@ class ProgramVariable:
     :ivar CodeLocation location: Location of the variable.
     """
 
-    def __init__(self, variable, location, initial=False, arch=None):
+    def __init__(self, variable, location, initial=False, arch: Arch | None = None):
         self.variable = variable
         self.location = location
         self.initial = initial
@@ -481,7 +488,9 @@ class DDG(Analysis):
     analysis) will directly benefit the DDG.
     """
 
-    def __init__(self, cfg, start=None, call_depth=None, block_addrs=None):
+    def __init__(
+        self, cfg, start: int | None = None, call_depth: int | None = None, block_addrs: Iterable[int] | None = None
+    ):
         """
         :param cfg:         Control flow graph. Please make sure each node has an associated `state` with it, e.g. by
                             passing the keep_state=True and state_add_options=angr.options.refs arguments to
@@ -626,7 +635,7 @@ class DDG(Analysis):
         # Not found
         return None
 
-    def data_sub_graph(self, pv, simplified=True, killing_edges=False, excluding_types=None):
+    def data_sub_graph(self, pv, simplified=True, killing_edges=False, excluding_types: Collection[str] | None = None):
         """
         Get a subgraph from the data graph or the simplified data graph that starts from node pv.
 
@@ -1547,7 +1556,7 @@ class DDG(Analysis):
 
         return filtered_defs
 
-    def find_definitions(self, variable, location=None, simplified_graph=True):
+    def find_definitions(self, variable, location: CodeLocation | None = None, simplified_graph=True):
         """
         Find all definitions of the given variable.
 

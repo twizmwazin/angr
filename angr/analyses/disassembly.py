@@ -4,7 +4,7 @@ import contextlib
 import logging
 from collections import defaultdict
 from collections.abc import Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import archinfo
 import pypcode
@@ -21,6 +21,9 @@ from angr.utils.library import get_cpp_function_name
 
 from .disassembly_utils import decode_instruction
 
+if TYPE_CHECKING:
+    from angr.project import Project
+
 IRSBType = pyvex.IRSB | pcode.lifter.IRSB
 IROpObjType = pyvex.stmt.IRStmt | pypcode.PcodeOp
 
@@ -33,7 +36,7 @@ class DisassemblyPiece:
     addr = None
     ident = float("nan")
 
-    def render(self, formatting=None) -> list[str]:
+    def render(self, formatting: dict[str, Any] | None = None) -> list[str]:
         x = self._render(formatting)
         if len(x) == 1:
             return [self.highlight(x[0], formatting)]
@@ -61,7 +64,7 @@ class DisassemblyPiece:
         except KeyError:
             return string
 
-    def highlight(self, string, formatting=None):
+    def highlight(self, string, formatting: dict[str, Any] | None = None):
         try:
             if formatting is not None:
                 if "format_callback" in formatting:
@@ -165,7 +168,7 @@ class Hook(DisassemblyPiece):
 
 
 class Instruction(DisassemblyPiece):
-    def __init__(self, insn, parentblock, project=None):
+    def __init__(self, insn, parentblock, project: Project | None = None):
         self.addr = insn.address
         self.size = insn.size
         self.insn = insn
@@ -423,7 +426,7 @@ class Instruction(DisassemblyPiece):
                 pieces.append(c)
         return pieces
 
-    def _render(self, formatting=None):
+    def _render(self, formatting: dict[str, Any] | None = None):
         return [
             "{} {}".format(self.opcode.render(formatting)[0], ", ".join(o.render(formatting)[0] for o in self.operands))
         ]
@@ -433,7 +436,7 @@ class SootExpression(DisassemblyPiece):
     def __init__(self, expr):
         self.expr = expr
 
-    def _render(self, formatting=None):
+    def _render(self, formatting: dict[str, Any] | None = None):
         return [self.expr]
 
 
@@ -442,7 +445,7 @@ class SootExpressionTarget(SootExpression):
         super().__init__(target_stmt_idx)
         self.target_stmt_idx = target_stmt_idx
 
-    def _render(self, formatting=None):
+    def _render(self, formatting: dict[str, Any] | None = None):
         return [f"Goto {self.target_stmt_idx}"]
 
 
@@ -453,7 +456,7 @@ class SootExpressionStaticFieldRef(SootExpression):
         self.field = field
         self.field_str = field_str
 
-    def _render(self, formatting=None):
+    def _render(self, formatting: dict[str, Any] | None = None):
         return [self.field_str]
 
 
@@ -470,7 +473,7 @@ class SootExpressionInvoke(SootExpression):
         self.method_name = expr.method_name
         self.arg_str = expr.list_to_arg_str(expr.args)
 
-    def _render(self, formatting=None):
+    def _render(self, formatting: dict[str, Any] | None = None):
         return [
             "{}{}({}) [{}]".format(
                 self.base + "." if self.base else "", self.method_name, self.arg_str, self.invoke_type
@@ -509,7 +512,7 @@ class SootStatement(DisassemblyPiece):
         # print func
         return SootExpression(str(expr))
 
-    def _render(self, formatting=None):
+    def _render(self, formatting: dict[str, Any] | None = None):
         return [
             " ".join(
                 [
@@ -585,7 +588,7 @@ class Opcode(DisassemblyPiece):
         self.opcode_string = self.insn.mnemonic
         self.ident = (self.addr, "opcode")
 
-    def _render(self, formatting=None):
+    def _render(self, formatting: dict[str, Any] | None = None):
         return [self.opcode_string.ljust(7)]
 
     def __eq__(self, other):
@@ -982,7 +985,7 @@ class Comment(DisassemblyPiece):
         self.addr = addr
         self.text = text.split("\n")
 
-    def _render(self, formatting=None):
+    def _render(self, formatting: dict[str, Any] | None = None):
         return [self.text]
 
     def height(self, formatting):
@@ -994,7 +997,7 @@ class FuncComment(DisassemblyPiece):
     def __init__(self, func):
         self.func = func
 
-    def _render(self, formatting=None):
+    def _render(self, formatting: dict[str, Any] | None = None):
         return ["##", "## Function " + self.func.name, "##"]
 
 
@@ -1193,7 +1196,7 @@ class Disassembly(Analysis):
 
     def render(
         self,
-        formatting=None,
+        formatting: dict[str, Any] | None = None,
         show_edges: bool = True,
         show_addresses: bool = True,
         show_bytes: bool = False,

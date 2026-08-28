@@ -27,7 +27,11 @@ class CongruencyCheck(Analysis):
         self.prev_pg = None
 
     def set_state_options(
-        self, left_add_options=None, left_remove_options=None, right_add_options=None, right_remove_options=None
+        self,
+        left_add_options: set[str] | None = None,
+        left_remove_options: set[str] | None = None,
+        right_add_options: set[str] | None = None,
+        right_remove_options: set[str] | None = None,
     ):
         """
         Checks that the specified state options result in the same states over the next `depth` states.
@@ -62,7 +66,7 @@ class CongruencyCheck(Analysis):
         return self
 
     @staticmethod
-    def _sync_steps(simgr, max_steps=None):
+    def _sync_steps(simgr, max_steps: int | None = None):
         l.debug("Sync-stepping pathgroup...")
         l.debug(
             "... left width: %s, right width: %s",
@@ -190,7 +194,7 @@ class CongruencyCheck(Analysis):
         if self._throw:
             raise AngrIncongruencyError(*args)
 
-    def run(self, depth=None):
+    def run(self, depth: int | None = None):
         """
         Checks that the paths in the specified path group stay the same over the next
         `depth` bytes.

@@ -15,7 +15,11 @@ from angr.errors import SimEngineError, SimMemoryError
 from angr.knowledge_plugins.cfg.memory_data import MemoryDataSort
 
 if TYPE_CHECKING:
-    from angr.knowledge_plugins import Function
+    from collections.abc import Iterable
+
+    from angr.codenode import CodeNode
+    from angr.knowledge_plugins import Function, FunctionManager
+    from angr.knowledge_plugins.cfg import CFGModel
 
 
 # todo include an explanation of the algorithm
@@ -359,7 +363,7 @@ class FunctionDiff:
     This class computes the a diff between two functions.
     """
 
-    def __init__(self, function_a: Function, function_b: Function, bindiff=None):
+    def __init__(self, function_a: Function, function_b: Function, bindiff: BinDiff | None = None):
         """
         :param function_a: The first angr Function object to diff.
         :param function_b: The second angr Function object.
@@ -756,8 +760,8 @@ class FunctionDiff:
         self,
         attributes_a,
         attributes_b,
-        filter_set_a=None,
-        filter_set_b=None,
+        filter_set_a: Iterable[CodeNode] | None = None,
+        filter_set_b: Iterable[CodeNode] | None = None,
         delta=(0, 0, 0),
         tiebreak_with_block_similarity=False,
     ):
@@ -865,7 +869,7 @@ class BinDiff(Analysis):
     This class computes the a diff between two binaries represented by angr Projects
     """
 
-    def __init__(self, other_project, cfg_a=None, cfg_b=None):
+    def __init__(self, other_project, cfg_a: CFGModel | None = None, cfg_b: CFGModel | None = None):
         """
         :param other_project: The second project to diff
         """
@@ -1219,7 +1223,7 @@ class BinDiff(Analysis):
 
     @staticmethod
     def _get_function_callees(
-        proj, funcs, func, main2secondary: dict[int, int] | None = None, funcs_secondary=None
+        proj, funcs, func, main2secondary: dict[int, int] | None = None, funcs_secondary: FunctionManager | None = None
     ) -> tuple[str, ...]:
         callees = proj.kb.functions.callgraph.successors(func.addr)
         # convert callees to meaningful function names
@@ -1469,7 +1473,9 @@ class BinDiff(Analysis):
                 del self._function_diffs[(x, y)]
 
     @staticmethod
-    def _get_function_matches(attributes_a, attributes_b, filter_set_a=None, filter_set_b=None):
+    def _get_function_matches(
+        attributes_a, attributes_b, filter_set_a: Iterable[int] | None = None, filter_set_b: Iterable[int] | None = None
+    ):
         """
         :param attributes_a:    A dict of functions to their attributes
         :param attributes_b:    A dict of functions to their attributes

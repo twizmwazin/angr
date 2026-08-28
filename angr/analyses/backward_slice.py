@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from typing import TYPE_CHECKING
 
 import networkx
 import pyvex
@@ -11,6 +12,11 @@ from angr.annocfg import AnnotatedCFG
 from angr.code_location import CodeLocation
 from angr.errors import AngrBackwardSlicingError
 from angr.utils.constants import DEFAULT_STATEMENT
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from angr.knowledge_plugins.cfg import CFGNode
 
 l = logging.getLogger(name=__name__)
 
@@ -28,9 +34,9 @@ class BackwardSlice(Analysis):
         cfg,
         cdg,
         ddg,
-        targets=None,
-        cfg_node=None,
-        stmt_id=None,
+        targets: Iterable[CodeLocation | tuple[CFGNode, int]] | None = None,
+        cfg_node: CFGNode | None = None,
+        stmt_id: int | None = None,
         control_flow_slice=False,
         same_function=False,
         no_construct=False,
@@ -202,7 +208,7 @@ class BackwardSlice(Analysis):
 
         return anno_cfg
 
-    def is_taint_related_to_ip(self, simrun_addr, stmt_idx, taint_type, simrun_whitelist=None):
+    def is_taint_related_to_ip(self, simrun_addr, stmt_idx, taint_type, simrun_whitelist: Iterable[int] | None = None):
         """
         Query in taint graph to check if a specific taint will taint the IP in the future or not.
         The taint is specified with the tuple (simrun_addr, stmt_idx, taint_type).
@@ -245,7 +251,9 @@ class BackwardSlice(Analysis):
 
         return False
 
-    def is_taint_impacting_stack_pointers(self, simrun_addr, stmt_idx, taint_type, simrun_whitelist=None):
+    def is_taint_impacting_stack_pointers(
+        self, simrun_addr, stmt_idx, taint_type, simrun_whitelist: Iterable[int] | None = None
+    ):
         """
         Query in taint graph to check if a specific taint will taint the stack pointer in the future or not.
         The taint is specified with the tuple (simrun_addr, stmt_idx, taint_type).
