@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 import networkx
 
 from angr.utils.graph import GraphUtils, dfs_back_edges
 
 from .graph import GraphVisitor, NodeType
+
+if TYPE_CHECKING:
+    from collections.abc import Collection
+    from typing import Any
 
 _l = logging.getLogger(__name__)
 
@@ -16,7 +21,7 @@ class FunctionGraphVisitor(GraphVisitor):
     :param knowledge.Function func:
     """
 
-    def __init__(self, func, graph=None):
+    def __init__(self, func, graph: networkx.DiGraph | None = None):
         super().__init__()
         self.function = func
 
@@ -68,7 +73,7 @@ class FunctionGraphVisitor(GraphVisitor):
     def predecessors(self, node):
         return list(self.graph.predecessors(node))
 
-    def sort_nodes(self, nodes=None):
+    def sort_nodes(self, nodes: Collection[Any] | None = None):
         sorted_nodes = GraphUtils.quasi_topological_sort_nodes(self.graph)
 
         if nodes is not None:

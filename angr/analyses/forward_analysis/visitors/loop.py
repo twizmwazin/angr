@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from angr.utils.graph import GraphUtils
 
 from .graph import GraphVisitor
+
+if TYPE_CHECKING:
+    from collections.abc import Collection
+    from typing import Any
 
 
 class LoopVisitor(GraphVisitor):
@@ -22,7 +28,7 @@ class LoopVisitor(GraphVisitor):
     def predecessors(self, node):
         return self.loop.graph.predecessors(node)
 
-    def sort_nodes(self, nodes=None):
+    def sort_nodes(self, nodes: Collection[Any] | None = None):
         sorted_nodes = GraphUtils.quasi_topological_sort_nodes(self.loop.graph)
 
         if nodes is not None:

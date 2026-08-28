@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from .graph import GraphVisitor
+
+if TYPE_CHECKING:
+    from collections.abc import Collection
+    from typing import Any
 
 
 class SingleNodeGraphVisitor(GraphVisitor):
@@ -33,7 +39,7 @@ class SingleNodeGraphVisitor(GraphVisitor):
     def predecessors(self, node):
         return []
 
-    def sort_nodes(self, nodes=None):
+    def sort_nodes(self, nodes: Collection[Any] | None = None):
         if nodes:
             return nodes
         return [self.node]
