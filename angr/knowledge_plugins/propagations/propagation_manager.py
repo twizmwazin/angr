@@ -33,7 +33,7 @@ class PropagationManager(KnowledgeBasePlugin):
         """
         self._propagations[prop_key] = model
 
-    def get(self, prop_key, default=None) -> PropagationModel:
+    def get(self, prop_key, default: PropagationModel | None = None) -> PropagationModel:
         """
         Gets the replacements for a specified function location.
         If the replacement does not exist in the known propagations, it

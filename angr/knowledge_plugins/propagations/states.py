@@ -21,6 +21,8 @@ if TYPE_CHECKING:
 
     from angr.project import Project
 
+    from .propagation_model import PropagationModel
+
 
 class CallExprFinder(ailment.AILBlockRewriter):
     """
@@ -85,8 +87,8 @@ class PropagatorState:
         store_tops: bool = True,
         gp: int | None = None,
         max_prop_expr_occurrence: int = 1,
-        model=None,
-        artificial_reg_offsets=None,
+        model: PropagationModel | None = None,
+        artificial_reg_offsets: set[int] | None = None,
     ):
         self.arch = arch
         self.gpr_size = arch.bits // arch.byte_width  # size of the general-purpose registers
@@ -113,12 +115,12 @@ class PropagatorState:
         cls,
         project: Project,
         only_consts=False,
-        gp=None,
+        gp: int | None = None,
         do_binops=True,
         store_tops=False,
-        func_addr=None,
-        max_prop_expr_occurrence=None,
-        initial_codeloc=None,
+        func_addr: int | None = None,
+        max_prop_expr_occurrence: int | None = None,
+        initial_codeloc: CodeLocation | None = None,
     ):
         raise NotImplementedError
 
@@ -364,19 +366,19 @@ class PropagatorVEXState(PropagatorState):
     def __init__(
         self,
         arch,
-        project=None,
-        registers=None,
-        local_variables=None,
-        replacements=None,
+        project: Project | None = None,
+        registers: LabeledMemory | None = None,
+        local_variables: LabeledMemory | None = None,
+        replacements: defaultdict[CodeLocation, dict] | None = None,
         only_consts=False,
-        expr_used_locs=None,
+        expr_used_locs: defaultdict | None = None,
         do_binops=True,
         store_tops=True,
-        block_initial_reg_values=None,
-        gp=None,
+        block_initial_reg_values: defaultdict[tuple, list[tuple[int, int, int]]] | None = None,
+        gp: int | None = None,
         max_prop_expr_occurrence: int = 1,
-        model=None,
-        artificial_reg_offsets=None,
+        model: PropagationModel | None = None,
+        artificial_reg_offsets: set[int] | None = None,
     ):
         super().__init__(
             arch,
@@ -416,13 +418,13 @@ class PropagatorVEXState(PropagatorState):
         cls,
         project,
         only_consts=False,
-        gp=None,
+        gp: int | None = None,
         do_binops=True,
         store_tops=False,
-        func_addr=None,
-        max_prop_expr_occurrence=None,
-        initial_codeloc=None,
-        model=None,
+        func_addr: int | None = None,
+        max_prop_expr_occurrence: int | None = None,
+        initial_codeloc: CodeLocation | None = None,
+        model: PropagationModel | None = None,
     ):
         state = cls(
             project.arch,
