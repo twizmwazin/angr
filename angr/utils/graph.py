@@ -377,6 +377,7 @@ class Dominators[T]:
     """
 
     dom: networkx.DiGraph[T]
+    prepared_graph: networkx.DiGraph[ContainerNode[T]]
 
     def __init__(self, graph: networkx.DiGraph[T], entry_node: T, successors_func=None, reverse=False):
         self._l = logging.getLogger("utils.graph.dominators")
@@ -391,7 +392,6 @@ class Dominators[T]:
 
         # Output
         self.dom = None  # type: ignore # this is guaranteed to be not null after the __init__ returns
-        self.prepared_graph = None
 
         self._construct(graph, entry_node)
 

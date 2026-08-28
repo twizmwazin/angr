@@ -43,6 +43,9 @@ class SimSymbolizer(SimStatePlugin):  # pylint:disable=abstract-method
     about memory disclosure).
     """
 
+    _LE_FMT: str
+    _BE_FMT: str
+
     def __init__(self):
         SimStatePlugin.__init__(self)
 
@@ -54,8 +57,6 @@ class SimSymbolizer(SimStatePlugin):  # pylint:disable=abstract-method
         self._min_addr = 0
         self._max_addr = 0
 
-        self._LE_FMT = None
-        self._BE_FMT = None
         self._zero = None
 
     def _page_map_callback(self):
