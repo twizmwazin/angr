@@ -14,6 +14,7 @@ from angr.analyses.decompiler.structured_codegen.c import (
     CAssignment,
     CConstant,
     CFunctionCall,
+    CStructuredCodeGenerator,
     CStructuredCodeWalker,
     CVariable,
 )
@@ -274,11 +275,13 @@ class APIObfuscationFinder(Analysis):
                 dec = self.project.analyses.Decompiler(self.kb.functions.get_by_addr(caller_addr), cfg=cfg)
             except Exception:  # pylint:disable=broad-exception-caught
                 continue
-            if dec.codegen is None:
+            codegen = dec.codegen
+            if not isinstance(codegen, CStructuredCodeGenerator):
+                # decompilation failed, or the result carries no C AST (e.g. a cached dummy codegen)
                 continue
 
             finder = Type1AssignmentFinder(func_addr, desc)
-            finder.handle(dec.codegen.cfunc)
+            finder.handle(codegen.cfunc)
 
             duplicate_addrs = set(assignments.keys()).intersection(set(finder.assignments.keys()))
             if duplicate_addrs:

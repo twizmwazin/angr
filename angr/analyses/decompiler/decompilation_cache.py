@@ -235,8 +235,14 @@ class DecompilationCache(Serializable):
 
         if self.clinic is not None:
             msg.clinic = self.clinic.serialize()
-        if self.codegen is not None:
-            msg.codegen = self.codegen.serialize()
+        codegen = self.codegen
+        if codegen is not None:
+            # Only Serializable codegens (currently CStructuredCodeGenerator, the flavor parse_from_cmessage
+            # reconstructs) can be embedded. Other flavors raise here, exactly as the previous unguarded
+            # ``.serialize()`` call did; callers catch it and fall back to the legacy metadata-only dump.
+            if not isinstance(codegen, Serializable):
+                raise TypeError(f"Codegen of type {type(codegen).__name__} is not serializable.")
+            msg.codegen = codegen.serialize()
 
         msg.errors.extend(self.errors)
         if self.function_summary is not None:
