@@ -5,8 +5,12 @@ import multiprocessing
 import os
 import tempfile
 import time
+from typing import TYPE_CHECKING
 
 from .worker import Worker
+
+if TYPE_CHECKING:
+    from collections.abc import MutableMapping
 
 _l = logging.getLogger(__name__)
 
@@ -61,7 +65,7 @@ class Server:
         self._recursion_limit = recursion_limit
 
         self._worker_exit_args_lock = None
-        self._worker_exit_args: dict[int, tuple] = None
+        self._worker_exit_args: MutableMapping[int, tuple] | None = None
 
         # the following will not be pickled
         self._worker_exit_callback = worker_exit_callback
