@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 import pyvex
 
 from angr.engines.engine import SimEngine
 from angr.utils.constants import DEFAULT_STATEMENT
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 l = logging.getLogger(name=__name__)
 
@@ -100,7 +104,7 @@ class VEXMixin(SimEngine):
             [self._analyze_vex_expr_CCall_arg(arg) for arg in expr.args],
         )
 
-    def _perform_vex_expr_CCall(self, func_name, ty, args, func=None):
+    def _perform_vex_expr_CCall(self, func_name, ty, args, func: Callable | None = None):
         return NotImplemented
 
     def _handle_vex_expr_ITE(self, expr: pyvex.expr.ITE):
@@ -248,7 +252,7 @@ class VEXMixin(SimEngine):
         if tmp not in (-1, 0xFFFFFFFF):
             self._perform_vex_stmt_Dirty_wrtmp(tmp, retval)
 
-    def _perform_vex_stmt_Dirty_call(self, func_name, ty, args, func=None):
+    def _perform_vex_stmt_Dirty_call(self, func_name, ty, args, func: Callable | None = None):
         return NotImplemented
 
     # stmt category 3: weird load/store patterns implemented in terms of above

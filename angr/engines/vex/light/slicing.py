@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from angr.utils.constants import DEFAULT_STATEMENT
 
 from .light import VEXMixin
+
+if TYPE_CHECKING:
+    from collections.abc import Container
 
 
 class VEXSlicingMixin(VEXMixin):
@@ -14,7 +19,15 @@ class VEXSlicingMixin(VEXMixin):
         self._last_stmt = None
         self._whitelist = None
 
-    def process(self, state, block=None, skip_stmts=0, last_stmt=None, whitelist=None, **kwargs):
+    def process(
+        self,
+        state,
+        block=None,
+        skip_stmts=0,
+        last_stmt: int | None = None,
+        whitelist: Container[int] | None = None,
+        **kwargs,
+    ):
         self._skip_stmts = skip_stmts
         self._last_stmt = last_stmt
         self._whitelist = whitelist

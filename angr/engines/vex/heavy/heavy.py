@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 import claripy
 import pyvex
@@ -15,6 +16,11 @@ from angr.utils.constants import DEFAULT_STATEMENT
 
 from . import dirty
 
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
+
+    from angr.state_plugins.sim_action import SimActionData, SimActionOperation
+
 l = logging.getLogger(__name__)
 
 
@@ -25,21 +31,38 @@ class VEXEarlyExit(Exception):
 
 class SimStateStorageMixin(VEXMixin):
     # pylint:disable=arguments-differ,missing-class-docstring
-    def _perform_vex_expr_Get(self, offset, ty, action=None, inspect=True):
+    def _perform_vex_expr_Get(self, offset, ty, action: SimActionData | None = None, inspect=True):
         return self.state.registers.load(offset, self._ty_to_bytes(ty), action=action, inspect=inspect)
 
     def _perform_vex_expr_RdTmp(self, tmp):
         return self.state.scratch.tmp_expr(tmp)
 
-    def _perform_vex_expr_Load(self, addr, ty, endness, action=None, inspect=True, condition=None, **kwargs):
+    def _perform_vex_expr_Load(
+        self,
+        addr,
+        ty,
+        endness,
+        action: SimActionData | None = None,
+        inspect=True,
+        condition: claripy.ast.Bool | None = None,
+        **kwargs,
+    ):
         return self.state.memory.load(
             addr, self._ty_to_bytes(ty), endness=endness, action=action, inspect=inspect, condition=condition
         )
 
-    def _perform_vex_stmt_Put(self, offset, data, action=None, inspect=True):
+    def _perform_vex_stmt_Put(self, offset, data, action: SimActionData | None = None, inspect=True):
         self.state.registers.store(offset, data, action=action, inspect=inspect)
 
-    def _perform_vex_stmt_Store(self, addr, data, endness, action=None, inspect=True, condition=None):
+    def _perform_vex_stmt_Store(
+        self,
+        addr,
+        data,
+        endness,
+        action: SimActionData | None = None,
+        inspect=True,
+        condition: claripy.ast.Bool | None = None,
+    ):
         if (
             o.UNICORN_HANDLE_SYMBOLIC_ADDRESSES in self.state.options
             or o.UNICORN_HANDLE_SYMBOLIC_CONDITIONS in self.state.options
@@ -55,7 +78,7 @@ class SimStateStorageMixin(VEXMixin):
             addr, data, size=data.size() // 8, endness=endness, action=action, inspect=inspect, condition=condition
         )
 
-    def _perform_vex_stmt_WrTmp(self, tmp, data, deps=None):
+    def _perform_vex_stmt_WrTmp(self, tmp, data, deps: frozenset[SimActionData | SimActionOperation] | None = None):
         self.state.scratch.store_tmp(tmp, data, deps=deps)
 
 
@@ -85,14 +108,14 @@ class HeavyVEXMixin(SuccessorsEngine, ClaripyDataMixin, SimStateStorageMixin, VE
     def process_successors(
         self,
         successors,
-        irsb=None,
-        insn_bytes=None,
+        irsb: pyvex.IRSB | None = None,
+        insn_bytes: bytes | None = None,
         thumb=False,
-        size=None,
-        num_inst=None,
-        extra_stop_points=None,
-        opt_level=None,
-        strict_block_end=None,
+        size: int | None = None,
+        num_inst: int | None = None,
+        extra_stop_points: Iterable[int] | None = None,
+        opt_level: int | None = None,
+        strict_block_end: bool | None = None,
         **kwargs,
     ):
         if not pyvex.lifting.lifters[self.state.arch.name] or type(successors.addr) is not int:
@@ -347,7 +370,7 @@ class HeavyVEXMixin(SuccessorsEngine, ClaripyDataMixin, SimStateStorageMixin, VE
             raise errors.SimUninitializedAccessError("addr", addr)
         return result
 
-    def _perform_vex_expr_CCall(self, func_name, ty, args, func=None):
+    def _perform_vex_expr_CCall(self, func_name, ty, args, func: Callable | None = None):
         if o.DO_CCALLS not in self.state.options:
             return symbol(ty, "ccall_ret")
         return super()._perform_vex_expr_CCall(func_name, ty, args, func=None)

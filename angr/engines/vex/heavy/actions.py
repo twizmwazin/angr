@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pyvex
 
 from angr import sim_options as o
 from angr.state_plugins.sim_action import SimActionData, SimActionExit, SimActionObject, SimActionOperation
 
 from .heavy import HeavyVEXMixin
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class TrackActionsMixin(HeavyVEXMixin):
@@ -59,13 +64,13 @@ class TrackActionsMixin(HeavyVEXMixin):
         return result, combined_deps
 
     # TODO for this and below: what if we made AUTO_DEPS work here?
-    def _perform_vex_expr_CCall(self, func_name, ty, args, func=None):
+    def _perform_vex_expr_CCall(self, func_name, ty, args, func: Callable | None = None):
         exprs, deps = zip(*args)
         combined_deps = frozenset().union(*deps)
         result = super()._perform_vex_expr_CCall(func_name, ty, exprs, func=None)
         return result, combined_deps
 
-    def _perform_vex_stmt_Dirty_call(self, func_name, ty, args, func=None):
+    def _perform_vex_stmt_Dirty_call(self, func_name, ty, args, func: Callable | None = None):
         exprs, deps = zip(*args) if args else ((), ())
         combined_deps = frozenset().union(*deps)
         result = super()._perform_vex_stmt_Dirty_call(func_name, ty, exprs, func=None)

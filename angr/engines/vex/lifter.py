@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 import claripy
 import cle
@@ -13,6 +14,11 @@ from angr.engines.engine import SimEngine
 from angr.errors import SimEngineError, SimError, SimTranslationError
 from angr.misc.ux import once
 from angr.state_plugins.inspect import BP_AFTER, BP_BEFORE, NO_OVERRIDE
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from angr.sim_state import SimState
 
 l = logging.getLogger(__name__)
 
@@ -28,10 +34,10 @@ class VEXLifter(SimEngine):
     def __init__(
         self,
         project,
-        use_cache=None,
+        use_cache: bool | None = None,
         cache_size=5000,
         default_opt_level=1,
-        selfmodifying_code=None,
+        selfmodifying_code: bool | None = None,
         single_step=False,
         default_strict_block_end=False,
         **kwargs,
@@ -80,18 +86,18 @@ class VEXLifter(SimEngine):
         state=None,
         clemory: cle.Clemory | cle.ClemoryReadOnlyView | None = None,
         insn_bytes: bytes | None = None,
-        offset=None,
+        offset: int | None = None,
         arch=None,
-        size=None,
-        num_inst=None,
+        size: int | None = None,
+        num_inst: int | None = None,
         traceflags=0,
         thumb=False,
-        extra_stop_points=None,
-        opt_level=None,
-        strict_block_end=None,
+        extra_stop_points: Iterable[int] | None = None,
+        opt_level: int | None = None,
+        strict_block_end: bool | None = None,
         skip_stmts=False,
         collect_data_refs=False,
-        cross_insn_opt=None,
+        cross_insn_opt: bool | None = None,
         load_from_ro_regions=False,
         const_prop=False,
     ) -> pyvex.IRSB:
@@ -292,7 +298,11 @@ class VEXLifter(SimEngine):
             raise SimTranslationError("Unable to translate bytecode") from e
 
     def _load_bytes(
-        self, addr, max_size, state=None, clemory: cle.Clemory | cle.ClemoryReadOnlyView | None = None
+        self,
+        addr,
+        max_size,
+        state: SimState | None = None,
+        clemory: cle.Clemory | cle.ClemoryReadOnlyView | None = None,
     ) -> tuple[bytes, int, int]:
         if clemory is None and state is None:
             raise SimEngineError("state and clemory cannot both be None in _load_bytes().")
@@ -366,7 +376,7 @@ class VEXLifter(SimEngine):
         size = min(max_size, size)
         return buff, size, offset
 
-    def _first_stoppoint(self, irsb, extra_stop_points=None):
+    def _first_stoppoint(self, irsb, extra_stop_points: Iterable[int] | None = None):
         """
         Enumerate the imarks in the block. If any of them (after the first one) are at a stop point, returns the address
         of the stop point. None is returned otherwise.
@@ -388,7 +398,7 @@ class VEXLifter(SimEngine):
                 first_imark = False
         return None
 
-    def __is_stop_point(self, addr, extra_stop_points=None):
+    def __is_stop_point(self, addr, extra_stop_points: Iterable[int] | None = None):
         return bool(
             (self.project is not None and addr in self.project._sim_procedures)
             or (extra_stop_points is not None and addr in extra_stop_points)

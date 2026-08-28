@@ -1006,7 +1006,7 @@ class SimIROp:
     def _op_fgeneric_CmpLT(self, a0, a1):
         return self._fp_vector_comparison(claripy.fpLT, a0, a1)
 
-    def _auto_vectorize(self, f, args, rm=None, rm_passed=False):
+    def _auto_vectorize(self, f, args, rm: claripy.ast.BV | None = None, rm_passed=False):
         if rm is not None:
             rm = self._translate_rm(rm)
             if rm_passed:

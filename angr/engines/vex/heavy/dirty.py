@@ -56,7 +56,7 @@ def amd64g_dirtyhelper_CPUID_baseline(state, _):
 
     old_eax = state.regs.rax[31:0]
 
-    def SET_ABCD(a, b, c, d, condition=None):
+    def SET_ABCD(a, b, c, d, condition: int | None = None):
         if condition is None:
             state.registers.store("rax", a, size=8)
             state.registers.store("rbx", b, size=8)
@@ -163,7 +163,7 @@ def CORRECT_amd64g_dirtyhelper_CPUID_avx_and_cx16(state, _):
     old_eax = state.regs.rax[31:0]
     old_ecx = state.regs.rcx[31:0]
 
-    def SET_ABCD(a, b, c, d, condition=None, condition2=None):
+    def SET_ABCD(a, b, c, d, condition: int | None = None, condition2: int | None = None):
         if condition is None:
             state.registers.store("rax", a, size=8)
             state.registers.store("rbx", b, size=8)
@@ -251,7 +251,7 @@ def x86g_dirtyhelper_CPUID_sse0(state, _):
 
     old_eax = state.regs.eax
 
-    def SET_ABCD(a, b, c, d, condition=None, condition2=None):
+    def SET_ABCD(a, b, c, d, condition: int | None = None, condition2: int | None = None):
         if condition is None:
             state.registers.store("eax", a, size=4)
             state.registers.store("ebx", b, size=4)
@@ -286,7 +286,7 @@ def CORRECT_x86g_dirtyhelper_CPUID_sse2(state, _):
     old_eax = state.regs.eax
     old_ecx = state.regs.ecx
 
-    def SET_ABCD(a, b, c, d, condition=None, condition2=None):
+    def SET_ABCD(a, b, c, d, condition: int | None = None, condition2: int | None = None):
         if condition is None:
             state.registers.store("eax", a, size=4)
             state.registers.store("ebx", b, size=4)
