@@ -55,14 +55,11 @@ class RewriteCxxOperatorCalls(PeepholeOptimizationStmtBase):
         return None
 
     def _optimize_operator_equal(self, stmt: SideEffectStatement) -> WeakAssignment | None:
-        if (
-            stmt.expr.args
-            and len(stmt.expr.args) == 2
-            and isinstance(stmt.expr.args[0], UnaryOp)
-            and stmt.expr.args[0].op == "Reference"
-        ):
-            prototype = variable_map_of(self.manager).prototype(stmt.expr)
-            dst = stmt.expr.args[0].operand
+        call = stmt.expr
+        assert isinstance(call, Call)
+        if call.args and len(call.args) == 2 and isinstance(call.args[0], UnaryOp) and call.args[0].op == "Reference":
+            prototype = variable_map_of(self.manager).prototype(call)
+            dst = call.args[0].operand
             if isinstance(dst, VirtualVariable):
                 self.preserve_vvar_ids.add(dst.varid)
                 atom = atoms.VirtualVariable(dst.varid, dst.size, dst.category, dst.oident)
@@ -71,9 +68,9 @@ class RewriteCxxOperatorCalls(PeepholeOptimizationStmtBase):
                     if type_hint is not None:
                         self.type_hints.append((atom, type_hint))
             arg1 = (
-                Load(self.manager.next_atom(), stmt.expr.args[1], UNDETERMINED_SIZE, Endness.BE, **stmt.tags)
-                if isinstance(stmt.expr.args[1], Const)
-                else stmt.expr.args[1]
+                Load(self.manager.next_atom(), call.args[1], UNDETERMINED_SIZE, Endness.BE, **stmt.tags)
+                if isinstance(call.args[1], Const)
+                else call.args[1]
             )
             type_ = None
             if prototype is not None:
@@ -81,24 +78,25 @@ class RewriteCxxOperatorCalls(PeepholeOptimizationStmtBase):
                 if isinstance(dst_ty, SimTypeReference):
                     dst_ty = dst_ty.refs
                 type_ = {"dst": dst_ty, "src": prototype.args[1]}
-            return WeakAssignment(stmt.idx, stmt.expr.args[0].operand, arg1, type=type_, **stmt.tags)  # type: ignore
+            return WeakAssignment(stmt.idx, call.args[0].operand, arg1, type=type_, **stmt.tags)
         return None
 
     def _optimize_operator_add_call(self, stmt: SideEffectStatement) -> WeakAssignment | None:
+        call = stmt.expr
+        assert isinstance(call, Call)
         if (
-            isinstance(stmt.expr, Call)
-            and stmt.expr.args
-            and len(stmt.expr.args) == 3
-            and isinstance(stmt.expr.args[1], UnaryOp)
-            and stmt.expr.args[1].op == "Reference"
-            and isinstance(stmt.expr.args[1].operand, VirtualVariable)
-            and isinstance(stmt.expr.args[2], Const)
+            call.args
+            and len(call.args) == 3
+            and isinstance(call.args[1], UnaryOp)
+            and call.args[1].op == "Reference"
+            and isinstance(call.args[1].operand, VirtualVariable)
+            and isinstance(call.args[2], Const)
             and isinstance(stmt.ret_expr, VirtualVariable)
         ):
-            arg2 = Load(self.manager.next_atom(), stmt.expr.args[2], UNDETERMINED_SIZE, Endness.BE, **stmt.tags)
-            addition = BinaryOp(self.manager.next_atom(), "Add", [stmt.expr.args[1].operand, arg2], **stmt.tags)
+            arg2 = Load(self.manager.next_atom(), call.args[2], UNDETERMINED_SIZE, Endness.BE, **stmt.tags)
+            addition = BinaryOp(self.manager.next_atom(), "Add", [call.args[1].operand, arg2], **stmt.tags)
             type_ = None
-            prototype = variable_map_of(self.manager).prototype(stmt.expr)
+            prototype = variable_map_of(self.manager).prototype(call)
             if prototype is not None:
                 dst_ty = prototype.returnty
                 if isinstance(dst_ty, SimTypeReference):
