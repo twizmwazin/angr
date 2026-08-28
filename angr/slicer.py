@@ -25,8 +25,8 @@ class SimLightState:
 
     def __init__(
         self,
-        temps: set[int] | dict[int, int] | None = None,
-        regs: set[int] | dict[int, int] | None = None,
+        temps=None,
+        regs=None,
         stack_offsets: set[int] | None = None,
         options: dict[str, bool] | None = None,
     ):
