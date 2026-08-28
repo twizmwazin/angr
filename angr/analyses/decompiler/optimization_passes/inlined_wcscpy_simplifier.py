@@ -173,10 +173,11 @@ class InlinedWcscpySimplifier(OptimizationPass):
         # Collect all candidate statements with their base/offset
         candidates = []  # list of (stmt_index, base, offset, store_size, stmt)
         for i, stmt in enumerate(statements):
-            if isinstance(stmt, SideEffectStatement) and self.is_inlined_wcsncpy(stmt):
-                assert stmt.expr.args is not None and len(stmt.expr.args) >= 3
-                base, off = self._parse_addr(stmt.expr.args[0])
-                count = stmt.expr.args[2]
+            wcsncpy_call = self._as_inlined_wcsncpy(stmt)
+            if wcsncpy_call is not None:
+                assert wcsncpy_call.args is not None and len(wcsncpy_call.args) >= 3
+                base, off = self._parse_addr(wcsncpy_call.args[0])
+                count = wcsncpy_call.args[2]
                 if not isinstance(count, Const) or not count.is_int:
                     return None
                 store_size = count.value_int * 2
@@ -297,13 +298,13 @@ class InlinedWcscpySimplifier(OptimizationPass):
 
     def _optimize_pair(self, last_stmt, stmt):
         # convert (store, wcsncpy()) to (wcsncpy(), store) if they do not overlap
+        curr_call = self._as_inlined_wcsncpy(stmt)
         if (
-            isinstance(stmt, SideEffectStatement)
-            and self.is_inlined_wcsncpy(stmt)
-            and stmt.expr.args is not None
-            and len(stmt.expr.args) == 3
-            and isinstance(stmt.expr.args[2], Const)
-            and isinstance(stmt.expr.args[2].value, int)
+            curr_call is not None
+            and curr_call.args is not None
+            and len(curr_call.args) == 3
+            and isinstance(curr_call.args[2], Const)
+            and isinstance(curr_call.args[2].value, int)
             and isinstance(last_stmt, (Store, Assignment))
         ):
             if isinstance(last_stmt, Store) and isinstance(last_stmt.data, Const):
@@ -314,8 +315,8 @@ class InlinedWcscpySimplifier(OptimizationPass):
                 store_size = last_stmt.dst.size
             else:
                 return None
-            wcsncpy_addr = stmt.expr.args[0]
-            wcsncpy_size = stmt.expr.args[2].value * 2
+            wcsncpy_addr = curr_call.args[0]
+            wcsncpy_size = curr_call.args[2].value * 2
             delta = self._get_delta(store_addr, wcsncpy_addr)
             if delta is not None:
                 if (0 <= delta <= store_size) or (delta < 0 and -delta <= wcsncpy_size):
@@ -324,24 +325,26 @@ class InlinedWcscpySimplifier(OptimizationPass):
                     last_stmt, stmt = stmt, last_stmt
 
         # swap two statements if they are out of order
-        if self.is_inlined_wcsncpy(last_stmt) and self.is_inlined_wcsncpy(stmt):
-            assert isinstance(last_stmt, SideEffectStatement) and isinstance(stmt, SideEffectStatement)
-            assert last_stmt.expr.args is not None and stmt.expr.args is not None
-            delta = self._get_delta(last_stmt.expr.args[0], stmt.expr.args[0])
+        last_call = self._as_inlined_wcsncpy(last_stmt)
+        curr_call = self._as_inlined_wcsncpy(stmt)
+        if last_call is not None and curr_call is not None:
+            assert last_call.args is not None and curr_call.args is not None
+            delta = self._get_delta(last_call.args[0], curr_call.args[0])
             if delta is not None and delta < 0:
                 last_stmt, stmt = stmt, last_stmt
 
-        if self.is_inlined_wcsncpy(last_stmt):
-            assert isinstance(last_stmt, SideEffectStatement)
-            assert last_stmt.expr.args is not None and isinstance(last_stmt.expr.args[1], Const)
-            s_last = self.kb.custom_strings[last_stmt.expr.args[1].value_int]
-            addr_last = last_stmt.expr.args[0]
+        last_call = self._as_inlined_wcsncpy(last_stmt)
+        if last_call is not None:
+            assert last_call.args is not None and isinstance(last_call.args[1], Const)
+            s_last = self.kb.custom_strings[last_call.args[1].value_int]
+            addr_last = last_call.args[0]
             new_str = None
 
-            if isinstance(stmt, SideEffectStatement) and self.is_inlined_wcsncpy(stmt):
-                assert stmt.expr.args is not None and isinstance(stmt.expr.args[1], Const)
-                s_curr = self.kb.custom_strings[stmt.expr.args[1].value_int]
-                addr_curr = stmt.expr.args[0]
+            curr_call = self._as_inlined_wcsncpy(stmt)
+            if curr_call is not None:
+                assert curr_call.args is not None and isinstance(curr_call.args[1], Const)
+                s_curr = self.kb.custom_strings[curr_call.args[1].value_int]
+                addr_curr = curr_call.args[0]
                 delta = self._get_delta(addr_last, addr_curr)
                 if delta is not None and delta == len(s_last):
                     new_str = s_last + s_curr
@@ -384,12 +387,12 @@ class InlinedWcscpySimplifier(OptimizationPass):
                     str_const = Const(
                         self.manager.next_atom(),
                         new_str_idx,
-                        last_stmt.expr.args[0].bits,
+                        last_call.args[0].bits,
                         type=wstr_type,
                     )
                     variable_map_of(self.manager).set_custom_string(str_const)
                     args = [
-                        last_stmt.expr.args[0],
+                        last_call.args[0],
                         str_const,
                     ]
                 else:
@@ -398,12 +401,12 @@ class InlinedWcscpySimplifier(OptimizationPass):
                     str_const = Const(
                         self.manager.next_atom(),
                         new_str_idx,
-                        last_stmt.expr.args[0].bits,
+                        last_call.args[0].bits,
                         type=wstr_type,
                     )
                     variable_map_of(self.manager).set_custom_string(str_const)
                     args = [
-                        last_stmt.expr.args[0],
+                        last_call.args[0],
                         str_const,
                         Const(self.manager.next_atom(), len(new_str) // 2, self.project.arch.bits),
                     ]
@@ -564,16 +567,27 @@ class InlinedWcscpySimplifier(OptimizationPass):
             return True, bytes(chars)
         return False, None
 
+    def _as_inlined_wcsncpy(self, stmt) -> Call | None:
+        """
+        Return the wrapped Call expression if stmt is an inlined wcsncpy call statement, or None otherwise.
+        """
+        if not isinstance(stmt, SideEffectStatement):
+            return None
+        call = stmt.expr
+        if (
+            isinstance(call, Call)
+            and isinstance(call.target, str)
+            and call.target == "wcsncpy"
+            and call.args is not None
+            and len(call.args) == 3
+            and isinstance(call.args[1], Const)
+            and variable_map_of(self.manager).custom_string(call.args[1])
+        ):
+            return call
+        return None
+
     def is_inlined_wcsncpy(self, stmt):
-        return (
-            isinstance(stmt, SideEffectStatement)
-            and isinstance(stmt.expr.target, str)
-            and stmt.expr.target == "wcsncpy"
-            and stmt.expr.args is not None
-            and len(stmt.expr.args) == 3
-            and isinstance(stmt.expr.args[1], Const)
-            and variable_map_of(self.manager).custom_string(stmt.expr.args[1])
-        )
+        return self._as_inlined_wcsncpy(stmt) is not None
 
     @staticmethod
     def _parse_addr(addr):
