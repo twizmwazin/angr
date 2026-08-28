@@ -51,10 +51,10 @@ class VFGJob(CFGJobBase):
 
         self.call_stack_suffix: list = []
         self.vfg_node: VFGNode | None = None
-        self.is_call_jump = None
+        self.is_call_jump: bool = False
         self.call_target = None
         self.dbg_exit_status = {}
-        self.is_return_jump = None
+        self.is_return_jump: bool = False
 
         self.sim_successors: SimSuccessors | None = None
 
@@ -224,7 +224,7 @@ class VFGNode:
     A descriptor of nodes in a Value-Flow Graph
     """
 
-    def __init__(self, addr: int, key: BlockID, state: SimState | None = None) -> None:
+    def __init__(self, addr: int, key: BlockID, state: SimState) -> None:
         """
         Constructor.
 
@@ -234,7 +234,7 @@ class VFGNode:
         """
         self.key = key
         self.addr = addr
-        self.state: SimState | None = None
+        self.state: SimState = state
         self.widened_state: SimState | None = None
         self.narrowing_times: int = 0
         self.all_states: list[SimState] = []
@@ -243,9 +243,7 @@ class VFGNode:
         self.actions: list = []
         self.final_states: list[SimState] = []
 
-        if state:
-            self.all_states.append(state)
-            self.state = state
+        self.all_states.append(state)
 
     def __hash__(self) -> int:
         return hash(self.key)
@@ -341,12 +339,19 @@ class VFG(ForwardAnalysis[SimState, VFGNode, VFGJob, BlockID, SimState], Analysi
             self, order_jobs=True, allow_merging=True, allow_widening=True, status_callback=status_callback
         )  # type: ignore
 
-        # Related CFG.
-        # We can still perform analysis if you don't specify a CFG. But providing a CFG may give you better result.
-        self._cfg = cfg
-
         # Where to start the analysis
         self._start: int = start if start is not None else self.project.entry
+
+        # Related CFG.
+        # We can still perform analysis if you don't specify a CFG. But providing a CFG may give you better result.
+        if cfg is None:
+            l.debug("Generating a CFG, since none was given...")
+            # TODO: can we use a fast CFG instead? note that fast CFG does not care of context sensitivity at all, but
+            # TODO: for state merging, we also don't really care about context sensitivity.
+            cfg = self.project.analyses[CFGEmulated].prep()(
+                context_sensitivity_level=context_sensitivity_level, starts=(self._start,)
+            )
+        self._cfg: CFGEmulated = cfg
         self._function_start: int = function_start if function_start is not None else self._start
 
         # Other parameters
@@ -517,15 +522,6 @@ class VFG(ForwardAnalysis[SimState, VFGNode, VFGJob, BlockID, SimState], Analysi
 
         # initialize the execution counter dict
         self._execution_counter = defaultdict(int)
-
-        # Generate a CFG if no CFG is provided
-        if not self._cfg:
-            l.debug("Generating a CFG, since none was given...")
-            # TODO: can we use a fast CFG instead? note that fast CFG does not care of context sensitivity at all, but
-            # TODO: for state merging, we also don't really care about context sensitivity.
-            self._cfg: CFGEmulated = self.project.analyses[CFGEmulated].prep()(
-                context_sensitivity_level=self._context_sensitivity_level, starts=(self._start,)
-            )
 
         if not self._cfg.normalized:
             l.warning(
@@ -791,7 +787,7 @@ class VFG(ForwardAnalysis[SimState, VFGNode, VFGJob, BlockID, SimState], Analysi
 
         job.call_target = None if not call_targets else call_targets[0]
 
-        job.is_return_jump = len(all_successors) and all_successors[0].history.jumpkind == "Ijk_Ret"
+        job.is_return_jump = bool(all_successors) and all_successors[0].history.jumpkind == "Ijk_Ret"
 
         if job.is_call_jump:
             # create the call task

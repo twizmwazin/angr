@@ -509,10 +509,10 @@ class SuccessorsEngine(SimEngine[HeavyState, SimSuccessors]):
     and dispatches to a ``process_successors`` method to fill a SimSuccessors object with the results.
     """
 
+    successors: SimSuccessors
+
     def __init__(self, project: angr.Project):
         super().__init__(project)
-
-        self.successors: SimSuccessors | None = None
 
     def process(self, state: HeavyState, **kwargs) -> SimSuccessors:  # pylint:disable=unused-argument
         """

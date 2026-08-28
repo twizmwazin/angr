@@ -97,20 +97,21 @@ class PropagatorAnalysis(ForwardAnalysis, Analysis):  # pylint:disable=abstract-
         else:  # flavor == "block"
             self._initial_codeloc = CodeLocation(self._block_addr, stmt_idx=0, ins_addr=self._block_addr)
 
-        self.model: PropagationModel = None
+        model: PropagationModel | None = None
 
         if self._cache_results:
             # Resume the analysis from the previously unfinished result
-            self.model = self.kb.propagations.get(self.prop_key, None)
+            model = self.kb.propagations.get(self.prop_key, None)
 
-        if self.model is None:
-            self.model = PropagationModel(
+        if model is None:
+            model = PropagationModel(
                 self.prop_key,
                 function=self._function,
             )
             cache_used = False
         else:
             cache_used = True
+        self.model: PropagationModel = model
 
         graph_visitor: visitors.SingleNodeGraphVisitor | visitors.FunctionGraphVisitor
         if self.flavor == "block":

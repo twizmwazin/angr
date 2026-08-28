@@ -574,7 +574,6 @@ class Lifter:
         self.max_inst = None
         self.max_bytes = None
         self.skip_stmts = False
-        self.irsb = None
 
     def _lift(
         self,
@@ -1000,7 +999,7 @@ class PcodeLifterEngineMixin(SimEngine):
 
     def __init__(
         self,
-        project=None,
+        project,
         use_cache: bool | None = None,
         cache_size: int = 50000,
         default_opt_level: int = 1,
@@ -1030,7 +1029,6 @@ class PcodeLifterEngineMixin(SimEngine):
                 self.selfmodifying_code = False
 
         # block cache
-        self._block_cache = None
         self._block_cache_hits = 0
         self._block_cache_misses = 0
         self._initialize_block_cache()

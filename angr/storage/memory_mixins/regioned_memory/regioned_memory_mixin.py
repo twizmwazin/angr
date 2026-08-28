@@ -65,10 +65,8 @@ class RegionedMemoryMixin(MemoryMixin):
         self._cle_memory_backer = cle_memory_backer
         self._dict_memory_backer = dict_memory_backer
         self._stack_size: int = stack_size
-        self._stack_region_map: RegionMap | None = stack_region_map if stack_region_map is not None else RegionMap(True)
-        self._generic_region_map: RegionMap | None = (
-            generic_region_map if generic_region_map is not None else RegionMap(False)
-        )
+        self._stack_region_map: RegionMap = stack_region_map if stack_region_map is not None else RegionMap(True)
+        self._generic_region_map: RegionMap = generic_region_map if generic_region_map is not None else RegionMap(False)
 
         self._write_targets_limit = write_targets_limit
         self._read_targets_limit = read_targets_limit

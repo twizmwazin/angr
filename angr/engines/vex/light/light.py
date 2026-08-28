@@ -19,9 +19,7 @@ class VEXMixin(SimEngine):
         self._vex_stmt_handlers = []
         self.__init_handlers()
 
-        self.irsb = None
         self.stmt_idx = None
-        self.tmps = None
 
     def __init_handlers(self):
         self._vex_expr_handlers = [None] * pyvex.expr.tag_count
@@ -537,7 +535,7 @@ class VEXMixin(SimEngine):
 
     def handle_vex_block(self, irsb: pyvex.IRSB):
         self.irsb = irsb
-        self.tmps = [None] * self.irsb.tyenv.types_used
+        self.tmps: list = [None] * self.irsb.tyenv.types_used
 
         for stmt_idx, stmt in enumerate(irsb.statements):
             self.stmt_idx = stmt_idx

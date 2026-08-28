@@ -45,7 +45,7 @@ class HeavyPcodeMixin(
         super().__init__(*args, **kwargs)
         self._addr = None
         self._insn_bytes = None
-        self._thumb = None
+        self._thumb = False
         self._size = None
         self._num_inst = None
         self._extra_stop_points = None

@@ -13,8 +13,8 @@ Dirent = namedtuple("dirent", ("d_ino", "d_off", "d_reclen", "d_type", "d_name")
 
 
 class readdir(angr.SimProcedure):
-    struct = None
-    condition = None
+    struct: Dirent
+    condition: claripy.ast.Bool
 
     def run(self, dirp):  # pylint: disable=arguments-differ
         # TODO: make sure argument is actually a dir struct

@@ -19,15 +19,15 @@ class ListPage(MemoryObjectMixin, PageBase):
     This class implements a page memory mixin with lists as the main content store.
     """
 
-    def __init__(self, memory=None, content=None, sinkhole=None, mo_cmp=None, **kwargs):
+    def __init__(self, memory, content=None, sinkhole=None, mo_cmp=None, **kwargs):
         super().__init__(**kwargs)
 
-        self.content: DynamicDictList[SimMemoryObject | None] | None = (
-            DynamicDictList(max_size=memory.page_size, content=content) if content is not None else None
+        self.content: DynamicDictList[SimMemoryObject | None] = (
+            DynamicDictList(max_size=memory.page_size, content=content)
+            if content is not None
+            else DynamicDictList(max_size=memory.page_size)
         )
         self.stored_offset = set()
-        if self.content is None and memory is not None:
-            self.content: DynamicDictList[SimMemoryObject | None] = DynamicDictList(max_size=memory.page_size)
         self._mo_cmp = mo_cmp
 
         self.sinkhole: SimMemoryObject | None = sinkhole
@@ -108,7 +108,7 @@ class ListPage(MemoryObjectMixin, PageBase):
                 self.content[subaddr] = data
                 self.stored_offset.add(subaddr)
 
-    def erase(self, addr, size=None, **kwargs) -> None:
+    def erase(self, addr, size, **kwargs) -> None:
         for off in range(size):
             self.content[addr + off] = None
 
@@ -117,8 +117,9 @@ class ListPage(MemoryObjectMixin, PageBase):
         others: list[ListPage],
         merge_conditions,
         common_ancestor=None,
-        page_addr: int | None = None,
-        memory=None,
+        page_addr: int = 0,
+        *,
+        memory,
         changed_offsets: set[int] | None = None,
     ):
         if changed_offsets is None:
@@ -241,7 +242,7 @@ class ListPage(MemoryObjectMixin, PageBase):
         self.stored_offset |= merged_offsets
         return merged_offsets
 
-    def changed_bytes(self, other: ListPage, page_addr: int | None = None):
+    def changed_bytes(self, other: ListPage, page_addr: int = 0):
         candidates = super().changed_bytes(other)
         if candidates is None:
             candidates: set[int] = set()

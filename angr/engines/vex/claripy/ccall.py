@@ -2119,18 +2119,17 @@ def _concat_flags(nbits, flags_vec):
     return result.concat(claripy.BVV(0, nbits - result.length))
 
 
-def _get_nbits(cc_str):
-    nbits = None
+def _get_nbits(cc_str: str) -> int:
     if cc_str.endswith("B"):
-        nbits = 8
-    elif cc_str.endswith("W"):
-        nbits = 16
-    elif cc_str.endswith("L"):
-        nbits = 32
-    elif cc_str.endswith("Q"):
-        nbits = 64
-    elif cc_str.endswith("32"):
-        nbits = 32
-    elif cc_str.endswith("64"):
-        nbits = 64
-    return nbits
+        return 8
+    if cc_str.endswith("W"):
+        return 16
+    if cc_str.endswith("L"):
+        return 32
+    if cc_str.endswith("Q"):
+        return 64
+    if cc_str.endswith("32"):
+        return 32
+    if cc_str.endswith("64"):
+        return 64
+    raise SimCCallError(f"Unable to determine the operand width from opcode string {cc_str}")

@@ -340,7 +340,7 @@ class VariableRecoveryFast(ForwardAnalysis, VariableRecoveryBase):  # pylint:dis
         self._node_to_cc = {}
         self.var_to_typevars: defaultdict[SimVariable, set[TypeVariable]] = defaultdict(set)
         self.typevars = None
-        self.type_constraints: dict[TypeVariable, set[TypeConstraint]] | None = None
+        self.type_constraints: dict[TypeVariable, set[TypeConstraint]] = defaultdict(set)
         self.func_typevar = self.tv_manager.new_tv(name=func.name)
         self.delayed_type_constraints = None
         self.ret_val_size = None
