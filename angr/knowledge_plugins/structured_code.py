@@ -291,7 +291,7 @@ class StructuredCodeManager(KnowledgeBasePlugin):
     def __delitem__(self, key):
         del self.cached[self._normalize_key(key)]
 
-    def get(self, key, default=None):
+    def get(self, key, default: DecompilationCache | None = None):
         return self.cached.get(self._normalize_key(key), default)
 
     def discard(self, key):

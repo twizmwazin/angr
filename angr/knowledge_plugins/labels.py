@@ -62,14 +62,14 @@ class Labels(KnowledgeBasePlugin):
     def items(self):
         return self._labels.items()
 
-    def get(self, addr, default=None):
+    def get(self, addr, default: str | None = None):
         """
         Get a label as string for a given address
         Same as .labels[x]
         """
         return self._labels.get(addr, default)
 
-    def lookup(self, name, default=None):
+    def lookup(self, name, default: int | None = None):
         """
         Returns an address to a given label
         To show all available labels, iterate over .labels or list(b.kb.labels)
