@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import TYPE_CHECKING
 
 import claripy
 from archinfo import ArchAArch64, ArchAMD64, ArchARM, ArchMIPS32, ArchMIPS64, ArchPPC32, ArchPPC64, ArchX86
@@ -19,6 +20,9 @@ from angr.storage.file import SimFile, SimFileBase
 from angr.tablespecs import StringTableSpec
 
 from .userland import SimUserland
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
 
 _l = logging.getLogger(name=__name__)
 
@@ -206,10 +210,10 @@ class SimLinux(SimUserland):
         self,
         fs=None,
         concrete_fs=False,
-        chroot=None,
+        chroot: str | None = None,
         cwd=None,
         pathsep=b"/",
-        thread_idx=None,
+        thread_idx: int | None = None,
         init_libc=False,
         **kwargs,
     ):
@@ -277,7 +281,13 @@ class SimLinux(SimUserland):
             libc_start_main._initialize_errno()
         return state
 
-    def state_entry(self, args=None, env=None, argc=None, **kwargs):
+    def state_entry(
+        self,
+        args: Sequence[str | bytes | claripy.ast.BV] | None = None,
+        env: Mapping[str | bytes | claripy.ast.BV, str | bytes | claripy.ast.BV] | None = None,
+        argc=None,
+        **kwargs,
+    ):
         state = super().state_entry(**kwargs)
 
         # Handle default values
@@ -425,7 +435,7 @@ class SimLinux(SimUserland):
         kwargs["addr"] = self._loader_addr
         return super().state_full_init(**kwargs)
 
-    def prepare_function_symbol(self, symbol_name, basic_addr=None):
+    def prepare_function_symbol(self, symbol_name, basic_addr: int | None = None):
         """
         Prepare the address space with the data necessary to perform relocations pointing to the given symbol.
 

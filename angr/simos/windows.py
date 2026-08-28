@@ -6,6 +6,7 @@ import logging
 import os
 import random
 import struct
+from typing import TYPE_CHECKING
 
 import claripy
 import cle.backends
@@ -19,6 +20,9 @@ from angr.procedures.definitions import load_win32api_definitions
 from angr.tablespecs import StringTableSpec
 
 from .simos import SimOS
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
 
 _l = logging.getLogger(name=__name__)
 
@@ -92,7 +96,13 @@ class SimWindows(SimOS):
         return sym.rebased_addr
 
     # pylint: disable=arguments-differ
-    def state_entry(self, args=None, env=None, argc=None, **kwargs):
+    def state_entry(
+        self,
+        args: Sequence[str | bytes | claripy.ast.BV] | None = None,
+        env: Mapping[str | bytes | claripy.ast.BV, str | bytes | claripy.ast.BV] | None = None,
+        argc=None,
+        **kwargs,
+    ):
         state = super().state_entry(**kwargs)
 
         # Handle default values
@@ -185,7 +195,7 @@ class SimWindows(SimOS):
 
         return state
 
-    def state_blank(self, thread_idx=None, **kwargs):
+    def state_blank(self, thread_idx: int | None = None, **kwargs):
         if isinstance(self.project.loader.main_object, cle.backends.PE) and self.project.loader.main_object.supports_nx:
             add_options = kwargs.get("add_options", set())
             add_options.add(o.ENABLE_NX)

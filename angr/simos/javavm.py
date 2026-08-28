@@ -101,7 +101,7 @@ class SimJavaVM(SimOS):
     # States
     #
 
-    def state_blank(self, addr=None, **kwargs):  # pylint: disable=arguments-differ
+    def state_blank(self, addr: SootAddressDescriptor | int | None = None, **kwargs):  # pylint:disable=arguments-differ
         if not kwargs.get("mode"):
             kwargs["mode"] = self.project._default_analysis_mode
         if not kwargs.get("os_name"):
@@ -169,7 +169,7 @@ class SimJavaVM(SimOS):
 
         return state
 
-    def state_entry(self, args=None, **kwargs):  # pylint: disable=arguments-differ
+    def state_entry(self, args: list[SootArgument] | None = None, **kwargs):  # pylint: disable=arguments-differ
         """
         Create an entry state.
 
@@ -316,7 +316,7 @@ class SimJavaVM(SimOS):
         return SimSootValue_ThisRef.new_object(state, type_, symbolic=True, init_object=False)
 
     @staticmethod
-    def _get_default_concrete_value_by_type(type_, state=None):  # pylint: disable=unused-argument
+    def _get_default_concrete_value_by_type(type_, state: SimState | None = None):  # pylint: disable=unused-argument
         if type_ in ["byte", "char", "short", "int", "boolean"]:
             return BVV(0, 32)
         if type_ == "long":

@@ -23,7 +23,9 @@ class SimCGC(SimUserland):
         super().__init__(project, syscall_library=L["cgcabi"][0], syscall_addr_alignment=1, name="CGC", **kwargs)
 
     # pylint: disable=arguments-differ
-    def state_blank(self, flag_page=None, allocate_stack_page_count=0x100, **kwargs):
+    def state_blank(
+        self, flag_page: bytes | list[claripy.ast.BV] | None = None, allocate_stack_page_count=0x100, **kwargs
+    ):
         """
         :param flag_page:                   Flag page content, either a string or a list of BV8s
         :param allocate_stack_page_count:   Number of pages to pre-allocate for stack
@@ -76,7 +78,7 @@ class SimCGC(SimUserland):
 
         return s
 
-    def state_entry(self, add_options=None, **kwargs):
+    def state_entry(self, add_options: set[str] | None = None, **kwargs):
         if isinstance(self.project.loader.main_object, BackedCGC):
             kwargs["permissions_backer"] = (True, self.project.loader.main_object.permissions_map)
         if add_options is None:

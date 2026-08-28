@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from angr.calling_conventions import SYSCALL_CC, SimCCSyscall
 from angr.errors import AngrUnsupportedSyscallError, SimSolverError
 from angr.procedures import SIM_PROCEDURES as P
 
 from .simos import SimOS
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 _l = logging.getLogger(name=__name__)
 
@@ -32,7 +36,7 @@ class SimUserland(SimOS):
         # but a number. to convert from syscall number to address it's
         # (number - min_num + base_num) * alignment + kernel_base
 
-    def configure_project(self, abi_list=None):  # pylint: disable=arguments-differ
+    def configure_project(self, abi_list: Sequence[str] | None = None):  # pylint: disable=arguments-differ
         if abi_list is None:
             abi_list = list(self.syscall_library.syscall_number_mapping)
             assert len(abi_list) == 1, (
@@ -133,7 +137,7 @@ class SimUserland(SimOS):
             abi = None
         return self.syscall_from_number(number, allow_unsupported=allow_unsupported, abi=abi)
 
-    def syscall_from_number(self, number, allow_unsupported=True, abi=None):
+    def syscall_from_number(self, number, allow_unsupported=True, abi: str | None = None):
         """
         Get a syscall SimProcedure from its number.
 

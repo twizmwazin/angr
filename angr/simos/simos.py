@@ -17,6 +17,8 @@ from angr.state_plugins.posix import SimSystemPosix
 from angr.storage.file import SimFileBase, SimFileStream
 
 if TYPE_CHECKING:
+    from cle import Backend
+
     from angr.sim_procedure import SimProcedure
 
 
@@ -79,7 +81,7 @@ class SimOS:
 
         self.project.loader.perform_irelative_relocs(irelative_resolver)
 
-    def _weak_hook_symbol(self, name, hook, scope=None):
+    def _weak_hook_symbol(self, name, hook, scope: Backend | None = None):
         sym = self.project.loader.find_symbol(name) if scope is None else scope.get_symbol(name)
 
         if sym is not None:
@@ -275,7 +277,9 @@ class SimOS:
 
         return state
 
-    def prepare_call_state(self, calling_state, initial_state=None, preserve_registers=(), preserve_memory=()):
+    def prepare_call_state(
+        self, calling_state, initial_state: SimState | None = None, preserve_registers=(), preserve_memory=()
+    ):
         """
         This function prepares a state that is executing a call instruction.
         If given an initial_state, it copies over all of the critical registers to it from the
@@ -303,7 +307,7 @@ class SimOS:
 
         return new_state
 
-    def prepare_function_symbol(self, symbol_name, basic_addr=None):
+    def prepare_function_symbol(self, symbol_name, basic_addr: int | None = None):
         """
         Prepare the address space with the data necessary to perform relocations pointing to the given symbol
 
@@ -346,7 +350,7 @@ class SimOS:
     def syscall_from_addr(self, addr, allow_unsupported=True) -> SimProcedure | None:
         return None
 
-    def syscall_from_number(self, number, allow_unsupported=True, abi=None) -> SimProcedure | None:
+    def syscall_from_number(self, number, allow_unsupported=True, abi: str | None = None) -> SimProcedure | None:
         return None
 
     def setup_gdt(self, state, gdt):
