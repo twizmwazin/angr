@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING, Any
 
 from angr.analyses.loopfinder import Loop
 from angr.knowledge_base import KnowledgeBase
 from angr.knowledge_plugins.functions import Function
 
 from .base import ExplorationTechnique
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from angr.analyses.cfg.cfg_base import CFGBase
+    from angr.sim_state import SimState
 
 l = logging.getLogger(name=__name__)
 
@@ -20,12 +27,12 @@ class LoopSeer(ExplorationTechnique):
 
     def __init__(
         self,
-        cfg=None,
+        cfg: CFGBase | None = None,
         functions=None,
         loops=None,
         use_header=False,
-        bound=None,
-        bound_reached=None,
+        bound: int | None = None,
+        bound_reached: Callable[[LoopSeer, SimState], Any] | None = None,
         discard_stash="spinning",
         limit_concrete_loops=True,
     ):

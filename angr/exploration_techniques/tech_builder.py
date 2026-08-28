@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 from .base import ExplorationTechnique
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class TechniqueBuilder(ExplorationTechnique):
@@ -25,7 +30,14 @@ class TechniqueBuilder(ExplorationTechnique):
     """
 
     def __init__(
-        self, setup=None, step_state=None, step=None, successors=None, filter=None, selector=None, complete=None
+        self,
+        setup: Callable[..., Any] | None = None,
+        step_state: Callable[..., Any] | None = None,
+        step: Callable[..., Any] | None = None,
+        successors: Callable[..., Any] | None = None,
+        filter: Callable[..., Any] | None = None,
+        selector: Callable[..., Any] | None = None,
+        complete: Callable[..., Any] | None = None,
     ):
         super().__init__()
         self.setup = _its_a_func(setup) or super().setup

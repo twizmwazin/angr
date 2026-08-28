@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import concurrent.futures
 import logging
+from typing import TYPE_CHECKING
 
 from .base import ExplorationTechnique
+
+if TYPE_CHECKING:
+    from angr.sim_manager import ErrorRecord
 
 l = logging.getLogger(__name__)
 
@@ -24,7 +28,14 @@ class Threading(ExplorationTechnique):
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=threads)
         self.local_stash = local_stash
 
-    def step(self, simgr, stash="active", error_list=None, target_stash=None, **kwargs):
+    def step(
+        self,
+        simgr,
+        stash="active",
+        error_list: list[ErrorRecord] | None = None,
+        target_stash: str | None = None,
+        **kwargs,
+    ):
         target_stash = target_stash or stash
         if error_list is not None:
             raise ValueError("Can't pass error_list to step with threading enabled. Did you install threading twice?")

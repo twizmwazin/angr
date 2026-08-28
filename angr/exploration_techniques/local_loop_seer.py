@@ -2,8 +2,14 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from typing import TYPE_CHECKING, Any
 
 from .base import ExplorationTechnique
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from angr.sim_state import SimState
 
 l = logging.getLogger(name=__name__)
 
@@ -13,7 +19,12 @@ class LocalLoopSeer(ExplorationTechnique):
     LocalLoopSeer monitors exploration and maintains all loop-related data without relying on a control flow graph.
     """
 
-    def __init__(self, bound=None, bound_reached=None, discard_stash="spinning"):
+    def __init__(
+        self,
+        bound: int | None = None,
+        bound_reached: Callable[[LocalLoopSeer, SimState], Any] | None = None,
+        discard_stash="spinning",
+    ):
         """
         :param bound:                 Limit the number of iterations a loop may be executed.
         :param bound_reached:         If provided, should be a function that takes the LoopSeer and the succ_state.

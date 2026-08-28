@@ -14,7 +14,7 @@ from .base import ExplorationTechnique
 l = logging.getLogger(__name__)
 
 
-def ast_weight(ast, memo=None):
+def ast_weight(ast, memo: dict[int, int] | None = None):
     if isinstance(ast, SimActionObject):
         ast = ast.ast
     if not isinstance(ast, claripy.ast.Base):

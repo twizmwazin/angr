@@ -42,7 +42,7 @@ class TracerDesyncError(AngrTracerError):
     An error class to report tracing Tracing desyncronization error
     """
 
-    def __init__(self, msg, deviating_addr=None, deviating_trace_idx=None):
+    def __init__(self, msg, deviating_addr: int | None = None, deviating_trace_idx: int | None = None):
         super().__init__(msg)
         self.deviating_addr = deviating_addr
         self.deviating_trace_idx = deviating_trace_idx
@@ -164,8 +164,8 @@ class Tracer(ExplorationTechnique):
         trace: list[int],
         resiliency=False,
         keep_predecessors=1,
-        crash_addr=None,
-        syscall_data=None,
+        crash_addr: int | None = None,
+        syscall_data: dict[str, list[tuple[int, int]]] | None = None,
         copy_states=False,
         fast_forward_to_entry=True,
         mode=TracingMode.Strict,
@@ -670,14 +670,14 @@ class Tracer(ExplorationTechnique):
         else:
             l.debug("Trace: %s/%s", state.globals["trace_idx"], len(self._trace))
 
-    def _translate_state_addr(self, state_addr, obj=None):
+    def _translate_state_addr(self, state_addr, obj: cle.Backend | None = None):
         if obj is None:
             obj = self.project.loader.find_object_containing(state_addr)
         if obj not in self._aslr_slides:
             raise Exception("Internal error: cannot translate address")
         return state_addr + self._aslr_slides[obj]
 
-    def _translate_trace_addr(self, trace_addr, obj=None):
+    def _translate_trace_addr(self, trace_addr, obj: cle.Backend | None = None):
         if obj is None:
             for obj, slide in self._aslr_slides.items():  # noqa: PLR1704  # pylint: disable=redefined-argument-from-local
                 if obj.contains_addr(trace_addr - slide):
@@ -914,7 +914,7 @@ class Tracer(ExplorationTechnique):
         retsite_addr = state.block(callsite_addr).size + callsite_addr
         return self._sync(state, idx, retsite_addr)
 
-    def _sync_return(self, state, idx, assert_obj=None):
+    def _sync_return(self, state, idx, assert_obj: cle.Backend | None = None):
         ret_addr_bv = self.project.factory.cc().return_addr.get_value(state)
         if state.solver.symbolic(ret_addr_bv):
             l.info("...symbolic return address. I refuse to deal with this.")

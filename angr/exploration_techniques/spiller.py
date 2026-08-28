@@ -3,10 +3,16 @@ from __future__ import annotations
 
 import contextlib
 import logging
+from typing import TYPE_CHECKING, Any
 
 from angr import vaults
 
 from .base import ExplorationTechnique
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from angr.sim_state import SimState
 
 l = logging.getLogger(name=__name__)
 
@@ -153,12 +159,12 @@ class Spiller(ExplorationTechnique):
         staging_stash="spill_stage",
         staging_min=10,
         staging_max=20,
-        pickle_callback=None,
-        unpickle_callback=None,
-        post_pickle_callback=None,
-        priority_key=None,
-        vault=None,
-        states_collection=None,
+        pickle_callback: Callable[[SimState], Any] | None = None,
+        unpickle_callback: Callable[[str, SimState], Any] | None = None,
+        post_pickle_callback: Callable[[SimState, int, str], Any] | None = None,
+        priority_key: Callable[[SimState], int] | None = None,
+        vault: vaults.Vault | None = None,
+        states_collection: PickledStatesBase | None = None,
     ):
         """
         Initializes the spiller.

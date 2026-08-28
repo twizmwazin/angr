@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING, Any
 
 import claripy
 
@@ -9,6 +10,12 @@ from angr.state_plugins.sim_event import resource_event
 
 from .base import ExplorationTechnique
 from .common import condition_to_lambda
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from angr.analyses.cfg.cfg_base import CFGBase
+    from angr.sim_state import SimState
 
 l = logging.getLogger(name=__name__)
 
@@ -33,7 +40,14 @@ class Explorer(ExplorationTechnique):
     """
 
     def __init__(
-        self, find=None, avoid=None, find_stash="found", avoid_stash="avoid", cfg=None, num_find=1, avoid_priority=False
+        self,
+        find: int | tuple[int, ...] | set[int] | list[int] | Callable[[SimState], Any] | None = None,
+        avoid: int | tuple[int, ...] | set[int] | list[int] | Callable[[SimState], Any] | None = None,
+        find_stash="found",
+        avoid_stash="avoid",
+        cfg: CFGBase | None = None,
+        num_find=1,
+        avoid_priority=False,
     ):
         super().__init__()
         self.find, static_find = condition_to_lambda(find)

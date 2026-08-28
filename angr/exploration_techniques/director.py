@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from typing import TYPE_CHECKING, Any
 
 import claripy
 import networkx
@@ -12,6 +13,12 @@ from angr.knowledge_base import KnowledgeBase
 from angr.sim_type import SimType, SimTypeChar, SimTypePointer, SimTypeReg, SimTypeString
 
 from .base import ExplorationTechnique
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from angr.sim_manager import SimulationManager
+    from angr.sim_state import SimState
 
 l = logging.getLogger(name=__name__)
 
@@ -76,7 +83,7 @@ class BaseGoal:
         return cfg.model.get_node(block_id)
 
     @staticmethod
-    def _dfs_edges(graph, source, max_steps=None):
+    def _dfs_edges(graph, source, max_steps: int | None = None):
         """
         Perform a depth-first search on the given DiGraph, with a limit on maximum steps.
 
@@ -371,9 +378,9 @@ class Director(ExplorationTechnique):
         self,
         peek_blocks=100,
         peek_functions=5,
-        goals=None,
+        goals: list[BaseGoal] | None = None,
         cfg_keep_states=False,
-        goal_satisfied_callback=None,
+        goal_satisfied_callback: Callable[[BaseGoal, SimState, SimulationManager], Any] | None = None,
         num_fallback_states=5,
     ):
         """

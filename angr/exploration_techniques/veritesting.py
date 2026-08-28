@@ -1,8 +1,15 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from angr.sim_options import EFFICIENT_STATE_MERGING
 
 from .base import ExplorationTechnique
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from angr.engines.successors import SimSuccessors
 
 
 class Veritesting(ExplorationTechnique):
@@ -17,7 +24,7 @@ class Veritesting(ExplorationTechnique):
         super().__init__()
         self.options = options
 
-    def step_state(self, simgr, state, successor_func=None, **kwargs):
+    def step_state(self, simgr, state, successor_func: Callable[..., SimSuccessors] | None = None, **kwargs):
         if EFFICIENT_STATE_MERGING not in state.options:
             state.options.add(EFFICIENT_STATE_MERGING)
 

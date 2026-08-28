@@ -19,7 +19,7 @@ class DrillerCore(ExplorationTechnique):
     'diverted' stash.
     """
 
-    def __init__(self, trace, fuzz_bitmap=None):
+    def __init__(self, trace, fuzz_bitmap: bytes | None = None):
         """
         :param trace      : The basic block trace.
         :param fuzz_bitmap: AFL's bitmap of state transitions. Defaults to saying every transition is worth satisfying.

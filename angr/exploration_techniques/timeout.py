@@ -14,7 +14,7 @@ class Timeout(ExplorationTechnique):
     a predefined timeout
     """
 
-    def __init__(self, timeout=None):
+    def __init__(self, timeout: float | None = None):
         super().__init__()
         self.start_time = None
         self.timeout = timeout

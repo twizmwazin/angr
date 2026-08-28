@@ -2,8 +2,14 @@ from __future__ import annotations
 
 from collections import Counter
 from difflib import SequenceMatcher
+from typing import TYPE_CHECKING
 
 from .base import ExplorationTechnique
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from angr.sim_state import SimState
 
 
 class UniqueSearch(ExplorationTechnique):
@@ -17,7 +23,7 @@ class UniqueSearch(ExplorationTechnique):
     The (L2) distance between the counts of the state addresses in the history of the path.
     """
 
-    def __init__(self, similarity_func=None, deferred_stash="deferred"):
+    def __init__(self, similarity_func: Callable[[SimState, SimState], float] | None = None, deferred_stash="deferred"):
         """
         :param similarity_func: How to calculate similarity between two states.
         :param deferred_stash:  Where to store the deferred states.
