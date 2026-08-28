@@ -34,7 +34,7 @@ class ConvenientMappingsMixin(MemoryMixin):
         o._updated_mappings = set()
         return o
 
-    def store(self, addr, data, size=None, **kwargs):
+    def store(self, addr, data, size: int | None = None, **kwargs):
         if options.MEMORY_SYMBOLIC_BYTES_MAP in self.state.options:
             if data.symbolic:
                 self._symbolic_addrs.update(range(addr, addr + size))

@@ -52,7 +52,7 @@ class NameResolutionMixin(MemoryMixin):
             return self.state.registers.load(name[1:]), None
         raise SimMemoryError("Trying to address memory with a register name.")
 
-    def store(self, addr, data, size=None, **kwargs):
+    def store(self, addr, data, size: int | claripy.ast.BV | None = None, **kwargs):
         if isinstance(addr, str):
             named_addr, named_size = self._resolve_location_name(addr, is_write=True)
             if isinstance(data, claripy.ast.BV) and len(data) < named_size * self.state.arch.byte_width:
@@ -60,7 +60,7 @@ class NameResolutionMixin(MemoryMixin):
             return super().store(named_addr, data, size=named_size if size is None else size, **kwargs)
         return super().store(addr, data, size=size, **kwargs)
 
-    def load(self, addr, size=None, **kwargs):
+    def load(self, addr, size: int | claripy.ast.BV | None = None, **kwargs):
         if isinstance(addr, str):
             named_addr, named_size = self._resolve_location_name(addr, is_write=False)
             return super().load(named_addr, size=named_size if size is None else size, **kwargs)

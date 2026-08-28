@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import claripy
 from sortedcontainers import SortedDict
@@ -14,6 +14,9 @@ from angr.errors import SimMemoryError
 from .base import PageBase
 from .cooperation import MemoryObjectMixin, SimMemoryObject
 from .symbolic_bitmap import SymbolicBitmap
+
+if TYPE_CHECKING:
+    from angr.storage.memory_mixins.paged_memory.paged_memory_mixin import PagedMemoryMixin
 
 l = logging.getLogger(name=__name__)
 
@@ -27,7 +30,7 @@ class UltraPage(MemoryObjectMixin, PageBase):
 
     SUPPORTS_CONCRETE_LOAD = True
 
-    def __init__(self, memory=None, init_zero=False, **kwargs):
+    def __init__(self, memory: PagedMemoryMixin | None = None, init_zero=False, **kwargs):
         super().__init__(**kwargs)
 
         self.concrete_data = None
@@ -38,7 +41,7 @@ class UltraPage(MemoryObjectMixin, PageBase):
         self.symbolic_data = SortedDict()
 
     @classmethod
-    def new_from_shared(cls, data, memory=None, **kwargs):
+    def new_from_shared(cls, data, memory: PagedMemoryMixin | None = None, **kwargs):
         o = cls(**kwargs)
         o.concrete_data = data
         o.symbolic_bitmap = SymbolicBitmap(memory.page_size if memory is not None else DEFAULT_PAGE_SIZE, 0)
@@ -62,7 +65,16 @@ class UltraPage(MemoryObjectMixin, PageBase):
             self.concrete_data = data
         return data
 
-    def load(self, addr, size=None, page_addr=None, endness=None, memory=None, cooperate=False, **kwargs):  # pylint: disable=arguments-differ
+    def load(  # pylint: disable=arguments-differ
+        self,
+        addr,
+        size: int | None = None,
+        page_addr: int | None = None,
+        endness: str | None = None,
+        memory: PagedMemoryMixin | None = None,
+        cooperate=False,
+        **kwargs,
+    ):
         concrete_run = []
         symbolic_run = ...
         last_run = None
@@ -143,9 +155,9 @@ class UltraPage(MemoryObjectMixin, PageBase):
         addr,
         data: int | SimMemoryObject,
         size: int | None = None,
-        endness=None,
+        endness: str | None = None,
         memory=None,
-        page_addr=None,  # pylint: disable=arguments-differ
+        page_addr: int | None = None,  # pylint: disable=arguments-differ
         cooperate=False,
         **kwargs,
     ):
@@ -219,7 +231,7 @@ class UltraPage(MemoryObjectMixin, PageBase):
         self,
         others: list[UltraPage],
         merge_conditions,
-        common_ancestor=None,
+        common_ancestor: UltraPage | None = None,
         page_addr: int | None = None,  # pylint: disable=arguments-differ
         memory=None,
         changed_offsets: set[int] | None = None,
@@ -370,7 +382,7 @@ class UltraPage(MemoryObjectMixin, PageBase):
             return data
         return data, self.symbolic_bitmap.view(addr, addr + size)
 
-    def changed_bytes(self, other, page_addr=None) -> set[int]:
+    def changed_bytes(self, other, page_addr: int | None = None) -> set[int]:
         changed_candidates = super().changed_bytes(other)
         if changed_candidates is None:
             changed_candidates = self._ultra_changed_candidates(other)
@@ -462,7 +474,7 @@ class UltraPage(MemoryObjectMixin, PageBase):
         # symbolic data or does not exist
         return self._get_object(start, page_addr) is not None
 
-    def _get_object(self, start: int, page_addr: int, memory=None) -> SimMemoryObject | None:
+    def _get_object(self, start: int, page_addr: int, memory: PagedMemoryMixin | None = None) -> SimMemoryObject | None:
         try:
             place = next(self.symbolic_data.irange(maximum=start, reverse=True))
         except StopIteration:
@@ -481,7 +493,13 @@ class UltraPage(MemoryObjectMixin, PageBase):
             return None
         return place
 
-    def replace_all_with_offsets(self, offsets: Iterable[int], old: claripy.ast.BV, new: claripy.ast.BV, memory=None):
+    def replace_all_with_offsets(
+        self,
+        offsets: Iterable[int],
+        old: claripy.ast.BV,
+        new: claripy.ast.BV,
+        memory: PagedMemoryMixin | None = None,
+    ):
         memory_objects = set()
         for offset in sorted(offsets):
             try:
@@ -512,7 +530,9 @@ class UltraPage(MemoryObjectMixin, PageBase):
             if replaced_object is not None:
                 self._replace_memory_object(mo, replaced_object, memory=memory)
 
-    def _replace_memory_object(self, old: SimMemoryObject, new_content: claripy.ast.Bits, memory=None):
+    def _replace_memory_object(
+        self, old: SimMemoryObject, new_content: claripy.ast.Bits, memory: PagedMemoryMixin | None = None
+    ):
         """
         Replaces the memory object `old` with a new memory object containing `new_content`.
 

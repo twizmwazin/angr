@@ -20,9 +20,9 @@ class UnwrapperMixin(MemoryMixin):
         self,
         addr,
         data,
-        size: SimActionObject | int | claripy.ast.BV | None = None,
+        size=None,
         *,
-        condition: SimActionObject | claripy.ast.Bool | None = None,
+        condition: SimActionObject | claripy.ast.Bool | bool | None = None,
         **kwargs,
     ):
         return super().store(
@@ -32,10 +32,10 @@ class UnwrapperMixin(MemoryMixin):
     def load(
         self,
         addr,
-        size: SimActionObject | int | claripy.ast.BV | None = None,
+        size=None,
         *,
-        condition: SimActionObject | claripy.ast.Bool | None = None,
-        fallback: SimActionObject | claripy.ast.Bits | float | bytes | bytearray | str | None = None,
+        condition: SimActionObject | claripy.ast.Bool | bool | None = None,
+        fallback: SimActionObject | claripy.ast.Bits | float | bytes | bytearray | memoryview | str | None = None,
         **kwargs,
     ):
         return super().load(
@@ -45,5 +45,7 @@ class UnwrapperMixin(MemoryMixin):
     def find(self, addr, data, max_search, *, default: SimActionObject | claripy.ast.BV | int | None = None, **kwargs):
         return super().find(_raw_ast(addr), _raw_ast(data), max_search, default=_raw_ast(default), **kwargs)
 
-    def copy_contents(self, dst, src, size, condition: SimActionObject | claripy.ast.Bool | None = None, **kwargs):
+    def copy_contents(
+        self, dst, src, size, condition: SimActionObject | claripy.ast.Bool | bool | None = None, **kwargs
+    ):
         return super().copy_contents(_raw_ast(dst), _raw_ast(src), _raw_ast(size), _raw_ast(condition), **kwargs)

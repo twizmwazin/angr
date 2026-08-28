@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 import claripy
 
@@ -11,6 +12,11 @@ from angr.utils.dynamic_dictlist import DynamicDictList
 from .base import PageBase
 from .cooperation import MemoryObjectMixin
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from angr.storage.memory_mixins.paged_memory.paged_memory_mixin import PagedMemoryMixin
+
 l = logging.getLogger(name=__name__)
 
 
@@ -19,7 +25,17 @@ class ListPage(MemoryObjectMixin, PageBase):
     This class implements a page memory mixin with lists as the main content store.
     """
 
-    def __init__(self, memory=None, content=None, sinkhole=None, mo_cmp=None, **kwargs):
+    def __init__(
+        self,
+        memory: PagedMemoryMixin | None = None,
+        content: DynamicDictList[SimMemoryObject | None]
+        | dict[int, SimMemoryObject | None]
+        | list[SimMemoryObject | None]
+        | None = None,
+        sinkhole: SimMemoryObject | None = None,
+        mo_cmp: Callable | None = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
 
         self.content: DynamicDictList[SimMemoryObject | None] | None = (
@@ -40,7 +56,16 @@ class ListPage(MemoryObjectMixin, PageBase):
         o._mo_cmp = self._mo_cmp
         return o
 
-    def load(self, addr, size=None, endness=None, page_addr=None, memory=None, cooperate=False, **kwargs):
+    def load(
+        self,
+        addr,
+        size: int | None = None,
+        endness: str | None = None,
+        page_addr: int | None = None,
+        memory: PagedMemoryMixin | None = None,
+        cooperate=False,
+        **kwargs,
+    ):
         result = []
         last_seen = ...  # ;)
 
@@ -93,7 +118,16 @@ class ListPage(MemoryObjectMixin, PageBase):
             self.stored_offset.add(subaddr)
         result[-1] = (global_start_addr, new_item)
 
-    def store(self, addr, data, size=None, endness=None, memory=None, cooperate=False, **kwargs):
+    def store(
+        self,
+        addr,
+        data,
+        size: int | None = None,
+        endness: str | None = None,
+        memory: PagedMemoryMixin | None = None,
+        cooperate=False,
+        **kwargs,
+    ):
         super().store(addr, data, size=size, endness=endness, memory=memory, cooperate=cooperate, **kwargs)
 
         if not cooperate:
@@ -108,7 +142,7 @@ class ListPage(MemoryObjectMixin, PageBase):
                 self.content[subaddr] = data
                 self.stored_offset.add(subaddr)
 
-    def erase(self, addr, size=None, **kwargs) -> None:
+    def erase(self, addr, size: int | None = None, **kwargs) -> None:
         for off in range(size):
             self.content[addr + off] = None
 
@@ -116,9 +150,9 @@ class ListPage(MemoryObjectMixin, PageBase):
         self,
         others: list[ListPage],
         merge_conditions,
-        common_ancestor=None,
+        common_ancestor: ListPage | None = None,
         page_addr: int | None = None,
-        memory=None,
+        memory: PagedMemoryMixin | None = None,
         changed_offsets: set[int] | None = None,
     ):
         if changed_offsets is None:

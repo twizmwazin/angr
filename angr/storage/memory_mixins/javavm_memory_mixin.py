@@ -3,6 +3,7 @@ from __future__ import annotations
 import binascii
 import logging
 import os
+from typing import TYPE_CHECKING
 
 import claripy
 
@@ -20,6 +21,9 @@ from angr.engines.soot.values import (
 from angr.errors import SimMemoryAddressError, SimUnsatError
 from angr.storage.memory_mixins.memory_mixin import MemoryMixin
 
+if TYPE_CHECKING:
+    from angr.concretization_strategies import SimConcretizationStrategy
+
 l = logging.getLogger(name=__name__)
 
 
@@ -35,8 +39,8 @@ class JavaVmMemoryMixin(MemoryMixin):
         stack=None,
         heap=None,
         vm_static_table=None,
-        load_strategies=None,
-        store_strategies=None,
+        load_strategies: list[SimConcretizationStrategy] | None = None,
+        store_strategies: list[SimConcretizationStrategy] | None = None,
         max_array_size=1000,
         **kwargs,
     ):
@@ -189,7 +193,9 @@ class JavaVmMemoryMixin(MemoryMixin):
             constraint_on_start_idx = claripy.Or(*start_idx_options)
             self.state.add_constraints(constraint_on_start_idx)
 
-    def _store_array_element_on_heap(self, array, idx, value, value_type, store_condition=None):
+    def _store_array_element_on_heap(
+        self, array, idx, value, value_type, store_condition: claripy.ast.Bool | None = None
+    ):
         heap_elem_id = f"{array.id}[{idx}]"
         l.debug("Set %s to %s with condition %s", heap_elem_id, value, store_condition)
         if store_condition is not None:
@@ -297,7 +303,7 @@ class JavaVmMemoryMixin(MemoryMixin):
 
         raise SimMemoryAddressError(f"Unable to concretize index {idx}")
 
-    def concretize_store_idx(self, idx, strategies=None):
+    def concretize_store_idx(self, idx, strategies: list[SimConcretizationStrategy] | None = None):
         """
         Concretizes a store index.
 
@@ -315,7 +321,7 @@ class JavaVmMemoryMixin(MemoryMixin):
         strategies = self.store_strategies if strategies is None else strategies
         return self._apply_concretization_strategies(idx, strategies, "store")
 
-    def concretize_load_idx(self, idx, strategies=None):
+    def concretize_load_idx(self, idx, strategies: list[SimConcretizationStrategy] | None = None):
         """
         Concretizes a load index.
 
@@ -379,9 +385,21 @@ class JavaVmMemoryMixin(MemoryMixin):
         o.max_array_size = self.max_array_size
         return o
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(
+        self,
+        others,
+        merge_conditions,
+        common_ancestor: MemoryMixin | None = None,
+    ):  # pylint: disable=unused-argument
         l.warning("Merging is not implemented for JavaVM memory!")
 
     # pylint: disable=no-self-use,unused-argument
-    def _find(self, addr, what, max_search=None, max_symbolic_bytes=None, default=None):
+    def _find(
+        self,
+        addr,
+        what,
+        max_search: int | None = None,
+        max_symbolic_bytes: int | None = None,
+        default: claripy.ast.BV | int | None = None,
+    ):
         l.warning("Find is not implemented for JavaVM memory!")

@@ -4,7 +4,7 @@ from angr.storage.memory_mixins.memory_mixin import MemoryMixin
 
 
 class DirtyAddrsMixin(MemoryMixin):
-    def store(self, addr, data, size=None, **kwargs):
+    def store(self, addr, data, size: int | None = None, **kwargs):
         assert type(size) is int
         if self.category == "mem":
             self.state.scratch.dirty_addrs.update(range(addr, addr + size))

@@ -15,7 +15,7 @@ class DataNormalizationMixin(MemoryMixin):
     Normalizes the data field for a store and the fallback field for a load to be BVs.
     """
 
-    def store(self, addr, data, size=None, **kwargs):
+    def store(self, addr, data, size: int | claripy.ast.BV | None = None, **kwargs):
         data_bv = self._convert_to_ast(data, size, self.state.arch.byte_width)
 
         # zero extend if size is greater than len(data_e)
@@ -29,7 +29,14 @@ class DataNormalizationMixin(MemoryMixin):
 
         super().store(addr, data_bv, size=size, **kwargs)
 
-    def load(self, addr, size=None, *, fallback=None, **kwargs):
+    def load(
+        self,
+        addr,
+        size: int | claripy.ast.BV | None = None,
+        *,
+        fallback: claripy.ast.Bits | float | bytes | bytearray | memoryview | str | None = None,
+        **kwargs,
+    ):
         fallback_bv = self._convert_to_ast(fallback, size, self.state.arch.byte_width) if fallback is not None else None
         return super().load(addr, size=size, fallback=fallback_bv, **kwargs)
 

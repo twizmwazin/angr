@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+from typing import TYPE_CHECKING
 
 import claripy
 
@@ -12,9 +13,17 @@ from angr.storage.memory_mixins.memory_mixin import MemoryMixin
 from .abstract_address_descriptor import AbstractAddressDescriptor
 from .region_data import AddressWrapper
 
+if TYPE_CHECKING:
+    from angr.concretization_strategies import SimConcretizationStrategy
+
 
 class RegionedAddressConcretizationMixin(MemoryMixin):
-    def __init__(self, read_strategies=None, write_strategies=None, **kwargs):
+    def __init__(
+        self,
+        read_strategies: list[SimConcretizationStrategy] | None = None,
+        write_strategies: list[SimConcretizationStrategy] | None = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
 
         self.read_strategies = read_strategies

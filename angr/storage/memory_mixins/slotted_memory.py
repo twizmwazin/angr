@@ -8,7 +8,7 @@ from angr.storage.memory_mixins.paged_memory.pages.ispo_mixin import ISPOMixin
 
 
 class SlottedMemoryMixin(MemoryMixin):
-    def __init__(self, width=None, **kwargs):
+    def __init__(self, width: int | None = None, **kwargs):
         super().__init__(**kwargs)
 
         if width is None and isinstance(self, ISPOMixin):
@@ -28,7 +28,7 @@ class SlottedMemoryMixin(MemoryMixin):
         o.contents = dict(self.contents)
         return o
 
-    def merge(self, others, merge_conditions, common_ancestor=None):
+    def merge(self, others, merge_conditions, common_ancestor: MemoryMixin | None = None):
         if any(o.width != self.width for o in others):
             raise SimMergeError("Cannot merge slotted memory with disparate widths")
         addr_set = set(self.contents)
@@ -108,7 +108,7 @@ class SlottedMemoryMixin(MemoryMixin):
             end = cur.get_bytes(offset + size, self.width - offset - size)
             self.contents[addr] = start.concat(data, end)
 
-    def load(self, addr, size=None, *, endness=None, **kwargs):
+    def load(self, addr, size: int | None = None, *, endness: str | None = None, **kwargs):
         accesses = self._resolve_access(addr, size)
 
         pieces = [self._single_load(addr, offset, size) for addr, offset, size in accesses]
@@ -120,7 +120,7 @@ class SlottedMemoryMixin(MemoryMixin):
 
         return value
 
-    def store(self, addr, data, size=None, *, endness=None, **kwargs):
+    def store(self, addr, data, size=None, *, endness: str | None = None, **kwargs):
         if endness != self.endness:
             data = data.reversed
 

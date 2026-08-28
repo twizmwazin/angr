@@ -2,12 +2,16 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Generator
+from typing import TYPE_CHECKING
 
 import claripy
 
 from angr.storage.memory_object import SimLabeledMemoryObject, SimMemoryObject
 
 from .multi_values import MultiValues
+
+if TYPE_CHECKING:
+    from angr.storage.memory_mixins.memory_mixin import MemoryMixin
 
 
 class CooperationBase[T]:
@@ -67,8 +71,8 @@ class MemoryObjectMixin(CooperationBase[SimMemoryObject]):
         cls,
         objects: list[list[tuple[int, SimMemoryObject]]],
         size,
-        endness=None,
-        memory=None,
+        endness: str | None = None,
+        memory: MemoryMixin | None = None,
         labels: list | None = None,
         **kwargs,
     ):
@@ -120,7 +124,9 @@ class MemoryObjectMixin(CooperationBase[SimMemoryObject]):
         return elements[0].concat(*elements[1:])
 
     @classmethod
-    def _decompose_objects(cls, addr, data, endness, memory=None, page_addr=0, label=None, **kwargs):
+    def _decompose_objects(
+        cls, addr, data, endness, memory: MemoryMixin | None = None, page_addr=0, label: dict | None = None, **kwargs
+    ):
         # the generator model is definitely overengineered here but wouldn't be if we were working with raw BVs
         cur_addr = addr + page_addr
         byte_width = memory.state.arch.byte_width if memory is not None else 8
@@ -164,7 +170,7 @@ class MemoryObjectMixin(CooperationBase[SimMemoryObject]):
             size = yield memory_object, memory_object.base, memory_object.length
 
     @classmethod
-    def _zero_objects(cls, addr, size, memory=None, **kwargs):
+    def _zero_objects(cls, addr, size, memory: MemoryMixin | None = None, **kwargs):
         data = claripy.BVV(0, size * memory.state.arch.byte_width if memory is not None else 8)
         return cls._decompose_objects(addr, data, "Iend_BE", memory=memory, **kwargs)
 
@@ -176,7 +182,12 @@ class MemoryObjectSetMixin(CooperationBase):
 
     @classmethod
     def _compose_objects(
-        cls, objects: list[list[tuple[int, set[SimMemoryObject]]]], size, endness=None, memory=None, **kwargs
+        cls,
+        objects: list[list[tuple[int, set[SimMemoryObject]]]],
+        size,
+        endness: str | None = None,
+        memory: MemoryMixin | None = None,
+        **kwargs,
     ):
         c_objects: list[tuple[int, SimMemoryObject | set[SimMemoryObject]]] = []
         for objlist in objects:
@@ -246,7 +257,9 @@ class MemoryObjectSetMixin(CooperationBase):
         return mv
 
     @classmethod
-    def _decompose_objects(cls, addr, data, endness, memory=None, page_addr=0, label=None, **kwargs):
+    def _decompose_objects(
+        cls, addr, data, endness, memory: MemoryMixin | None = None, page_addr=0, label: dict | None = None, **kwargs
+    ):
         # the generator model is definitely overengineered here but wouldn't be if we were working with raw BVs
         cur_addr = addr + page_addr
         if isinstance(data, MultiValues):
@@ -298,7 +311,7 @@ class MemoryObjectSetMixin(CooperationBase):
                 _ = yield {obj}, obj.base, obj.length
 
     @classmethod
-    def _zero_objects(cls, addr, size, memory=None, **kwargs):
+    def _zero_objects(cls, addr, size, memory: MemoryMixin | None = None, **kwargs):
         data = claripy.BVV(0, size * memory.state.arch.byte_width if memory is not None else 8)
         return cls._decompose_objects(addr, data, "Iend_BE", memory=memory, **kwargs)
 
@@ -317,7 +330,7 @@ class BasicClaripyCooperation(CooperationBase):
         return claripy.Concat(*objects)
 
     @classmethod
-    def _decompose_objects(cls, addr, data, endness, memory=None, **kwargs):
+    def _decompose_objects(cls, addr, data, endness, memory: MemoryMixin | None = None, **kwargs):
         if endness == "Iend_BE":
             size = yield
             offset = 0
@@ -335,6 +348,6 @@ class BasicClaripyCooperation(CooperationBase):
                 size = yield data_slice, addr + offset, data_slice.length
 
     @classmethod
-    def _zero_objects(cls, addr, size, memory=None, **kwargs):
+    def _zero_objects(cls, addr, size, memory: MemoryMixin | None = None, **kwargs):
         data = claripy.BVV(0, size * memory.state.arch.byte_width if memory is not None else 8)
         return cls._decompose_objects(addr, data, "Iend_BE", memory=memory, **kwargs)

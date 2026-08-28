@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import Any
 
 from angr.storage.memory_mixins.memory_mixin import MemoryMixin
 
@@ -28,5 +29,5 @@ class LabelMergerMixin(MemoryMixin):
             new_label[key] = v
         return new_label
 
-    def copy(self, memo=None):
+    def copy(self, memo: dict[int, Any] | None = None):
         return super().copy(memo)

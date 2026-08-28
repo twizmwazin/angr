@@ -11,7 +11,7 @@ class ConditionalMixin(MemoryMixin):
         addr,
         size: int | claripy.ast.BV | None = None,
         *,
-        condition: claripy.ast.Bool | None = None,
+        condition: claripy.ast.Bool | bool | None = None,
         fallback: claripy.ast.BV | None = None,
         **kwargs,
     ):
@@ -26,7 +26,7 @@ class ConditionalMixin(MemoryMixin):
         data,
         size: int | claripy.ast.BV | None = None,
         *,
-        condition: claripy.ast.Bool | None = None,
+        condition: claripy.ast.Bool | bool | None = None,
         **kwargs,
     ):
         if condition is None or self.state.solver.is_true(condition):

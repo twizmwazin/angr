@@ -49,7 +49,9 @@ class ClemoryBackerMixin(PagedMemoryMixin):
         o._cle_loader = self._cle_loader
         return o
 
-    def _initialize_page(self, pageno, permissions=None, *, force_default=False, **kwargs):
+    def _initialize_page(
+        self, pageno, permissions: int | claripy.ast.BV | None = None, *, force_default=False, **kwargs
+    ):
         if self._clemory_backer is None or force_default:
             return super()._initialize_page(pageno, permissions=permissions, **kwargs)
 
@@ -184,7 +186,7 @@ class ClemoryBackerMixin(PagedMemoryMixin):
 
 
 class DictBackerMixin(PagedMemoryMixin):
-    def __init__(self, dict_memory_backer=None, **kwargs):
+    def __init__(self, dict_memory_backer: dict[int, bytes] | None = None, **kwargs):
         super().__init__(**kwargs)
         self._dict_memory_backer = dict_memory_backer
 
@@ -193,7 +195,9 @@ class DictBackerMixin(PagedMemoryMixin):
         o._dict_memory_backer = self._dict_memory_backer
         return o
 
-    def _initialize_page(self, pageno: int, permissions=None, *, force_default=False, **kwargs):
+    def _initialize_page(
+        self, pageno: int, permissions: int | claripy.ast.BV | None = None, *, force_default=False, **kwargs
+    ):
         page_addr = pageno * self.page_size
 
         if self._dict_memory_backer is None or force_default:

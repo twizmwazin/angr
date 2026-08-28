@@ -65,7 +65,7 @@ class MemoryMixin[InData, OutData, Addr](SimStatePlugin):
         self, addr: Addr, data: InData, max_search: int, **kwargs
     ) -> tuple[Addr, list[claripy.ast.Bool], list[int]]: ...
 
-    def _add_constraints(self, c, *, add_constraints=True, condition=None, **kwargs):
+    def _add_constraints(self, c, *, add_constraints=True, condition: claripy.ast.Bool | None = None, **kwargs):
         if add_constraints:
             to_add = c & condition | ~condition if condition is not None else c
             self.state.add_constraints(to_add)
@@ -124,7 +124,17 @@ class MemoryMixin[InData, OutData, Addr](SimStatePlugin):
         """
         raise NotImplementedError
 
-    def _default_value(self, addr, size, *, name=None, inspect=True, events=True, key=None, **kwargs) -> OutData:
+    def _default_value(
+        self,
+        addr,
+        size,
+        *,
+        name: str | None = None,
+        inspect=True,
+        events=True,
+        key: tuple[Any, ...] | None = None,
+        **kwargs,
+    ) -> OutData:
         """
         Override this method to provide default values for a variety of edge cases and base cases.
 

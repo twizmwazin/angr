@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from angr.storage.memory_mixins.memory_mixin import MemoryMixin
 from angr.storage.memory_object import SimLabeledMemoryObject, SimMemoryObject
@@ -11,6 +11,9 @@ from angr.utils.dynamic_dictlist import DynamicDictList
 
 from .base import PageBase
 from .cooperation import MemoryObjectSetMixin
+
+if TYPE_CHECKING:
+    from angr.storage.memory_mixins.paged_memory.paged_memory_mixin import PagedMemoryMixin
 
 l = logging.getLogger(name=__name__)
 
@@ -28,7 +31,17 @@ class MVListPage(
     Each load() returns an iterator of all values stored at that location.
     """
 
-    def __init__(self, memory=None, content=None, sinkhole=None, mo_cmp=None, **kwargs):
+    def __init__(
+        self,
+        memory: PagedMemoryMixin | None = None,
+        content: DynamicDictList[_MOTYPE | set[_MOTYPE] | None]
+        | dict[int, _MOTYPE | set[_MOTYPE] | None]
+        | list[_MOTYPE | set[_MOTYPE] | None]
+        | None = None,
+        sinkhole: _MOTYPE | None = None,
+        mo_cmp: Callable | None = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
 
         self.content: DynamicDictList[_MOTYPE | set[_MOTYPE] | None] = (
@@ -51,7 +64,14 @@ class MVListPage(
         return o
 
     def load(
-        self, addr, size=None, endness=None, page_addr=None, memory=None, cooperate=False, **kwargs
+        self,
+        addr,
+        size: int | None = None,
+        endness: str | None = None,
+        page_addr: int | None = None,
+        memory: PagedMemoryMixin | None = None,
+        cooperate=False,
+        **kwargs,
     ) -> list[tuple[int, _MOTYPE]]:
         result = []
         last_seen = ...  # ;)
@@ -105,7 +125,16 @@ class MVListPage(
             self.stored_offset.add(subaddr)
         result[-1] = (global_start_addr, new_item)
 
-    def store(self, addr, data, size=None, endness=None, memory=None, cooperate=False, **kwargs):
+    def store(
+        self,
+        addr,
+        data,
+        size: int | None = None,
+        endness: str | None = None,
+        memory: PagedMemoryMixin | None = None,
+        cooperate=False,
+        **kwargs,
+    ):
         super().store(addr, data, size=size, endness=endness, memory=memory, cooperate=cooperate, **kwargs)
 
         if not cooperate:
@@ -125,7 +154,7 @@ class MVListPage(
                 self.content[subaddr] = data
                 self.stored_offset.add(subaddr)
 
-    def erase(self, addr, size=None, **kwargs) -> None:
+    def erase(self, addr, size: int | None = None, **kwargs) -> None:
         for off in range(size):
             self.content[addr + off] = None
 
@@ -133,7 +162,7 @@ class MVListPage(
         self,
         others: list[MVListPage],
         merge_conditions,
-        common_ancestor=None,
+        common_ancestor: MVListPage | None = None,
         *,
         page_addr: int,
         memory: MemoryMixin,
@@ -269,7 +298,13 @@ class MVListPage(
         self.stored_offset |= merged_offsets
         return merged_offsets
 
-    def compare(self, other: MVListPage, page_addr: int | None = None, memory=None, changed_offsets=None) -> bool:  # pylint: disable=unused-argument
+    def compare(  # pylint: disable=unused-argument
+        self,
+        other: MVListPage,
+        page_addr: int | None = None,
+        memory: PagedMemoryMixin | None = None,
+        changed_offsets=None,
+    ) -> bool:
         compared_to = None
         for b in sorted(changed_offsets):
             if compared_to is not None and not b >= compared_to:

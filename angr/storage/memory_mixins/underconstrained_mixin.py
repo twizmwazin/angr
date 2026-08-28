@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 import claripy
 
@@ -22,15 +23,25 @@ class UnderconstrainedMixin(MemoryMixin):
         out._unconstrained_range = self._unconstrained_range
         return out
 
-    def load(self, addr, size=None, **kwargs):
+    def load(self, addr, size: int | claripy.ast.BV | None = None, **kwargs):
         self._constrain_underconstrained_index(addr)
         return super().load(addr, size, **kwargs)
 
-    def store(self, addr, data, size=None, **kwargs):
+    def store(self, addr, data, size: int | claripy.ast.BV | None = None, **kwargs):
         self._constrain_underconstrained_index(addr)
         super().store(addr, data, size, **kwargs)
 
-    def _default_value(self, addr, size, *, name=None, key=None, inspect=True, events=True, **kwargs):
+    def _default_value(
+        self,
+        addr,
+        size,
+        *,
+        name: str | None = None,
+        key: tuple[Any, ...] | None = None,
+        inspect=True,
+        events=True,
+        **kwargs,
+    ):
         if o.UNDER_CONSTRAINED_SYMEXEC in self.state.options and type(addr) is int:
             if self.category == "mem":
                 alloc_depth = self.state.uc_manager.get_alloc_depth(addr)

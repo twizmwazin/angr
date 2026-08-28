@@ -67,7 +67,7 @@ class RegionDescriptor:
         "related_function_address",
     )
 
-    def __init__(self, region_id, base_address, related_function_address=None):
+    def __init__(self, region_id, base_address, related_function_address: int | None = None):
         self.region_id = region_id
         self.base_address = base_address
         self.related_function_address = related_function_address
@@ -132,7 +132,7 @@ class RegionMap:
 
         return r
 
-    def map(self, absolute_address, region_id, related_function_address=None):
+    def map(self, absolute_address, region_id, related_function_address: int | None = None):
         """
         Add a mapping between an absolute address and a region ID. If this is a stack region map, all stack regions
         beyond (lower than) this newly added regions will be discarded.
@@ -203,7 +203,7 @@ class RegionMap:
         base_address = self._region_id_to_address[region_id].base_address
         return base_address + relative_address
 
-    def relativize(self, absolute_address, target_region_id=None):
+    def relativize(self, absolute_address, target_region_id: str | None = None):
         """
         Convert an absolute address to the memory offset in a memory region.
 

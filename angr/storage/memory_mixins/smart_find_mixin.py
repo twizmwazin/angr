@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import claripy
 
 from angr.errors import SimSegfaultException
 from angr.storage.memory_mixins.memory_mixin import MemoryMixin
+
+if TYPE_CHECKING:
+    from angr.state_plugins.sim_action_object import SimActionObject
 
 
 class SmartFindMixin(MemoryMixin):
@@ -17,11 +22,11 @@ class SmartFindMixin(MemoryMixin):
         data,
         max_search,
         *,
-        default=None,
-        endness=None,
-        chunk_size=None,
-        max_symbolic_bytes=None,
-        condition=None,
+        default: SimActionObject | claripy.ast.BV | int | None = None,
+        endness: str | None = None,
+        chunk_size: int | None = None,
+        max_symbolic_bytes: int | None = None,
+        condition: claripy.ast.Bool | None = None,
         char_size=1,
         **kwargs,
     ):

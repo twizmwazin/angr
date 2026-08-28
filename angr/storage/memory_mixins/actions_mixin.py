@@ -8,7 +8,17 @@ from angr.storage.memory_mixins.memory_mixin import MemoryMixin
 
 
 class ActionsMixinHigh(MemoryMixin):
-    def load(self, addr, size=None, *, condition=None, fallback=None, disable_actions=False, action=None, **kwargs):
+    def load(
+        self,
+        addr,
+        size: int | claripy.ast.BV | None = None,
+        *,
+        condition: claripy.ast.Bool | None = None,
+        fallback: claripy.ast.BV | None = None,
+        disable_actions=False,
+        action: SimActionData | None = None,
+        **kwargs,
+    ):
         if not disable_actions and o.AUTO_REFS in self.state.options and action is None:
             action = self.__make_action("read", addr, size, None, condition, fallback)
 
@@ -29,7 +39,17 @@ class ActionsMixinHigh(MemoryMixin):
 
         return r
 
-    def store(self, addr, data, size=None, *, disable_actions=False, action=None, condition=None, **kwargs):
+    def store(
+        self,
+        addr,
+        data,
+        size: int | claripy.ast.BV | None = None,
+        *,
+        disable_actions=False,
+        action: SimActionData | None = None,
+        condition: claripy.ast.Bool | None = None,
+        **kwargs,
+    ):
         if not disable_actions and o.AUTO_REFS in self.state.options and action is None:
             action = self.__make_action("write", addr, size, data, condition, None)
 
@@ -57,14 +77,14 @@ class ActionsMixinHigh(MemoryMixin):
 
 
 class ActionsMixinLow(MemoryMixin):
-    def load(self, addr, size=None, *, action=None, **kwargs):
+    def load(self, addr, size: int | None = None, *, action=None, **kwargs):
         if action is not None:
             if action.actual_addrs is None:
                 action.actual_addrs = []
             action.actual_addrs.append(addr)
         return super().load(addr, size, action=action, **kwargs)
 
-    def store(self, addr, data, size=None, *, action: SimActionData | None = None, **kwargs):
+    def store(self, addr, data, size: int | None = None, *, action: SimActionData | None = None, **kwargs):
         if action is not None:
             if action.actual_addrs is None:
                 action.actual_addrs = []

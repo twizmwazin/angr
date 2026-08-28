@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import claripy
 
 import angr
@@ -9,6 +11,9 @@ from angr.errors import SimMemoryAddressError, SimMemoryError, SimMergeError, Si
 from angr.sim_state_options import SimStateOptions
 from angr.state_plugins.inspect import BP_AFTER, BP_BEFORE
 from angr.storage.memory_mixins.memory_mixin import MemoryMixin
+
+if TYPE_CHECKING:
+    from angr.concretization_strategies import SimConcretizationStrategy
 
 
 class MultiwriteAnnotation(claripy.Annotation):
@@ -48,7 +53,12 @@ class AddressConcretizationMixin(MemoryMixin):
     process of serializing symbolic addresses into concrete ones to be specified.
     """
 
-    def __init__(self, read_strategies=None, write_strategies=None, **kwargs):
+    def __init__(
+        self,
+        read_strategies: list[SimConcretizationStrategy] | None = None,
+        write_strategies: list[SimConcretizationStrategy] | None = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
 
         self.read_strategies = read_strategies
@@ -205,7 +215,12 @@ class AddressConcretizationMixin(MemoryMixin):
         # well, we tried
         raise SimMemoryAddressError(f"Unable to concretize address for {action} with the provided strategies.")
 
-    def concretize_write_addr(self, addr, strategies=None, condition=None):
+    def concretize_write_addr(
+        self,
+        addr,
+        strategies: list[SimConcretizationStrategy] | None = None,
+        condition: claripy.ast.Bool | None = None,
+    ):
         """
         Concretizes an address meant for writing.
 
@@ -223,7 +238,12 @@ class AddressConcretizationMixin(MemoryMixin):
         strategies = self.write_strategies if strategies is None else strategies
         return self._apply_concretization_strategies(addr, strategies, "store", condition)
 
-    def concretize_read_addr(self, addr, strategies=None, condition=None):
+    def concretize_read_addr(
+        self,
+        addr,
+        strategies: list[SimConcretizationStrategy] | None = None,
+        condition: claripy.ast.Bool | None = None,
+    ):
         """
         Concretizes an address meant for reading.
 
@@ -262,7 +282,16 @@ class AddressConcretizationMixin(MemoryMixin):
                 back -= 1
         return lst
 
-    def _load_one_addr(self, concrete_addr: int, trivial: bool, addr, condition, size, read_value=None, **kwargs):
+    def _load_one_addr(
+        self,
+        concrete_addr: int,
+        trivial: bool,
+        addr,
+        condition,
+        size,
+        read_value: claripy.ast.BV | int | None = None,
+        **kwargs,
+    ):
         if trivial:
             sub_condition = condition
         else:
@@ -276,7 +305,7 @@ class AddressConcretizationMixin(MemoryMixin):
             return sub_value
         return claripy.If(addr == concrete_addr, sub_value, read_value)
 
-    def load(self, addr, size=None, *, condition=None, **kwargs):
+    def load(self, addr, size: int | None = None, *, condition: claripy.ast.Bool | None = None, **kwargs):
         if type(size) is not int:
             raise TypeError("Size must have been specified as an int before reaching address concretization")
 
@@ -334,7 +363,7 @@ class AddressConcretizationMixin(MemoryMixin):
                 sub_condition = condition & sub_condition
         super().store(concrete_addr, data, size=size, condition=sub_condition, **kwargs)
 
-    def store(self, addr, data, size=None, *, condition=None, **kwargs):
+    def store(self, addr, data, size: int | None = None, *, condition: claripy.ast.Bool | None = None, **kwargs):
         # Fast path
         if type(addr) is int:
             self._store_one_addr(addr, data, True, addr, condition, size, **kwargs)
@@ -372,7 +401,7 @@ class AddressConcretizationMixin(MemoryMixin):
             # the implementation of conditionality must be at the bottom of the stack
             self._store_one_addr(concrete_addr, data, trivial, addr, condition, size, **kwargs)
 
-    def permissions(self, addr, permissions=None, **kwargs):
+    def permissions(self, addr, permissions: int | claripy.ast.BV | None = None, **kwargs):
         if type(addr) is int:
             pass
         elif getattr(addr, "op", None) == "BVV":

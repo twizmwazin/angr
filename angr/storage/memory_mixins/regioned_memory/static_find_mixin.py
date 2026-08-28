@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import claripy
 
 from angr.storage.memory_mixins.smart_find_mixin import SmartFindMixin
+
+if TYPE_CHECKING:
+    from angr.state_plugins.sim_action_object import SimActionObject
 
 
 class StaticFindMixin(SmartFindMixin):  # pylint:disable=abstract-method
@@ -16,11 +21,11 @@ class StaticFindMixin(SmartFindMixin):  # pylint:disable=abstract-method
         data,
         max_search,
         *,
-        default=None,
-        endness=None,
-        chunk_size=None,
-        max_symbolic_bytes=None,
-        condition=None,
+        default: SimActionObject | claripy.ast.BV | int | None = None,
+        endness: str | None = None,
+        chunk_size: int | None = None,
+        max_symbolic_bytes: int | None = None,
+        condition: claripy.ast.Bool | None = None,
         char_size=1,
         **kwargs,
     ):  # pylint:disable=arguments-differ

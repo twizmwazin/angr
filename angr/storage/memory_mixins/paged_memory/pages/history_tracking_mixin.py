@@ -21,7 +21,7 @@ class HistoryTrackingMixin(RefcountMixin, MemoryMixin):
         self._history_depth = 0
         self._changed_offsets: SegmentList = SegmentList()
 
-    def store(self, addr, data, size=None, **kwargs):
+    def store(self, addr, data, size: int | None = None, **kwargs):
         if size > 0:
             self._changed_offsets.occupy(addr, size, DUMMY_SORT)
         return super().store(addr, data, **kwargs)

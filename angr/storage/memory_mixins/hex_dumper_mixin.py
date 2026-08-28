@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import contextlib
 import string
+from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from angr.errors import SimValueError
 from angr.storage.memory_mixins.memory_mixin import MemoryMixin
+
+if TYPE_CHECKING:
+    import claripy
 
 
 class HexDumperMixin(MemoryMixin):
@@ -18,7 +23,7 @@ class HexDumperMixin(MemoryMixin):
         symbolic_char="?",
         unprintable_char=".",
         solve=False,
-        extra_constraints=None,
+        extra_constraints: Sequence[claripy.ast.Bool] | None = None,
         inspect=False,
         disable_actions=True,
     ):

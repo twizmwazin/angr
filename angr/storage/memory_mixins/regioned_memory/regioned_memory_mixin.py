@@ -92,7 +92,15 @@ class RegionedMemoryMixin(MemoryMixin):
 
         return o
 
-    def load(self, addr, size: BV | int | None = None, *, endness=None, condition: Bool | None = None, **kwargs):
+    def load(
+        self,
+        addr,
+        size: BV | int | None = None,
+        *,
+        endness: str | None = None,
+        condition: Bool | None = None,
+        **kwargs,
+    ):
         if isinstance(size, BV) and size.has_annotation_type(RegionAnnotation):
             _l.critical("load(): size %s is a ValueSet. Something is wrong.", size)
             if self.state.scratch.ins_addr is not None:
@@ -133,7 +141,9 @@ class RegionedMemoryMixin(MemoryMixin):
 
         return val
 
-    def store(self, addr, data, size: int | None = None, *, endness=None, **kwargs):  # pylint:disable=unused-argument
+    def store(  # pylint:disable=unused-argument
+        self, addr, data, size: int | None = None, *, endness: str | None = None, **kwargs
+    ):
         regioned_addrs_desc = self._normalize_address(addr)
         if (
             regioned_addrs_desc.cardinality >= self._write_targets_limit
@@ -145,7 +155,7 @@ class RegionedMemoryMixin(MemoryMixin):
         for aw in gen:
             self._region_store(aw.address, data, aw.region, endness, related_function_addr=aw.function_address)
 
-    def merge(self, others, merge_conditions, common_ancestor=None) -> bool:
+    def merge(self, others, merge_conditions, common_ancestor: MemoryMixin | None = None) -> bool:
         r = False
         for o in others:
             for region_id, region in o._regions.items():
@@ -238,7 +248,7 @@ class RegionedMemoryMixin(MemoryMixin):
         self,
         key: str,
         state: SimState,
-        related_function_addr: int,
+        related_function_addr: int | None,
         endness,
         cle_memory_backer: None = None,
         dict_memory_backer: dict | None = None,
@@ -280,7 +290,7 @@ class RegionedMemoryMixin(MemoryMixin):
 
         return base_addr
 
-    def _region_load(self, addr, size, key: str, related_function_addr=None, **kwargs):
+    def _region_load(self, addr, size, key: str, related_function_addr: int | None = None, **kwargs):
         bbl_addr, stmt_id, ins_addr = (
             self.state.scratch.bbl_addr,
             self.state.scratch.stmt_idx,
@@ -341,7 +351,7 @@ class RegionedMemoryMixin(MemoryMixin):
     ) -> Generator[AddressWrapper]:
         raise NotImplementedError
 
-    def _normalize_address(self, addr: claripy.ast.Bits, condition=None) -> AbstractAddressDescriptor:
+    def _normalize_address(self, addr: claripy.ast.Bits, condition: Bool | None = None) -> AbstractAddressDescriptor:
         """
         Translate an address into a series of internal representation of addresses that can be used to address in
         individual regions.

@@ -20,7 +20,15 @@ class Segment:
 class AbstractLocation:
     """AbstractLocation represents a location in memory."""
 
-    def __init__(self, bbl_key, stmt_id, region_id, segment_list=None, region_offset=None, size=None):
+    def __init__(
+        self,
+        bbl_key,
+        stmt_id,
+        region_id,
+        segment_list: list[Segment] | None = None,
+        region_offset: int | None = None,
+        size: int | None = None,
+    ):
         self._bbl_key = -1 if bbl_key is None else bbl_key
         self._stmt_id = -1 if stmt_id is None else stmt_id
         self._region_id = region_id
@@ -137,7 +145,7 @@ class MemoryRegionMetaMixin(MemoryMixin):
         "_state",
     )
 
-    def __init__(self, related_function_addr=None, **kwargs):
+    def __init__(self, related_function_addr: int | None = None, **kwargs):
         super().__init__(**kwargs)
         self._related_function_addr = related_function_addr
         # This is a map from tuple (basicblock_key, stmt_id) to AbstractLocation objects
@@ -186,7 +194,18 @@ class MemoryRegionMetaMixin(MemoryMixin):
 
         return ret
 
-    def store(self, addr, data, size=None, *, bbl_addr=None, stmt_id=None, ins_addr=None, endness=None, **kwargs):
+    def store(
+        self,
+        addr,
+        data,
+        size: int | None = None,
+        *,
+        bbl_addr: int | None = None,
+        stmt_id: int | None = None,
+        ins_addr: int | None = None,
+        endness: str | None = None,
+        **kwargs,
+    ):
         # It comes from a SimProcedure. We'll use bbl_addr as the aloc_id
         aloc_id = ins_addr if ins_addr is not None else bbl_addr
 
@@ -199,7 +218,16 @@ class MemoryRegionMetaMixin(MemoryMixin):
             return super().store(addr, data, size=size, endness=endness, **kwargs)
         return super().store(addr, data, size=size, endness=endness, **kwargs)
 
-    def load(self, addr, size=None, *, bbl_addr=None, stmt_idx=None, ins_addr=None, **kwargs):  # pylint:disable=unused-argument
+    def load(  # pylint:disable=unused-argument
+        self,
+        addr,
+        size: int | None = None,
+        *,
+        bbl_addr: int | None = None,
+        stmt_idx: int | None = None,
+        ins_addr: int | None = None,
+        **kwargs,
+    ):
         # if bbl_addr is not None and stmt_id is not None:
         return super().load(addr, size=size, **kwargs)
 

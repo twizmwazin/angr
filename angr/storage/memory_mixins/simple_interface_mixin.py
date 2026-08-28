@@ -7,7 +7,16 @@ from angr.storage.memory_mixins.memory_mixin import MemoryMixin
 
 
 class SimpleInterfaceMixin(MemoryMixin):
-    def load(self, addr, size=None, *, endness=None, condition=None, fallback=None, **kwargs):
+    def load(
+        self,
+        addr,
+        size: int | claripy.ast.BV | None = None,
+        *,
+        endness: str | None = None,
+        condition: claripy.ast.Bool | None = None,
+        fallback: claripy.ast.Base | int | bytes | bytearray | None = None,
+        **kwargs,
+    ):
         tsize = self._translate_size(size, None)
         return super().load(
             self._translate_addr(addr),
@@ -18,7 +27,16 @@ class SimpleInterfaceMixin(MemoryMixin):
             **kwargs,
         )
 
-    def store(self, addr, data, size=None, *, endness=None, condition=None, **kwargs):
+    def store(
+        self,
+        addr,
+        data,
+        size: int | claripy.ast.BV | None = None,
+        *,
+        endness: str | None = None,
+        condition: claripy.ast.Bool | None = None,
+        **kwargs,
+    ):
         tsize = self._translate_size(size, data)
         super().store(
             self._translate_addr(addr),

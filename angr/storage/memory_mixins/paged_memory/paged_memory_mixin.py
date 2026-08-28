@@ -30,7 +30,14 @@ class PagedMemoryMixin[PageType: PageBase](
     SUPPORTS_CONCRETE_LOAD = True
     PAGE_TYPE: type[PageType]  # must be provided in subclass
 
-    def __init__(self, page_size=0x1000, default_permissions=3, permissions_map=None, page_kwargs=None, **kwargs):
+    def __init__(
+        self,
+        page_size=0x1000,
+        default_permissions=3,
+        permissions_map: dict[tuple[int, int], int] | None = None,
+        page_kwargs: dict[str, Any] | None = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.page_size = page_size
         self._extra_page_kwargs = page_kwargs if page_kwargs is not None else {}
@@ -82,13 +89,17 @@ class PagedMemoryMixin[PageType: PageBase](
             self._pages[pageno] = page
         return page
 
-    def _initialize_default_page(self, pageno: int, permissions=None, **kwargs) -> PageType:
+    def _initialize_default_page(
+        self, pageno: int, permissions: int | claripy.ast.BV | None = None, **kwargs
+    ) -> PageType:
         # the difference between _initialize_default_page and _initialize_page with force_default=True
         # is that the latter may segfault. this strictly gives you a new page.
         kwargs["allow_default"] = True
         return PagedMemoryMixin._initialize_page(self, pageno, permissions=permissions, **kwargs)
 
-    def _initialize_page(self, pageno: int, permissions=None, *, allow_default=True, **kwargs) -> PageType:
+    def _initialize_page(
+        self, pageno: int, permissions: int | claripy.ast.BV | None = None, *, allow_default=True, **kwargs
+    ) -> PageType:
         if not allow_default:
             raise SimMemoryError("I have been instructed not to create a default page")
 
@@ -117,7 +128,7 @@ class PagedMemoryMixin[PageType: PageBase](
     def _divide_addr(self, addr: int) -> tuple[int, int]:
         return divmod(addr, self.page_size)
 
-    def load(self, addr: int, size: int | None = None, *, endness=None, **kwargs):
+    def load(self, addr: int, size: int | None = None, *, endness: str | None = None, **kwargs):
         if endness is None:
             endness = self.endness
 
@@ -174,7 +185,7 @@ class PagedMemoryMixin[PageType: PageBase](
         l.debug("%s.load(%#x, %d, %s) = %s", self.id, addr, size, endness, out)
         return out
 
-    def store(self, addr: int, data, size: int | None = None, *, endness=None, **kwargs):
+    def store(self, addr: int, data, size: int | None = None, *, endness: str | None = None, **kwargs):
         if endness is None:
             endness = self.endness
 
@@ -248,7 +259,7 @@ class PagedMemoryMixin[PageType: PageBase](
 
         sub_gen.close()
 
-    def erase(self, addr, size=None, **kwargs) -> None:
+    def erase(self, addr, size: int | None = None, **kwargs) -> None:
         if not isinstance(size, int):
             raise TypeError("Need size to be resolved to an int by this point")
 
@@ -266,7 +277,7 @@ class PagedMemoryMixin[PageType: PageBase](
             pageno = (pageno + 1) % max_pageno
             pageoff = 0
 
-    def merge(self, others, merge_conditions, common_ancestor=None):
+    def merge(self, others, merge_conditions, common_ancestor: MemoryMixin | None = None):
         changed_pages_and_offsets: dict[int, set[int] | None] = {}
         for o in others:
             for changed_page, changed_offsets in self.changed_pages(o).items():
@@ -327,7 +338,7 @@ class PagedMemoryMixin[PageType: PageBase](
 
         return True
 
-    def permissions(self, addr, permissions=None, **kwargs):
+    def permissions(self, addr, permissions: int | claripy.ast.BV | None = None, **kwargs):
         if not isinstance(addr, int):
             raise TypeError("addr must be an int in paged memory")
         pageno, _ = self._divide_addr(addr)
@@ -632,7 +643,7 @@ class PagedMemoryMixin[PageType: PageBase](
             self._pages[page_no] = page
             page.replace_all_with_offsets(offsets, old, new, memory=self)
 
-    def copy_contents(self, dst, src, size, condition=None, **kwargs):
+    def copy_contents(self, dst, src, size, condition: claripy.ast.Bool | None = None, **kwargs):
         data = self.load(src, size, **kwargs)
         self.store(dst, data, size, **kwargs)
 
@@ -669,7 +680,7 @@ class PagedMemoryMixin[PageType: PageBase](
 
 class LabeledPagesMixin(PagedMemoryMixin):
     def load_with_labels(
-        self, addr: int, size: int | None = None, endness=None, **kwargs
+        self, addr: int, size: int | None = None, endness: str | None = None, **kwargs
     ) -> tuple[claripy.ast.Base, tuple[tuple[int, int, int, Any]]]:
         if endness is None:
             endness = self.endness

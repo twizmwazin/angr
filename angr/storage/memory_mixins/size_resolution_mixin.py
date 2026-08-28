@@ -89,7 +89,7 @@ class SizeConcretizationMixin(MemoryMixin):
 
         return o
 
-    def load(self, addr, size=None, **kwargs):
+    def load(self, addr, size: int | claripy.ast.BV | None = None, **kwargs):
         if getattr(size, "op", "BVV") == "BVV":
             return super().load(addr, size=size, **kwargs)
 
@@ -97,7 +97,7 @@ class SizeConcretizationMixin(MemoryMixin):
         out_size = self.state.solver.max(size)
         return super().load(addr, size=out_size, **kwargs)
 
-    def store(self, addr, data, size=None, *, condition=None, **kwargs):
+    def store(self, addr, data, size=None, *, condition: claripy.ast.Bool | bool | None = None, **kwargs):
         if getattr(size, "op", "BVV") == "BVV":
             super().store(addr, data, size=size, condition=condition, **kwargs)
             return
