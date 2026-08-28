@@ -69,8 +69,9 @@ class CFGBase(Analysis):
     The base class for control flow graphs.
     """
 
-    tag: str = None  # type:ignore
-    addr_type: Literal["int", "block_id", "soot"] = None  # type: ignore
+    # Both are abstract class-level attributes: every concrete subclass must define them.
+    tag: str
+    addr_type: Literal["int", "block_id", "soot"]
     _cle_pseudo_objects = (ExternObject, KernelObject, TLSObject)
 
     def __init__(

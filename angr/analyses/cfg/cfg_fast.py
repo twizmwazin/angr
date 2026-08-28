@@ -922,13 +922,13 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
         #
         self._pending_jobs = None  # type: ignore
         self._traced_addresses = None  # type: ignore
-        self._function_returns: defaultdict[int, set] = None  # type: ignore
+        self._function_returns: defaultdict[int, set]
         self._function_exits = None  # type: ignore
         self._gp_value: int | None = None
         self._ro_region_cdata_cache: list | None = None
         self._job_ctr = 0
         self._decoding_assumptions: dict[int, DecodingAssumption] = {}
-        self._decoding_assumption_relations: networkx.DiGraph = None  # type: ignore
+        self._decoding_assumption_relations: networkx.DiGraph
 
         # A mapping between address and the actual data in memory
         # self._memory_data = { }
