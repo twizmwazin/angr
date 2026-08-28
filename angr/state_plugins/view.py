@@ -105,7 +105,7 @@ class SimRegNameView(SimStatePlugin):
     def copy(self, memo):  # pylint: disable=unused-argument
         return SimRegNameView()
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: SimRegNameView | None = None):  # pylint: disable=unused-argument
         return False
 
     def get(self, reg_name):
@@ -147,7 +147,7 @@ class SimMemView(SimStatePlugin):
         'SOSNEAKY'
     """
 
-    def __init__(self, ty=None, addr=None, state=None):
+    def __init__(self, ty: SimType | None = None, addr=None, state: SimState | None = None):
         super().__init__()
         self._type = ty
         self._addr = addr
@@ -254,7 +254,7 @@ class SimMemView(SimStatePlugin):
     def copy(self, memo):  # pylint: disable=unused-argument
         return SimMemView()
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: SimMemView | None = None):  # pylint: disable=unused-argument
         return False
 
     @property

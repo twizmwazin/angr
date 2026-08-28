@@ -3,12 +3,17 @@ from __future__ import annotations
 import logging
 import os
 from collections import namedtuple
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from angr.errors import SimMergeError
 from angr.storage.file import SimFile
 
 from .plugin import SimStatePlugin
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from angr.storage.file import SimFileBase
 
 l = logging.getLogger(name=__name__)
 
@@ -51,7 +56,13 @@ class SimFilesystem(SimStatePlugin):  # pretends links don't exist
                         shallow-copied from successor to successor, so don't mutate anything in it without copying.
     """
 
-    def __init__(self, files=None, pathsep=None, cwd=None, mountpoints=None):
+    def __init__(
+        self,
+        files: Mapping[str | bytes, SimFileBase] | None = None,
+        pathsep: bytes | None = None,
+        cwd: bytes | None = None,
+        mountpoints: Mapping[str | bytes, SimMount] | None = None,
+    ):
         super().__init__()
 
         if files is None:
@@ -101,7 +112,7 @@ class SimFilesystem(SimStatePlugin):  # pretends links don't exist
         for fname in self._mountpoints:
             self._mountpoints[fname].set_state(state)
 
-    def merge(self, others, merge_conditions, common_ancestor=None):
+    def merge(self, others, merge_conditions, common_ancestor: SimFilesystem | None = None):
         for o in others:
             if o.cwd != self.cwd:
                 raise SimMergeError("Can't merge filesystems with disparate cwds")
@@ -405,7 +416,7 @@ class SimConcreteFilesystem(SimMount):
         for fname in self.cache:
             self.cache[fname].set_state(state)
 
-    def merge(self, others, merge_conditions, common_ancestor=None):
+    def merge(self, others, merge_conditions, common_ancestor: SimConcreteFilesystem | None = None):
         merging_occurred = False
 
         for o in others:
@@ -450,7 +461,7 @@ class SimHostFilesystem(SimConcreteFilesystem):
     :param str pathsep:         The host path separator character, default os.path.sep
     """
 
-    def __init__(self, host_path=None, **kwargs):
+    def __init__(self, host_path: str | None = None, **kwargs):
         super().__init__(**kwargs)
         self.host_path = host_path if host_path is not None else self.pathsep
 

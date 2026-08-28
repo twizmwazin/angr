@@ -21,7 +21,7 @@ class ImportedLine:
 
 
 class ImportSourceCode(BaseStructuredCodeGenerator, Analysis):
-    def __init__(self, function, flavor="source", source_root: str | None = None, encoding="utf-8"):
+    def __init__(self, function, flavor="source", source_root=None, encoding="utf-8"):
         super().__init__(flavor=flavor)
 
         if isinstance(function, (int, str)):
@@ -73,7 +73,7 @@ class ImportSourceCode(BaseStructuredCodeGenerator, Analysis):
 
         return None
 
-    def _open_file(self, name, cache: dict[str, list[str] | None] | None = None):
+    def _open_file(self, name, cache=None):
         if cache is None:
             cache = {}
         if name in cache:
@@ -88,7 +88,7 @@ class ImportSourceCode(BaseStructuredCodeGenerator, Analysis):
         cache[name] = line_data
         return line_data
 
-    def _compute_function_ranges(self, cache: dict[str, list[str] | None] | None = None):
+    def _compute_function_ranges(self, cache=None):
         if cache is None:
             cache = {}
 

@@ -3,9 +3,13 @@ from __future__ import annotations
 
 import contextlib
 import logging
+from typing import TYPE_CHECKING
 
 from .sim_action_object import SimActionObject
 from .sim_event import SimEvent
+
+if TYPE_CHECKING:
+    import claripy
 
 l = logging.getLogger(name=__name__)
 
@@ -98,7 +102,13 @@ class SimActionExit(SimAction):
     CONDITIONAL = "conditional"
     DEFAULT = "default"
 
-    def __init__(self, state, target, condition=None, exit_type=None):
+    def __init__(
+        self,
+        state,
+        target,
+        condition: claripy.ast.Bool | SimActionObject | None = None,
+        exit_type: str | None = None,
+    ):
         super().__init__(state, "exit")
         if exit_type is not None:
             self.exit_type = exit_type
@@ -132,7 +142,7 @@ class SimActionConstraint(SimAction):
     A constraint action represents an extra constraint added during execution of a path.
     """
 
-    def __init__(self, state, constraint, condition=None):
+    def __init__(self, state, constraint, condition: claripy.ast.Bool | SimActionObject | None = None):
         super().__init__(state, "constraint")
 
         self.constraint = self._make_object(constraint)
@@ -203,13 +213,13 @@ class SimActionData(SimAction):
         state,
         region_type,
         action,
-        tmp=None,
-        addr=None,
-        size=None,
-        data=None,
-        condition=None,
-        fallback=None,
-        fd=None,
+        tmp: int | None = None,
+        addr: int | claripy.ast.Base | SimActionObject | None = None,
+        size: int | claripy.ast.Base | SimActionObject | None = None,
+        data: claripy.ast.Base | SimActionObject | None = None,
+        condition: claripy.ast.Bool | SimActionObject | None = None,
+        fallback: claripy.ast.Base | SimActionObject | None = None,
+        fd: int | claripy.ast.BV | SimActionObject | None = None,
     ):
         super().__init__(state, region_type)
         self.action = action

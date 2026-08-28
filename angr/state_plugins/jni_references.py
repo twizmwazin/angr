@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from angr.sim_state import SimState
 
@@ -15,7 +16,7 @@ class SimStateJNIReferences(SimStatePlugin):
     corresponding Java objects.
     """
 
-    def __init__(self, local_refs=None, global_refs=None):
+    def __init__(self, local_refs: dict[Any, Any] | None = None, global_refs: dict[Any, Any] | None = None):
         super().__init__()
         self.local_refs = local_refs or {}
         self.global_refs = global_refs or {}
@@ -83,7 +84,7 @@ class SimStateJNIReferences(SimStatePlugin):
     def copy(self, memo):  # pylint: disable=unused-argument
         return SimStateJNIReferences(local_refs=self.local_refs, global_refs=self.global_refs)
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: SimStateJNIReferences | None = None):  # pylint: disable=unused-argument
         l.warning("Merging is not implemented for JNI references!")
         return False
 

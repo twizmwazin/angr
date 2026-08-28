@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from angr.sim_state import SimState
 
@@ -10,14 +11,14 @@ l = logging.getLogger(name=__name__)
 
 
 class SimStateGlobals(SimStatePlugin):
-    def __init__(self, backer=None):
+    def __init__(self, backer: dict[Any, Any] | None = None):
         super().__init__()
         self._backer = backer if backer is not None else {}
 
     def set_state(self, state):
         pass
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: SimStateGlobals | None = None):  # pylint: disable=unused-argument
         for other in others:
             for k in other:
                 if k not in self:

@@ -24,7 +24,7 @@ class SimStateHistory(SimStatePlugin):
     This class keeps track of historically-relevant information for paths.
     """
 
-    def __init__(self, parent=None, clone=None):
+    def __init__(self, parent: SimStateHistory | None = None, clone: SimStateHistory | None = None):
         SimStatePlugin.__init__(self)
 
         # attributes handling the progeny of this history object
@@ -137,7 +137,7 @@ class SimStateHistory(SimStatePlugin):
             return None
         return self.recent_bbl_addrs[-1]
 
-    def merge(self, others, merge_conditions, common_ancestor=None):
+    def merge(self, others, merge_conditions, common_ancestor: SimStateHistory | None = None):
         if not others:
             return False
 
@@ -188,7 +188,13 @@ class SimStateHistory(SimStatePlugin):
         self.state.register_plugin("history", new_hist)
 
     def filter_actions(
-        self, start_block_addr=None, end_block_addr=None, block_stmt=None, insn_addr=None, read_from=None, write_to=None
+        self,
+        start_block_addr: int | None = None,
+        end_block_addr: int | None = None,
+        block_stmt: int | None = None,
+        insn_addr: int | None = None,
+        read_from: str | int | None = None,
+        write_to: str | int | None = None,
     ):
         """
         Filter self.actions based on some common parameters.
@@ -477,7 +483,7 @@ class SimStateHistory(SimStatePlugin):
 
 
 class TreeIter:
-    def __init__(self, start, end=None):
+    def __init__(self, start, end: SimStateHistory | None = None):
         self._start = start
         self._end = end
 

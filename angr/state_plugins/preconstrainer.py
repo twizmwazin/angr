@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 import claripy
 
@@ -9,6 +10,11 @@ from angr.errors import AngrError
 from angr.sim_state import SimState
 
 from .plugin import SimStatePlugin
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from .sim_action import SimActionData
 
 l = logging.getLogger(name=__name__)
 
@@ -21,7 +27,7 @@ class SimStatePreconstrainer(SimStatePlugin):
                               analysis
     """
 
-    def __init__(self, constrained_addrs=None):
+    def __init__(self, constrained_addrs: Sequence[SimActionData] | None = None):
         SimStatePlugin.__init__(self)
 
         # map of variable string names to preconstraints, for re-applying constraints.
@@ -30,7 +36,7 @@ class SimStatePreconstrainer(SimStatePlugin):
         self._constrained_addrs = [] if constrained_addrs is None else constrained_addrs
         self.address_concretization = []
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: SimStatePreconstrainer | None = None):  # pylint: disable=unused-argument
         l.warning("Merging is not implemented for preconstrainer!")
         return False
 

@@ -14,7 +14,11 @@ l = logging.getLogger(__name__)
 
 
 class SimLightRegisters(SimStatePlugin):
-    def __init__(self, reg_map=None, registers=None):
+    def __init__(
+        self,
+        reg_map: dict[tuple[int, int], tuple[str, tuple[int, int] | None, int]] | None = None,
+        registers: dict[str, claripy.ast.BV] | None = None,
+    ):
         super().__init__()
 
         self.reg_map = {} if reg_map is None else reg_map
@@ -79,7 +83,7 @@ class SimLightRegisters(SimStatePlugin):
         except KeyError as e:
             raise SimFastMemoryError("Register access to an unknown register or register slice") from e
 
-    def load(self, offset, size=None, **kwargs):
+    def load(self, offset, size: int | claripy.ast.BV | None = None, **kwargs):
         name, extract, _ = self.resolve_register(offset, size)
         return self._complex_load(name, extract)
 
@@ -102,7 +106,7 @@ class SimLightRegisters(SimStatePlugin):
 
         return self._fill(name, size)
 
-    def store(self, offset, value, size=None, endness=None, **kwargs):
+    def store(self, offset, value, size: int | claripy.ast.BV | None = None, endness: str | None = None, **kwargs):
         if size is None and not isinstance(offset, str) and not isinstance(value, int):
             try:
                 size = len(value) // self.state.arch.byte_width

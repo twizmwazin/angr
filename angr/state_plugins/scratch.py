@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 import claripy
 
@@ -12,6 +13,9 @@ from .inspect import BP_AFTER, BP_BEFORE
 from .plugin import SimStatePlugin
 from .sim_action import SimActionData, SimActionObject
 
+if TYPE_CHECKING:
+    from .sim_action import SimActionOperation
+
 l = logging.getLogger(name=__name__)
 
 
@@ -20,7 +24,7 @@ class SimStateScratch(SimStatePlugin):
     Implements the scratch state plugin.
     """
 
-    def __init__(self, scratch=None):
+    def __init__(self, scratch: SimStateScratch | None = None):
         super().__init__()
 
         # info on the current run
@@ -142,7 +146,15 @@ class SimStateScratch(SimStatePlugin):
         return v
 
     # pylint:disable=unused-argument
-    def store_tmp(self, tmp, content, reg_deps=frozenset(), tmp_deps=frozenset(), deps=None, **kwargs):
+    def store_tmp(
+        self,
+        tmp,
+        content,
+        reg_deps=frozenset(),
+        tmp_deps=frozenset(),
+        deps: frozenset[SimActionData | SimActionOperation] | None = None,
+        **kwargs,
+    ):
         """
         Stores a Claripy expression in a VEX temp value.
         If in symbolic mode, this involves adding a constraint for the tmp's symbolic variable.
@@ -177,7 +189,7 @@ class SimStateScratch(SimStatePlugin):
     def copy(self, memo):  # pylint: disable=unused-argument
         return SimStateScratch(scratch=self)
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: SimStateScratch | None = None):  # pylint: disable=unused-argument
         return False
 
     def clear(self):

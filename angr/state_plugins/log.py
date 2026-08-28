@@ -14,7 +14,7 @@ l = logging.getLogger(name=__name__)
 
 
 class SimStateLog(SimStatePlugin):
-    def __init__(self, log=None):
+    def __init__(self, log: SimStateLog | None = None):
         SimStatePlugin.__init__(self)
 
         # general events
@@ -65,7 +65,7 @@ class SimStateLog(SimStatePlugin):
         self.events = [SimEvent(self.state, "merge", event_lists=all_events)]
         return False
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: SimStateLog | None = None):  # pylint: disable=unused-argument
         return self._combine(others)
 
     def clear(self):

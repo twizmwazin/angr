@@ -4,7 +4,6 @@ from __future__ import annotations
 from angr.analyses.decompiler.condition_processor import ConditionProcessor
 from angr.analyses.decompiler.sequence_walker import SequenceWalker
 from angr.analyses.decompiler.structurer_nodes import (
-    BaseNode,
     CascadingConditionNode,
     CodeNode,
     ConditionNode,
@@ -36,13 +35,7 @@ class IfElseFlattener(SequenceWalker):
         self.functions = functions
         self.walk(node)
 
-    def _handle_Condition(
-        self,
-        node: ConditionNode,
-        parent: BaseNode | MultiNode | None = None,
-        index: int | None = None,
-        **kwargs,
-    ):
+    def _handle_Condition(self, node: ConditionNode, parent=None, index=None, **kwargs):
         if node.true_node is not None:
             self._handle(node.true_node, parent=node, index=0)
         if node.false_node is not None:
@@ -74,13 +67,7 @@ class IfElseFlattener(SequenceWalker):
                     node.false_node = None
                     insert_node(parent, "after", else_node, index, **kwargs)
 
-    def _handle_CascadingCondition(
-        self,
-        node: CascadingConditionNode,
-        parent: BaseNode | MultiNode | None = None,
-        index: int | None = None,
-        **kwargs,
-    ):
+    def _handle_CascadingCondition(self, node: CascadingConditionNode, parent=None, index=None, **kwargs):
         super()._handle_CascadingCondition(node, parent=parent, index=index, **kwargs)
 
         if node.else_node is not None:

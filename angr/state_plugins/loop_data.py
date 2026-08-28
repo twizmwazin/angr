@@ -3,10 +3,14 @@ from __future__ import annotations
 import copy
 import logging
 from collections import defaultdict
+from typing import TYPE_CHECKING
 
 from angr.sim_state import SimState
 
 from .plugin import SimStatePlugin
+
+if TYPE_CHECKING:
+    from angr.analyses.loopfinder import Loop
 
 l = logging.getLogger(name=__name__)
 
@@ -26,7 +30,12 @@ class SimStateLoopData(SimStatePlugin):
     other loop analyses.
     """
 
-    def __init__(self, back_edge_trip_counts=None, header_trip_counts=None, current_loop=None):
+    def __init__(
+        self,
+        back_edge_trip_counts: defaultdict[int, list[int]] | None = None,
+        header_trip_counts: defaultdict[int, list[int]] | None = None,
+        current_loop: list[tuple[Loop, list[int]]] | None = None,
+    ):
         """
         :param back_edge_trip_counts: Dictionary that stores back edge based trip counts for each loop.
                                       Keys are address of loop headers.
@@ -73,7 +82,7 @@ class SimStateLoopData(SimStatePlugin):
         self.header_trip_counts = defaultdict(list) if header_trip_counts is None else header_trip_counts
         self.current_loop = [] if current_loop is None else current_loop
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: SimStateLoopData | None = None):  # pylint: disable=unused-argument
         l.warning("Merging is not implemented for loop data!")
         return False
 

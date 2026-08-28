@@ -33,7 +33,6 @@ from .utils import (
 
 if TYPE_CHECKING:
     from angr.ailment.block import Block
-    from angr.analyses.stack_pointer_tracker import StackPointerTracker
     from angr.project import Project
 
 
@@ -134,15 +133,15 @@ class BlockSimplifier:
         block: Block | None,
         ail_manager: Manager,
         func_addr: int | None = None,
-        stack_pointer_tracker: StackPointerTracker | None = None,
+        stack_pointer_tracker=None,
         peephole_optimizations: Iterable[
             type[PeepholeOptimizationStmtBase | PeepholeOptimizationExprBase | PeepholeOptimizationMultiStmtBase]
         ]
         | None = None,
         preserve_vvar_ids: set[int] | None = None,
         type_hints: list[tuple[atoms.VirtualVariable | atoms.MemoryLocation, str]] | None = None,
-        cached_reaching_definitions: SRDAModel | None = None,
-        cached_propagator: SPropagator | None = None,
+        cached_reaching_definitions=None,
+        cached_propagator=None,
         peephole_bundle: PeepholeOptimizationBundle | None = None,
     ):
         """

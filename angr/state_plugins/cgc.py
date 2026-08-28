@@ -103,7 +103,7 @@ class SimStateCGC(SimStatePlugin):
 
         return merging_occurred
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: SimStateCGC | None = None):  # pylint: disable=unused-argument
         return self._combine(others)
 
     ### HEAP MANAGEMENT

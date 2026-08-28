@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import networkx
 
@@ -11,10 +11,6 @@ from angr.analyses.forward_analysis.visitors.graph import NodeType
 from angr.utils.ail import is_phi_assignment
 
 from .rewriting_engine import SimEngineDephiRewriting
-
-if TYPE_CHECKING:
-    from angr import KnowledgeBase
-    from angr.analyses.decompiler.variable_map import VariableMap
 
 l = logging.getLogger(__name__)
 
@@ -30,8 +26,8 @@ class GraphRewritingAnalysis(ForwardAnalysis[None, NodeType, object, object, obj
         func,
         ail_graph,
         vvar_to_vvar: dict[int, int],
-        kb: KnowledgeBase | None = None,
-        variable_map: VariableMap | None = None,
+        kb=None,
+        variable_map=None,
     ):
         self.project = project
         self._function = func

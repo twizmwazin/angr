@@ -23,10 +23,7 @@ if TYPE_CHECKING:
     from angr import ailment
     from angr.analyses.decompiler.optimization_passes.expr_op_swapper import OpDescriptor
     from angr.analyses.typehoon.typevars import TypeConstraint, TypeVariable
-    from angr.knowledge_base import KnowledgeBase
     from angr.knowledge_plugins.cfg import CFGModel
-    from angr.knowledge_plugins.functions import Function
-    from angr.project import Project
 
     from .notes import DecompilationNote
     from .structured_codegen import BaseStructuredCodeGenerator
@@ -56,7 +53,7 @@ def _simvar_from_bytes(b: bytes):
     return getattr(sv_mod, b[:sep].decode("ascii")).parse(b[sep + 1 :])
 
 
-def _serialize_binop_operators(binop_operators, out_msg, set_flag: tuple[object, str] | None = None) -> None:
+def _serialize_binop_operators(binop_operators, out_msg, set_flag=None) -> None:
     if binop_operators is None:
         return
     if set_flag is not None:
@@ -273,10 +270,10 @@ class DecompilationCache(Serializable):
         cls,
         cmsg,
         *,
-        project: Project | None = None,
-        kb: KnowledgeBase | None = None,
-        function: Function | None = None,
-        cfg: CFGModel | None = None,
+        project=None,
+        kb=None,
+        function=None,
+        cfg=None,
         **_,
     ):
         """Parse a DecompilationCache from a cmessage. Runtime back-references (project, kb, function, cfg) are

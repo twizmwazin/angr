@@ -111,7 +111,7 @@ class SequenceNode(BaseNode):
         "nodes",
     )
 
-    def __init__(self, addr: int | None, nodes: list | None = None):
+    def __init__(self, addr: int | None, nodes=None):
         self.addr = addr
         self.nodes = nodes if nodes is not None else []
 
@@ -385,13 +385,7 @@ class SwitchCaseNode(BaseNode):
         "switch_expr",
     )
 
-    def __init__(
-        self,
-        switch_expr,
-        cases: OrderedDict[int | tuple[int, ...], SequenceNode],
-        default_node,
-        addr: int | None = None,
-    ):
+    def __init__(self, switch_expr, cases: OrderedDict[int | tuple[int, ...], SequenceNode], default_node, addr=None):
         self.switch_expr = switch_expr
         self.cases: OrderedDict[int | tuple[int, ...], SequenceNode] = cases
         self.default_node = default_node

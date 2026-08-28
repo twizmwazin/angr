@@ -84,7 +84,7 @@ class DuplicationReverter(StructuringOptimizationPass):
     # Main Analysis
     #
 
-    def _analyze(self, cache: dict | None = None) -> bool:
+    def _analyze(self, cache=None) -> bool:
         """
         This function is the main analysis function for this deoptimization which implements SAILR's ISD deoptimization.
         There are generally three steps to this deoptimization:
@@ -533,7 +533,7 @@ class DuplicationReverter(StructuringOptimizationPass):
         other_input = io_finder.inputs_by_stmt[other_idx]
         return target_output.intersection(other_input)
 
-    def stmt_can_move_to(self, stmt, block, new_idx, io_finder: BlockIOFinder | None = None):
+    def stmt_can_move_to(self, stmt, block, new_idx, io_finder=None):
         if stmt not in block.statements:
             raise NotImplementedError("Statement not in block, and we can't compute moving a stmt to a new block!")
 
@@ -816,7 +816,7 @@ class DuplicationReverter(StructuringOptimizationPass):
 
         return []
 
-    def _block_has_goto_edge(self, block: ailment.Block, other_ends, graph: nx.DiGraph | None = None):
+    def _block_has_goto_edge(self, block: ailment.Block, other_ends, graph=None):
         # case1:
         # A -> (goto) -> B.
         # if goto edge coming from end block, from any instruction in the block

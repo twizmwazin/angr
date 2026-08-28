@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from archinfo.arch_soot import SootAddressDescriptor, SootAddressTerminator, SootClassDescriptor
 
@@ -9,6 +10,11 @@ from angr.engines.soot.method_dispatcher import resolve_method
 from angr.sim_state import SimState
 
 from .plugin import SimStatePlugin
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from angr.sim_manager import SimulationManager
 
 l = logging.getLogger("angr.state_plugins.javavm_classloader")
 
@@ -19,11 +25,16 @@ class SimJavaVmClassloader(SimStatePlugin):
     Java classes.
     """
 
-    def __init__(self, initialized_classes=None):
+    def __init__(self, initialized_classes: set[SootClassDescriptor] | None = None):
         super().__init__()
         self._initialized_classes = set() if initialized_classes is None else initialized_classes
 
-    def get_class(self, class_name, init_class=False, step_func=None):
+    def get_class(
+        self,
+        class_name,
+        init_class=False,
+        step_func: Callable[[SimulationManager], SimulationManager] | None = None,
+    ):
         """
         Get a class descriptor for the class.
 
@@ -68,7 +79,7 @@ class SimJavaVmClassloader(SimStatePlugin):
         """
         return class_ in self.initialized_classes
 
-    def init_class(self, class_, step_func=None):
+    def init_class(self, class_, step_func: Callable[[SimulationManager], SimulationManager] | None = None):
         """
         This method simulates the loading of a class by the JVM, during which
         parts of the class (e.g. static fields) are initialized. For this, we
@@ -122,7 +133,7 @@ class SimJavaVmClassloader(SimStatePlugin):
     def copy(self, memo):  # pylint: disable=unused-argument
         return SimJavaVmClassloader(initialized_classes=self.initialized_classes.copy())
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: SimJavaVmClassloader | None = None):  # pylint: disable=unused-argument
         l.warning("Merging is not implemented for JavaVM classloader!")
         return False
 

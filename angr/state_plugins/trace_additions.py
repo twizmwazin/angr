@@ -16,15 +16,22 @@ from __future__ import annotations
 
 import logging
 import string
+from typing import TYPE_CHECKING
 
 import claripy
 
 import angr
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
 l = logging.getLogger(name=__name__)
 
 
 class FormatInfo:
+    addr: int
+    func_name: str
+
     def copy(self):
         raise NotImplementedError
 
@@ -355,7 +362,7 @@ class ChallRespInfo(angr.state_plugins.SimStatePlugin):
         s.allows_negative_bvs = set(self.allows_negative_bvs)
         return s
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: ChallRespInfo | None = None):  # pylint: disable=unused-argument
         raise angr.errors.SimMergeError("Can't merge ChallRespInfo - what on earth are you doing?")
 
     @staticmethod
@@ -533,7 +540,7 @@ class ChallRespInfo(angr.state_plugins.SimStatePlugin):
             return state.posix.dumps(0)
 
     @staticmethod
-    def prep_tracer(state, format_infos=None):
+    def prep_tracer(state, format_infos: Iterable[FormatInfo] | None = None):
         format_infos = [] if format_infos is None else format_infos
         state.inspect.b("exit", angr.BP_BEFORE, action=exit_hook)
         state.inspect.b("syscall", angr.BP_AFTER, action=syscall_hook)
@@ -681,7 +688,7 @@ class ZenPlugin(angr.state_plugins.SimStatePlugin):
         z.controlled_transmits = self.controlled_transmits
         return z
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: ZenPlugin | None = None):  # pylint: disable=unused-argument
         raise angr.errors.SimMergeError("Can't merge ZenPlugin - what on earth are you doing?")
 
     def get_flag_bytes(self, ast):
