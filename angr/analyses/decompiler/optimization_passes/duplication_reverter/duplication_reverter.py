@@ -152,7 +152,7 @@ class DuplicationReverter(StructuringOptimizationPass):
 
     def _construct_merged_candidate(self, candidate: tuple[Block, Block]) -> tuple[AILMergeGraph, tuple[Block, Block]]:
         ail_merge_graph = self.create_merged_subgraph(candidate, self.write_graph)
-        new_candidate = ail_merge_graph.starts
+        new_candidate = (ail_merge_graph.starts[0], ail_merge_graph.starts[1])
         for block in ail_merge_graph.original_ends:
             if self._block_has_goto_edge(
                 block, [b for b in ail_merge_graph.original_ends if b is not block], graph=self.write_graph
