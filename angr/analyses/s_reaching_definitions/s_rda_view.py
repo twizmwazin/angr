@@ -19,6 +19,7 @@ from angr.utils.ssa import get_reg_offset_base
 from .s_rda_model import SRDAModel
 
 if TYPE_CHECKING:
+    from angr.analyses.decompiler.variable_map import VariableMap
     from angr.knowledge_plugins.functions.function_manager import FunctionManager
 
 log = logging.getLogger(__name__)
@@ -74,7 +75,7 @@ class RegVVarPredicate:
         arch,
         platform: str | None = None,
         language: str | None = None,
-        variable_map=None,
+        variable_map: VariableMap | None = None,
         functions: FunctionManager | None = None,
     ):
         self.reg_offset = reg_offset

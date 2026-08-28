@@ -18,6 +18,7 @@ from .s_rda_model import SRDAModel, populate_model
 from .s_rda_view import SRDAView
 
 if TYPE_CHECKING:
+    from angr.analyses.decompiler.variable_map import VariableMap
     from angr.project import Project
 
 
@@ -39,7 +40,7 @@ class SReachingDefinitions:
         func_args: set[VirtualVariable] | None = None,
         use_callee_saved_regs_at_return: bool = False,
         track_tmps: bool = False,
-        variable_map=None,
+        variable_map: VariableMap | None = None,
     ):
         self.project = project
         self.kb = project.kb
@@ -231,7 +232,7 @@ class SReachingDefinitionsAnalysis(Analysis, SReachingDefinitions):
         func_args: set[VirtualVariable] | None = None,
         use_callee_saved_regs_at_return: bool = False,
         track_tmps: bool = False,
-        variable_map=None,
+        variable_map: VariableMap | None = None,
     ):
         super().__init__(
             self.project,

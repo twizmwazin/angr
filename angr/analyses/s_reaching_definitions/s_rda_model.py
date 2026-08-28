@@ -12,6 +12,7 @@ from angr.knowledge_plugins.key_definitions import Definition, atoms
 from angr.utils.ssa import get_tmp_deflocs, get_tmp_uselocs, get_vvar_deflocs, get_vvar_uselocs
 
 if TYPE_CHECKING:
+    from angr.analyses.decompiler.variable_map import VariableMap
     from angr.knowledge_plugins.functions.function_manager import FunctionManager
 
 
@@ -27,7 +28,7 @@ class SRDAModel:
         arch,
         platform: str | None = None,
         language: str | None = None,
-        variable_map=None,
+        variable_map: VariableMap | None = None,
         functions: FunctionManager | None = None,
     ):
         self.func_graph = func_graph
