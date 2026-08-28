@@ -38,7 +38,7 @@ class SimSlicer:
         target_regs=None,
         target_stack_offsets=None,
         inslice_callback=None,
-        inslice_callback_infodict=None,
+        inslice_callback_infodict: dict | None = None,
         include_imarks: bool = True,
     ):
         self._arch = arch
@@ -51,7 +51,9 @@ class SimSlicer:
         self._include_imarks = include_imarks
 
         # It could be accessed publicly
-        self.inslice_callback_infodict = inslice_callback_infodict
+        self.inslice_callback_infodict: dict = (
+            inslice_callback_infodict if inslice_callback_infodict is not None else {}
+        )
 
         self.stmts = []
         self.stmt_indices = []

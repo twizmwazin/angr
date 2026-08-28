@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import itertools
+from typing import TYPE_CHECKING
 
 import networkx
 import pyvex
@@ -9,6 +10,9 @@ from .errors import AngrBladeError, SimTranslationError
 from .knowledge_plugins.cfg import CFGNode
 from .slicer import SimSlicer
 from .utils.constants import DEFAULT_STATEMENT
+
+if TYPE_CHECKING:
+    from angr.project import Project
 
 
 class BadJumpkindNotification(Exception):
@@ -29,8 +33,9 @@ class Blade:
         dst_run: int,
         dst_stmt_idx: int,
         direction: str = "backward",
-        project=None,
-        cfg=None,
+        *,
+        project: Project,
+        cfg,
         ignore_sp: bool = False,
         ignore_bp: bool = False,
         ignored_regs=None,
@@ -49,7 +54,7 @@ class Blade:
         :param dst_stmt_idx:            The target statement index. -1 means executing until the last statement.
         :param direction:               'backward' or 'forward' slicing. Forward slicing is not yet supported.
         :param angr.Project project:    The project instance.
-        :param angr.analyses.CFGBase cfg: the CFG instance. It will be made mandatory later.
+        :param angr.analyses.CFGBase cfg: the CFG instance.
         :param ignore_sp:               Whether the stack pointer should be ignored in dependency tracking. Any
                                         dependency from/to stack pointers will be ignored if this options is True.
         :param ignore_bp:               Whether the base pointer should be ignored or not.
