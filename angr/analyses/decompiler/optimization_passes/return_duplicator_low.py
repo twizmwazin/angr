@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import networkx
 
@@ -11,6 +11,9 @@ from angr.ailment.statement import ConditionalJump
 
 from .optimization_pass import StructuringOptimizationPass
 from .return_duplicator_base import ReturnDuplicatorBase
+
+if TYPE_CHECKING:
+    from angr.analyses.decompiler.region_identifier import RegionIdentifier
 
 _l = logging.getLogger(name=__name__)
 
@@ -53,7 +56,7 @@ class ReturnDuplicatorLow(StructuringOptimizationPass, ReturnDuplicatorBase):
         max_calls_in_regions: int = 2,
         prevent_new_gotos: bool = True,
         minimize_copies_for_regions: bool = True,
-        region_identifier=None,
+        region_identifier: RegionIdentifier | None = None,
         vvar_id_start: int = 0,
         scratch: dict[str, Any] | None = None,
         max_func_blocks: int = 300,
@@ -160,7 +163,7 @@ class ReturnDuplicatorLow(StructuringOptimizationPass, ReturnDuplicatorBase):
 
         return False
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         """
         This analysis is run in a loop in analyze() for a maximum of max_opt_iters times.
         """

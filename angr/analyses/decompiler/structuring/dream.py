@@ -42,6 +42,7 @@ from angr.utils.graph import GraphUtils
 from .structurer_base import StructurerBase
 
 if TYPE_CHECKING:
+    from angr.analyses.decompiler.region_overlay import RegionOverlay
     from angr.knowledge_plugins.functions import Function
 
 l = logging.getLogger(name=__name__)
@@ -70,11 +71,11 @@ class DreamStructurer(StructurerBase):
     def __init__(
         self,
         region,
-        parent_map=None,
-        condition_processor=None,
+        parent_map: dict[RegionOverlay, RegionOverlay] | None = None,
+        condition_processor: ConditionProcessor | None = None,
         func: Function | None = None,
         case_entry_to_switch_head: dict[int, int] | None = None,
-        parent_region=None,
+        parent_region: RegionOverlay | None = None,
         **kwargs,
     ):
         super().__init__(
@@ -676,7 +677,7 @@ class DreamStructurer(StructurerBase):
         to_remove,
         *,
         jumptable_addr: int,
-        node_a=None,
+        node_a: CodeNode | None = None,
     ):
         scnode = SwitchCaseNode(cmp_expr, cases, node_default, addr=addr)
         scnode = CodeNode(scnode, node.reaching_condition)

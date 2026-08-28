@@ -112,7 +112,7 @@ class PeepholeOptimizationMultiStmtBase:
         self.type_hints = [] if type_hints is None else type_hints
         self.fixpoint_reached = False
 
-    def optimize(self, stmts: list[Statement], stmt_idx: int | None = None, block=None, **kwargs):
+    def optimize(self, stmts: list[Statement], stmt_idx: int | None = None, block: Block | None = None, **kwargs):
         raise NotImplementedError("_optimize() is not implemented.")
 
 
@@ -159,7 +159,7 @@ class PeepholeOptimizationExprBase:
         self.type_hints = [] if type_hints is None else type_hints
         self.fixpoint_reached = False
 
-    def optimize(self, expr, *, stmt_idx: int | None = None, block=None, **kwargs) -> Expression | None:
+    def optimize(self, expr, *, stmt_idx: int | None = None, block: Block | None = None, **kwargs) -> Expression | None:
         raise NotImplementedError("_optimize() is not implemented.")
 
     #

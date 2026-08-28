@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from angr import ailment
 from angr.analyses.decompiler.block_simplifier import BlockSimplifier, PeepholeOptimizationBundle
 from angr.analyses.decompiler.sequence_walker import SequenceWalker
@@ -8,6 +10,15 @@ from angr.analyses.decompiler.utils import (
 )
 
 from .optimization_pass import OptimizationPassStage, SequenceOptimizationPass
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from angr.analyses.decompiler.peephole_optimizations import (
+        PeepholeOptimizationExprBase,
+        PeepholeOptimizationMultiStmtBase,
+        PeepholeOptimizationStmtBase,
+    )
 
 
 class ExpressionSequenceWalker(SequenceWalker):
@@ -34,7 +45,15 @@ class PostStructuringPeepholeOptimizationPass(SequenceOptimizationPass):
     NAME = "Post-Structuring Peephole Optimization"
     DESCRIPTION = (__doc__ or "").strip()
 
-    def __init__(self, *args, peephole_optimizations=None, **kwargs):
+    def __init__(
+        self,
+        *args,
+        peephole_optimizations: Iterable[
+            type[PeepholeOptimizationStmtBase | PeepholeOptimizationExprBase | PeepholeOptimizationMultiStmtBase]
+        ]
+        | None = None,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self._peephole_optimizations = peephole_optimizations
         # one bundle for all BlockSimplifier invocations of this pass
@@ -51,7 +70,7 @@ class PostStructuringPeepholeOptimizationPass(SequenceOptimizationPass):
     def _check(self):
         return True, None
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         walker = ExpressionSequenceWalker(
             handlers={ailment.Expr.Expression: self._optimize_expr, ailment.Block: self._optimize_block}
         )

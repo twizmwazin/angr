@@ -80,7 +80,7 @@ class ITEExprConverter(OptimizationPass):
     )
     DESCRIPTION = (__doc__ or "").strip()
 
-    def __init__(self, *args, ite_exprs=None, **kwargs):
+    def __init__(self, *args, ite_exprs: set[tuple[int, Expression]] | None = None, **kwargs):
         super().__init__(*args, **kwargs)
         self._ite_exprs = ite_exprs
 
@@ -90,7 +90,7 @@ class ITEExprConverter(OptimizationPass):
     def _check(self):
         return True, None
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         for ins_addr, expr in self._ite_exprs:
             for block_addr, blocks in self.blocks_by_addr.items():
                 # TODO: Optimize this stupid loop

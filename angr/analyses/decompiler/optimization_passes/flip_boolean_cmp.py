@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 from angr import ailment
 from angr.ailment.expression import Op
 from angr.analyses.decompiler.sequence_walker import SequenceWalker
-from angr.analyses.decompiler.structurer_nodes import ConditionNode
+from angr.analyses.decompiler.structurer_nodes import BaseNode, ConditionNode, MultiNode
 from angr.analyses.decompiler.utils import (
     sequence_to_statements,
     structured_node_has_multi_predecessors,
@@ -26,7 +26,13 @@ class FlipBooleanWalker(SequenceWalker):
     Uses the flip_size to determine when to flip the condition on large if-statement bodies.
     """
 
-    def __init__(self, graph, manager: Manager, flip_size=9, last_node=None):
+    def __init__(
+        self,
+        graph,
+        manager: Manager,
+        flip_size=9,
+        last_node: BaseNode | MultiNode | ailment.Block | None = None,
+    ):
         super().__init__()
         self._graph = graph
         self.manager = manager
@@ -112,7 +118,7 @@ class FlipBooleanCmp(SequenceOptimizationPass):
     def _check(self):
         return bool(self.seq.nodes), None
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         walker = FlipBooleanWalker(self._graph, self.manager, last_node=self.seq.nodes[-1], flip_size=self._flip_size)
         walker.walk(self.seq)
         self.out_seq = self.seq
