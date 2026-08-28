@@ -26,7 +26,7 @@ class ComboRegisterRewriter(OptimizationPass, SRDAMixin):
     def _check(self):
         return self.project.is_rust_binary, None
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         ident_to_vvar = {}
         first_offset_to_vvar = {}
         if self._arg_vvars is None:

@@ -119,7 +119,7 @@ class CleanupCodeRemover(OptimizationPass, CFGTransformationMixin, CFAMixin, SRD
                         self._clean_return_exprs()
                         break
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         self._adjust_returns_and_prototype()
         self._remove_cleanup_calls()
 

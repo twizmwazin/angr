@@ -33,7 +33,7 @@ class SecurityCheckRemover(OptimizationPass, CFAMixin, CFGTransformationMixin):
     def _check(self):
         return self.project.is_rust_binary, None
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         for block in list(self._graph.nodes):
             if self.match_call(block, SECURITY_CHECK_FUNCTIONS):
                 self.remove_block(block)

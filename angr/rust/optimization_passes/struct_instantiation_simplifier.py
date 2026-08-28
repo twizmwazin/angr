@@ -401,7 +401,7 @@ class StructInstantiationSimplifier(OptimizationPass, SRDAMixin, CFAMixin, DFAMi
         for block in self._graph.nodes:
             walker.walk(block)
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         # First, align callsite arguments with known/recovered prototypes
         # self._align_prototype_and_args()
 

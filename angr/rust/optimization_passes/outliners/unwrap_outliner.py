@@ -179,7 +179,7 @@ class UnwrapOutliner(OptimizationPass, CFAMixin, SRDAMixin, DFAMixin, CFGTransfo
                         self.manager.next_atom(), replacement, **last_stmt.tags
                     )
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         for block in list(self._graph.nodes):
             # if block.addr == 0x40B2DE:
             #     import ipdb

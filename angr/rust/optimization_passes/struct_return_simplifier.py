@@ -136,7 +136,7 @@ class StructReturnSimplifier(OptimizationPass, SRDAMixin, CFGTransformationMixin
             return self.try_convert_to_enum(result), stmts_to_remove
         return None, None
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         ret_blocks = set()
         for block in self._graph.nodes:
             if block.statements and isinstance(block.statements[-1], Return):

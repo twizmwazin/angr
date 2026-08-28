@@ -33,7 +33,7 @@ class RetExprRewriter(OptimizationPass):
             return locs
         return [arg]
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         def callback(call_stmt: SideEffectStatement, _block, _stmt):
             if (
                 isinstance(call_stmt.expr, Call)

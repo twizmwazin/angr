@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from angr.ailment.expression import BinaryOp, Call, Const, UnaryOp, VirtualVariable
 from angr.ailment.statement import Assignment, ConditionalJump, Jump, Label, Return, SideEffectStatement
 from angr.analyses.decompiler.optimization_passes.optimization_pass import OptimizationPass, OptimizationPassStage
@@ -8,6 +10,9 @@ from angr.knowledge_plugins.functions.function import PrototypeSource
 from angr.rust.analyses.rust_calling_convention import Pathfinder
 from angr.rust.mixins import CFAMixin, SSAVariableMixin
 from angr.rust.sim_type import RustSimEnum, RustSimTypeFunction, is_composite_type
+
+if TYPE_CHECKING:
+    from angr.ailment import Block
 
 
 class FunctionPrototypeInference(OptimizationPass, CFAMixin, SSAVariableMixin):
@@ -202,7 +207,7 @@ class FunctionPrototypeInference(OptimizationPass, CFAMixin, SSAVariableMixin):
             return (discriminant_value, True)  # ret == X → early return → X is Err
         return (discriminant_value, False)  # ret != X → early return → X is Ok
 
-    def _is_early_return_block(self, block, block_map, visited=None):
+    def _is_early_return_block(self, block, block_map, visited: set[Block] | None = None):
         """Check if a block leads to a simple early return (only labels, register assignments, and returns)."""
         if visited is None:
             visited = set()
@@ -226,7 +231,7 @@ class FunctionPrototypeInference(OptimizationPass, CFAMixin, SSAVariableMixin):
                 return False
         return has_return
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         for block in self._graph.nodes:
             for stmt_idx, stmt in enumerate(block.statements):
                 if isinstance(stmt, SideEffectStatement) and isinstance(stmt.expr, Call):

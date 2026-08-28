@@ -353,7 +353,7 @@ class FormatMacroSimplifier(OptimizationPass, CFAMixin, DFAMixin, SRDAMixin, SSA
                         return macro
         return call
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         for block in self._graph.nodes:
             CallRewriter(self.replace_call).walk(block)
         for block, stmts in self._stmts_to_remove.items():

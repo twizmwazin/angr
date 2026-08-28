@@ -112,7 +112,7 @@ class StringCmpOutliner(OptimizationPass):
                 return new_stmt
         return stmt
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         walker = AILBlockRewriter(stmt_handlers={ConditionalJump: self._process_condition})
         for block in self._graph.nodes:
             walker.walk(block)

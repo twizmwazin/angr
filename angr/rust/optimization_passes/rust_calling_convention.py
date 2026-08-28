@@ -19,7 +19,7 @@ class RustCallingConvention(OptimizationPass):
     def _check(self):
         return self.project.is_rust_binary, None
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         rcc = self.project.analyses.RustCallingConvention(self._func, ail_manager=self.manager)
         self._func.prototype = rcc.prototype
         self._func.calling_convention = rcc.calling_convention

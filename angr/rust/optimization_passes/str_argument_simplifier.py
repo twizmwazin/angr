@@ -112,7 +112,7 @@ class StrArgumentSimplifier(OptimizationPass, SRDAMixin):
             return new_call
         return call
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         walker = CallRewriter(self.replace_call)
         for block in self._graph.nodes:
             walker.walk(block)

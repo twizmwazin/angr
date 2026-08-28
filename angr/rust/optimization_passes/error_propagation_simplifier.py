@@ -32,7 +32,7 @@ class ErrorPropagationWalker(SequenceWalker):
                 return False
         return True
 
-    def _is_early_return_block(self, block, visited=None):
+    def _is_early_return_block(self, block, visited: set[Block] | None = None):
         if visited and block in visited:
             return False
         if visited is None:
@@ -205,7 +205,7 @@ class ErrorPropagationSimplifier(SequenceOptimizationPass):
         for block in self._graph.nodes:
             callback(block)
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         walker = ErrorPropagationWalker(self)
         walker.walk(self.seq)
 

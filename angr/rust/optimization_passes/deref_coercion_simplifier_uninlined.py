@@ -54,7 +54,7 @@ class DerefCoercionSimplifierUninlined(OptimizationPass, SRDAMixin, CFAMixin, AI
             return self._vvar_replacements[expr.varid]
         return expr
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         for block in self._graph.nodes:
             for stmt in block.statements:
                 if (

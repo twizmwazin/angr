@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from typing import TYPE_CHECKING
 
 from angr import ailment
 from angr.ailment.expression import Load, VirtualVariable
@@ -17,6 +18,9 @@ from angr.rust.optimization_passes.pre_pattern_match_simplifier import PrePatter
 from angr.rust.sim_type import EnumVariant, RustSimTypeOption, RustSimTypeResult
 from angr.rust.structuring.structurer_nodes import IfLetNode, PatternMatchNode
 from angr.rust.utils.ail import unwrap_stack_vvar_reference
+
+if TYPE_CHECKING:
+    from angr.analyses.decompiler.structurer_nodes import BaseNode, MultiNode
 
 
 class PatternMatchWalker(SequenceWalker, DFAMixin):
@@ -128,7 +132,15 @@ class PatternMatchWalker(SequenceWalker, DFAMixin):
         )
         return PatternMatchNode(scrutinee, arms, None, addr)  # pyright: ignore[reportArgumentType]
 
-    def _build_if_let(self, true_node, true_variant, scrutinee, addr, leftover, false_node=None):
+    def _build_if_let(
+        self,
+        true_node,
+        true_variant,
+        scrutinee,
+        addr,
+        leftover,
+        false_node: BaseNode | MultiNode | ailment.Block | None = None,
+    ):
         true_move_stmts = self._collect_move_stmts(scrutinee, true_variant, true_node)
         for stmt in true_move_stmts:
             if stmt:
@@ -145,7 +157,16 @@ class PatternMatchWalker(SequenceWalker, DFAMixin):
                 return True
         return False
 
-    def _try_build_if_let(self, body_node, variant, scrutinee, addr, leftover, false_node=None, **kwargs):
+    def _try_build_if_let(
+        self,
+        body_node,
+        variant,
+        scrutinee,
+        addr,
+        leftover,
+        false_node: BaseNode | MultiNode | ailment.Block | None = None,
+        **kwargs,
+    ):
         """Helper to build an IfLetNode and handle it. Returns the new node or None."""
         if_let = self._build_if_let(body_node, variant, scrutinee, addr, leftover, false_node=false_node)
         if if_let:
@@ -256,7 +277,7 @@ class PatternMatchSimplifier(SequenceOptimizationPass):
     def _check(self):
         return bool(self.seq is not None and self.seq.nodes), None
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         if self._dvars_kb is None:
             return
         walker = PatternMatchWalker(

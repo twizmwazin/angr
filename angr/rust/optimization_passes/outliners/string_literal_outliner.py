@@ -27,7 +27,7 @@ class StringLiteralOutliner(OptimizationPass, DFAMixin, SSAVariableMixin):
     def _check(self):
         return self.project.is_rust_binary, None
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         def callback(expr: Struct):
             new_fields = OrderedDict()
             new_field_offsets = {}

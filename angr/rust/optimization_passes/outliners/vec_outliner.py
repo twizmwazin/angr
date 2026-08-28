@@ -23,7 +23,7 @@ class VecOutliner(OptimizationPass):
     def _check(self):
         return self.project.is_rust_binary, None
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         def callback(stmt_idx, stmt: Assignment, block):
             if isinstance(stmt.src, Struct) and stmt.src.name.startswith("alloc::vec::Vec"):
                 cap = stmt.src.get_field("buf.cap.__0") or stmt.src.get_field("buf.inner.cap.__0")

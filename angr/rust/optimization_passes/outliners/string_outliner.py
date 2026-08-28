@@ -22,7 +22,7 @@ class StringOutliner(OptimizationPass):
     def _check(self):
         return self.project.is_rust_binary, None
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         def callback(stmt_idx, stmt: Assignment, block):
             if isinstance(stmt.src, Struct) and stmt.src.name == "alloc::string::String":
                 cap = stmt.src.get_field("vec.buf.cap.__0") or stmt.src.get_field("vec.buf.inner.cap.__0")

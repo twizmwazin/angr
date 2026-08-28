@@ -305,7 +305,7 @@ class PrePatternMatchSimplifier(OptimizationPass, ReturnDuplicatorBase, DFAMixin
                         if false_block and false_variant:
                             self._group_move_stmts_for_block(false_block, scrutinee, false_variant)
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         graph_copy = copy_graph(self._graph)
         # since we run before the RegionIdentification pass in the decompiler, we need to collect it early here
         self._ri = self._recover_regions(graph_copy)

@@ -66,7 +66,7 @@ class RedundantBlockRemover(OptimizationPass, CFAMixin, CFGTransformationMixin):
             for block in blocks_to_remove:
                 removed = self.remove_block(block) or removed
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         self._remove_redundant_blocks()
         self._remove_redundant_blocks(dephicate=True)
         self.out_graph = self._graph
