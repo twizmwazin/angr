@@ -147,7 +147,9 @@ class ReachingDefinitionsModel:
         self, node_addr: int, stmt_idx: int, kind: ObservationPointType, *, block_idx: int | None = None
     ): ...
 
-    def get_observation_by_stmt(self, arg1, arg2, arg3=None, *, block_idx=None):
+    def get_observation_by_stmt(
+        self, arg1, arg2, arg3: ObservationPointType | None = None, *, block_idx: int | None = None
+    ):
         if isinstance(arg1, int):
             if block_idx is None:
                 return self.observed_results.get(("stmt", (arg1, arg2), arg3), None)
