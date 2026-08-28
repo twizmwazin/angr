@@ -49,7 +49,14 @@ class ConditionalRegion:
         "variable",
     )
 
-    def __init__(self, variable, op: CmpOp, value: int, node: ConditionNode | ailment.Block, parent=None):
+    def __init__(
+        self,
+        variable,
+        op: CmpOp,
+        value: int,
+        node: ConditionNode | ailment.Block,
+        parent: BaseNode | MultiNode | None = None,
+    ):
         self.variable = variable
         self.op = op
         self.value = value
@@ -71,7 +78,7 @@ class SwitchCaseRegion:
         "variable",
     )
 
-    def __init__(self, variable, node: SwitchCaseNode, parent=None):
+    def __init__(self, variable, node: SwitchCaseNode, parent: BaseNode | MultiNode | None = None):
         self.variable = variable
         self.node = node
         self.parent = parent
@@ -99,17 +106,17 @@ class SwitchClusterFinder(SequenceWalker):
 
         self.walk(node)
 
-    def _handle_Block(self, node: ailment.Block, parent=None, **kwargs):  # pylint:disable=unused-argument
+    def _handle_Block(self, node: ailment.Block, parent: BaseNode | MultiNode | None = None, **kwargs):  # pylint:disable=unused-argument
         if node.statements and isinstance(node.statements[-1], ailment.Stmt.ConditionalJump):
             cond = node.statements[-1].condition
             self._process_condition(cond, node, parent)
 
-    def _handle_Condition(self, node, parent=None, **kwargs):
+    def _handle_Condition(self, node, parent: BaseNode | MultiNode | None = None, **kwargs):
         cond = node.condition
         self._process_condition(cond, node, parent)
         return super()._handle_Condition(node, parent=parent, **kwargs)
 
-    def _handle_SwitchCase(self, node: SwitchCaseNode, parent=None, **kwargs):
+    def _handle_SwitchCase(self, node: SwitchCaseNode, parent: BaseNode | MultiNode | None = None, **kwargs):
         cond = node.switch_expr
         variable = self._variable_map.variable(cond)
         scr = SwitchCaseRegion(variable, node, parent)
