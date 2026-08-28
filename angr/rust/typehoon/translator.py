@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from angr import sim_type
 from angr.analyses.typehoon import typeconsts
 from angr.analyses.typehoon.translator import SimTypeTempRef, TypeTranslator
@@ -18,11 +20,14 @@ from angr.rust.sim_type import (
 )
 from angr.sim_type import SimTypeNum
 
+if TYPE_CHECKING:
+    from angr.sim_type import SimType
+
 
 class RustSimTypeTempRef(RustSimType, SimTypeTempRef):
     """Temporary reference to an unresolved type variable during translation."""
 
-    def repr(self, name=None, full=0, memo=None, indent=0):
+    def repr(self, name: str | None = None, full=0, memo: tuple[SimType, ...] | None = None, indent=0):
         return "<RustSimTypeTempRef>"
 
 
