@@ -34,7 +34,7 @@ class VariableAccess(Serializable):
         "variable",
     )
 
-    def __init__(self, variable, access_type, location, offset, atom_hash=None):
+    def __init__(self, variable, access_type, location, offset, atom_hash: int | None = None):
         self.variable: SimVariable = variable
         self.access_type: int = access_type
         self.location: CodeLocation = location

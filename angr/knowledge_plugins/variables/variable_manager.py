@@ -45,8 +45,20 @@ from .spilling_vardict import USE_SPILLING_DVARS, SpillingVariableInternalDict
 from .variable_access import VariableAccess, VariableAccessSort
 
 if TYPE_CHECKING:
+    from collections.abc import Container
+
+    import pyvex
+
     from angr.analyses.decompiler.stack_item import StackItem
     from angr.code_location import CodeLocation
+    from angr.knowledge_plugins.labels import Labels
+
+    # The AIL or VEX node a variable access originated from. It is only ever hashed (to build
+    # ``_atom_to_variable`` keys) and isinstance-checked, and both the AIL and the VEX variable-recovery
+    # engines record statements as well as expressions.
+    type AccessAtom = (
+        ailment.expression.Expression | ailment.statement.Statement | pyvex.IRExpr.IRExpr | pyvex.IRStmt.IRStmt
+    )
 
     class SortedDict[K, T](dict[K, T]):  # pylint:disable=missing-class-docstring
         def irange(self, *args, **kwargs) -> Iterator[K]:  # pylint:disable=unused-argument, no-self-use
@@ -94,7 +106,7 @@ class VariableManagerInternal(Serializable):
     would be "VariableManagerScope".
     """
 
-    def __init__(self, manager, func_addr=None):
+    def __init__(self, manager, func_addr: int | None = None):
         self.manager: VariableManager = manager
 
         self.func_addr = func_addr
@@ -320,7 +332,9 @@ class VariableManagerInternal(Serializable):
         return cmsg
 
     @classmethod
-    def parse_from_cmessage(cls, cmsg, variable_manager=None, func_addr=None, **kwargs) -> VariableManagerInternal:  # pylint:disable=arguments-differ
+    def parse_from_cmessage(  # pylint:disable=arguments-differ
+        cls, cmsg, variable_manager: VariableManager | None = None, func_addr: int | None = None, **kwargs
+    ) -> VariableManagerInternal:
         model = VariableManagerInternal(variable_manager, func_addr=func_addr)
 
         variable_by_ident = {}
@@ -537,17 +551,17 @@ class VariableManagerInternal(Serializable):
         self._variables.add(variable)
         self._variables_without_writes.add(variable)
 
-    def write_to(self, variable, offset, location, overwrite=False, atom=None):
+    def write_to(self, variable, offset, location, overwrite=False, atom: AccessAtom | None = None):
         self._record_variable_access(
             VariableAccessSort.WRITE, variable, offset, location, overwrite=overwrite, atom=atom
         )
 
-    def read_from(self, variable, offset, location, overwrite=False, atom=None):
+    def read_from(self, variable, offset, location, overwrite=False, atom: AccessAtom | None = None):
         self._record_variable_access(
             VariableAccessSort.READ, variable, offset, location, overwrite=overwrite, atom=atom
         )
 
-    def reference_at(self, variable, offset, location, overwrite=False, atom=None):
+    def reference_at(self, variable, offset, location, overwrite=False, atom: AccessAtom | None = None):
         self._record_variable_access(
             VariableAccessSort.REFERENCE, variable, offset, location, overwrite=overwrite, atom=atom
         )
@@ -559,7 +573,7 @@ class VariableManagerInternal(Serializable):
         offset,
         location: CodeLocation,
         overwrite=False,
-        atom: ailment.expression.Atom | None = None,
+        atom: AccessAtom | None = None,
     ):
         atom_hash = (hash(atom) & 0xFFFF_FFFF) if atom is not None else None
         if overwrite:
@@ -576,7 +590,7 @@ class VariableManagerInternal(Serializable):
         variable,
         offset: int | None,
         overwrite=False,
-        atom: ailment.expression.Atom | None = None,
+        atom: AccessAtom | None = None,
     ):
         if variable.ident not in self._ident_to_variable:
             self._ident_to_variable[variable.ident] = variable
@@ -827,7 +841,7 @@ class VariableManagerInternal(Serializable):
     @overload
     def get_variables(self, sort: None = None, collapse_same_ident: bool = False) -> list[SimRegisterVariable]: ...
 
-    def get_variables(self, sort=None, collapse_same_ident=False):
+    def get_variables(self, sort: Literal["stack", "reg"] | None = None, collapse_same_ident=False):
         """
         Get a list of variables.
 
@@ -857,7 +871,7 @@ class VariableManagerInternal(Serializable):
     @overload
     def get_unified_variables(self, sort: None) -> list[SimRegisterVariable]: ...
 
-    def get_unified_variables(self, sort=None):
+    def get_unified_variables(self, sort: Literal["stack", "reg"] | None = None):
         """
         Get a list of unified variables.
 
@@ -969,7 +983,7 @@ class VariableManagerInternal(Serializable):
 
         return input_variables
 
-    def assign_variable_names(self, labels=None, types=None):
+    def assign_variable_names(self, labels: Labels | None = None, types: Container[type[SimVariable]] | None = None):
         """
         Assign default names to all SSA variables.
 
@@ -1011,7 +1025,7 @@ class VariableManagerInternal(Serializable):
 
     def assign_unified_variable_names(
         self,
-        labels=None,
+        labels: Labels | None = None,
         arg_names: list[str] | None = None,
         reset: bool = False,
         func_blocks: list[ailment.Block] | None = None,
