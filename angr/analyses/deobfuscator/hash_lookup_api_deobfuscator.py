@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Sequence
+from typing import TYPE_CHECKING
 
 import claripy
 
@@ -10,6 +11,9 @@ from angr.ailment.block_walker import AILBlockViewer
 from angr.analyses.analysis import Analysis
 from angr.errors import AngrCallableError
 from angr.knowledge_plugins.functions.function import Function
+
+if TYPE_CHECKING:
+    from angr.analyses.decompiler.variable_map import VariableMap
 
 
 class HashLookupAPIDeobfuscator(Analysis):
@@ -112,7 +116,7 @@ class FindCallsTo(AILBlockViewer):
     Walker which stores calls with a given target.
     """
 
-    def __init__(self, *args, target: str | int, variable_map=None, **kwargs):
+    def __init__(self, *args, target: str | int, variable_map: VariableMap | None = None, **kwargs):
         super().__init__(*args, **kwargs)
         self.found_calls: list[tuple[ailment.Block, int, ailment.expression.Call]] = []
         self.target = target

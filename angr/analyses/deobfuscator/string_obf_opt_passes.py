@@ -47,7 +47,7 @@ class StringObfType3Rewriter(OptimizationPass):
     def is_call_or_call_assignment(stmt) -> bool:
         return isinstance(stmt, SideEffectStatement) or (isinstance(stmt, Assignment) and isinstance(stmt.src, Call))
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         # find all blocks with type-3 deobfuscation calls
         for block in list(self._graph):
             if not block.statements:
