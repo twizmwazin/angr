@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import random
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
-def rand_str(length, byte_list=None) -> str:
+def rand_str(length, byte_list: Sequence[str] | None = None) -> str:
     """
     Generate a random string of `length` characters, drawn from `byte_list` (or all 256 characters if not provided).
     """
@@ -12,7 +16,7 @@ def rand_str(length, byte_list=None) -> str:
     return "".join(random.choice(byte_list) for _ in range(length))
 
 
-def rand_bytes(length, byte_list=None) -> bytes:
+def rand_bytes(length, byte_list: Sequence[int] | None = None) -> bytes:
     """
     Generate `length` random bytes, drawn from `byte_list` (or all 256 byte values if not provided).
     """
@@ -28,8 +32,8 @@ class TestData:
         expected_output_args,
         expected_return_val,
         max_steps,
-        preloaded_stdin=None,
-        expected_stdout=None,
+        preloaded_stdin: str | None = None,
+        expected_stdout: str | None = None,
     ):
         assert isinstance(input_args, (list, tuple))
         assert isinstance(expected_output_args, (list, tuple))

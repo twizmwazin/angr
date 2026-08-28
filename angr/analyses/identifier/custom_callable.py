@@ -1,9 +1,15 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from angr.calling_conventions import default_cc
 from angr.errors import AngrCallableError, AngrCallableMultistateError
+
+if TYPE_CHECKING:
+    from angr.calling_conventions import SimCC
+    from angr.sim_state import SimState
+    from angr.sim_type import SimTypeFunction
 
 l = logging.getLogger(name=__name__)
 
@@ -25,10 +31,10 @@ class IdentifierCallable:
         addr,
         concrete_only=False,
         perform_merge=False,
-        base_state=None,
-        toc=None,
-        cc=None,
-        max_steps=None,
+        base_state: SimState | None = None,
+        toc: int | None = None,
+        cc: SimCC | None = None,
+        max_steps: int | None = None,
     ):
         """
         :param project:         The project to operate on
@@ -90,7 +96,7 @@ class IdentifierCallable:
             toc=self._toc,
         )
 
-    def perform_call(self, *args, prototype=None):
+    def perform_call(self, *args, prototype: SimTypeFunction | None = None):
         if prototype is None:
             prototype = self._cc.guess_prototype(args)
         self._base_state.ip = self._addr

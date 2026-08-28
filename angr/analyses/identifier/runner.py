@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import random
+from typing import TYPE_CHECKING
 
 import claripy
 
@@ -14,6 +15,11 @@ from angr.state_plugins.posix import SimSystemPosix
 from angr.storage.file import SimFile, SimFileDescriptor
 
 from .custom_callable import IdentifierCallable
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from angr.sim_state import SimState
 
 l = logging.getLogger(name=__name__)
 
@@ -180,7 +186,7 @@ class Runner:
                 a = random.randint(0, 255)
                 state.memory.store(buf + i, claripy.BVV(a, 8))
 
-    def get_base_call_state(self, function, test_data, initial_state=None, concrete_rand=False):
+    def get_base_call_state(self, function, test_data, initial_state: SimState | None = None, concrete_rand=False):
         curr_buf_loc = 0x2000
         mapped_input = []
         s = self.setup_state(function, test_data, initial_state, concrete_rand=concrete_rand)
@@ -206,7 +212,7 @@ class Runner:
         )
         return call.get_base_state(*mapped_input)
 
-    def test(self, function, test_data, concrete_rand=False, custom_offs=None):
+    def test(self, function, test_data, concrete_rand=False, custom_offs: Sequence[int] | None = None):
         curr_buf_loc = 0x2000
         mapped_input = []
         s = self.setup_state(function, test_data, concrete_rand=concrete_rand)
@@ -312,7 +318,14 @@ class Runner:
 
         return True
 
-    def get_out_state(self, function, test_data, initial_state=None, concrete_rand=False, custom_offs=None):
+    def get_out_state(
+        self,
+        function,
+        test_data,
+        initial_state: SimState | None = None,
+        concrete_rand=False,
+        custom_offs: Sequence[int] | None = None,
+    ):
         curr_buf_loc = 0x2000
         mapped_input = []
         s = self.setup_state(function, test_data, initial_state, concrete_rand=concrete_rand)

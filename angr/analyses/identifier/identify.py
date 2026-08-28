@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from itertools import chain
+from typing import TYPE_CHECKING
 
 import claripy
 from cle.backends.cgc import CGC
@@ -15,6 +16,11 @@ from angr.errors import AngrError, SimEngineError, SimError, SimMemoryError, Sim
 from .errors import IdentifierException
 from .functions import Functions
 from .runner import Runner
+
+if TYPE_CHECKING:
+    from collections.abc import Container
+
+    from angr.analyses.cfg.cfg_base import CFGBase
 
 l = logging.getLogger(name=__name__)
 
@@ -41,7 +47,7 @@ class FuncInfo:
 class Identifier(Analysis):
     _special_case_funcs = ["free"]
 
-    def __init__(self, cfg=None, require_predecessors=True, only_find=None):
+    def __init__(self, cfg: CFGBase | None = None, require_predecessors=True, only_find: Container[str] | None = None):
         # self.project = project
         if not isinstance(self.project.loader.main_object, CGC):
             l.critical("The identifier currently works only on CGC binaries. Results may be completely unexpected.")
@@ -108,7 +114,7 @@ class Identifier(Analysis):
     def _too_large(self):
         return len(self._cfg.functions) > 400
 
-    def run(self, only_find=None):
+    def run(self, only_find: Container[str] | None = None):
         if only_find is not None:
             self.only_find = only_find
 
