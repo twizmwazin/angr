@@ -263,7 +263,7 @@ class ConditionProcessor:
     Convert between claripy AST and AIL expressions. Also calculates reaching conditions of all nodes on a graph.
     """
 
-    def __init__(self, arch, ail_manager: Manager, condition_mapping=None):
+    def __init__(self, arch, ail_manager: Manager, condition_mapping: dict[str, Any] | None = None):
         self.arch = arch
         self.ail_manager = ail_manager
         self._condition_mapping: dict[str, Any] = {} if condition_mapping is None else condition_mapping
@@ -362,7 +362,7 @@ class ConditionProcessor:
             predicate = claripy.true()
         return predicate
 
-    def recover_edge_conditions(self, region, graph=None) -> dict:
+    def recover_edge_conditions(self, region, graph: networkx.DiGraph | None = None) -> dict:
         edge_conditions = {}
         # traverse the graph to recover the condition for each edge
         graph = graph or region.graph
@@ -378,7 +378,7 @@ class ConditionProcessor:
     def recover_reaching_conditions(
         self,
         region,
-        graph=None,
+        graph: networkx.DiGraph | None = None,
         with_successors=False,
         case_entry_to_switch_head: dict[int, int] | None = None,
         simplify_conditions: bool = True,
@@ -496,7 +496,7 @@ class ConditionProcessor:
         self.reaching_conditions = reaching_conditions
         self.guarding_conditions = guarding_conditions
 
-    def remove_claripy_bool_asts(self, node, memo=None):
+    def remove_claripy_bool_asts(self, node, memo: dict[int, ailment.Expression] | None = None):
         # Convert claripy Bool ASTs to AIL expressions
 
         if memo is None:
@@ -813,7 +813,7 @@ class ConditionProcessor:
     # Expression conversion
     #
 
-    def _convert_extract(self, hi, lo, expr, tags, memo=None):
+    def _convert_extract(self, hi, lo, expr, tags, memo: dict[int, ailment.Expression] | None = None):
         # ailment does not support Extract. We translate Extract(hi, lo, expr) to a
         # logical right shift by `lo` (dropping the low bits) followed by a Convert
         # that truncates to the extracted width.
@@ -838,7 +838,7 @@ class ConditionProcessor:
             **tags,
         )
 
-    def convert_claripy_bool_ast(self, cond, memo=None):
+    def convert_claripy_bool_ast(self, cond, memo: dict[int, ailment.Expression] | None = None):
         """
         Convert recovered reaching conditions from claripy ASTs to ailment Expressions
 
@@ -1098,7 +1098,7 @@ class ConditionProcessor:
     #
 
     @staticmethod
-    def claripy_ast_to_sympy_expr(ast, memo=None):
+    def claripy_ast_to_sympy_expr(ast, memo: dict | None = None):
         import sympy  # pylint:disable=import-outside-toplevel
 
         if ast.op == "And":

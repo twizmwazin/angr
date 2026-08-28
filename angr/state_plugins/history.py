@@ -37,7 +37,7 @@ class SimStateHistory(SimStatePlugin):
         )
 
         # a string description of this history
-        self.recent_description = None if clone is None else clone.recent_description
+        self.recent_description: str | None = None if clone is None else clone.recent_description
 
         # the control flow transfer information from this history onwards (to the current state)
         self.jump_target = None if clone is None else clone.jump_target

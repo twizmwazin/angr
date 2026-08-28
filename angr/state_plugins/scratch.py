@@ -24,7 +24,7 @@ class SimStateScratch(SimStatePlugin):
     Implements the scratch state plugin.
     """
 
-    def __init__(self, scratch: SimStateScratch | None = None):
+    def __init__(self, scratch=None):
         super().__init__()
 
         # info on the current run

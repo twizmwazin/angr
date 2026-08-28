@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import weakref
 from collections import namedtuple
-from collections.abc import Generator
+from collections.abc import Generator, Iterable
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
@@ -22,8 +22,17 @@ from angr.analyses.decompiler.structuring import RecursiveStructurer, SAILRStruc
 from angr.analyses.decompiler.utils import add_labels, is_empty_node, remove_edges_in_ailgraph
 
 if TYPE_CHECKING:
+    from angr.analyses.decompiler.peephole_optimizations import (
+        PeepholeOptimizationExprBase,
+        PeepholeOptimizationMultiStmtBase,
+        PeepholeOptimizationStmtBase,
+    )
     from angr.analyses.decompiler.region_identifier import RegionIdentifier, RegionOverlay
     from angr.analyses.decompiler.stack_item import StackItem
+    from angr.analyses.decompiler.structurer_nodes import SequenceNode
+    from angr.analyses.s_reaching_definitions.s_rda_model import SRDAModel
+    from angr.analyses.stack_pointer_tracker import StackPointerTracker
+    from angr.knowledge_base import KnowledgeBase
     from angr.knowledge_plugins.functions import Function
     from angr.project import Project
     from angr.sim_variable import SimVariable
@@ -110,7 +119,7 @@ class BaseOptimizationPass:
         """
         raise NotImplementedError
 
-    def _analyze(self, cache=None):
+    def _analyze(self, cache: dict | None = None):
         """
         Run the analysis.
 
@@ -137,13 +146,13 @@ class OptimizationPass(BaseOptimizationPass):
         manager,
         *,
         graph,
-        blocks_by_addr=None,
-        blocks_by_addr_and_idx=None,
-        kb=None,
-        region_identifier=None,
-        reaching_definitions=None,
+        blocks_by_addr: dict[int, set[ailment.Block]] | None = None,
+        blocks_by_addr_and_idx: dict[tuple[int, int | None], ailment.Block] | None = None,
+        kb: KnowledgeBase | None = None,
+        region_identifier: RegionIdentifier | None = None,
+        reaching_definitions: SRDAModel | None = None,
         vvar_id_start: int = 0,
-        entry_node_addr=None,
+        entry_node_addr: tuple[int, int | None] | None = None,
         scratch: dict[str, Any] | None = None,
         force_loop_single_exit: bool = True,
         refine_loops_with_single_successor: bool = False,
@@ -151,8 +160,11 @@ class OptimizationPass(BaseOptimizationPass):
         fold_expressions: bool = True,
         avoid_vvar_ids: set[int] | None = None,
         arg_vvars: dict[int, tuple[ailment.Expr.VirtualVariable, SimVariable]] | None = None,
-        peephole_optimizations=None,
-        stack_pointer_tracker=None,
+        peephole_optimizations: Iterable[
+            type[PeepholeOptimizationStmtBase | PeepholeOptimizationExprBase | PeepholeOptimizationMultiStmtBase]
+        ]
+        | None = None,
+        stack_pointer_tracker: StackPointerTracker | None = None,
         notes: dict | None = None,
         **kwargs,
     ):
@@ -280,7 +292,7 @@ class OptimizationPass(BaseOptimizationPass):
             f"There are {len(blocks)} blocks at address {addr:#x} (block ID ignored) but only one is requested."
         )
 
-    def _get_blocks(self, addr, idx=None) -> Generator[ailment.Block]:
+    def _get_blocks(self, addr, idx: int | None = None) -> Generator[ailment.Block]:
         if not self._blocks_by_addr:
             return
         else:
@@ -396,7 +408,7 @@ class OptimizationPass(BaseOptimizationPass):
             self._scratch["peephole_bundle"] = bundle
         return bundle
 
-    def _simplify_block(self, ail_block, cache=None):
+    def _simplify_block(self, ail_block, cache: dict[tuple[int, int | None], BlockCache] | None = None):
         """
         Simplify a single AIL block.
 
@@ -456,7 +468,9 @@ class OptimizationPass(BaseOptimizationPass):
             _l.warning("Failed to reach fixed point after %s simplification iterations.", MAX_SIMP_ITERATION)
         return graph
 
-    def _recover_regions(self, graph: networkx.DiGraph, condition_processor=None, update_graph: bool = False):
+    def _recover_regions(
+        self, graph: networkx.DiGraph, condition_processor: ConditionProcessor | None = None, update_graph: bool = False
+    ):
         return self.project.analyses[angr.analyses.decompiler.RegionIdentifier].prep(kb=self.kb)(
             self._func,
             graph=graph,
@@ -475,7 +489,7 @@ class SequenceOptimizationPass(BaseOptimizationPass):
     The base class for any sequence node optimization pass.
     """
 
-    def __init__(self, func, manager, seq=None, **kwargs):
+    def __init__(self, func, manager, seq: SequenceNode | None = None, **kwargs):
         super().__init__(func, manager)
         self.seq = seq
         self.out_seq = None
@@ -537,7 +551,7 @@ class StructuringOptimizationPass(OptimizationPass):
         self._initial_structure_counter = None
         self._current_structure_counter = None
 
-    def _analyze(self, cache=None) -> bool:
+    def _analyze(self, cache: dict | None = None) -> bool:
         raise NotImplementedError
 
     def analyze(self):
@@ -618,7 +632,7 @@ class StructuringOptimizationPass(OptimizationPass):
         assert self._goto_manager is not None
         return self._goto_manager.gotos
 
-    def _fixed_point_analyze(self, cache=None):
+    def _fixed_point_analyze(self, cache: dict | None = None):
         had_any_changes = False
         for _ in range(self._max_opt_iters):
             if self._require_gotos:

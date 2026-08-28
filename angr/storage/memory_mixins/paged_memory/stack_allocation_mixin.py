@@ -17,7 +17,13 @@ class StackAllocationMixin(PagedMemoryMixin):
 
     # TODO: multiple stacks. this scheme should scale p well
     # TODO tbh this should be handled by an actual fault handler in simos or something
-    def __init__(self, stack_end=None, stack_size=None, stack_perms=None, **kwargs):
+    def __init__(
+        self,
+        stack_end: int | None = None,
+        stack_size: int | None = None,
+        stack_perms: int | None = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self._red_pageno = (stack_end - 1) // self.page_size if stack_end is not None else None
         self._remaining_stack = stack_size

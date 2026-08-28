@@ -31,7 +31,13 @@ class AILBlockSplit:
     the AILMergeGraph class.
     """
 
-    def __init__(self, original=None, up_split=None, match_split=None, down_split=None):
+    def __init__(
+        self,
+        original: Block | None = None,
+        up_split: Block | None = None,
+        match_split: Block | None = None,
+        down_split: Block | None = None,
+    ):
         """
 
         :param original:
@@ -119,7 +125,12 @@ class AILMergeGraph:
     """
 
     def __init__(
-        self, graph=None, original_graph=None, conditional_block=None, original_blocks=None, original_split_blocks=None
+        self,
+        graph: nx.DiGraph | None = None,
+        original_graph: nx.DiGraph | None = None,
+        conditional_block: Block | None = None,
+        original_blocks: dict[Block, list[Block]] | None = None,
+        original_split_blocks: dict[Block, list[AILBlockSplit]] | None = None,
     ):
         self.graph = graph or nx.DiGraph()
         self.original_graph = original_graph or nx.DiGraph()

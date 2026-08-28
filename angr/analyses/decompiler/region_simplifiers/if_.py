@@ -6,6 +6,7 @@ import logging
 from angr import ailment
 from angr.analyses.decompiler.sequence_walker import SequenceWalker
 from angr.analyses.decompiler.structurer_nodes import (
+    BaseNode,
     CascadingConditionNode,
     CodeNode,
     ConditionNode,
@@ -36,7 +37,7 @@ class IfSimplifier(SequenceWalker):
         super().__init__(handlers)
         self.walk(node)
 
-    def _handle_sequencenode(self, node, successor=None, **kwargs):
+    def _handle_sequencenode(self, node, successor: BaseNode | MultiNode | ailment.Block | None = None, **kwargs):
         """
 
         :param SequenceNode node:
@@ -46,7 +47,7 @@ class IfSimplifier(SequenceWalker):
         for n0, n1 in zip(node.nodes, [*node.nodes[1:], successor]):
             self._handle(n0, successor=n1)
 
-    def _handle_codenode(self, node, successor=None, **kwargs):
+    def _handle_codenode(self, node, successor: BaseNode | MultiNode | ailment.Block | None = None, **kwargs):
         """
 
         :param CodeNode node:
@@ -55,7 +56,7 @@ class IfSimplifier(SequenceWalker):
 
         self._handle(node.node, successor=successor)
 
-    def _handle_conditionnode(self, node, successor=None, **kwargs):
+    def _handle_conditionnode(self, node, successor: BaseNode | MultiNode | ailment.Block | None = None, **kwargs):
         """
 
         :param ConditionNode node:
@@ -68,13 +69,15 @@ class IfSimplifier(SequenceWalker):
         if node.false_node is not None:
             self._handle(node.false_node, successor=successor)
 
-    def _handle_cascadingconditionnode(self, node: CascadingConditionNode, successor=None, **kwargs):
+    def _handle_cascadingconditionnode(
+        self, node: CascadingConditionNode, successor: BaseNode | MultiNode | ailment.Block | None = None, **kwargs
+    ):
         for _, child_node in node.condition_and_nodes:
             self._handle(child_node, successor=successor)
         if node.else_node is not None:
             self._handle(node.else_node, successor=successor)
 
-    def _handle_loopnode(self, node, successor=None, **kwargs):
+    def _handle_loopnode(self, node, successor: BaseNode | MultiNode | ailment.Block | None = None, **kwargs):
         """
 
         :param LoopNode node:
@@ -84,7 +87,7 @@ class IfSimplifier(SequenceWalker):
 
         self._handle(node.sequence_node, successor=successor)
 
-    def _handle_multinode(self, node, successor=None, **kwargs):
+    def _handle_multinode(self, node, successor: BaseNode | MultiNode | ailment.Block | None = None, **kwargs):
         """
 
         :param MultiNode node:
@@ -94,7 +97,7 @@ class IfSimplifier(SequenceWalker):
         for n0, n1 in zip(node.nodes, [*node.nodes[1:], successor]):
             self._handle(n0, successor=n1)
 
-    def _handle_block(self, block, successor=None, **kwargs):  # pylint:disable=no-self-use
+    def _handle_block(self, block, successor: BaseNode | MultiNode | ailment.Block | None = None, **kwargs):  # pylint:disable=no-self-use
         """
         Remove unnecessary jump or conditional jump statements if they jump to the successor right afterwards.
 

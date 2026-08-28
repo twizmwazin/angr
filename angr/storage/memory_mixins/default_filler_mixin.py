@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING, Any
 
 import claripy
 
@@ -9,12 +10,26 @@ from angr.errors import SimMemoryMissingError
 from angr.misc.ux import once
 from angr.storage.memory_mixins.memory_mixin import MemoryMixin
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from angr.sim_state import SimState
+
 l = logging.getLogger(__name__)
 
 
 class DefaultFillerMixin(MemoryMixin):
     def _default_value(
-        self, addr, size, *, name=None, inspect=True, events=True, key=None, fill_missing: bool = True, **kwargs
+        self,
+        addr,
+        size,
+        *,
+        name: str | None = None,
+        inspect=True,
+        events=True,
+        key: tuple[Any, ...] | None = None,
+        fill_missing: bool = True,
+        **kwargs,
     ):
         if fill_missing is False:
             raise SimMemoryMissingError(addr, size)
@@ -98,11 +113,11 @@ class DefaultFillerMixin(MemoryMixin):
 
 
 class SpecialFillerMixin(MemoryMixin):
-    def __init__(self, special_memory_filler=None, **kwargs):
+    def __init__(self, special_memory_filler: Callable[[str, int, int, SimState], Any] | None = None, **kwargs):
         super().__init__(**kwargs)
         self._special_memory_filler = special_memory_filler
 
-    def _default_value(self, addr, size, *, name=None, **kwargs):
+    def _default_value(self, addr, size, *, name: str | None = None, **kwargs):
         if (
             options.SPECIAL_MEMORY_FILL in self.state.options
             and self.state._special_memory_filler is not None
@@ -118,7 +133,7 @@ class SpecialFillerMixin(MemoryMixin):
 
 
 class ExplicitFillerMixin(MemoryMixin):
-    def __init__(self, uninitialized_read_handler=None, **kwargs):
+    def __init__(self, uninitialized_read_handler: Callable[..., claripy.ast.BV] | None = None, **kwargs):
         super().__init__(**kwargs)
         self._uninitialized_read_handler = uninitialized_read_handler
 

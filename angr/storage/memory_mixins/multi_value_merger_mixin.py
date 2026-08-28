@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from angr.storage.memory_mixins.memory_mixin import MemoryMixin
+
+if TYPE_CHECKING:
+    import claripy
 
 
 class MultiValueMergerMixin(MemoryMixin):
@@ -13,9 +16,9 @@ class MultiValueMergerMixin(MemoryMixin):
         *args,
         element_limit=5,
         annotation_limit=256,
-        top_func=None,
-        is_top_func=None,
-        phi_maker=None,
+        top_func: Callable[[int], claripy.ast.BV] | None = None,
+        is_top_func: Callable[[Any], bool] | None = None,
+        phi_maker: Callable[[set[claripy.ast.BV | claripy.ast.FP]], claripy.ast.Base | None] | None = None,
         merge_into_top=True,
         **kwargs,
     ):
@@ -69,7 +72,7 @@ class MultiValueMergerMixin(MemoryMixin):
             merged_val = values_set
         return merged_val
 
-    def copy(self, memo=None):
+    def copy(self, memo: dict[int, Any] | None = None):
         copied = super().copy(memo)
         copied._element_limit = self._element_limit
         copied._annotation_limit = self._annotation_limit

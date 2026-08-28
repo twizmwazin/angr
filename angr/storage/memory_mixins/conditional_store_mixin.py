@@ -6,13 +6,29 @@ from angr.storage.memory_mixins.memory_mixin import MemoryMixin
 
 
 class ConditionalMixin(MemoryMixin):
-    def load(self, addr, size=None, *, condition=None, fallback=None, **kwargs):
+    def load(
+        self,
+        addr,
+        size: int | claripy.ast.BV | None = None,
+        *,
+        condition: claripy.ast.Bool | None = None,
+        fallback: claripy.ast.BV | None = None,
+        **kwargs,
+    ):
         res = super().load(addr, size, condition=condition, **kwargs)
         if condition is not None and fallback is not None:
             res = claripy.If(condition, res, fallback)
         return res
 
-    def store(self, addr, data, size=None, *, condition=None, **kwargs):
+    def store(
+        self,
+        addr,
+        data,
+        size: int | claripy.ast.BV | None = None,
+        *,
+        condition: claripy.ast.Bool | None = None,
+        **kwargs,
+    ):
         if condition is None or self.state.solver.is_true(condition):
             super().store(addr, data, size=size, **kwargs)
             return

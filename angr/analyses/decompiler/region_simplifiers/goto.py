@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from angr import ailment
 from angr.analyses.decompiler.goto_manager import Goto
 from angr.analyses.decompiler.sequence_walker import SequenceWalker
 from angr.analyses.decompiler.structurer_nodes import (
+    BaseNode,
     CascadingConditionNode,
     CodeNode,
     ConditionNode,
@@ -16,6 +18,10 @@ from angr.analyses.decompiler.structurer_nodes import (
 )
 
 from .node_address_finder import NodeAddressFinder
+
+if TYPE_CHECKING:
+    from angr.knowledge_base import KnowledgeBase
+    from angr.knowledge_plugins.functions import Function
 
 l = logging.getLogger(name=__name__)
 
@@ -32,7 +38,7 @@ class GotoSimplifier(SequenceWalker):
     Move the recording of Gotos outside this function
     """
 
-    def __init__(self, node, function=None, kb=None):
+    def __init__(self, node, function: Function | None = None, kb: KnowledgeBase | None = None):
         handlers = {
             SequenceNode: self._handle_sequencenode,
             CodeNode: self._handle_codenode,
@@ -51,7 +57,7 @@ class GotoSimplifier(SequenceWalker):
 
         self.walk(node)
 
-    def _handle_sequencenode(self, node, successor=None, **kwargs):
+    def _handle_sequencenode(self, node, successor: BaseNode | MultiNode | ailment.Block | None = None, **kwargs):
         """
 
         :param SequenceNode node:
@@ -61,7 +67,7 @@ class GotoSimplifier(SequenceWalker):
         for n0, n1 in zip(node.nodes, [*node.nodes[1:], successor]):
             self._handle(n0, successor=n1)
 
-    def _handle_codenode(self, node, successor=None, **kwargs):
+    def _handle_codenode(self, node, successor: BaseNode | MultiNode | ailment.Block | None = None, **kwargs):
         """
 
         :param CodeNode node:
@@ -70,7 +76,7 @@ class GotoSimplifier(SequenceWalker):
 
         self._handle(node.node, successor=successor)
 
-    def _handle_conditionnode(self, node, successor=None, **kwargs):
+    def _handle_conditionnode(self, node, successor: BaseNode | MultiNode | ailment.Block | None = None, **kwargs):
         """
 
         :param ConditionNode node:
@@ -83,13 +89,15 @@ class GotoSimplifier(SequenceWalker):
         if node.false_node is not None:
             self._handle(node.false_node, successor=successor)
 
-    def _handle_cascadingconditionnode(self, node: CascadingConditionNode, successor=None, **kwargs):
+    def _handle_cascadingconditionnode(
+        self, node: CascadingConditionNode, successor: BaseNode | MultiNode | ailment.Block | None = None, **kwargs
+    ):
         for _, child_node in node.condition_and_nodes:
             self._handle(child_node, successor=successor)
         if node.else_node is not None:
             self._handle(node.else_node, successor=successor)
 
-    def _handle_loopnode(self, node, successor=None, **kwargs):
+    def _handle_loopnode(self, node, successor: BaseNode | MultiNode | ailment.Block | None = None, **kwargs):
         """
 
         :param LoopNode node:
@@ -102,7 +110,7 @@ class GotoSimplifier(SequenceWalker):
             successor=node,  # the end of a loop always jumps to the beginning of its body
         )
 
-    def _handle_multinode(self, node, successor=None, **kwargs):
+    def _handle_multinode(self, node, successor: BaseNode | MultiNode | ailment.Block | None = None, **kwargs):
         """
 
         :param MultiNode node:
@@ -112,7 +120,7 @@ class GotoSimplifier(SequenceWalker):
         for n0, n1 in zip(node.nodes, [*node.nodes[1:], successor]):
             self._handle(n0, successor=n1)
 
-    def _handle_block(self, block, successor=None, **kwargs):  # pylint:disable=no-self-use
+    def _handle_block(self, block, successor: BaseNode | MultiNode | ailment.Block | None = None, **kwargs):  # pylint:disable=no-self-use
         """
         This will also record irreducible gotos into the kb if found.
 
@@ -156,7 +164,7 @@ class GotoSimplifier(SequenceWalker):
                 self._handle_irreducible_goto(block, last_stmt, branch_target=False)
 
     def _handle_irreducible_goto(
-        self, block, goto_stmt: ailment.Stmt.Jump | ailment.Stmt.ConditionalJump, branch_target=None
+        self, block, goto_stmt: ailment.Stmt.Jump | ailment.Stmt.ConditionalJump, branch_target: bool | None = None
     ):
         if not self._function:
             l.debug("Unable to store a goto at %#x because simplifier is kb or functionless", block.addr)

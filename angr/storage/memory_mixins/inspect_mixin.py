@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from angr.state_plugins.inspect import BP_AFTER, BP_BEFORE
 from angr.storage.memory_mixins.memory_mixin import MemoryMixin
+
+if TYPE_CHECKING:
+    import claripy
 
 
 class InspectMixin(MemoryMixin):
@@ -17,7 +22,17 @@ class InspectMixin(MemoryMixin):
         - address_concretization_add_constraints (before)
     """
 
-    def store(self, addr, data, size=None, *, condition=None, endness=None, inspect=True, **kwargs):
+    def store(
+        self,
+        addr,
+        data,
+        size: int | claripy.ast.BV | None = None,
+        *,
+        condition: claripy.ast.Bool | None = None,
+        endness: str | None = None,
+        inspect=True,
+        **kwargs,
+    ):
         if not inspect or not self.state.supports_inspect:
             super().store(addr, data, size=size, condition=condition, endness=endness, inspect=inspect, **kwargs)
             return
@@ -76,7 +91,16 @@ class InspectMixin(MemoryMixin):
                 mem_write_endness=endness,
             )
 
-    def load(self, addr, size=None, *, condition=None, endness=None, inspect=True, **kwargs):
+    def load(
+        self,
+        addr,
+        size: int | claripy.ast.BV | None = None,
+        *,
+        condition: claripy.ast.Bool | None = None,
+        endness: str | None = None,
+        inspect=True,
+        **kwargs,
+    ):
         if not inspect or not self.state.supports_inspect:
             return super().load(addr, size=size, condition=condition, endness=endness, inspect=inspect, **kwargs)
 
