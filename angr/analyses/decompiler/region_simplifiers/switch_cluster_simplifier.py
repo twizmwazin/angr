@@ -629,14 +629,20 @@ def simplify_lowered_switches_core(
             )
         cases[k] = case_node
 
-    if not isinstance(outermost_node.condition.operands[0], ailment.Expr.Const) and isinstance(
-        outermost_node.condition.operands[1], ailment.Expr.Const
+    # the condition of a lowered-switch node is always a normalized comparison (see
+    # SwitchClusterFinder._process_condition, and the negation performed above)
+    outermost_cond = outermost_node.condition
+    if not isinstance(outermost_cond, ailment.Expr.BinaryOp):
+        return False
+
+    if not isinstance(outermost_cond.operands[0], ailment.Expr.Const) and isinstance(
+        outermost_cond.operands[1], ailment.Expr.Const
     ):
-        switch_expr = outermost_node.condition.operands[0]
-    elif not isinstance(outermost_node.condition.operands[1], ailment.Expr.Const) and isinstance(
-        outermost_node.condition.operands[0], ailment.Expr.Const
+        switch_expr = outermost_cond.operands[0]
+    elif not isinstance(outermost_cond.operands[1], ailment.Expr.Const) and isinstance(
+        outermost_cond.operands[0], ailment.Expr.Const
     ):
-        switch_expr = outermost_node.condition.operands[1]
+        switch_expr = outermost_cond.operands[1]
     else:
         return False
 
