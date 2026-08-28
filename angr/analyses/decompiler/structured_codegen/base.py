@@ -139,11 +139,11 @@ class InstructionMapping:
 
 class BaseStructuredCodeGenerator:
     def __init__(self, flavor=None, notes=None, expr_comments=None, stmt_comments=None, const_formats=None):
-        self.flavor = flavor
-        self.text = None
-        self.map_pos_to_node = None
-        self.map_pos_to_addr = None
-        self.map_addr_to_pos = None
+        self.flavor: str | None = flavor
+        self.text: str | None = None
+        self.map_pos_to_node: PositionMapping | None = None
+        self.map_pos_to_addr: PositionMapping | None = None
+        self.map_addr_to_pos: InstructionMapping | None = None
         self.map_ast_to_pos: dict[SimVariable, set[PositionMappingElement]] | None = None
         self.notes = notes if notes is not None else {}
         self.expr_comments: dict[int, str] = expr_comments if expr_comments is not None else {}
