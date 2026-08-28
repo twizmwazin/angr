@@ -24,6 +24,8 @@ from angr.sim_type import SimType, SimTypeBottom, SimTypeFunction, parse_cpp_fil
 from angr.utils.json_utils import json_decode
 
 if TYPE_CHECKING:
+    from archinfo import Arch
+
     from angr.calling_conventions import SimCCSyscall
 
 
@@ -367,7 +369,7 @@ class SimLibrary:
         self._apply_metadata(proc, arch)
         return proc
 
-    def get_prototype(self, name: str, arch=None, deref: bool = False) -> SimTypeFunction | None:
+    def get_prototype(self, name: str, arch: Arch | None = None, deref: bool = False) -> SimTypeFunction | None:
         """
         Get a prototype of the given function name, optionally specialize the prototype to a given architecture.
 
@@ -515,7 +517,7 @@ class SimCppLibrary(SimLibrary):
                     stub.num_args = len(stub.prototype.args)
         return stub
 
-    def get_prototype(self, name: str, arch=None, deref: bool = False) -> SimTypeFunction | None:
+    def get_prototype(self, name: str, arch: Arch | None = None, deref: bool = False) -> SimTypeFunction | None:
         """
         Get a prototype of the given function name, optionally specialize the prototype to a given architecture. The
         function name will be demangled first.
@@ -758,7 +760,7 @@ class SimSyscallLibrary(SimLibrary):
         return proc
 
     def get_prototype(  # type: ignore
-        self, abi: str, name: str, arch=None, deref: bool = False
+        self, abi: str, name: str, arch: Arch | None = None, deref: bool = False
     ) -> SimTypeFunction | None:
         """
         Get a prototype of the given syscall name and its ABI, optionally specialize the prototype to a given
@@ -844,7 +846,7 @@ _DATA_DEFINITIONS_DIR = angr_data.get_path("procedures", "definitions")
 _EXTERNAL_DEFINITIONS_DIRS: list[str] | None = None
 
 
-def load_type_collections(only=None, skip=None) -> None:
+def load_type_collections(only: set[str] | None = None, skip: set[str] | None = None) -> None:
     if skip is None:
         skip = set()
 
