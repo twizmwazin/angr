@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from sortedcontainers import SortedDict
 
@@ -9,6 +10,10 @@ from angr.protos import xrefs_pb2
 from angr.serializable import Serializable
 
 from .xref import XRef, XRefType
+
+if TYPE_CHECKING:
+    from angr.knowledge_base import KnowledgeBase
+    from angr.knowledge_plugins.cfg.cfg_model import CFGModel
 
 l = logging.getLogger(name=__name__)
 
@@ -124,7 +129,13 @@ class XRefManager(KnowledgeBasePlugin, Serializable):
         return cmsg
 
     @classmethod
-    def parse_from_cmessage(cls, cmsg, cfg_model=None, kb=None, **kwargs):  # pylint:disable=arguments-differ
+    def parse_from_cmessage(  # pylint:disable=arguments-differ
+        cls,
+        cmsg,
+        cfg_model: CFGModel | None = None,
+        kb: KnowledgeBase | None = None,
+        **kwargs,
+    ):
         model = XRefManager(kb)
         bits = kb._project.arch.bits
 

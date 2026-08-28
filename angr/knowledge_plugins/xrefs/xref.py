@@ -32,7 +32,7 @@ class XRef(Serializable):
         insn_op_idx: int | None = None,
         memory_data: angr.knowledge_plugins.cfg.memory_data.MemoryData | None = None,
         dst: int | None = None,
-        xref_type=None,
+        xref_type: int | None = None,
     ):
         if dst is not None and not isinstance(dst, int):
             raise TypeError(f"XRefs must be pointing to a constant target. Target {dst!r} is not supported.")
@@ -113,7 +113,7 @@ class XRef(Serializable):
         return cmsg
 
     @classmethod
-    def parse_from_cmessage(cls, cmsg, bits=None, **kwargs):  # pylint:disable=arguments-differ
+    def parse_from_cmessage(cls, cmsg, bits: int | None = None, **kwargs):  # pylint:disable=arguments-differ
         # Note that we cannot recover _memory_data from cmsg
 
         if not isinstance(bits, int):
