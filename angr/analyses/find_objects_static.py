@@ -49,7 +49,7 @@ class NewFunctionHandler(FunctionHandler):
      if so we mark it as an instance of the class the constructor belongs to.(only for non stripped binaries)
     """
 
-    def __init__(self, max_addr=None, new_func_addr=None, project=None):
+    def __init__(self, max_addr, new_func_addr: int, project):
         super().__init__()
         self.max_addr = max_addr
 
