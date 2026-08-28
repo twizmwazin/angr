@@ -21,7 +21,7 @@ from angr.analyses.decompiler.structured_codegen import DummyStructuredCodeGener
 from angr.analyses.decompiler.structured_codegen.c import CConstant
 from angr.angrdb import AngrDB
 from angr.knowledge_plugins.structured_code import SpillingDecompilationDict
-from tests.common import bin_location, print_decompilation_result
+from tests.common import bin_location, codegen_text, print_decompilation_result
 
 test_location = os.path.join(bin_location, "tests")
 
@@ -438,7 +438,7 @@ class TestDb(unittest.TestCase):
         cfg = proj.analyses.CFGFast(normalize=True)
         main = proj.kb.functions.function(name="main")
         dec = proj.analyses.Decompiler(main, cfg=cfg.model)
-        assert dec.codegen is not None and dec.codegen.text is not None
+        codegen_text(dec)  # the decompiler must have produced code
 
         dvm = proj.kb.dec_variables
         nonempty_addrs = {addr for addr, internal in dvm.function_managers.items() if internal.serialize()}
@@ -483,7 +483,7 @@ class TestDb(unittest.TestCase):
         cfg = proj.analyses.CFGFast(normalize=True)
         for name in ("main", "authenticate"):
             dec = proj.analyses.Decompiler(name, cfg=cfg.model)
-            assert dec.codegen is not None and dec.codegen.text is not None
+            codegen_text(dec)  # the decompiler must have produced code
 
         dvm = proj.kb.dec_variables
         fm = dvm.function_managers
@@ -699,9 +699,9 @@ class TestDb(unittest.TestCase):
 
                 # now if we decompile it again, we should see the change reflected
                 dec_1 = proj.analyses.Decompiler(main_func)
-                assert dec_1.codegen is not None and dec_1.codegen.text is not None
+                code_1 = codegen_text(dec_1)
                 print_decompilation_result(dec_1)
-                assert dec_1.codegen.text.count("0x8") == 1
+                assert code_1.count("0x8") == 1
 
                 # it should be part of the structured code cache
                 assert proj.kb.decompilations
@@ -726,9 +726,9 @@ class TestDb(unittest.TestCase):
 
             # decompile the function again
             dec_2 = proj_new.analyses.Decompiler(proj_new.kb.functions["main"])
-            assert dec_2.codegen is not None and dec_2.codegen.text is not None
+            code_2 = codegen_text(dec_2)
             print_decompilation_result(dec_2)
-            assert dec_2.codegen.text.count("0x8") == 1
+            assert code_2.count("0x8") == 1
 
     def test_angrdb_full_decompilation_cache_roundtrip(self):
         # DecompilationCache objects in the structured code manager are fully serialized into the database and come
@@ -742,7 +742,7 @@ class TestDb(unittest.TestCase):
             proj.analyses.CFGFast(normalize=True)
             func = proj.kb.functions.function(name="authenticate")
             dec = proj.analyses.Decompiler(func)
-            assert dec.codegen is not None and dec.codegen.text is not None
+            dec_text = codegen_text(dec)
 
             cache = proj.kb.decompilations[(func.addr, "pseudocode")]
             assert cache.version == angr.__version__
@@ -757,7 +757,7 @@ class TestDb(unittest.TestCase):
 
             new_cache = new_proj.kb.decompilations[(func.addr, "pseudocode")]
             assert not isinstance(new_cache.codegen, DummyStructuredCodeGenerator)
-            assert new_cache.codegen.text == dec.codegen.text
+            assert codegen_text(new_cache) == dec_text
             assert new_cache.version == cache.version
             assert new_cache.timestamp == cache.timestamp
 
@@ -779,7 +779,8 @@ class TestDb(unittest.TestCase):
             main_func = proj.kb.functions.function(name="main")
             auth_dec = proj.analyses.Decompiler(auth_func)
             main_dec = proj.analyses.Decompiler(main_func)
-            assert auth_dec.codegen is not None and main_dec.codegen is not None
+            auth_text = codegen_text(auth_dec)
+            assert main_dec.codegen is not None
 
             AngrDB(proj, nullpool=True).dump(db_file)
 
@@ -793,7 +794,7 @@ class TestDb(unittest.TestCase):
 
                 # accessing a spilled cache deserializes it lazily
                 new_cache = new_proj.kb.decompilations[(auth_func.addr, "pseudocode")]
-                assert new_cache.codegen.text == auth_dec.codegen.text
+                assert codegen_text(new_cache) == auth_text
 
     def test_angrdb_decompilation_load_variables(self):
         # https://github.com/angr/angr/issues/5990
@@ -810,7 +811,7 @@ class TestDb(unittest.TestCase):
                 detect_tail_calls=True,
             )
             dec = proj.analyses.Decompiler("main", cfg=cfg.model, regen_clinic=False)
-            assert dec.codegen is not None and dec.codegen.text is not None
+            codegen_text(dec)  # the decompiler must have produced code
 
             adb = AngrDB(proj, nullpool=True)
             adb.dump(out_db, extra_info={"binary_path": bin_path})
@@ -831,8 +832,7 @@ class TestDb(unittest.TestCase):
             proj.analyses.CompleteCallingConventions(recover_variables=False)
             func = proj.kb.functions.function(name="doit")
             dec = proj.analyses.Decompiler(func, cfg=cfg.model)
-            assert dec.codegen is not None and dec.codegen.text is not None
-            original_text = dec.codegen.text
+            original_text = codegen_text(dec)
             # sanity: the original has variable declarations and rendered strings
             assert "int node;" in original_text
             assert 'puts("1 AFTER 909:' in original_text or "1 AFTER 909" in original_text

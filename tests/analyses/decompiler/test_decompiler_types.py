@@ -11,7 +11,7 @@ from collections import OrderedDict
 import angr
 from angr import default_cc
 from angr.sim_type import SimStruct, SimTypeArray, SimTypeChar, SimTypeFunction, SimTypeInt, SimTypePointer
-from tests.common import WORKER, bin_location, print_decompilation_result
+from tests.common import WORKER, bin_location, codegen_text, print_decompilation_result
 
 test_location = os.path.join(bin_location, "tests")
 
@@ -33,7 +33,7 @@ class TestDecompilerTypes(unittest.TestCase):
 
         func = proj.kb.functions[0x14004C100]
         dec = proj.analyses.Decompiler(func, cfg=cfg.model)
-        assert dec.codegen is not None and dec.codegen.text is not None
+        codegen_text(dec)  # decompilation must have succeeded
 
         # these prototypes are created when decompiling the function above (their caller)
         proto_0 = proj.kb.functions[0x1402004F8].prototype
@@ -55,19 +55,19 @@ class TestDecompilerTypes(unittest.TestCase):
         func = cfg.functions[0x132B0]
         assert func is not None
         dec = proj.analyses.Decompiler(func, cfg=cfg)
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
         print_decompilation_result(dec)
 
         # find the Guid variable
-        guid_var = re.search(r"Guid (?P<var>v\d+);", dec.codegen.text)
+        guid_var = re.search(r"Guid (?P<var>v\d+);", code)
         assert guid_var is not None
         guid_varname = guid_var.group("var")
 
-        assert f"{guid_varname}.Data1 = " in dec.codegen.text
-        assert f"{guid_varname}.Data2 = " in dec.codegen.text
-        assert f"{guid_varname}.Data3 = " in dec.codegen.text
+        assert f"{guid_varname}.Data1 = " in code
+        assert f"{guid_varname}.Data2 = " in code
+        assert f"{guid_varname}.Data3 = " in code
         for i in range(8):
-            assert f"{guid_varname}.Data4[{i}] = " in dec.codegen.text
+            assert f"{guid_varname}.Data4[{i}] = " in code
 
     def test_clinic_callee_type_rewrite_should_skip_plt_functions(self):
         bin_path = os.path.join(test_location, "x86_64", "1after909")
@@ -85,7 +85,7 @@ class TestDecompilerTypes(unittest.TestCase):
         func = cfg.functions["verify_password"]
         assert func is not None
         dec = proj.analyses.Decompiler(func, cfg=cfg)
-        assert dec.codegen is not None and dec.codegen.text is not None
+        codegen_text(dec)  # decompilation must have succeeded
         print_decompilation_result(dec)
 
         assert strcmp_plt.prototype is not None
@@ -102,7 +102,7 @@ class TestDecompilerTypes(unittest.TestCase):
         func = cfg.functions["verify_password"]
         assert func is not None
         dec = proj.analyses.Decompiler(func, cfg=cfg)
-        assert dec.codegen is not None and dec.codegen.text is not None
+        codegen_text(dec)  # decompilation must have succeeded
         print_decompilation_result(dec)
 
         # take the stack variable v2; it should be a char array of size 64
@@ -120,18 +120,18 @@ class TestDecompilerTypes(unittest.TestCase):
 
         # decompile again; should not crash!
         new_dec = proj.analyses.Decompiler(func, fail_fast=True, regen_clinic=True)
-        assert dec.codegen is not None and dec.codegen.text is not None
+        new_code = codegen_text(new_dec)
         print_decompilation_result(new_dec)
-        assert f"char {var2.name}[0];" in new_dec.codegen.text
+        assert f"char {var2.name}[0];" in new_code
 
         # set it to an integer
         varman.set_variable_type(var2, SimTypeInt().with_arch(proj.arch), mark_manual=True)
 
         # decompile again; should not crash!
         new_dec = proj.analyses.Decompiler(func, fail_fast=True, regen_clinic=True)
-        assert dec.codegen is not None and dec.codegen.text is not None
+        new_code = codegen_text(new_dec)
         print_decompilation_result(new_dec)
-        assert f"int {var2.name};" in new_dec.codegen.text
+        assert f"int {var2.name};" in new_code
 
     def test_mutually_recursive_known_structs_are_defined_once(self):
         # a known struct is rendered as defined: one typedef per name, with the recursive references intact
@@ -152,9 +152,8 @@ class TestDecompilerTypes(unittest.TestCase):
         )
 
         dec = proj.analyses.Decompiler(cfg.functions["main"], cfg=cfg, fail_fast=True)
-        assert dec.codegen is not None and dec.codegen.text is not None
+        text = codegen_text(dec)
         print_decompilation_result(dec)
-        text = dec.codegen.text
 
         for name in ("Alpha", "Beta"):
             assert text.count(f"typedef struct {name} {{") == 1
