@@ -256,7 +256,7 @@ class SimIROp:
         self.name = name
         self.op_attrs = attrs
 
-        self._generic_name: str = None
+        self._generic_name: str | None = None
         self._from_size = None
         self._from_side = None
         self._from_type = None
