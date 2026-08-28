@@ -31,39 +31,42 @@ class OuterWalker(SequenceWalker):
 
     def _handle_Condition(self, node: ConditionNode, **kwargs):
         for desc, new_op in self.desc.items():
+            cond = node.condition
             if (
-                node.condition is not None
-                and "ins_addr" in node.condition.tags
-                and node.condition.tags["ins_addr"] == desc.ins_addr
-                and node.condition.op == desc.op
+                isinstance(cond, BinaryOp)
+                and "ins_addr" in cond.tags
+                and cond.tags["ins_addr"] == desc.ins_addr
+                and cond.op == desc.op
             ):
-                node.condition = self._swap_expr_op(new_op, node.condition)
+                node.condition = self._swap_expr_op(new_op, cond)
         return super()._handle_Condition(node, **kwargs)
 
     def _handle_Loop(self, node: LoopNode, **kwargs):
         for desc, new_op in self.desc.items():
+            cond = node.condition
             if (
-                node.condition is not None
-                and "ins_addr" in node.condition.tags
-                and node.condition.tags["ins_addr"] == desc.ins_addr
-                and node.condition.op == desc.op
+                isinstance(cond, BinaryOp)
+                and "ins_addr" in cond.tags
+                and cond.tags["ins_addr"] == desc.ins_addr
+                and cond.op == desc.op
             ):
-                node.condition = self._swap_expr_op(new_op, node.condition)
+                node.condition = self._swap_expr_op(new_op, cond)
         return super()._handle_Loop(node, **kwargs)
 
     def _handle_ConditionalBreak(self, node: ConditionalBreakNode, **kwargs):
         for desc, new_op in self.desc.items():
+            cond = node.condition
             if (
-                node.condition is not None
-                and "ins_addr" in node.condition.tags
-                and node.condition.tags["ins_addr"] == desc.ins_addr
-                and node.condition.op == desc.op
+                isinstance(cond, BinaryOp)
+                and "ins_addr" in cond.tags
+                and cond.tags["ins_addr"] == desc.ins_addr
+                and cond.op == desc.op
             ):
-                node.condition = self._swap_expr_op(new_op, node.condition)
+                node.condition = self._swap_expr_op(new_op, cond)
         return super()._handle_ConditionalBreak(node, **kwargs)
 
     @staticmethod
-    def _swap_expr_op(new_op: str, atom: Expression) -> Expression | None:
+    def _swap_expr_op(new_op: str, atom: BinaryOp) -> Expression | None:
         # swap
         return BinaryOp(
             atom.idx, new_op, (atom.operands[1], atom.operands[0]), atom.signed, bits=atom.bits, **atom.tags
