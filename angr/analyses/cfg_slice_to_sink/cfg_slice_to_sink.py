@@ -11,7 +11,7 @@ class CFGSliceToSink:
     The representation of a slice of a CFG.
     """
 
-    def __init__(self, target, transitions=None):
+    def __init__(self, target, transitions: dict[int, list[int]] | None = None):
         """
         :param angr.knowledge_plugins.functions.function.Function target:
             The targeted sink, to which every path in the slice leads.
