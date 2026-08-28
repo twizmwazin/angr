@@ -431,7 +431,7 @@ def get_ast_subexprs(claripy_ast):
             yield ast
 
 
-def insert_node(parent, insert_location: str, node, node_idx: int, label=None):
+def insert_node(parent, insert_location: str, node, node_idx: int, label: str | None = None):
     if insert_location not in {"before", "after"}:
         raise ValueError('"insert_location" must be either "before" or "after"')
 
@@ -965,7 +965,7 @@ class _PeepholeExprsWalker(ailment.AILBlockRewriter):
         return expr
 
 
-def peephole_optimize_exprs(block, expr_opts, walker=None):
+def peephole_optimize_exprs(block, expr_opts, walker: _PeepholeExprsWalker | None = None):
     # run expression optimizers
     if walker is None:
         walker = _PeepholeExprsWalker(expr_opts=expr_opts)
@@ -1045,7 +1045,9 @@ def build_stmt_opts_by_kind(stmt_opts):
     return by_kind
 
 
-def peephole_optimize_stmts(block, stmt_opts, *, stmt_opts_by_kind=None, fixpoint_exprs=None):
+def peephole_optimize_stmts(
+    block, stmt_opts, *, stmt_opts_by_kind: dict[str, list] | None = None, fixpoint_exprs: set[int] | None = None
+):
     """
     :param fixpoint_exprs:  IDs of the statements the preceding expression pass left untouched *and* whose
                             expression optimizers all reported ``fixpoint_reached``.
