@@ -4,6 +4,6 @@ import angr
 
 
 class retreg(angr.SimProcedure):
-    def run(self, reg=None):
+    def run(self, reg: str | None = None):
         return self.state.registers.load(reg)
         # print self.state.options
