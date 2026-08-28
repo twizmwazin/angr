@@ -112,9 +112,10 @@ class Pathfinder(Analysis):
         if self._search_address_backtrack_points[self._search_frontier_marker.addr] is self._search_frontier_marker:
             self._search_address_backtrack_points.pop(self._search_frontier_marker.addr)
 
-        self._search_frontier_marker = self._search_frontier_marker.parent
-        if self._search_frontier_marker is None:
+        parent = self._search_frontier_marker.parent
+        if parent is None:
             raise Unreachable
+        self._search_frontier_marker = parent
 
         addr, jumpkind = self._search_path.pop()
         if jumpkind == "Ijk_Ret":
@@ -158,7 +159,6 @@ class Pathfinder(Analysis):
 
             best_node, best_jumpkind, best_weight = min(
                 options,
-                default=(None, None),
                 key=lambda xyz: xyz[2],
             )
 

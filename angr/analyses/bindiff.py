@@ -869,7 +869,7 @@ class BinDiff(Analysis):
         """
         :param other_project: The second project to diff
         """
-        if cfg_a is None:
+        if cfg_a is None or cfg_b is None:
             l.debug("Computing cfg's")
             self.cfg_a = self.project.analyses[CFGFast].prep(fail_fast=self._fail_fast)().model
             self.cfg_b = other_project.analyses[CFGFast].prep(fail_fast=self._fail_fast)().model

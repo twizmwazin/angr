@@ -52,7 +52,7 @@ class LoopUnroller(Analysis):
                 self._block_min_ids[node.addr], node.idx if node.idx is not None else 0
             )
 
-        self.out_graph: networkx.DiGraph | None = networkx.DiGraph(self.graph)
+        self.out_graph: networkx.DiGraph = networkx.DiGraph(self.graph)
 
         self._analyze()
 

@@ -67,8 +67,8 @@ class DataDependencyGraphAnalysis(Analysis):
         :param end_at: An address or None, Specifies where to end generation of DDG
         :param iterable or None block_addrs: List of block addresses that the DDG analysis should be run on
         """
-        self._graph: DiGraph | None = None
-        self._simplified_graph: DiGraph | None = None
+        self._graph: DiGraph = DiGraph()
+        self._simplified_graph: DiGraph = DiGraph()
         self._sub_graph: DiGraph | None = None
 
         self._end_state = end_state
@@ -94,22 +94,22 @@ class DataDependencyGraphAnalysis(Analysis):
         self._work()
 
     @property
-    def graph(self) -> DiGraph | None:
+    def graph(self) -> DiGraph:
         return self._graph
 
     @property
-    def simplified_graph(self) -> DiGraph | None:
+    def simplified_graph(self) -> DiGraph:
         return self._simplified_graph
 
     @property
     def sub_graph(self) -> DiGraph | None:
         return self._sub_graph
 
-    def _pop(self) -> SimActionData | None:
+    def _pop(self) -> SimActionData:
         """
-        Safely pops the first action, if it exists.
+        Pops the first action. Callers guarantee at least one action remains.
         """
-        return self._actions.pop(0) if self._actions else None
+        return self._actions.pop(0)
 
     def _peek(self, idx: int = 0) -> SimActionData | None:
         """
@@ -286,7 +286,7 @@ class DataDependencyGraphAnalysis(Analysis):
     def _parse_action(self) -> BaseDepNode:
         return self._get_generic_node(self._pop())
 
-    def _parse_read_statement(self, read_nodes: dict[int, list[BaseDepNode]] | None = None) -> BaseDepNode:
+    def _parse_read_statement(self, read_nodes: dict[int, list[BaseDepNode]]) -> BaseDepNode:
         act = self._peek()
         read_node = self._parse_action()
         ancestor_node = self._get_active_node(read_node)
@@ -336,14 +336,14 @@ class DataDependencyGraphAnalysis(Analysis):
 
         return dep_found
 
-    def _parse_var_statement(self, read_nodes: dict[int, list[BaseDepNode]] | None = None) -> SimActLocation:
+    def _parse_var_statement(self, read_nodes: dict[int, list[BaseDepNode]]) -> SimActLocation:
         act = self._peek()
         act_loc = SimActLocation(act.bbl_addr, act.ins_addr, act.stmt_idx)
 
         if act.action == SimActionData.WRITE:
             write_node = self._parse_action()
 
-            src_nodes = read_nodes.get(write_node.value, None)
+            src_nodes = read_nodes.get(write_node.value)
             if src_nodes:
                 # Write value came from a previous read value
                 for src_node in src_nodes:
@@ -379,18 +379,18 @@ class DataDependencyGraphAnalysis(Analysis):
         # Sometimes an R is the last action in a statement
         return self._parse_statement(read_nodes) if self._peek() and act.stmt_idx == self._peek().stmt_idx else act_loc
 
-    def _parse_mem_statement(self, read_nodes: dict[int, list[BaseDepNode]] | None = None) -> SimActLocation:
+    def _parse_mem_statement(self, read_nodes: dict[int, list[BaseDepNode]]) -> SimActLocation:
         act = self._peek()
         act_loc = SimActLocation(act.bbl_addr, act.ins_addr, act.stmt_idx)
 
         if act.action == SimActionData.WRITE:
             mem_node = MemDepNode.cast_to_mem(self._parse_action())
-            src_nodes = read_nodes.get(mem_node.value, None)
+            src_nodes = read_nodes.get(mem_node.value)
             if src_nodes:
                 # Value being written to, address came from previous read
                 for src_node in src_nodes:
                     self._graph.add_edge(src_node, mem_node, label="val")
-            elif len(read_nodes) == 1 and read_nodes.get(mem_node.addr, None):
+            elif len(read_nodes) == 1 and read_nodes.get(mem_node.addr):
                 # Only read thus far was for the memory address, value is direct
                 val_node = self._get_or_create_graph_node(DepNodeTypes.Constant, act, mem_node.value_tuple(), True)
                 self._graph.add_edge(val_node, mem_node)
@@ -405,7 +405,7 @@ class DataDependencyGraphAnalysis(Analysis):
             ret_val = None if self._peek() and act.stmt_idx == self._peek().stmt_idx else act_loc
 
         # Handle the address of the mem R/W
-        addr_source_nodes = read_nodes.get(mem_node.addr, None)
+        addr_source_nodes = read_nodes.get(mem_node.addr)
         if addr_source_nodes:
             for addr_source_node in addr_source_nodes:
                 self._graph.add_edge(addr_source_node, mem_node, label="addr_source")

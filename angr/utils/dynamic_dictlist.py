@@ -19,7 +19,7 @@ class DynamicDictList[VT]:
 
     def __init__(
         self,
-        max_size: int | None = None,
+        max_size: int,
         content: DynamicDictList | dict[int, VT] | list[VT] | None = None,
     ):
         self.list_content: list[VT] | None = None

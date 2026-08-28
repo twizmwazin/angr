@@ -23,19 +23,20 @@ NUM_TESTS = 5
 
 
 class FuncInfo:
+    stack_vars: list[int]
+    stack_var_accesses: dict[int, set[tuple[int, str]]]
+    frame_size: int
+    pushed_regs: list[str]
+    stack_args: list[int]
+    stack_arg_accesses: dict[int, set[tuple[int, str]]]
+    buffers: set[int]
+    var_args: bool
+    bp_based: bool
+    accesses_ret: bool
+    preamble_sp_change: int
+
     def __init__(self):
-        self.stack_vars = None
-        self.stack_var_accesses = None
-        self.frame_size = None
-        self.pushed_regs = None
-        self.stack_args = None
-        self.stack_arg_accesses = None
-        self.buffers = None
-        self.var_args = None
-        self.bp_based = None
-        self.bp_sp_diff = None
-        self.accesses_ret = None
-        self.preamble_sp_change = None
+        self.bp_sp_diff: int | None = None
 
 
 class Identifier(Analysis):

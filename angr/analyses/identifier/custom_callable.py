@@ -25,10 +25,11 @@ class IdentifierCallable:
         addr,
         concrete_only=False,
         perform_merge=False,
-        base_state=None,
+        *,
+        base_state,
         toc=None,
         cc=None,
-        max_steps=None,
+        max_steps,
     ):
         """
         :param project:         The project to operate on

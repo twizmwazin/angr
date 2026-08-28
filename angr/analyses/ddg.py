@@ -518,14 +518,13 @@ class DDG(Analysis):
         self.simple_view = DDGView(self._cfg, self, simplified=True)
 
         # Local variables
-        self._live_defs = None
-        self._temp_variables = None
-        self._temp_register_symbols = None
-        self._temp_edges = None
-        self._temp_register_symbols = None
-        self._variables_per_statement = None
+        self._live_defs = LiveDefinitions()
+        self._temp_variables = {}
+        self._temp_register_symbols = {}
+        self._temp_edges = defaultdict(list)
+        self._variables_per_statement = []
         self._custom_data_per_statement = None
-        self._register_edges = None
+        self._register_edges = defaultdict(list)
 
         # Begin construction!
         self._construct()
@@ -846,9 +845,7 @@ class DDG(Analysis):
         self._register_edges = defaultdict(list)
 
         last_statement_id = None
-        self._variables_per_statement = (
-            None  # program variables read out in the same statement. we keep a copy of those variables here so
-        )
+        self._variables_per_statement = []  # program variables read out in the same statement. we keep a copy of those variables here so
         # we can link it to the tmp_write action right afterwards
         self._custom_data_per_statement = None
 

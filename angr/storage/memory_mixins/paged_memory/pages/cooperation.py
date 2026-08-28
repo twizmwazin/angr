@@ -18,7 +18,7 @@ class CooperationBase[T]:
 
     @classmethod
     @abstractmethod
-    def _compose_objects(cls, objects: list[list[tuple[int, T]]], size: str, endness: str, **kwargs) -> T:
+    def _compose_objects(cls, objects: list[list[tuple[int, T]]], size: int, endness: str, memory, **kwargs) -> T:
         """
         Provide this a list of the result of several load calls, and it will compose them into a single result.
         """
@@ -52,8 +52,8 @@ class CooperationBase[T]:
         return sub_data
 
     @classmethod
-    def _force_load_cooperation(cls, results, size, endness, **kwargs):
-        return cls._compose_objects([results], size, endness, **kwargs)
+    def _force_load_cooperation(cls, results, size, endness, memory, **kwargs):
+        return cls._compose_objects([results], size, endness, memory=memory, **kwargs)
 
 
 class MemoryObjectMixin(CooperationBase[SimMemoryObject]):
@@ -67,8 +67,8 @@ class MemoryObjectMixin(CooperationBase[SimMemoryObject]):
         cls,
         objects: list[list[tuple[int, SimMemoryObject]]],
         size,
-        endness=None,
-        memory=None,
+        endness,
+        memory,
         labels: list | None = None,
         **kwargs,
     ):
@@ -175,9 +175,7 @@ class MemoryObjectSetMixin(CooperationBase):
     """
 
     @classmethod
-    def _compose_objects(
-        cls, objects: list[list[tuple[int, set[SimMemoryObject]]]], size, endness=None, memory=None, **kwargs
-    ):
+    def _compose_objects(cls, objects: list[list[tuple[int, set[SimMemoryObject]]]], size, endness, memory, **kwargs):
         c_objects: list[tuple[int, SimMemoryObject | set[SimMemoryObject]]] = []
         for objlist in objects:
             for element in objlist:
@@ -310,7 +308,7 @@ class BasicClaripyCooperation(CooperationBase):
     """
 
     @classmethod
-    def _compose_objects(cls, objects, size, endness, **kwargs):
+    def _compose_objects(cls, objects, size, endness, memory=None, **kwargs):
         if endness == "Iend_LE":
             objects = reversed(objects)
 

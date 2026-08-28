@@ -3010,7 +3010,7 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
         self._variable_map: VariableMap = variable_map if variable_map is not None else VariableMap()
         self.binop_depth_cutoff = binop_depth_cutoff
 
-        self._variables_in_use: dict | None = None
+        self._variables_in_use: dict = {}
         self._inlined_strings: set[SimMemoryVariable] = set()
         self._function_pointers: set[SimMemoryVariable] = set()
         self.ailexpr2cnode: dict[tuple[Expr.Expression, bool], CExpression] | None = None

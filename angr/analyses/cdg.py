@@ -29,10 +29,10 @@ class CDG(Analysis):
 
         self._ancestor = None
         self._semi = None
-        self._post_dom: networkx.DiGraph | None = None
+        self._post_dom: networkx.DiGraph = networkx.DiGraph()
 
-        self._graph: networkx.DiGraph | None = None
-        self._normalized_cfg = None
+        self._graph: networkx.DiGraph = networkx.DiGraph()
+        self._normalized_cfg: networkx.DiGraph = networkx.DiGraph()
 
         if not no_construct:
             if self._cfg is None:
@@ -103,7 +103,7 @@ class CDG(Analysis):
         # Construct post-dominator tree
         self._pd_construct()
 
-        self._graph: networkx.DiGraph = networkx.DiGraph()
+        self._graph = networkx.DiGraph()
 
         # Construct the reversed dominance frontier mapping
         rdf = compute_dominance_frontier(self._normalized_cfg, self._post_dom)

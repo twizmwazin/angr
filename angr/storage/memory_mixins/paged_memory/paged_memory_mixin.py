@@ -248,7 +248,7 @@ class PagedMemoryMixin[PageType: PageBase](
 
         sub_gen.close()
 
-    def erase(self, addr, size=None, **kwargs) -> None:
+    def erase(self, addr, size, **kwargs) -> None:
         if not isinstance(size, int):
             raise TypeError("Need size to be resolved to an int by this point")
 

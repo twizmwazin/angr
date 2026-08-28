@@ -113,7 +113,7 @@ class MemoryMixin[InData, OutData, Addr](SimStatePlugin):
         n = min(size, len(bitmap) * 8)
         return next((i for i in range(n) if bitmap[i >> 3] >> (i & 7) & 1), n)
 
-    def erase(self, addr: Addr, size: int | None = None, **kwargs) -> None:
+    def erase(self, addr: Addr, size: int, **kwargs) -> None:
         """
         Set [addr:addr+size) to uninitialized. In many cases this will be faster than overwriting those locations with
         new values. This is commonly used during static data flow analysis.

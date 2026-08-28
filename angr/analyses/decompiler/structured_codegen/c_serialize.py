@@ -674,7 +674,7 @@ def parse_codegen(msg, *, project=None, kb=None, func=None):
     cg.kb = kb
     cg.externs = set()
     # codegen._variables_in_use is the same {SimVariable: CVariable} dict the CFunction carries (and serializes).
-    cg._variables_in_use = cg.cfunc.variables_in_use if cg.cfunc is not None else None
+    cg._variables_in_use = cg.cfunc.variables_in_use if cg.cfunc is not None else {}
     cg._inlined_strings = set()
     cg._function_pointers = set()
     cg.ailexpr2cnode = None

@@ -196,7 +196,6 @@ class SimFile(SimFileBase, DefaultMemory):  # TODO: pick a better base class omg
     ):
         kwargs["memory_id"] = kwargs.get("memory_id", "file")
         super().__init__(name=name, writable=writable, ident=ident, **kwargs)
-        self._size = size
         self.has_end = has_end
         self.seekable = seekable
 
@@ -225,13 +224,14 @@ class SimFile(SimFileBase, DefaultMemory):  # TODO: pick a better base class omg
         if content is not None:
             self.__content = content
 
-            if self._size is None:
-                self._size = len(content) // 8
+            if size is None:
+                size = len(content) // 8
         else:
-            if self._size is None:
-                self._size = 0
+            if size is None:
+                size = 0
                 if has_end is None:
                     self.has_end = False
+        self._size = size
 
     @property
     def category(self):  # override trying to determine from self.id to allow arbitrary idents
@@ -429,32 +429,24 @@ class SimPackets(SimFileBase):
         super().__init__(name, writable=writable, ident=ident, **kwargs)
 
         self.write_mode = write_mode
-        self.content = content
         self.sanitized = 0
 
-        if self.content is None:
+        if content is None:
             self.content = []
         else:
-            self.content = [
-                (
-                    x
-                    if type(x) is tuple
-                    else (
-                        (x, len(x) // 8)
-                        if isinstance(x, claripy.ast.Bits)
-                        else (
-                            (x.ast, len(x) // 8)
-                            if isinstance(x, SimActionObject)
-                            else (claripy.BVV(x), len(x))
-                            if type(x) is bytes
-                            else None
-                        )
-                    )
-                )
-                for x in self.content
-            ]
-            if any(x is None for x in self.content):
-                raise TypeError("Bad type in initial SimPacket content")
+            normalized = []
+            for x in content:
+                if type(x) is tuple:
+                    normalized.append(x)
+                elif isinstance(x, claripy.ast.Bits):
+                    normalized.append((x, len(x) // 8))
+                elif isinstance(x, SimActionObject):
+                    normalized.append((x.ast, len(x) // 8))
+                elif type(x) is bytes:
+                    normalized.append((claripy.BVV(x), len(x)))
+                else:
+                    raise TypeError("Bad type in initial SimPacket content")
+            self.content = normalized
 
     def set_state(self, state):
         super().set_state(state)

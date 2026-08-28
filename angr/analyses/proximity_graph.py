@@ -178,7 +178,7 @@ class ProximityGraphAnalysis(Analysis):
         self._variable_map = self._decompilation._variable_map if self._decompilation is not None else None
         self._expand_funcs = expand_funcs.copy() if expand_funcs else None
 
-        self.graph: networkx.DiGraph | None = None
+        self.graph: networkx.DiGraph = networkx.DiGraph()
         self.handled_stmts = []
 
         self._work()
@@ -272,7 +272,7 @@ class ProximityGraphAnalysis(Analysis):
                     subgraph.add_edge(end_node, succ)
 
     def _process_function(
-        self, func: Function, graph: networkx.DiGraph, func_proxi_node: FunctionProxiNode | None = None
+        self, func: Function, graph: networkx.DiGraph, func_proxi_node: FunctionProxiNode
     ) -> list[FunctionProxiNode]:
         to_expand: list[FunctionProxiNode] = []
         found_blocks: dict[BlockNode, BaseProxiNode] = {}
