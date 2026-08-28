@@ -360,6 +360,7 @@ class SimIROp:
 
         elif self._float and self._vector_zero:
             # /* --- lowest-lane-only scalar FP --- */
+            assert self._generic_name is not None
             f = getattr(claripy, "fp" + self._generic_name, None)
             if f is not None:
                 f = partial(f, claripy.fp.RM.default())  # always? really?
@@ -528,6 +529,7 @@ class SimIROp:
     NO_RM = {"Neg", "Abs"}
 
     def _op_float_mapped(self, args):
+        assert self._generic_name is not None
         op = getattr(claripy, "fp" + self._generic_name)
 
         if self._generic_name in self.NO_RM:
