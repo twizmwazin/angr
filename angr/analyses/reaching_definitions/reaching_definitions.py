@@ -4,7 +4,7 @@ import contextlib
 import logging
 from collections import defaultdict
 from collections.abc import Iterable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pyvex
 
@@ -29,6 +29,15 @@ from .rd_initializer import RDAStateInitializer
 from .rd_state import ReachingDefinitionsState
 from .subject import Subject, SubjectType
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    import networkx
+
+    from angr.analyses.decompiler.variable_map import VariableMap
+    from angr.analyses.stack_pointer_tracker import StackPointerTracker
+    from angr.calling_conventions import SimCC
+
 l = logging.getLogger(name=__name__)
 
 
@@ -51,29 +60,29 @@ class ReachingDefinitionsAnalysis(
     def __init__(
         self,
         subject: Subject | ailment.Block | Block | Function | str,
-        func_graph=None,
+        func_graph: networkx.DiGraph | None = None,
         max_iterations=30,
         track_tmps=False,
         track_consts=True,
         observation_points: Iterable[ObservationPoint] | None = None,
         init_state: ReachingDefinitionsState | None = None,
-        init_context=None,
+        init_context: Any = None,
         state_initializer: RDAStateInitializer | None = None,
-        cc=None,
+        cc: SimCC | None = None,
         function_handler: FunctionHandler | None = None,
         observe_all=False,
-        visited_blocks=None,
+        visited_blocks: set[Any] | None = None,
         dep_graph: DepGraph | bool | None = True,
-        observe_callback=None,
+        observe_callback: Callable[..., bool] | None = None,
         canonical_size=8,
-        stack_pointer_tracker=None,
+        stack_pointer_tracker: StackPointerTracker | None = None,
         use_callee_saved_regs_at_return=True,
         interfunction_level: int = 0,
         track_liveness: bool = True,
         func_addr: int | None = None,
         element_limit: int = 5,
         merge_into_tops: bool = True,
-        variable_map=None,
+        variable_map: VariableMap | None = None,
     ):
         """
         :param subject:                         The subject of the analysis: a function, or a single basic block

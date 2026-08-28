@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from angr import ailment
 from angr.analyses.forward_analysis import FunctionGraphVisitor, SingleNodeGraphVisitor
 from angr.block import Block
 from angr.knowledge_plugins.functions.function_manager import Function
+
+if TYPE_CHECKING:
+    import networkx
+
+    from angr.calling_conventions import SimCC
 
 
 class SubjectType(Enum):
@@ -17,7 +23,7 @@ class SubjectType(Enum):
 class Subject:
     _visitor: FunctionGraphVisitor | SingleNodeGraphVisitor
 
-    def __init__(self, content, func_graph=None, cc=None):
+    def __init__(self, content, func_graph: networkx.DiGraph | None = None, cc: SimCC | None = None):
         """
         The thing being analysed, and the way (visitor) to analyse it.
 

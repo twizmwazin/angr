@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from itertools import chain
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import claripy
 import pyvex
@@ -27,6 +27,7 @@ from .rd_state import ReachingDefinitionsState
 if TYPE_CHECKING:
     from angr.knowledge_plugins import FunctionManager
 
+    from .dep_graph import DepGraph
     from .function_handler import FunctionHandler
 
 
@@ -59,7 +60,15 @@ class SimEngineRDVEX(
         self.state: ReachingDefinitionsState
 
     def process(
-        self, state, *, block=None, fail_fast=False, visited_blocks=None, dep_graph=None, whitelist=None, **kwargs
+        self,
+        state,
+        *,
+        block=None,
+        fail_fast=False,
+        visited_blocks: set[Any] | None = None,
+        dep_graph: DepGraph | None = None,
+        whitelist: set[int] | None = None,
+        **kwargs,
     ):
         self._visited_blocks = visited_blocks
         self._dep_graph = dep_graph
@@ -257,7 +266,7 @@ class SimEngineRDVEX(
         size: int,
         data: MultiValues,
         data_old: MultiValues | None = None,
-        endness=None,
+        endness: str | None = None,
     ):
         if data_old is not None:
             data = data.merge(data_old)

@@ -23,6 +23,8 @@ from .rd_initializer import RDAStateInitializer
 from .subject import Subject, SubjectType
 
 if TYPE_CHECKING:
+    from angr.project import Project
+
     from .reaching_definitions import ReachingDefinitionsAnalysis
 
 
@@ -81,7 +83,7 @@ class ReachingDefinitionsState:
         analysis: ReachingDefinitionsAnalysis,
         track_tmps: bool = False,
         track_consts: bool = False,
-        rtoc_value=None,
+        rtoc_value: int | None = None,
         live_definitions: LiveDefinitions | None = None,
         canonical_size: int = 8,
         heap_allocator: HeapAllocator | None = None,
@@ -281,7 +283,7 @@ class ReachingDefinitionsState:
         subject: Subject,
         rtoc_value: int | None = None,
         initializer: RDAStateInitializer | None = None,
-        project=None,
+        project: Project | None = None,
     ):
         if initializer is None:
             initializer = RDAStateInitializer(self.arch, project=project)
@@ -357,7 +359,7 @@ class ReachingDefinitionsState:
         data: MultiValues,
         dummy=False,
         tags: set[Tag] | None = None,
-        endness=None,  # XXX destroy
+        endness: str | None = None,  # XXX destroy
         annotated: bool = False,
         uses: set[Definition[A, CodeLoc]] | None = None,
         override_codeloc: CodeLocation | None = None,

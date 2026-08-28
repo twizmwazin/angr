@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from itertools import chain
-from typing import cast
+from typing import TYPE_CHECKING, Any, cast
 
 import archinfo
 import claripy
@@ -26,6 +26,12 @@ from .function_handler import FunctionCallData, FunctionHandler
 from .rd_state import ReachingDefinitionsState
 from .subject import SubjectType
 
+if TYPE_CHECKING:
+    from angr.analyses.decompiler.variable_map import VariableMap
+    from angr.analyses.stack_pointer_tracker import StackPointerTracker
+
+    from .dep_graph import DepGraph
+
 l = logging.getLogger(name=__name__)
 
 
@@ -38,10 +44,10 @@ class SimEngineRDAIL(
         self,
         project,
         function_handler: FunctionHandler,
-        stack_pointer_tracker=None,
+        stack_pointer_tracker: StackPointerTracker | None = None,
         use_callee_saved_regs_at_return=True,
         bp_as_gpr: bool = False,
-        variable_map=None,
+        variable_map: VariableMap | None = None,
     ):
         super().__init__(project)
         self._function_handler = function_handler
@@ -63,7 +69,15 @@ class SimEngineRDAIL(
         return MultiValues(self.state.top(bits))
 
     def process(
-        self, state, *, dep_graph=None, visited_blocks=None, block=None, fail_fast=False, whitelist=None, **kwargs
+        self,
+        state,
+        *,
+        dep_graph: DepGraph | None = None,
+        visited_blocks: set[Any] | None = None,
+        block=None,
+        fail_fast=False,
+        whitelist: set[int] | None = None,
+        **kwargs,
     ):
         self._dep_graph = dep_graph
         self._visited_blocks = visited_blocks
