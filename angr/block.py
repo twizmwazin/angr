@@ -19,11 +19,14 @@ except ImportError:
     pcode = None
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
+
     from angr import Project
     from angr.engines.pcode.lifter import IRSB as PcodeIRSB
     from angr.engines.pcode.lifter import PcodeLifterEngineMixin
     from angr.engines.soot.engine import SootMixin
     from angr.engines.vex import VEXLifter
+    from angr.sim_state import SimState
 
 
 l = logging.getLogger(name=__name__)
@@ -205,23 +208,23 @@ class Block(Serializable):
     def __init__(
         self,
         addr,
-        project=None,
+        project: Project | None = None,
         arch: Arch | None = None,
-        size=None,
-        max_size=None,
-        byte_string=None,
+        size: int | None = None,
+        max_size: int | None = None,
+        byte_string: bytes | None = None,
         thumb=False,
-        backup_state=None,
-        extra_stop_points=None,
-        opt_level=None,
-        num_inst=None,
+        backup_state: SimState | None = None,
+        extra_stop_points: Iterable[int] | None = None,
+        opt_level: int | None = None,
+        num_inst: int | None = None,
         traceflags=0,
-        strict_block_end=None,
+        strict_block_end: bool | None = None,
         collect_data_refs=False,
         cross_insn_opt=True,
         load_from_ro_regions=False,
         const_prop=False,
-        initial_regs=None,
+        initial_regs: Sequence[tuple[int, int, int]] | None = None,
         skip_stmts=False,
     ):
         if arch is not None:

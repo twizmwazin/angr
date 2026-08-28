@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import logging
 import weakref
+from typing import TYPE_CHECKING, Any
 
 from sortedcontainers import SortedDict
 
 from .knowledge_plugins.key_definitions.unknown_size import UnknownSize
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
 
 l = logging.getLogger(name=__name__)
 
@@ -41,7 +45,7 @@ class RegionObject:
 
     __slots__ = ("_internal_objects", "size", "start", "stored_objects")
 
-    def __init__(self, start, size, objects=None):
+    def __init__(self, start, size, objects: set[StoredObject] | None = None):
         self.start = start
         self.size = size
         self.stored_objects = set() if objects is None else objects
@@ -118,7 +122,12 @@ class KeyedRegion:
         "_storage",
     )
 
-    def __init__(self, tree=None, phi_node_contains=None, canonical_size=8):
+    def __init__(
+        self,
+        tree: SortedDict | None = None,
+        phi_node_contains: Callable[[Any, Any], bool] | None = None,
+        canonical_size=8,
+    ):
         self._storage = SortedDict() if tree is None else tree
         self._object_mapping = weakref.WeakValueDictionary()
         self._phi_node_contains = phi_node_contains
@@ -177,7 +186,7 @@ class KeyedRegion:
         kr._object_mapping = self._object_mapping.copy()
         return kr
 
-    def merge(self, other, replacements=None):
+    def merge(self, other, replacements: Mapping[Any, Any] | None = None):
         """
         Merge another KeyedRegion into this KeyedRegion.
 
@@ -201,7 +210,7 @@ class KeyedRegion:
 
         return self
 
-    def merge_to_top(self, other, replacements=None, top=None):
+    def merge_to_top(self, other, replacements: Mapping[Any, Any] | None = None, top=None):
         """
         Merge another KeyedRegion into this KeyedRegion, but mark all variables with different values as TOP.
 

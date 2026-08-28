@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import itertools
+from typing import TYPE_CHECKING
 
 import networkx
 import pyvex
@@ -9,6 +10,15 @@ from .errors import AngrBladeError, SimTranslationError
 from .knowledge_plugins.cfg import CFGNode
 from .slicer import SimSlicer
 from .utils.constants import DEFAULT_STATEMENT
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    import archinfo
+
+    from .analyses.cfg.cfg_base import CFGBase
+    from .project import Project
+    from .sim_state import SimState
 
 
 class BadJumpkindNotification(Exception):
@@ -29,13 +39,13 @@ class Blade:
         dst_run: int,
         dst_stmt_idx: int,
         direction: str = "backward",
-        project=None,
-        cfg=None,
+        project: Project | None = None,
+        cfg: CFGBase | None = None,
         ignore_sp: bool = False,
         ignore_bp: bool = False,
-        ignored_regs=None,
+        ignored_regs: Iterable[int | str] | None = None,
         max_level: int = 3,
-        base_state=None,
+        base_state: SimState | None = None,
         stop_at_calls: bool = False,
         cross_insn_opt=False,
         max_predecessors: int = 10,
@@ -117,7 +127,7 @@ class Blade:
     # Public methods
     #
 
-    def dbg_repr(self, arch=None):
+    def dbg_repr(self, arch: archinfo.Arch | None = None):
         if arch is None and self.project is not None:
             arch = self.project.arch
 

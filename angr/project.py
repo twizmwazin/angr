@@ -8,7 +8,7 @@ import types
 from collections import defaultdict
 from io import BytesIO, IOBase
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import archinfo
 import cle
@@ -24,6 +24,13 @@ from .llm_client import LLMClient
 from .procedures import SIM_LIBRARIES, SIM_PROCEDURES
 from .sim_procedure import SimProcedure
 from .simos import SimOS, os_mapping
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Collection
+
+    from .engines import SimEngine
+    from .misc.plugins import PluginPreset
+    from .sim_state import SimState
 
 l = logging.getLogger(name=__name__)
 
@@ -120,25 +127,25 @@ class Project:
     def __init__(
         self,
         thing,
-        default_analysis_mode=None,
-        ignore_functions=None,
+        default_analysis_mode: str | None = None,
+        ignore_functions: Collection[str] | None = None,
         use_sim_procedures=True,
-        exclude_sim_procedures_func=None,
+        exclude_sim_procedures_func: Callable[[str], bool] | None = None,
         exclude_sim_procedures_list=(),
-        arch=None,
-        simos=None,
-        engine=None,
+        arch: str | archinfo.Arch | None = None,
+        simos: str | type[SimOS] | None = None,
+        engine: type[SimEngine] | None = None,
         load_options: dict[str, Any] | None = None,
         translation_cache=True,
         selfmodifying_code: bool = False,
         support_selfmodifying_code: bool | None = None,  # deprecated. use selfmodifying_code instead
-        store_function=None,
-        load_function=None,
-        analyses_preset=None,
-        eager_ifunc_resolution=None,
+        store_function: Callable[[Any], None] | None = None,
+        load_function: Callable[[Any], Any] | None = None,
+        analyses_preset: str | PluginPreset[Any] | None = None,
+        eager_ifunc_resolution: bool | None = None,
         cache_limits: dict[str, int | None] | None = None,
-        rustc_version=None,
-        rustc_optimization_level=None,
+        rustc_version: str | None = None,
+        rustc_optimization_level: str | None = None,
         **kwargs,
     ):
         self.rustc_version = rustc_version
@@ -523,7 +530,14 @@ class Project:
     #
 
     # pylint: disable=inconsistent-return-statements
-    def hook(self, addr, hook=None, length=0, kwargs=None, replace: bool | None = False):
+    def hook(
+        self,
+        addr,
+        hook: SimProcedure | Callable[[SimState], Any] | None = None,
+        length=0,
+        kwargs: dict[str, Any] | None = None,
+        replace: bool | None = False,
+    ):
         """
         Hook a section of code with a custom function. This is used internally to provide symbolic
         summaries of library functions, and can be used to instrument execution or to modify
@@ -624,7 +638,7 @@ class Project:
 
         del self._sim_procedures[addr]
 
-    def hook_symbol(self, symbol_name, simproc, kwargs=None, replace: bool | None = None):
+    def hook_symbol(self, symbol_name, simproc, kwargs: dict[str, Any] | None = None, replace: bool | None = None):
         """
         Resolve a dependency in a binary. Looks up the address of the given symbol, and then hooks that
         address. If the symbol was not available in the loaded libraries, this address may be provided
@@ -788,7 +802,7 @@ class Project:
     # Private methods related to hooking
     #
 
-    def _hook_decorator(self, addr, length=0, kwargs=None, replace=False):
+    def _hook_decorator(self, addr, length=0, kwargs: dict[str, Any] | None = None, replace=False):
         """
         Return a function decorator that allows easy hooking. Please refer to hook() for its usage.
 

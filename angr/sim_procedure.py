@@ -28,6 +28,9 @@ from .sim_type import parse_signature, parse_type
 from .state_plugins.inspect import BP_AFTER, BP_BEFORE, NO_OVERRIDE
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from angr.engines.successors import SimSuccessors
     from angr.sim_state import SimState
 
 l = logging.getLogger(name=__name__)
@@ -120,14 +123,14 @@ class SimProcedure:
         project: angr.Project | None = None,
         cc: angr.SimCC | None = None,
         prototype: str | SimTypeFunction | None = None,
-        symbolic_return=None,
-        returns=None,
+        symbolic_return: bool | None = None,
+        returns: bool | None = None,
         is_syscall=False,
         is_stub=False,
-        num_args=None,
-        display_name=None,
-        library_name=None,
-        is_function=None,
+        num_args: int | None = None,
+        display_name: str | None = None,
+        library_name: str | None = None,
+        is_function: bool | None = None,
         **kwargs,
     ):
         # WE'LL FIGURE IT OUT
@@ -196,7 +199,13 @@ class SimProcedure:
             " (stub)" if self.is_stub else "",
         )
 
-    def execute(self, state, successors=None, arguments=None, ret_to=None):
+    def execute(
+        self,
+        state,
+        successors: SimSuccessors | None = None,
+        arguments: Sequence[Any] | None = None,
+        ret_to: int | claripy.ast.bv.BV | None = None,
+    ):
         """
         Call this method with a SimState and a SimSuccessors to execute the procedure.
 
@@ -416,7 +425,7 @@ class SimProcedure:
         for arg, ty in zip(args, self.prototype.args):
             self.cc.next_arg(arg_session, ty).set_value(self.state, arg)
 
-    def va_arg(self, ty, index=None):
+    def va_arg(self, ty, index: int | None = None):
         assert self.arg_session is not None
         if not self.use_state_arguments:
             assert self.arguments is not None
@@ -464,7 +473,7 @@ class SimProcedure:
         returnty = SimTypeNum(ret_size, signed=False, label=f"u{ret_size}")
         self.prototype.returnty = returnty
 
-    def ret(self, expr=None):
+    def ret(self, expr: Any = None):
         """
         Add an exit representing a return from this function.
         If this is not an inline call, grab a return address from the state and jump to it.
@@ -530,7 +539,15 @@ class SimProcedure:
         self._exit_action(self.state, ret_addr)
         self.successors.add_successor(self.state, ret_addr, claripy.true(), "Ijk_Ret")
 
-    def call(self, addr, args, continue_at, cc=None, prototype=None, jumpkind="Ijk_Call"):
+    def call(
+        self,
+        addr,
+        args,
+        continue_at,
+        cc: angr.SimCC | None = None,
+        prototype: str | SimTypeFunction | None = None,
+        jumpkind="Ijk_Call",
+    ):
         """
         Add an exit representing calling another function via pointer.
 
