@@ -291,7 +291,9 @@ class Outliner(Analysis):
 
         return callee_func, subgraph, callee_arg_vvars
 
-    def _update_phi_stmts(self, block: Block, collapsed_loc=None, ret_vvar=None):
+    def _update_phi_stmts(
+        self, block: Block, collapsed_loc: Address | None = None, ret_vvar: VirtualVariable | None = None
+    ):
         srcs = list(self.parent_graph.predecessors(block))
         src_addrs = [(src.addr, src.idx) for src in srcs]
         for i, stmt in enumerate(block.statements):
