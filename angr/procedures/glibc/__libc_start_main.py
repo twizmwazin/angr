@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 import claripy
 from cle import AT
 
 import angr
+
+if TYPE_CHECKING:
+    from angr.analyses.cfg.cfg_base import CFGBase
 
 l = logging.getLogger(name=__name__)
 
@@ -184,7 +188,7 @@ class __libc_start_main(angr.SimProcedure):
     def after_main(self, main, argc, argv, init, fini, exit_addr=0):
         self.exit(0)
 
-    def static_exits(self, blocks, cfg=None, **kwargs):
+    def static_exits(self, blocks, cfg: CFGBase | None = None, **kwargs):
         # the caller (CFG recovery) sets self.project before calling this method
         assert self.project is not None
         # Execute those blocks with a blank state, and then dump the arguments
