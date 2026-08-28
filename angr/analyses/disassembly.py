@@ -174,7 +174,7 @@ class Instruction(DisassemblyPiece):
         self.arch = self.project.arch
         self.format = ""
         self.components = ()
-        self.opcode: Opcode = None  # type: ignore
+        self.opcode: Opcode
         self.operands = []
 
         # the following members will be filled in after dissecting the instruction
