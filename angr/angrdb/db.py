@@ -33,7 +33,7 @@ class AngrDB:
 
     VERSION = 1
 
-    def __init__(self, project=None, nullpool=False):
+    def __init__(self, project: Project | None = None, nullpool=False):
         self.project = project
         self.config = {}
         self.engine = None
