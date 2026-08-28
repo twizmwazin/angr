@@ -16,7 +16,15 @@ from angr.utils.ins_addr_list import InsAddrList
 from .block_id import BlockID
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from types import TracebackType
+
+    from pysoot.sootir.soot_block import SootBlock as PySootBlock
+    from pyvex import IRSB
+
     from angr.block import Block, SootBlock
+    from angr.knowledge_base import KnowledgeBase
+    from angr.sim_state import SimState
 
     from .cfg_model import CFGModel
 
@@ -34,7 +42,11 @@ class CFGNodeCreationFailure:
 
     __slots__ = ["long_reason", "short_reason", "traceback"]
 
-    def __init__(self, exc_info=None, to_copy=None):
+    def __init__(
+        self,
+        exc_info: tuple[type[BaseException], BaseException, TracebackType] | None = None,
+        to_copy: CFGNodeCreationFailure | None = None,
+    ):
         if to_copy is None:
             assert exc_info is not None
             e_type, e, e_traceback = exc_info
@@ -79,17 +91,17 @@ class CFGNode(Serializable):
         addr,
         size,
         cfg,
-        simprocedure_name=None,
+        simprocedure_name: str | None = None,
         no_ret=False,
-        function_address=None,
-        block_id: BlockID | int | None = None,
-        irsb=None,
-        soot_block=None,
-        instruction_addrs=None,
+        function_address: int | None = None,
+        block_id: BlockID | AddressType | None = None,
+        irsb: IRSB | None = None,
+        soot_block: PySootBlock | None = None,
+        instruction_addrs: InsAddrList | Sequence[int] | None = None,
         thumb=False,
-        byte_string=None,
-        is_syscall=None,
-        name=None,
+        byte_string: bytes | None = None,
+        is_syscall: bool | None = None,
+        name: str | None = None,
     ):
         """
         Note: simprocedure_name is not used to recreate the SimProcedure object. It's only there for better
@@ -102,7 +114,7 @@ class CFGNode(Serializable):
         self._no_ret = no_ret
         self._cfg_model: CFGModel = cfg
         self._function_address = function_address
-        self._block_id: BlockID | int | None = block_id
+        self._block_id: BlockID | AddressType | None = block_id
         self._thumb = thumb
         self._byte_string: bytes | None = byte_string
 
@@ -237,7 +249,7 @@ class CFGNode(Serializable):
     def predecessors_and_jumpkinds(self, excluding_fakeret=True):
         return self._cfg_model.get_predecessors_and_jumpkinds(self, excluding_fakeret=excluding_fakeret)
 
-    def get_data_references(self, kb=None):
+    def get_data_references(self, kb: KnowledgeBase | None = None):
         """
         Get the known data references for this CFGNode via the knowledge base.
 
@@ -271,7 +283,7 @@ class CFGNode(Serializable):
         return self.simprocedure_name is not None
 
     @property
-    def callstack_key(self):
+    def callstack_key(self) -> tuple[int | None, ...] | None:
         # A dummy stub for the future support of context sensitivity in CFGFast
         return None
 
@@ -310,7 +322,7 @@ class CFGNode(Serializable):
         return obj
 
     @classmethod
-    def parse_from_cmessage(cls, cmsg, cfg=None):  # pylint:disable=arguments-differ
+    def parse_from_cmessage(cls, cmsg, cfg: CFGModel | None = None):  # pylint:disable=arguments-differ
         block_id = None if len(cmsg.block_id) == 0 else cmsg.block_id[0]
         instruction_addrs = InsAddrList(cmsg.ins_base_addr, cmsg.ins_sizes)
 
@@ -478,24 +490,24 @@ class CFGENode(CFGNode):
         addr,
         size,
         cfg,
-        simprocedure_name=None,
+        simprocedure_name: str | None = None,
         no_ret=False,
-        function_address=None,
-        block_id=None,
-        irsb=None,
-        instruction_addrs=None,
+        function_address: int | None = None,
+        block_id: BlockID | AddressType | None = None,
+        irsb: IRSB | None = None,
+        instruction_addrs: InsAddrList | Sequence[int] | None = None,
         thumb=False,
-        byte_string=None,
-        is_syscall=None,
-        name=None,
+        byte_string: bytes | None = None,
+        is_syscall: bool | None = None,
+        name: str | None = None,
         # CFGENode specific
-        input_state=None,
-        final_states=None,
-        syscall_name=None,
+        input_state: SimState | None = None,
+        final_states: list[SimState] | None = None,
+        syscall_name: str | None = None,
         looping_times=0,
-        depth=None,
-        callstack_key=None,
-        creation_failure_info=None,
+        depth: int | None = None,
+        callstack_key: tuple[int | None, ...] | None = None,
+        creation_failure_info: tuple[type[BaseException], BaseException, TracebackType] | None = None,
     ):
         super().__init__(
             addr,
@@ -651,7 +663,7 @@ class CFGENode(CFGNode):
         return obj
 
     @classmethod
-    def parse_from_cmessage(cls, cmsg, cfg=None):  # pylint:disable=arguments-differ
+    def parse_from_cmessage(cls, cmsg, cfg: CFGModel | None = None):  # pylint:disable=arguments-differ
         base = cmsg.base
 
         # Parse block_id

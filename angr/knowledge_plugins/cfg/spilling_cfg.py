@@ -13,7 +13,7 @@ import os
 import threading
 import weakref
 from collections import OrderedDict, defaultdict
-from collections.abc import Generator, Iterator
+from collections.abc import Generator, Iterable, Iterator
 from typing import TYPE_CHECKING, Literal, overload
 
 import lmdb
@@ -569,24 +569,29 @@ class _InEdgeView:
         self._graph = graph
 
     @overload
-    def __call__(self, nbunch=None, data: Literal[False] = False) -> list[tuple[CFGNode, CFGNode]]: ...
+    def __call__(
+        self, nbunch: CFGNode | Iterable[CFGNode] | None = None, data: Literal[False] = False
+    ) -> list[tuple[CFGNode, CFGNode]]: ...
     @overload
-    def __call__(self, nbunch=None, *, data: Literal[True]) -> list[tuple[CFGNode, CFGNode, dict]]: ...
+    def __call__(
+        self, nbunch: CFGNode | Iterable[CFGNode] | None = None, *, data: Literal[True]
+    ) -> list[tuple[CFGNode, CFGNode, dict]]: ...
 
     def __call__(
-        self, nbunch=None, data: bool = False
+        self, nbunch: CFGNode | Iterable[CFGNode] | None = None, data: bool = False
     ) -> list[tuple[CFGNode, CFGNode]] | list[tuple[CFGNode, CFGNode, dict]]:
+        nbunch_keys: list[K] | None = None
         if nbunch is not None:
-            nbunch = [get_block_key(nbunch)] if isinstance(nbunch, CFGNode) else [get_block_key(n) for n in nbunch]
+            nbunch_keys = [get_block_key(nbunch)] if isinstance(nbunch, CFGNode) else [get_block_key(n) for n in nbunch]
 
         if data:
             return [
                 (self._graph.get_node_by_key(src_id), self._graph.get_node_by_key(dst_id), edge_data)
-                for src_id, dst_id, edge_data in self._graph._graph.in_edges(nbunch, data=True)
+                for src_id, dst_id, edge_data in self._graph._graph.in_edges(nbunch_keys, data=True)
             ]
         return [
             (self._graph.get_node_by_key(src_id), self._graph.get_node_by_key(dst_id))
-            for src_id, dst_id in self._graph._graph.in_edges(nbunch)
+            for src_id, dst_id in self._graph._graph.in_edges(nbunch_keys)
         ]
 
     def __getitem__(self, node) -> list[tuple[CFGNode, CFGNode]]:
@@ -610,24 +615,29 @@ class _OutEdgeView:
         self._graph = graph
 
     @overload
-    def __call__(self, nbunch=None, data: Literal[False] = False) -> list[tuple[CFGNode, CFGNode]]: ...
+    def __call__(
+        self, nbunch: CFGNode | Iterable[CFGNode] | None = None, data: Literal[False] = False
+    ) -> list[tuple[CFGNode, CFGNode]]: ...
     @overload
-    def __call__(self, nbunch=None, *, data: Literal[True]) -> list[tuple[CFGNode, CFGNode, dict]]: ...
+    def __call__(
+        self, nbunch: CFGNode | Iterable[CFGNode] | None = None, *, data: Literal[True]
+    ) -> list[tuple[CFGNode, CFGNode, dict]]: ...
 
     def __call__(
-        self, nbunch=None, data: bool = False
+        self, nbunch: CFGNode | Iterable[CFGNode] | None = None, data: bool = False
     ) -> list[tuple[CFGNode, CFGNode]] | list[tuple[CFGNode, CFGNode, dict]]:
+        nbunch_keys: list[K] | None = None
         if nbunch is not None:
-            nbunch = [get_block_key(nbunch)] if isinstance(nbunch, CFGNode) else [get_block_key(n) for n in nbunch]
+            nbunch_keys = [get_block_key(nbunch)] if isinstance(nbunch, CFGNode) else [get_block_key(n) for n in nbunch]
 
         if data:
             return [
                 (self._graph.get_node_by_key(src_id), self._graph.get_node_by_key(dst_id), edge_data)
-                for src_id, dst_id, edge_data in self._graph._graph.out_edges(nbunch, data=True)
+                for src_id, dst_id, edge_data in self._graph._graph.out_edges(nbunch_keys, data=True)
             ]
         return [
             (self._graph.get_node_by_key(src_id), self._graph.get_node_by_key(dst_id))
-            for src_id, dst_id in self._graph._graph.out_edges(nbunch)
+            for src_id, dst_id in self._graph._graph.out_edges(nbunch_keys)
         ]
 
     def __getitem__(self, node) -> list[tuple[CFGNode, CFGNode]]:
@@ -1052,7 +1062,7 @@ class SpillingCFG:
     def has_edge_by_key(self, src_block_key: K, dst_block_key: K) -> bool:
         return self._graph.has_edge(src_block_key, dst_block_key)
 
-    def get_edge_data(self, src: CFGNode, dst: CFGNode, default=None) -> dict | None:
+    def get_edge_data(self, src: CFGNode, dst: CFGNode, default: dict | None = None) -> dict | None:
         src_block_key = get_block_key(src)
         dst_block_key = get_block_key(dst)
         return self._graph.get_edge_data(src_block_key, dst_block_key, default)

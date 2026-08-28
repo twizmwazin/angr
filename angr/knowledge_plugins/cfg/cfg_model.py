@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from angr.knowledge_plugins.xrefs import XRef, XRefManager
     from angr.rustylib import SegmentList
 
+    from .cfg_manager import CFGManager
     from .types import CFG_ADDR_TYPES
 
 l = logging.getLogger(name=__name__)
@@ -67,7 +68,7 @@ class CFGModel(Serializable):
     def __init__(
         self,
         ident,
-        cfg_manager=None,
+        cfg_manager: CFGManager | None = None,
         is_arm=False,
         cache_limit: int | None = None,
         db_batch_size: int = 800,
@@ -273,7 +274,7 @@ class CFGModel(Serializable):
         return cmsg
 
     @classmethod
-    def parse_from_cmessage(cls, cmsg, cfg_manager=None, loader=None):  # pylint:disable=arguments-differ
+    def parse_from_cmessage(cls, cmsg, cfg_manager: CFGManager | None = None, loader: cle.Loader | None = None):  # pylint:disable=arguments-differ
         # create a new model unassociated from any project
         model = cls(cmsg.ident) if cfg_manager is None else cfg_manager.new_model(cmsg.ident)
 
@@ -697,7 +698,7 @@ class CFGModel(Serializable):
 
     get_predecessors_and_jumpkind = get_predecessors_and_jumpkinds
 
-    def get_all_predecessors(self, cfgnode, depth_limit=None):
+    def get_all_predecessors(self, cfgnode, depth_limit: int | None = None):
         """
         Get all predecessors of a specific node on the control flow graph.
 
@@ -713,7 +714,7 @@ class CFGModel(Serializable):
         )
         return list(predecessors)
 
-    def get_all_successors(self, cfgnode, depth_limit=None):
+    def get_all_successors(self, cfgnode, depth_limit: int | None = None):
         """
         Get all successors of a specific node on the control flow graph.
 
@@ -1034,7 +1035,7 @@ class CFGModel(Serializable):
         self,
         data_addr,
         max_size,
-        content_holder=None,
+        content_holder: list[bytes] | None = None,
         xrefs: XRefManager | None = None,
         seg_list: SegmentList | None = None,
         data_type_guessing_handlers: list[Callable] | None = None,
