@@ -457,15 +457,18 @@ class InterferenceChecker(SequenceWalker):
             spotter = ExpressionSpotter()
             # special case: we process the call arguments first, then the call itself. this is to allow more expression
             # folding opportunities.
-            the_call = None
+            the_call: Call | None = None
             if (
                 isinstance(stmt, Assignment)
                 and isinstance(stmt.src, ailment.Expr.Call)
                 and not isinstance(stmt.src.target, str)
             ):
                 the_call = stmt.src
-            elif isinstance(stmt, ailment.Stmt.SideEffectStatement) and not isinstance(stmt.expr.target, str):
-                the_call = stmt.expr
+            elif isinstance(stmt, ailment.Stmt.SideEffectStatement):
+                side_effect_expr = stmt.expr
+                assert isinstance(side_effect_expr, Call)
+                if not isinstance(side_effect_expr.target, str):
+                    the_call = side_effect_expr
             if the_call is not None:
                 assert isinstance(the_call.target, ailment.Expr.Expression)
                 spotter.walk_expression(the_call.target)

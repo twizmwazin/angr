@@ -249,7 +249,8 @@ class VVarAliasVisitor(AILBlockViewer):
     def _handle_SideEffectStatement(self, stmt_idx: int, stmt: SideEffectStatement, block: Block | None):
         call = stmt.expr
         if (
-            call.target == "memcpy"
+            isinstance(call, Call)
+            and call.target == "memcpy"
             and isinstance(call.args[0], VirtualVariable)
             and isinstance(call.args[1], Const)
             and isinstance(call.args[2], Const)
