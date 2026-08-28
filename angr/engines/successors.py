@@ -118,7 +118,15 @@ class SimSuccessors:
         return iter(self.flat_successors)
 
     def add_successor(
-        self, state, target, guard, jumpkind, add_guard=True, exit_stmt_idx=None, exit_ins_addr=None, source=None
+        self,
+        state,
+        target,
+        guard,
+        jumpkind,
+        add_guard=True,
+        exit_stmt_idx: int | None = None,
+        exit_ins_addr: int | None = None,
+        source: int | SootAddressDescriptor | None = None,
     ):
         """
         Add a successor state of the SimRun.

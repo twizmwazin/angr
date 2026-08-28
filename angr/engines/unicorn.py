@@ -66,7 +66,7 @@ class SimEngineUnicorn(SuccessorsEngine):
         self._stop_block_addrs_cache = args[2]
         self._stop_reasons_to_track = args[3]
 
-    def __check(self, num_inst=None, **kwargs):  # pylint: disable=unused-argument
+    def __check(self, num_inst: int | None = None, **kwargs):  # pylint: disable=unused-argument
         state = self.state
         if o.UNICORN not in state.options:
             l.debug("Unicorn-engine is not enabled.")

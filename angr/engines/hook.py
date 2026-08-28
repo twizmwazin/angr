@@ -74,7 +74,7 @@ class HooksMixin(SuccessorsEngine, ProcedureMixin):
 
         return None
 
-    def process_successors(self, successors, *, procedure=None, **kwargs):
+    def process_successors(self, successors, *, procedure: angr.SimProcedure | None = None, **kwargs):
         state = self.state
         if procedure is None:
             procedure = self._lookup_hook(state, procedure)

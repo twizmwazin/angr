@@ -1,12 +1,20 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING, Any
 
 from angr import errors
 from angr import sim_options as o
 from angr.state_plugins.inspect import BP_AFTER, BP_BEFORE
 
 from .successors import SuccessorsEngine
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    import claripy
+
+    from angr.sim_procedure import SimProcedure
 
 l = logging.getLogger(name=__name__)
 # pylint: disable=arguments-differ
@@ -18,7 +26,15 @@ class ProcedureMixin:
     to a SimSuccessors.
     """
 
-    def process_procedure(self, state, successors, procedure, ret_to=None, arguments=None, **kwargs):
+    def process_procedure(
+        self,
+        state,
+        successors,
+        procedure,
+        ret_to: int | claripy.ast.bv.BV | None = None,
+        arguments: Sequence[Any] | None = None,
+        **kwargs,
+    ):
         successors.sort = "SimProcedure"
 
         # fill in artifacts
@@ -65,7 +81,7 @@ class ProcedureEngine(ProcedureMixin, SuccessorsEngine):
     kwarg to be passed to process.
     """
 
-    def process_successors(self, successors, procedure=None, **kwargs):
+    def process_successors(self, successors, procedure: SimProcedure | None = None, **kwargs):
         if procedure is None:
             raise errors.SimEngineError("Must provide the procedure explicitly to use ProcedureEngine")
         self.process_procedure(self.state, successors, procedure, **kwargs)
