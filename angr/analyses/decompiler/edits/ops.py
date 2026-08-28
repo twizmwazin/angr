@@ -21,6 +21,7 @@ from .resolve import concrete_variables, list_variable_names, resolve_variable, 
 from .results import EditResult, Refresh
 
 if TYPE_CHECKING:
+    from angr.analyses.decompiler.structured_codegen import BaseStructuredCodeGenerator
     from angr.knowledge_base import KnowledgeBase
     from angr.knowledge_plugins.functions import Function
     from angr.project import Project
@@ -129,7 +130,7 @@ def rename_variable(
     allow_overwrite: bool = True,
     strict_names: bool = True,
     rerender: bool = True,
-    codegen=None,
+    codegen: BaseStructuredCodeGenerator | None = None,
 ) -> EditResult:
     """
     Rename a local, an argument, or a global as it appears in a function's decompilation.
@@ -307,7 +308,7 @@ def set_variable_type(
     reflow: bool = True,
     rerender: bool = True,
     allow_prototype_change: bool = True,
-    codegen=None,
+    codegen: BaseStructuredCodeGenerator | None = None,
 ) -> EditResult:
     """
     Change the type of a local, an argument, or a global.
