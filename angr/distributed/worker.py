@@ -4,10 +4,14 @@ import logging
 import multiprocessing
 import sys
 import time
+from typing import TYPE_CHECKING
 
 from angr.exploration_techniques import Bucketizer, ExplorationTechnique
 from angr.utils.mp import Initializer
 from angr.vaults import VaultDirShelf
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 _l = logging.getLogger(__name__)
 
@@ -64,10 +68,10 @@ class Worker:
         worker_id,
         server,
         server_state,
-        recursion_limit=None,
-        techniques=None,
-        add_options=None,
-        remove_options=None,
+        recursion_limit: int | None = None,
+        techniques: Sequence[ExplorationTechnique] | None = None,
+        add_options: set[str] | None = None,
+        remove_options: set[str] | None = None,
     ):
         self.worker_id = worker_id
         self.server = server

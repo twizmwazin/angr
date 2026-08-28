@@ -5,8 +5,15 @@ import multiprocessing
 import os
 import tempfile
 import time
+from typing import TYPE_CHECKING, Any
 
 from .worker import Worker
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Sequence
+
+    from angr.exploration_techniques import ExplorationTechnique
+    from angr.sim_state import SimState
 
 _l = logging.getLogger(__name__)
 
@@ -29,17 +36,17 @@ class Server:
     def __init__(
         self,
         project,
-        spill_yard=None,
-        db=None,
-        max_workers=None,
+        spill_yard: str | None = None,
+        db: str | None = None,
+        max_workers: int | None = None,
         max_states=10,
         staging_max=10,
         bucketizer=True,
         recursion_limit=1000,
-        worker_exit_callback=None,
-        techniques=None,
-        add_options=None,
-        remove_options=None,
+        worker_exit_callback: Callable[[int, dict[str, list[SimState]]], Any] | None = None,
+        techniques: Sequence[ExplorationTechnique] | None = None,
+        add_options: set[str] | None = None,
+        remove_options: set[str] | None = None,
     ):
         self.project = project
 
