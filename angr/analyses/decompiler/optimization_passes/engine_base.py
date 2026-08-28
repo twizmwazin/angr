@@ -124,15 +124,17 @@ class SimplifierAILEngine(
         return stmt
 
     def _handle_stmt_SideEffectStatement(self, stmt):
-        target = (
-            self._expr(stmt.expr.target) if isinstance(stmt.expr.target, ailment.Expr.Expression) else stmt.expr.target
-        )
+        # this handler rebuilds the wrapped expression as a Call, so it only ever applies to call expressions
+        call = stmt.expr
+        assert isinstance(call, ailment.expression.Call)
+
+        target = self._expr(call.target) if isinstance(call.target, ailment.Expr.Expression) else call.target
 
         new_args = None
 
-        if stmt.expr.args is not None:
+        if call.args is not None:
             new_args = []
-            for arg in stmt.expr.args:
+            for arg in call.args:
                 new_arg = self._expr(arg)
                 new_args.append(new_arg)
 
@@ -140,10 +142,10 @@ class SimplifierAILEngine(
             stmt.idx,
             ailment.expression.Call(
                 # Reuse the original Call's idx so its VariableMap entry (calling_convention/prototype) is preserved.
-                stmt.expr.idx,
+                call.idx,
                 target,
                 args=new_args,
-                bits=stmt.expr.bits,
+                bits=call.bits,
                 **stmt.tags,
             ),
             ret_expr=stmt.ret_expr,

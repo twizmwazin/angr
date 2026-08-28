@@ -104,6 +104,10 @@ class CallSiteMaker:
             self.result_block = self.block
             return
 
+        # every branch above establishes that call_expr is a call: SideEffectStatement is only ever built around a
+        # Call expression, and the other branches test for it explicitly
+        assert isinstance(call_expr, Expr.Call)
+
         if isinstance(call_expr.target, str):
             # custom function calls
             self.result_block = self.block
