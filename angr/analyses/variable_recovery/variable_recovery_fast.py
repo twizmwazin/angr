@@ -46,7 +46,10 @@ from .engine_vex import SimEngineVRVEX
 from .variable_recovery_base import VariableRecoveryBase, VariableRecoveryStateBase
 
 if TYPE_CHECKING:
+    from angr.analyses.decompiler.variable_map import VariableMap
     from angr.analyses.typehoon.typevars import TypeConstraint
+    from angr.storage.memory_mixins import MultiValuedMemory
+    from angr.utils.cowdict import DefaultChainMapCOW
 
 l = logging.getLogger(name=__name__)
 
@@ -66,15 +69,17 @@ class VariableRecoveryFastState(VariableRecoveryStateBase):
         arch,
         func,
         project,
-        stack_region=None,
-        register_region=None,
-        global_region=None,
-        typevars=None,
+        stack_region: MultiValuedMemory | None = None,
+        register_region: MultiValuedMemory | None = None,
+        global_region: MultiValuedMemory | None = None,
+        typevars: TypeVariables | None = None,
         type_constraints=None,
-        func_typevar=None,
-        delayed_type_constraints=None,
-        stack_offset_typevars=None,
-        ret_val_size=None,
+        func_typevar: TypeVariable | None = None,
+        delayed_type_constraints: (
+            defaultdict[SimVariable, set[TypeConstraint]] | DefaultChainMapCOW[SimVariable, set[TypeConstraint]] | None
+        ) = None,
+        stack_offset_typevars: dict[int, TypeVariable] | None = None,
+        ret_val_size: int | None = None,
         *,
         tv_manager: TypeVariableManager,
     ):
@@ -124,7 +129,7 @@ class VariableRecoveryFastState(VariableRecoveryStateBase):
         )
 
     def merge(
-        self, others: tuple[VariableRecoveryFastState, ...], successor=None
+        self, others: tuple[VariableRecoveryFastState, ...], successor: int | None = None
     ) -> tuple[VariableRecoveryFastState, bool]:
         """
         Merge two abstract states.
@@ -267,7 +272,7 @@ class VariableRecoveryFast(ForwardAnalysis, VariableRecoveryBase):  # pylint:dis
         func_arg_vvars: dict[int, tuple[VirtualVariable, SimVariable]] | None = None,
         vvar_to_vvar: dict[int, int] | None = None,
         type_hints: list[tuple[atoms.VirtualVariable | atoms.MemoryLocation, str]] | None = None,
-        variable_map=None,
+        variable_map: VariableMap | None = None,
     ):
         self._variable_map = variable_map
         if not isinstance(func, Function):

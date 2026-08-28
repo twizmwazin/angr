@@ -23,6 +23,9 @@ from angr.utils.types import dereference_simtype_by_lib
 from .engine_base import RichR, SimEngineVRBase
 
 if TYPE_CHECKING:
+    from angr.analyses.decompiler.variable_map import VariableMap
+    from angr.knowledge_plugins.functions.function import Function
+
     from .variable_recovery_fast import VariableRecoveryFastState  # noqa: F401
 
 
@@ -41,12 +44,12 @@ class SimEngineVRAIL(
         self,
         *args,
         type_lifter: TypeTranslator,
-        call_info=None,
+        call_info: dict[int, list[Function]] | None = None,
         vvar_to_vvar: dict[int, int] | None,
         vvar_type_hints: dict[int, typeconsts.TypeConstant] | None = None,
         func_ret_var: SimVariable | None = None,
         tv_manager: typevars.TypeVariableManager | None = None,
-        variable_map=None,
+        variable_map: VariableMap | None = None,
         **kwargs,
     ):
         super().__init__(*args, vvar_type_hints=vvar_type_hints, tv_manager=tv_manager, **kwargs)

@@ -25,6 +25,7 @@ from angr.storage.memory_mixins import MultiValuedMemory
 from angr.utils.cowdict import DefaultChainMapCOW
 
 if TYPE_CHECKING:
+    from angr.analyses.typehoon.typevars import TypeConstraint
     from angr.project import Project
     from angr.storage import SimMemoryObject
 
@@ -204,14 +205,16 @@ class VariableRecoveryStateBase:
         project: Project,
         *,
         tv_manager: TypeVariableManager,
-        stack_region=None,
-        register_region=None,
-        global_region=None,
-        typevars=None,
+        stack_region: MultiValuedMemory | None = None,
+        register_region: MultiValuedMemory | None = None,
+        global_region: MultiValuedMemory | None = None,
+        typevars: TypeVariables | None = None,
         type_constraints=None,
-        func_typevar=None,
-        delayed_type_constraints=None,
-        stack_offset_typevars=None,
+        func_typevar: TypeVariable | None = None,
+        delayed_type_constraints: (
+            defaultdict[SimVariable, set[TypeConstraint]] | DefaultChainMapCOW[SimVariable, set[TypeConstraint]] | None
+        ) = None,
+        stack_offset_typevars: dict[int, TypeVariable] | None = None,
     ):
         self.block_addr = block_addr
         self._analysis = analysis

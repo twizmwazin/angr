@@ -1,9 +1,14 @@
 # pylint:disable=no-self-use,unused-argument
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pyvex
 
 from angr.engines.light import SimEngineLightVEX
+
+if TYPE_CHECKING:
+    from angr.block import Block
 
 
 class VEXIRSBScanner(SimEngineLightVEX[None, None, None, None]):
@@ -39,7 +44,7 @@ class VEXIRSBScanner(SimEngineLightVEX[None, None, None, None]):
     def _is_top(self, expr) -> bool:
         return True
 
-    def process(self, state, *, block=None, whitelist=None, **kwargs):
+    def process(self, state, *, block: Block | None = None, whitelist: set[int] | None = None, **kwargs):
         self.tmps_with_64bit_regs = set()
         self.tmps_assignment_stmtidx = {}
         self.tmps_converted_to_32bit = set()

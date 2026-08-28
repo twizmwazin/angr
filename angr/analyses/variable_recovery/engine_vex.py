@@ -36,7 +36,7 @@ class SimEngineVRVEX(
     reg_read_stmts_to_ignore: set[int]
     stmts_to_lower: set[int]
 
-    def __init__(self, *args, call_info=None, **kwargs):
+    def __init__(self, *args, call_info: dict[int, list[Function]] | None = None, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.call_info = call_info or {}
@@ -49,7 +49,7 @@ class SimEngineVRVEX(
     def _top(self, bits: int) -> RichR[claripy.ast.BV]:
         return RichR(self.state.top(bits))
 
-    def _process_block(self, whitelist=None):
+    def _process_block(self, whitelist: set[int] | None = None):
         scanner = VEXIRSBScanner(self.project, logger=self.l)
         scanner.process(None, block=self.block)
         self.stmts_to_lower = scanner.stmts_to_lower

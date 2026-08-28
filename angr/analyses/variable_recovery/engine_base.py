@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import claripy
 
@@ -24,6 +24,9 @@ from angr.sim_variable import (
 )
 from angr.storage.memory_mixins.paged_memory.pages.multi_values import MultiValues
 from angr.utils.constants import MAX_ACCESS_SIZE, MAX_POINTSTO_BITS
+
+if TYPE_CHECKING:
+    import pyvex
 
 #
 # The base engine used in VariableRecoveryFast
@@ -47,7 +50,7 @@ class RichR[RichRT_co: claripy.ast.Bits]:
     def __init__(
         self,
         data: RichRT_co,
-        variable=None,
+        variable: SimVariable | None = None,
         typevar: typeconsts.TypeConstant | typevars.TypeVariable | None = None,
         type_constraints: set[typevars.TypeConstraint] | None = None,
     ):
@@ -248,7 +251,12 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
 
         return existing_vars
 
-    def _reference(self, richr: RichR[claripy.ast.BV | claripy.ast.FP], codeloc: CodeLocation, src=None):
+    def _reference(
+        self,
+        richr: RichR[claripy.ast.BV | claripy.ast.FP],
+        codeloc: CodeLocation,
+        src: ailment.expression.StackBaseOffset | ailment.expression.VirtualVariable | None = None,
+    ):
         data = richr.data
 
         if data is None:
@@ -302,7 +310,15 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
                 offset = None
             variable_manager.reference_at(var, offset, codeloc, atom=src)
 
-    def _assign_to_register(self, offset, richr, size, src=None, dst=None, create_variable: bool = True):  # pylint:disable=unused-argument
+    def _assign_to_register(
+        self,
+        offset,
+        richr,
+        size,
+        src: ailment.expression.Expression | None = None,
+        dst: ailment.expression.Register | None = None,
+        create_variable: bool = True,
+    ):  # pylint:disable=unused-argument
         """
 
         :param int offset:
@@ -388,8 +404,8 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
         self,
         vvar: ailment.expression.VirtualVariable,
         richr: RichR[claripy.ast.BV | claripy.ast.FP],
-        src=None,
-        dst=None,
+        src: ailment.expression.Expression | None = None,
+        dst: ailment.expression.VirtualVariable | None = None,
         create_variable: bool = True,
         vvar_id: int | None = None,
     ):  # pylint:disable=unused-argument
@@ -536,7 +552,19 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
 
         return variable
 
-    def _store(self, richr_addr: RichR[claripy.ast.BV], data: RichR[claripy.ast.BV | claripy.ast.FP], size, atom=None):  # pylint:disable=unused-argument
+    def _store(
+        self,
+        richr_addr: RichR[claripy.ast.BV],
+        data: RichR[claripy.ast.BV | claripy.ast.FP],
+        size,
+        atom: (
+            ailment.statement.Store
+            | ailment.expression.VirtualVariable
+            | pyvex.IRStmt.Store
+            | pyvex.IRStmt.StoreG
+            | None
+        ) = None,
+    ):  # pylint:disable=unused-argument
         """
 
         :param RichR addr:
@@ -579,7 +607,13 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
             self._store_to_variable(richr_addr, data, size)
 
     def _store_to_stack(
-        self, stack_offset, data: RichR[claripy.ast.BV | claripy.ast.FP], size, offset=0, atom=None, endness=None
+        self,
+        stack_offset,
+        data: RichR[claripy.ast.BV | claripy.ast.FP],
+        size,
+        offset=0,
+        atom=None,
+        endness: str | None = None,
     ):
         """
         Store data to a stack location. We limit the size of the data to store to 256 bytes for performance reasons.
@@ -774,7 +808,7 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
                 else:
                     self.state.add_type_constraint(typevars.Subtype(store_typevar, data_typevar))
 
-    def _load(self, richr_addr: RichR[claripy.ast.BV], size: int, expr=None):
+    def _load(self, richr_addr: RichR[claripy.ast.BV], size: int, expr: ailment.expression.Load | None = None):
         """
 
         :param RichR richr_addr:
@@ -965,7 +999,7 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
         self,
         addr: int,
         size,
-        expr=None,
+        expr: ailment.expression.Load | ailment.expression.Const | None = None,
         offset: claripy.ast.BV | None = None,
         elem_size: int | None = None,
     ) -> RichR[claripy.ast.BV]:
@@ -1029,7 +1063,14 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
 
         return RichR(self.state.top(size * self.project.arch.byte_width), typevar=typevar)
 
-    def _read_from_register(self, offset, size, expr=None, force_variable_size=None, create_variable: bool = True):
+    def _read_from_register(
+        self,
+        offset,
+        size,
+        expr=None,
+        force_variable_size: int | None = None,
+        create_variable: bool = True,
+    ):
         """
 
         :param offset:
@@ -1127,7 +1168,7 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
     def _read_from_vvar(
         self,
         vvar: ailment.expression.VirtualVariable,
-        expr=None,
+        expr: ailment.expression.VirtualVariable | ailment.expression.Phi | None = None,
         create_variable: bool = True,
         vvar_id: int | None = None,
     ):
@@ -1274,7 +1315,7 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
 
         return RichR(value, variable=var, typevar=typevar)
 
-    def _get_const(self, value, bits: int, expr=None) -> RichR:
+    def _get_const(self, value, bits: int, expr: ailment.expression.Const | None = None) -> RichR:
         codeloc = self._codeloc()
 
         if isinstance(value, float):

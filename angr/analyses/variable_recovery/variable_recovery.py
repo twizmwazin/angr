@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from typing import TYPE_CHECKING
 
 import archinfo
 import claripy
@@ -19,6 +20,9 @@ from angr.storage.memory_mixins.paged_memory.pages.multi_values import MultiValu
 
 from .annotations import StackLocationAnnotation
 from .variable_recovery_base import VariableRecoveryBase, VariableRecoveryStateBase
+
+if TYPE_CHECKING:
+    from angr.storage.memory_mixins import MultiValuedMemory
 
 l = logging.getLogger(name=__name__)
 
@@ -40,8 +44,8 @@ class VariableRecoveryState(VariableRecoveryStateBase):
         concrete_states,
         *,
         tv_manager: TypeVariableManager,
-        stack_region=None,
-        register_region=None,
+        stack_region: MultiValuedMemory | None = None,
+        register_region: MultiValuedMemory | None = None,
     ):
         super().__init__(
             project=project,
@@ -117,7 +121,9 @@ class VariableRecoveryState(VariableRecoveryStateBase):
             )
             concrete_state.inspect.add_breakpoint("mem_write", BP(enabled=True, action=self._hook_memory_write))
 
-    def merge(self, others: tuple[VariableRecoveryState, ...], successor=None) -> tuple[VariableRecoveryState, bool]:
+    def merge(
+        self, others: tuple[VariableRecoveryState, ...], successor: int | None = None
+    ) -> tuple[VariableRecoveryState, bool]:
         """
         Merge two abstract states.
 
