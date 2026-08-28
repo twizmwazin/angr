@@ -95,7 +95,9 @@ def get_reg_offset_base(
 ) -> int | None: ...
 
 
-def get_reg_offset_base(reg_offset, arch, size=None, resilient=True):
+def get_reg_offset_base(
+    reg_offset: int, arch: archinfo.Arch, size: int | None = None, resilient: bool = True
+) -> int | None:
     """
     Translate a given register offset into the offset of its full register.
 
