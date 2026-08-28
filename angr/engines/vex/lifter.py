@@ -57,7 +57,7 @@ class VEXLifter(SimEngine):
                 self.selfmodifying_code = False
 
         # block cache
-        self._block_cache: LRUCache = None
+        self._block_cache: LRUCache
         self._block_cache_hits = 0
         self._block_cache_misses = 0
 
