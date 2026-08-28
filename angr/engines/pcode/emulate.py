@@ -22,14 +22,12 @@ class PcodeEmulatorMixin(SimEngine):
     Mixin for p-code execution.
     """
 
-    _current_op: PcodeOp | None
+    _current_op: PcodeOp
     _current_op_idx: int
-    _current_behavior: OpBehavior | None
+    _current_behavior: OpBehavior
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._current_op = None
-        self._current_behavior = None
 
     def handle_pcode_block(self, irsb: IRSB) -> None:
         """
@@ -80,7 +78,6 @@ class PcodeEmulatorMixin(SimEngine):
             self._current_op_idx = op_idx - last_imark_op_idx
             l.debug("Executing P-Code op: %s", self._current_op)
             self._execute_current_op()
-            self._current_op = None
 
         if self.state.scratch.statement_offset == 0:
             self.state._inspect("instruction", BP_AFTER)
@@ -123,8 +120,6 @@ class PcodeEmulatorMixin(SimEngine):
             self._execute_unary()
         else:
             self._execute_binary()
-
-        self._current_behavior = None
 
     def _map_register_name(self, varnode: Varnode) -> int:
         """

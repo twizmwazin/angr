@@ -34,7 +34,7 @@ class SootMixin(SuccessorsEngine, ProcedureMixin):
     Execution engine based on Soot.
     """
 
-    def lift_soot(self, addr=None, the_binary=None, **kwargs):  # pylint: disable=unused-argument, no-self-use
+    def lift_soot(self, addr, the_binary, **kwargs):  # pylint: disable=unused-argument, no-self-use
         assert isinstance(addr, SootAddressDescriptor)
 
         method, stmt_idx = addr.method, addr.stmt_idx
