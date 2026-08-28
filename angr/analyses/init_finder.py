@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import claripy
 import pyvex
@@ -15,6 +15,13 @@ from angr.engines.light import SimEngineNostmtVEX
 
 from .analysis import Analysis
 from .propagator.vex_vars import VEXTmp
+
+if TYPE_CHECKING:
+    import networkx
+
+    from angr.block import Block
+    from angr.knowledge_plugins.functions import Function
+    from angr.storage import DefaultMemory
 
 
 class SimEngineInitFinderVEX(SimEngineNostmtVEX[None, claripy.ast.Base | int | None, None]):
@@ -196,12 +203,12 @@ class InitializationFinder(ForwardAnalysis, Analysis):  # pylint:disable=abstrac
 
     def __init__(
         self,
-        func=None,
-        func_graph=None,
-        block=None,
+        func: Function | None = None,
+        func_graph: networkx.DiGraph | None = None,
+        block: Block | None = None,
         max_iterations=1,
-        replacements=None,
-        overlay=None,
+        replacements: dict[CodeLocation, dict] | None = None,
+        overlay: DefaultMemory | None = None,
         pointers_only=False,
     ):
         self.pointers_only = pointers_only

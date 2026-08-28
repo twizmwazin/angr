@@ -25,6 +25,9 @@ from .cfg.cfg_fast import CFGFast
 from .ddg import DDG
 
 if TYPE_CHECKING:
+    from angr.knowledge_plugins.cfg.memory_data import MemoryData
+    from angr.knowledge_plugins.functions import Function
+
     from .cfg import CFGNode
 
 l = logging.getLogger(name=__name__)
@@ -145,7 +148,7 @@ fill_reg_map()
 class Label:
     g_label_ctr = count()
 
-    def __init__(self, binary, name, original_addr=None):
+    def __init__(self, binary, name, original_addr: int | None = None):
         self.binary = binary
         self.name = name
 
@@ -204,7 +207,13 @@ class Label:
     #
 
     @staticmethod
-    def new_label(binary, name=None, function_name=None, original_addr=None, data_label=False):
+    def new_label(
+        binary,
+        name: str | None = None,
+        function_name: str | None = None,
+        original_addr: int | None = None,
+        data_label=False,
+    ):
         if function_name is not None:
             return FunctionLabel(binary, function_name, original_addr)
         if data_label:
@@ -213,7 +222,7 @@ class Label:
 
 
 class DataLabel(Label):
-    def __init__(self, binary, original_addr, name=None):
+    def __init__(self, binary, original_addr, name: str | None = None):
         Label.__init__(self, binary, name, original_addr=original_addr)
 
     @property
@@ -326,7 +335,7 @@ class SymbolManager:
                 return name
             i += 1
 
-    def new_label(self, addr, name=None, is_function=None, force=False):
+    def new_label(self, addr, name: str | None = None, is_function: bool | None = None, force=False):
         if force:
             if self.binary.main_nonexecutable_regions_contain(addr):
                 label = DataLabel(self.binary, addr, name=name)
@@ -420,7 +429,15 @@ class SymbolManager:
 
 class Operand:
     def __init__(
-        self, binary, insn_addr, insn_size, capstone_operand, operand_str, mnemonic, operand_offset, syntax=None
+        self,
+        binary,
+        insn_addr,
+        insn_size,
+        capstone_operand,
+        operand_str,
+        mnemonic,
+        operand_offset,
+        syntax: str | None = None,
     ):
         """
         Constructor.
@@ -963,7 +980,16 @@ class Procedure:
     Procedure in the binary.
     """
 
-    def __init__(self, binary, function=None, addr=None, size=None, name=None, section=".text", asm_code=None):
+    def __init__(
+        self,
+        binary,
+        function: Function | None = None,
+        addr: int | None = None,
+        size: int | None = None,
+        name: str | None = None,
+        section=".text",
+        asm_code: str | None = None,
+    ):
         """
         Constructor.
 
@@ -1215,14 +1241,14 @@ class Data:
     def __init__(
         self,
         binary,
-        memory_data=None,
-        section=None,
-        section_name=None,
-        name=None,
-        size=None,
-        sort=None,
-        addr=None,
-        initial_content=None,
+        memory_data: MemoryData | None = None,
+        section: cle.Section | None = None,
+        section_name: str | None = None,
+        name: str | None = None,
+        size: int | None = None,
+        sort: str | None = None,
+        addr: int | None = None,
+        initial_content: bytes | None = None,
     ):
         self.binary = binary
         self.project = binary.project

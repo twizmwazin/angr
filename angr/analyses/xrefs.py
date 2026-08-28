@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import claripy
 import pyvex
@@ -17,13 +17,19 @@ from .analysis import Analysis
 from .propagator.values import Top
 from .propagator.vex_vars import VEXTmp
 
+if TYPE_CHECKING:
+    import networkx
+
+    from angr.block import Block
+    from angr.code_location import CodeLocation
+
 
 class SimEngineXRefsVEX(SimEngineNostmtVEX[None, None, None]):  # go girl give us nothing!!
     """
     The VEX engine class for XRefs analysis.
     """
 
-    def __init__(self, xref_manager, project, replacements=None):
+    def __init__(self, xref_manager, project, replacements: dict[CodeLocation, dict] | None = None):
         super().__init__(project)
         self.xref_manager = xref_manager
         self.replacements = replacements if replacements is not None else {}
@@ -212,7 +218,14 @@ class XRefsAnalysis(ForwardAnalysis, Analysis):  # pylint:disable=abstract-metho
         23ce - write access
     """
 
-    def __init__(self, func=None, func_graph=None, block=None, max_iterations=1, replacements=None):
+    def __init__(
+        self,
+        func: Function | int | str | None = None,
+        func_graph: networkx.DiGraph | None = None,
+        block: Block | None = None,
+        max_iterations=1,
+        replacements: dict[CodeLocation, dict] | None = None,
+    ):
         if func is not None:
             if not isinstance(func, Function):
                 func = self.kb.functions[func]
