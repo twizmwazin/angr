@@ -1,5 +1,14 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    import claripy
+
+    from angr.storage.memory_mixins.memory_mixin import MemoryMixin
+
 
 class SimConcretizationStrategy:
     """
@@ -9,7 +18,11 @@ class SimConcretizationStrategy:
     memory index concretization behavior can be modified.
     """
 
-    def __init__(self, filter=None, exact=True):  # pylint:disable=redefined-builtin
+    def __init__(  # pylint:disable=redefined-builtin
+        self,
+        filter: Callable[[MemoryMixin, claripy.ast.Base], bool] | None = None,
+        exact=True,
+    ):
         """
         Initializes the base SimConcretizationStrategy.
 

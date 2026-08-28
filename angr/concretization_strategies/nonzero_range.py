@@ -1,6 +1,13 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from .base import SimConcretizationStrategy
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    import claripy
 
 
 class SimConcretizationStrategyNonzeroRange(SimConcretizationStrategy):
@@ -12,7 +19,7 @@ class SimConcretizationStrategyNonzeroRange(SimConcretizationStrategy):
         super().__init__(**kwargs)
         self._limit = limit
 
-    def _concretize(self, memory, addr, extra_constraints=None, **kwargs):
+    def _concretize(self, memory, addr, extra_constraints: Sequence[claripy.ast.Bool] | None = None, **kwargs):
         mn, mx = self._range(memory, addr, extra_constraints=extra_constraints, **kwargs)
         if mx - mn <= self._limit:
             child_constraints = (addr != 0,)

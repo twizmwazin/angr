@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import itertools
+from typing import TYPE_CHECKING
 
 from .base import SimConcretizationStrategy
+
+if TYPE_CHECKING:
+    import claripy
 
 
 class SimConcretizationStrategyNorepeats(SimConcretizationStrategy):
@@ -10,7 +14,7 @@ class SimConcretizationStrategyNorepeats(SimConcretizationStrategy):
     Concretization strategy that resolves addresses, without repeating.
     """
 
-    def __init__(self, repeat_expr, repeat_constraints=None, **kwargs):
+    def __init__(self, repeat_expr, repeat_constraints: list[claripy.ast.Bool] | None = None, **kwargs):
         super().__init__(**kwargs)
         self._repeat_constraints = [] if repeat_constraints is None else repeat_constraints
         self._repeat_expr = repeat_expr

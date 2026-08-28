@@ -10,7 +10,9 @@ class SimConcretizationStrategyNorepeatsRange(SimConcretizationStrategy):
     Concretization strategy that resolves a range, with no repeats.
     """
 
-    def __init__(self, repeat_expr, min=None, granularity=None, **kwargs):  # pylint:disable=redefined-builtin
+    def __init__(  # pylint:disable=redefined-builtin
+        self, repeat_expr, min: int | None = None, granularity: int | None = None, **kwargs
+    ):
         super().__init__(**kwargs)
         self._repeat_expr = repeat_expr
         self._repeat_min = min
