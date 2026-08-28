@@ -18,7 +18,7 @@ class SootFunction(Function):
 
     __slots__ = ()
 
-    def __init__(self, function_manager, addr, name=None, syscall=None):
+    def __init__(self, function_manager, addr, name: str | None = None, syscall: bool | None = None):
         """
         Function constructor for Soot
 

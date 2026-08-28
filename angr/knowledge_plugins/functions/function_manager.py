@@ -30,6 +30,7 @@ from .soot_function import SootFunction
 
 if TYPE_CHECKING:
     from angr import KnowledgeBase
+    from angr.codenode import CodeNode
     from angr.knowledge_plugins.rtdb import RuntimeDb
 
 K = TypeVar("K", int, SootMethodDescriptor)
@@ -109,7 +110,7 @@ class FunctionDictBase[K: (int, SootMethodDescriptor)]:
     def get(self, addr: K, default=_missing, /, meta_only: bool = False):
         raise NotImplementedError
 
-    def irange(self, minimum=None, maximum=None, inclusive=(True, True), reverse=False):
+    def irange(self, minimum: K | None = None, maximum: K | None = None, inclusive=(True, True), reverse=False):
         raise NotImplementedError
 
 
@@ -997,7 +998,7 @@ class FunctionManager[K: (int, SootMethodDescriptor)](KnowledgeBasePlugin, colle
         self._func_name_to_addrs[new_name].add(addr)
         self._func_names[addr] = new_name
 
-    def _add_node(self, function_addr, node, syscall=None, size=None):
+    def _add_node(self, function_addr, node, syscall: bool | None = None, size: int | None = None):
         if isinstance(node, self.address_types):
             node = self._kb._project.factory.snippet(node, size=size)
         dst_func = self._function_map[function_addr]
@@ -1010,10 +1011,10 @@ class FunctionManager[K: (int, SootMethodDescriptor)](KnowledgeBasePlugin, colle
         function_addr,
         from_node,
         to_addr,
-        retn_node=None,
+        retn_node: CodeNode | int | None = None,
         syscall: bool = False,
-        stmt_idx=None,
-        ins_addr=None,
+        stmt_idx: int | None = None,
+        ins_addr: int | None = None,
         return_to_outside: bool = False,
     ):
         """
@@ -1064,7 +1065,14 @@ class FunctionManager[K: (int, SootMethodDescriptor)](KnowledgeBasePlugin, colle
             self.callgraph.add_edge(function_addr, to_addr, **edge_data)
 
     def _add_fakeret_to(
-        self, function_addr, from_node, to_node, confirmed=None, syscall=None, to_outside=False, to_function_addr=None
+        self,
+        function_addr,
+        from_node,
+        to_node,
+        confirmed: bool | None = None,
+        syscall: bool | None = None,
+        to_outside=False,
+        to_function_addr: int | None = None,
     ):
         if isinstance(from_node, self.address_types):
             from_node = self._kb._project.factory.snippet(from_node)
@@ -1094,12 +1102,20 @@ class FunctionManager[K: (int, SootMethodDescriptor)](KnowledgeBasePlugin, colle
             to_node = self._kb._project.factory.snippet(to_node)
         self._function_map[function_addr]._remove_fakeret(from_node, to_node)
 
-    def _add_return_from(self, function_addr, from_node, to_node=None):  # pylint:disable=unused-argument
+    def _add_return_from(self, function_addr, from_node, to_node: CodeNode | None = None):  # pylint:disable=unused-argument
         if isinstance(from_node, self.address_types):  # pylint: disable=unidiomatic-typecheck
             from_node = self._kb._project.factory.snippet(from_node)
         self._function_map[function_addr]._add_return_site(from_node)
 
-    def _add_transition_to(self, function_addr, from_node, to_node, ins_addr=None, stmt_idx=None, is_exception=False):
+    def _add_transition_to(
+        self,
+        function_addr,
+        from_node,
+        to_node,
+        ins_addr: int | None = None,
+        stmt_idx: int | None = None,
+        is_exception=False,
+    ):
         if isinstance(from_node, self.address_types):  # pylint: disable=unidiomatic-typecheck
             from_node = self._kb._project.factory.snippet(from_node)
         if isinstance(to_node, self.address_types):  # pylint: disable=unidiomatic-typecheck
@@ -1109,7 +1125,14 @@ class FunctionManager[K: (int, SootMethodDescriptor)](KnowledgeBasePlugin, colle
         )
 
     def _add_outside_transition_to(
-        self, function_addr, from_node, to_node, to_function_addr=None, ins_addr=None, stmt_idx=None, is_exception=False
+        self,
+        function_addr,
+        from_node,
+        to_node,
+        to_function_addr: int | None = None,
+        ins_addr: int | None = None,
+        stmt_idx: int | None = None,
+        is_exception=False,
     ):
         if type(from_node) is int:  # pylint: disable=unidiomatic-typecheck
             from_node = self._kb._project.factory.snippet(from_node)

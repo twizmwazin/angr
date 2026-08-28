@@ -169,12 +169,12 @@ class Function(Serializable):
         self,
         function_manager: FunctionManager | None,
         addr: int,
-        name=None,
-        syscall=None,
+        name: str | None = None,
+        syscall: bool | None = None,
         is_simprocedure: bool | None = None,
-        binary_name=None,
+        binary_name: str | None = None,
         is_plt: bool | None = None,
-        returning=None,
+        returning: bool | None = None,
         alignment=False,
         calling_convention: SimCC | None = None,
         prototype: SimTypeFunction | None = None,
@@ -1105,8 +1105,8 @@ class Function(Serializable):
         from_node: CodeNode,
         to_node,
         outside=False,
-        ins_addr=None,
-        stmt_idx=None,
+        ins_addr: int | None = None,
+        stmt_idx: int | None = None,
         is_exception=False,
         update_func_block_count: bool = True,
     ):
@@ -1152,8 +1152,8 @@ class Function(Serializable):
         from_node,
         to_func: FuncNode | HookNode,
         ret_node,
-        stmt_idx=None,
-        ins_addr=None,
+        stmt_idx: int | None = None,
+        ins_addr: int | None = None,
         return_to_outside=False,
         syscall: bool = False,
         update_func_block_count: bool = True,
@@ -1189,7 +1189,9 @@ class Function(Serializable):
         self._local_transition_graph = None
 
     @dirty_func
-    def _fakeret_to(self, from_node, to_node, confirmed=None, to_outside=False, update_func_block_count: bool = True):
+    def _fakeret_to(
+        self, from_node, to_node, confirmed: bool | None = None, to_outside=False, update_func_block_count: bool = True
+    ):
         from_node = self._register_node(True, from_node, update_func_block_count=update_func_block_count)
         if confirmed:
             to_node = self._register_node(not to_outside, to_node, update_func_block_count=update_func_block_count)

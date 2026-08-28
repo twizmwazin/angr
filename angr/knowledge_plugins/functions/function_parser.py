@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 from collections import defaultdict
+from typing import TYPE_CHECKING
 
 import angr
 from angr.calling_conventions import CC_NAMES, SimCC, SimCCUsercall
@@ -17,6 +18,10 @@ from angr.utils.enums_conv import (
     func_edge_type_to_pb,
 )
 from angr.utils.types import make_type_reference
+
+if TYPE_CHECKING:
+    from angr.knowledge_plugins.functions.function_manager import FunctionManager
+    from angr.project import Project
 
 l = logging.getLogger(name=__name__)
 
@@ -184,7 +189,9 @@ class FunctionParser:
         return obj
 
     @staticmethod
-    def parse_from_cmsg(cmsg, function_manager=None, project=None, meta_only: bool = False):
+    def parse_from_cmsg(
+        cmsg, function_manager: FunctionManager | None = None, project: Project | None = None, meta_only: bool = False
+    ):
         """
         :param cmsg: The data to instantiate the <Function> from.
 
