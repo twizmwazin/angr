@@ -103,8 +103,9 @@ class TestSerialize(unittest.TestCase):
         cr2 = roundtrip(cr)
         assert isinstance(cr2, ComboRegister)
         assert len(cr2.registers) == 2
-        assert cr2.registers[0].reg_offset == 0
-        assert cr2.registers[1].reg_offset == 4
+        reg0, reg1 = cr2.registers
+        assert isinstance(reg0, Register) and reg0.reg_offset == 0
+        assert isinstance(reg1, Register) and reg1.reg_offset == 4
         assert cr.likes(cr2)
 
     def test_virtual_variable_int_oident(self):
@@ -141,7 +142,7 @@ class TestSerialize(unittest.TestCase):
         u2 = roundtrip(u)
         assert isinstance(u2, UnaryOp)
         assert u2.op == "Not"
-        assert u2.operand.value == 5
+        assert isinstance(u2.operand, Const) and u2.operand.value == 5
         assert u.likes(u2)
 
     def test_binary_op(self):
@@ -182,7 +183,7 @@ class TestSerialize(unittest.TestCase):
         c2 = roundtrip(c)
         assert isinstance(c2, Convert)
         assert c2.from_bits == 32 and c2.to_bits == 64 and c2.is_signed
-        assert c2.operand.value == 0xFF
+        assert isinstance(c2.operand, Const) and c2.operand.value == 0xFF
 
     def test_reinterpret(self):
         ri = Reinterpret(6, 32, "I", 32, "F", Const(0, 0x40490FDB, 32))
@@ -228,7 +229,8 @@ class TestSerialize(unittest.TestCase):
         ite = ITE(3, Const(0, 1, 1), Const(0, 7, 32), Const(0, 5, 32))
         ite2 = roundtrip(ite)
         assert isinstance(ite2, ITE)
-        assert ite2.iftrue.value == 7 and ite2.iffalse.value == 5
+        assert isinstance(ite2.iftrue, Const) and ite2.iftrue.value == 7
+        assert isinstance(ite2.iffalse, Const) and ite2.iffalse.value == 5
 
     def test_dirty_expression(self):
         de = DirtyExpression(4, "rdtsc", [Const(0, 0, 32)], bits=64, mfx="read")
