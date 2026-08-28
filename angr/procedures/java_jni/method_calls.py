@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from archinfo.arch_soot import ArchSoot, SootAddressDescriptor, SootArgument, SootMethodDescriptor
 
@@ -8,6 +9,11 @@ from angr.calling_conventions import SimCCSoot
 from angr.engines.soot.method_dispatcher import resolve_method
 
 from . import JNISimProcedure
+
+if TYPE_CHECKING:
+    import claripy
+
+    from angr.engines.soot.values import SimSootValue_ThisRef
 
 l = logging.getLogger("angr.procedures.java_jni.callmethod")
 
@@ -42,7 +48,13 @@ class GetMethodID(JNISimProcedure):
 class CallMethodBase(JNISimProcedure):
     return_ty: str | None = None
 
-    def _invoke(self, method_id, obj=None, dynamic_dispatch=True, args_in_array=None):
+    def _invoke(
+        self,
+        method_id,
+        obj: SimSootValue_ThisRef | None = None,
+        dynamic_dispatch=True,
+        args_in_array: int | claripy.ast.bv.BV | None = None,
+    ):
         # get invoke target
         class_name = obj.type if dynamic_dispatch else method_id.class_name
         invoke_target = resolve_method(self.state, method_id.name, class_name, method_id.params)
@@ -70,7 +82,7 @@ class CallMethodBase(JNISimProcedure):
             addr=array, data_size=self.arch.bytes, no_of_elements=no_of_args, return_as_list=True
         )
 
-    def _setup_java_args(self, arg_values, method_id, this_ref=None):
+    def _setup_java_args(self, arg_values, method_id, this_ref: SimSootValue_ThisRef | None = None):
         args = []
 
         # if available, add 'this' reference

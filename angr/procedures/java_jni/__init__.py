@@ -13,6 +13,11 @@ from angr.sim_procedure import SimProcedure
 from angr.sim_type import SimTypeFunction
 from angr.state_plugins.sim_action_object import SimActionObject
 
+if typing.TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from angr.engines.successors import SimSuccessors
+
 l = logging.getLogger("angr.procedures.java_jni")
 
 
@@ -28,7 +33,13 @@ class JNISimProcedure(SimProcedure):
     JNI_TRUE = 1
     JNI_FALSE = 0
 
-    def execute(self, state, successors=None, arguments=None, ret_to=None):
+    def execute(
+        self,
+        state,
+        successors: SimSuccessors | None = None,
+        arguments: Sequence[typing.Any] | None = None,
+        ret_to: int | claripy.ast.bv.BV | None = None,
+    ):
         # Setup a SimCC using the correct type for the return value
         if not self.return_ty:
             raise ValueError("Classes implementing JNISimProcedure's must set the return type.")
@@ -47,7 +58,7 @@ class JNISimProcedure(SimProcedure):
     def _allocate_native_memory(self, size):
         return self.state.project.loader.extern_object.allocate(size=size)
 
-    def _store_in_native_memory(self, data, data_type, addr=None):
+    def _store_in_native_memory(self, data, data_type, addr: int | claripy.ast.bv.BV | None = None):
         """
         Store in native memory.
 
@@ -80,7 +91,14 @@ class JNISimProcedure(SimProcedure):
         # return native addr
         return addr
 
-    def _load_from_native_memory(self, addr, data_type=None, data_size=None, no_of_elements=1, return_as_list=False):
+    def _load_from_native_memory(
+        self,
+        addr,
+        data_type: str | None = None,
+        data_size: int | None = None,
+        no_of_elements=1,
+        return_as_list=False,
+    ):
         """
         Load from native memory.
 
