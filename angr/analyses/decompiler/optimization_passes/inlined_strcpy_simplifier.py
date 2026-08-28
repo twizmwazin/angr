@@ -249,9 +249,12 @@ class InlinedStrcpySimplifier(OptimizationPass):
         new_str = None
 
         if isinstance(stmt, SideEffectStatement) and self.is_inlined_strcpy(stmt):
-            assert stmt.expr.args is not None and isinstance(stmt.expr.args[1], Const)
-            s_curr = self.kb.custom_strings[stmt.expr.args[1].value_int]
-            addr_curr = stmt.expr.args[0]
+            call_curr = stmt.expr
+            # guaranteed by is_inlined_strcpy()
+            assert isinstance(call_curr, Call)
+            assert call_curr.args is not None and isinstance(call_curr.args[1], Const)
+            s_curr = self.kb.custom_strings[call_curr.args[1].value_int]
+            addr_curr = call_curr.args[0]
             delta = self._get_delta(addr_last, addr_curr)
             if delta is not None and delta == len(s_last):
                 new_str = s_last + s_curr
@@ -401,14 +404,17 @@ class InlinedStrcpySimplifier(OptimizationPass):
         return False, None
 
     def is_inlined_strcpy(self, stmt):
+        if not isinstance(stmt, SideEffectStatement):
+            return False
+        call = stmt.expr
         return (
-            isinstance(stmt, SideEffectStatement)
-            and isinstance(stmt.expr.target, str)
-            and stmt.expr.target == "strncpy"
-            and stmt.expr.args is not None
-            and len(stmt.expr.args) == 3
-            and isinstance(stmt.expr.args[1], Const)
-            and variable_map_of(self.manager).custom_string(stmt.expr.args[1])
+            isinstance(call, Call)
+            and isinstance(call.target, str)
+            and call.target == "strncpy"
+            and call.args is not None
+            and len(call.args) == 3
+            and isinstance(call.args[1], Const)
+            and variable_map_of(self.manager).custom_string(call.args[1])
         )
 
     @staticmethod
