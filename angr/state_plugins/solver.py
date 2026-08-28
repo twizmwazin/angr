@@ -4,7 +4,7 @@ import functools
 import logging
 import os
 import time
-from typing import TypeVar, overload
+from typing import TYPE_CHECKING, TypeVar, overload
 
 import claripy
 
@@ -17,6 +17,9 @@ from .inspect import BP_AFTER, BP_BEFORE
 from .plugin import SimStatePlugin
 from .sim_action import SimActionConstraint
 from .sim_action_object import SimActionObject, ast_stripping_decorator
+
+if TYPE_CHECKING:
+    from collections.abc import Hashable
 
 l = logging.getLogger(name=__name__)
 
@@ -197,7 +200,11 @@ class SimSolver(SimStatePlugin):
     """
 
     def __init__(
-        self, solver=None, all_variables=None, temporal_tracked_variables=None, eternal_tracked_variables=None
+        self,
+        solver=None,
+        all_variables: list[claripy.ast.BV] | None = None,
+        temporal_tracked_variables=None,
+        eternal_tracked_variables: dict[tuple[Hashable, ...], claripy.ast.BV] | None = None,
     ):  # pylint:disable=redefined-outer-name
         super().__init__()
 
@@ -206,7 +213,7 @@ class SimSolver(SimStatePlugin):
         self.temporal_tracked_variables = {} if temporal_tracked_variables is None else temporal_tracked_variables
         self.eternal_tracked_variables = {} if eternal_tracked_variables is None else eternal_tracked_variables
 
-    def reload_solver(self, constraints=None):
+    def reload_solver(self, constraints: list[claripy.ast.Bool] | None = None):
         """
         Reloads the solver. Useful when changing solver options.
 
@@ -324,9 +331,9 @@ class SimSolver(SimStatePlugin):
         uninitialized=True,
         inspect=True,
         events=True,
-        key=None,
+        key: tuple[Hashable, ...] | None = None,
         eternal=False,
-        uc_alloc_depth=None,
+        uc_alloc_depth: int | None = None,
         **kwargs,
     ):
         """
@@ -371,12 +378,12 @@ class SimSolver(SimStatePlugin):
         self,
         name,
         size,
-        min=None,
-        max=None,
-        stride=None,
+        min: int | None = None,
+        max: int | None = None,
+        stride: int | None = None,
         uninitialized=False,
         explicit_name=False,
-        key=None,
+        key: tuple[Hashable, ...] | None = None,
         eternal=False,
         inspect=True,
         events=True,
@@ -466,7 +473,7 @@ class SimSolver(SimStatePlugin):
         return c
 
     @error_converter
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=W0613
+    def merge(self, others, merge_conditions, common_ancestor: SimSolver | None = None):  # pylint: disable=W0613
         merging_occurred, self._stored_solver = self._solver.merge(
             [oc._solver for oc in others],
             merge_conditions,
@@ -495,7 +502,7 @@ class SimSolver(SimStatePlugin):
     @timed_function
     @ast_stripping_decorator
     @error_converter
-    def eval_to_ast(self, e, n, extra_constraints=(), exact=None):
+    def eval_to_ast(self, e, n, extra_constraints=(), exact: bool | None = None):
         """
         Evaluate an expression, using the solver if necessary. Returns AST objects.
 
@@ -512,7 +519,7 @@ class SimSolver(SimStatePlugin):
     @timed_function
     @ast_stripping_decorator
     @error_converter
-    def _eval(self, e, n, extra_constraints=(), exact=None):
+    def _eval(self, e, n, extra_constraints=(), exact: bool | None = None):
         """
         Evaluate an expression, using the solver if necessary. Returns primitives.
 
@@ -529,7 +536,7 @@ class SimSolver(SimStatePlugin):
     @timed_function
     @ast_stripping_decorator
     @error_converter
-    def max(self, e, extra_constraints=(), exact=None, signed=False):
+    def max(self, e, extra_constraints=(), exact: bool | None = None, signed=False):
         """
         Return the maximum value of expression `e`.
 
@@ -550,7 +557,7 @@ class SimSolver(SimStatePlugin):
     @timed_function
     @ast_stripping_decorator
     @error_converter
-    def min(self, e, extra_constraints=(), exact=None, signed=False):
+    def min(self, e, extra_constraints=(), exact: bool | None = None, signed=False):
         """
         Return the minimum value of expression `e`.
 
@@ -570,7 +577,7 @@ class SimSolver(SimStatePlugin):
     @timed_function
     @ast_stripping_decorator
     @error_converter
-    def solution(self, e, v, extra_constraints=(), exact=None):
+    def solution(self, e, v, extra_constraints=(), exact: bool | None = None):
         """
         Return True if `v` is a solution of `expr` with the extra constraints, False otherwise.
 
@@ -592,7 +599,7 @@ class SimSolver(SimStatePlugin):
     @timed_function
     @ast_stripping_decorator
     @error_converter
-    def is_true(self, e, extra_constraints=(), exact=None):
+    def is_true(self, e, extra_constraints=(), exact: bool | None = None):
         """
         If the expression provided is absolutely, definitely a true boolean, return True.
         Note that returning False doesn't necessarily mean that the expression can be false, just that we couldn't
@@ -615,7 +622,7 @@ class SimSolver(SimStatePlugin):
     @timed_function
     @ast_stripping_decorator
     @error_converter
-    def is_false(self, e, extra_constraints=(), exact=None):
+    def is_false(self, e, extra_constraints=(), exact: bool | None = None):
         """
         If the expression provided is absolutely, definitely a false boolean, return True.
         Note that returning False doesn't necessarily mean that the expression can be true, just that we couldn't
@@ -651,7 +658,7 @@ class SimSolver(SimStatePlugin):
     @timed_function
     @ast_stripping_decorator
     @error_converter
-    def satisfiable(self, extra_constraints=(), exact=None):
+    def satisfiable(self, extra_constraints=(), exact: bool | None = None):
         """
         This function does a constraint check and checks if the solver is in a sat state.
 
@@ -847,7 +854,7 @@ class SimSolver(SimStatePlugin):
     @overload
     def eval(self, e: claripy.ast.FP, cast_to: type[CastType], **kwargs) -> CastType: ...
 
-    def eval(self, e, cast_to=None, **kwargs):
+    def eval(self, e, cast_to: type[CastType] | None = None, **kwargs):
         """
         Evaluate an expression to get any possible solution. The desired output types can be specified using the
         `cast_to` parameter. `extra_constraints` can be used to specify additional constraints the returned values
@@ -884,7 +891,7 @@ class SimSolver(SimStatePlugin):
     @overload
     def eval_one(self, e: claripy.ast.FP, cast_to: type[CastType], **kwargs) -> CastType: ...
 
-    def eval_one(self, e, cast_to=None, **kwargs):
+    def eval_one(self, e, cast_to: type[CastType] | None = None, **kwargs):
         """
         Evaluate an expression to get the only possible solution. Errors if either no or more than one solution is
         returned. A kwarg parameter `default` can be specified to be returned instead of failure!
@@ -922,7 +929,7 @@ class SimSolver(SimStatePlugin):
     @overload
     def eval_atmost(self, e: claripy.ast.FP, n: int, cast_to: type[CastType], **kwargs) -> list[CastType]: ...
 
-    def eval_atmost(self, e, n, cast_to=None, **kwargs):
+    def eval_atmost(self, e, n, cast_to: type[CastType] | None = None, **kwargs):
         """
         Evaluate an expression to get at most `n` possible solutions. Errors if either none or more than `n` solutions
         are returned.
@@ -958,7 +965,7 @@ class SimSolver(SimStatePlugin):
     @overload
     def eval_atleast(self, e: claripy.ast.FP, n: int, cast_to: type[CastType], **kwargs) -> list[CastType]: ...
 
-    def eval_atleast(self, e, n, cast_to=None, **kwargs):
+    def eval_atleast(self, e, n, cast_to: type[CastType] | None = None, **kwargs):
         """
         Evaluate an expression to get at least `n` possible solutions. Errors if less than `n` solutions were found.
 
@@ -993,7 +1000,7 @@ class SimSolver(SimStatePlugin):
     @overload
     def eval_exact(self, e: claripy.ast.FP, n: int, cast_to: type[CastType], **kwargs) -> list[CastType]: ...
 
-    def eval_exact(self, e, n, cast_to=None, **kwargs):
+    def eval_exact(self, e, n, cast_to: type[CastType] | None = None, **kwargs):
         """
         Evaluate an expression to get exactly the `n` possible solutions. Errors if any number of solutions other
         than `n` was found to exist.
@@ -1063,7 +1070,7 @@ class SimSolver(SimStatePlugin):
         # All symbolic expressions are not single-valued
         return not self.symbolic(e)
 
-    def simplify(self, e=None):
+    def simplify(self, e: claripy.ast.Base | SimActionObject | float | bool | None = None):
         """
         Simplifies `e`. If `e` is None, simplifies the constraints of this
         state.

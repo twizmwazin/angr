@@ -9,6 +9,7 @@ import logging
 import sys
 import threading
 import time
+from typing import TYPE_CHECKING, Any
 
 import archinfo
 import cffi  # lmao
@@ -24,6 +25,9 @@ from angr.misc.testing import is_testing
 from angr.sim_state import SimState
 
 from .plugin import SimStatePlugin
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 l = logging.getLogger(name=__name__)
 ffi = cffi.FFI()
@@ -316,7 +320,7 @@ class Uniwrapper:
         # Delegate attribute access to the underlying Uc instance
         return getattr(self._uc, name)
 
-    def hook_add(self, htype, callback, user_data=None, begin=1, end=0, aux1=0, aux2=0):
+    def hook_add(self, htype, callback, user_data: Any = None, begin=1, end=0, aux1=0, aux2=0):
         h = self._uc.hook_add(htype, callback, user_data=user_data, begin=begin, end=end, aux1=aux1, aux2=aux2)
         # l.debug("Hook: %s,%s -> %s", htype, callback.__name__, h)
         self.wrapped_hooks.add(h)
@@ -604,18 +608,18 @@ class Unicorn(SimStatePlugin):
 
     def __init__(
         self,
-        syscall_hooks=None,
-        cache_key=None,
-        unicount=None,
-        symbolic_var_counts=None,
-        symbolic_inst_counts=None,
-        concretized_asts=None,
-        always_concretize=None,
-        never_concretize=None,
-        concretize_at=None,
-        concretization_threshold_memory=None,
-        concretization_threshold_registers=None,
-        concretization_threshold_instruction=None,
+        syscall_hooks: dict[int, Callable[[SimState], Any]] | None = None,
+        cache_key: int | None = None,
+        unicount: int | None = None,
+        symbolic_var_counts: dict[str, int] | None = None,
+        symbolic_inst_counts: dict[int, int] | None = None,
+        concretized_asts: set[int] | None = None,
+        always_concretize: set[str] | None = None,
+        never_concretize: set[str] | None = None,
+        concretize_at: set[int] | None = None,
+        concretization_threshold_memory: int | None = None,
+        concretization_threshold_registers: int | None = None,
+        concretization_threshold_instruction: int | None = None,
         cooldown_symbolic_stop=2,
         cooldown_unsupported_stop=2,
         cooldown_nonunicorn_blocks=100,
@@ -746,7 +750,7 @@ class Unicorn(SimStatePlugin):
         u.gdt = self.gdt
         return u
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: Unicorn | None = None):  # pylint: disable=unused-argument
         self.cooldown_nonunicorn_blocks = max(
             self.cooldown_nonunicorn_blocks, max(o.cooldown_nonunicorn_blocks for o in others)
         )
@@ -1204,7 +1208,11 @@ class Unicorn(SimStatePlugin):
         """
         return self.state.arch.name == "MIPS32"
 
-    def setup(self, syscall_data=None, fd_bytes=None):
+    def setup(
+        self,
+        syscall_data: dict[str, list[tuple[int, int]]] | None = None,
+        fd_bytes: dict[int, tuple[bytes, bytes]] | None = None,
+    ):
         if self._is_mips32 and options.COPY_STATES not in self.state.options:
             # we always re-create the thread-local UC object for MIPS32 even if COPY_STATES is disabled in state
             # options. this is to avoid some weird bugs in unicorn (e.g., it reports stepping 1 step while in reality it
@@ -1398,7 +1406,7 @@ class Unicorn(SimStatePlugin):
                 self._uc_state, fp_reg_start_offset, fp_regs_size, fp_op_codes_array, len(fp_op_codes)
             )
 
-    def start(self, step=None):
+    def start(self, step: int | None = None):
         self.jumpkind = "Ijk_Boring"
         self.countdown_nonunicorn_blocks = self.cooldown_nonunicorn_blocks
 

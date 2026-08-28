@@ -412,7 +412,7 @@ class SimInspector(SimStatePlugin):
                         seen.add(id(b))
         return False
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: SimInspector | None = None):  # pylint: disable=unused-argument
         return self._combine(others)
 
     def set_state(self, state):

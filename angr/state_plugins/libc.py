@@ -1237,7 +1237,7 @@ class SimStateLibc(SimStatePlugin):
 
         return o
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: SimStateLibc | None = None):  # pylint: disable=unused-argument
         return False
 
     @property

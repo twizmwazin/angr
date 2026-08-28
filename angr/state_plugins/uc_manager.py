@@ -15,7 +15,7 @@ l = logging.getLogger(name=__name__)
 class SimUCManager(SimStatePlugin):
     _uc_alloc_depth: dict[claripy.ast.Base, int]
 
-    def __init__(self, man=None):
+    def __init__(self, man: SimUCManager | None = None):
         SimStatePlugin.__init__(self)
 
         if man:

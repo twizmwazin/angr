@@ -81,7 +81,7 @@ class SimStateIcicle(SimStatePlugin):
             dirty_pages=set(self.dirty_pages),
         )
 
-    def merge(self, others, merge_conditions, common_ancestor=None):
+    def merge(self, others, merge_conditions, common_ancestor: SimStateIcicle | None = None):
         return False
 
 

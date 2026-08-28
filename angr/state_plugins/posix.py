@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 import claripy
 
@@ -11,6 +12,9 @@ from angr.storage.file import Flags, SimFile, SimFileDescriptor, SimFileDescript
 
 from .filesystem import SimMount, Stat
 from .plugin import SimStatePlugin
+
+if TYPE_CHECKING:
+    from angr.storage.file import SimFileBase
 
 l = logging.getLogger(name=__name__)
 
@@ -36,7 +40,7 @@ class PosixDevFS(SimMount):  # this'll be mounted at /dev
     def lookup(self, _):  # disable=unused-argument
         return False
 
-    def merge(self, others, conditions, common_ancestor=None):  # pylint: disable=unused-argument, arguments-differ
+    def merge(self, others, conditions, common_ancestor: PosixDevFS | None = None):  # pylint: disable=unused-argument, arguments-differ
         return False
 
     def copy(self, _):
@@ -62,7 +66,7 @@ class PosixProcFS(SimMount):
     def lookup(self, _):  # disable=unused-argument
         return False
 
-    def merge(self, others, conditions, common_ancestor=None):  # pylint: disable=unused-argument, arguments-differ
+    def merge(self, others, conditions, common_ancestor: PosixProcFS | None = None):  # pylint: disable=unused-argument, arguments-differ
         return False
 
     def copy(self, _):
@@ -119,23 +123,23 @@ class SimSystemPosix(SimStatePlugin):
 
     def __init__(
         self,
-        stdin=None,
-        stdout=None,
-        stderr=None,
+        stdin: SimFileBase | None = None,
+        stdout: SimFileBase | None = None,
+        stderr: SimFileBase | None = None,
         fd=None,
         sockets=None,
-        socket_queue=None,
-        argv=None,
-        argc=None,
-        environ=None,
-        auxv=None,
+        socket_queue: list[tuple[SimFileBase, SimFileBase] | None] | None = None,
+        argv: claripy.ast.BV | None = None,
+        argc: claripy.ast.BV | None = None,
+        environ: claripy.ast.BV | None = None,
+        auxv: claripy.ast.BV | None = None,
         tls_modules=None,
-        sigmask=None,
-        pid=None,
-        ppid=None,
-        uid=None,
-        gid=None,
-        brk=None,
+        sigmask: claripy.ast.BV | None = None,
+        pid: int | None = None,
+        ppid: int | None = None,
+        uid: int | None = None,
+        gid: int | None = None,
+        brk: int | claripy.ast.BV | None = None,
     ):
         super().__init__()
 
@@ -303,7 +307,7 @@ class SimSystemPosix(SimStatePlugin):
                 return fd
         raise SimPosixError("exhausted file descriptors")
 
-    def open(self, name, flags, preferred_fd=None):
+    def open(self, name, flags, preferred_fd: int | None = None):
         """
         Open a symbolic file. Basically open(2).
 
@@ -556,7 +560,7 @@ class SimSystemPosix(SimStatePlugin):
             result,
         )
 
-    def sigmask(self, sigsetsize=None):
+    def sigmask(self, sigsetsize: claripy.ast.BV | None = None):
         """
         Gets the current sigmask. If it's blank, a new one is created (of sigsetsize).
 
@@ -600,7 +604,7 @@ class SimSystemPosix(SimStatePlugin):
             oldmask,
         )
 
-    def merge(self, others, merge_conditions, common_ancestor=None):
+    def merge(self, others, merge_conditions, common_ancestor: SimSystemPosix | None = None):
         for o in others:
             if len(self.fd) != len(o.fd):
                 raise SimMergeError("Can't merge states with disparate open file descriptors")

@@ -47,7 +47,7 @@ class SimStateEdgeHitmap(SimStatePlugin):
         # bytes are immutable, so we can share the reference
         return SimStateEdgeHitmap(edge_hitmap=self.edge_hitmap)
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: SimStateEdgeHitmap | None = None):  # pylint: disable=unused-argument
         """
         Merge multiple hitmap plugins.
 
