@@ -56,7 +56,9 @@ def auto_import_modules(base_module, base_path, ignore_files=(), filter_func: Ca
             yield proc_module_name, proc_module
 
 
-def filter_module(mod, type_req=None, subclass_req=None):
+def filter_module(
+    mod, type_req: type | tuple[type, ...] | None = None, subclass_req: type | tuple[type, ...] | None = None
+):
     for name in dir(mod):
         val = getattr(mod, name)
         if type_req is not None and not isinstance(val, type_req):
