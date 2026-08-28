@@ -33,7 +33,7 @@ class SimHeapBrk(SimHeapBase):
     :ivar heap_location: the address of the top of the heap, bounding the allocations made starting from `heap_base`
     """
 
-    def __init__(self, heap_base=None, heap_size=None):
+    def __init__(self, heap_base: int | None = None, heap_size: int | None = None):
         super().__init__(heap_base, heap_size)
         self.heap_location = self.heap_base
 
@@ -144,7 +144,7 @@ class SimHeapBrk(SimHeapBase):
             return True
         return False
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint:disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: SimHeapBrk | None = None):  # pylint:disable=unused-argument
         return self._combine(others)
 
 

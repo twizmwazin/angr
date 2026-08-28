@@ -34,7 +34,7 @@ class SimHeapBase(SimStatePlugin):
     :ivar mmap_base: the address of the region from which large mmap allocations will be made
     """
 
-    def __init__(self, heap_base=None, heap_size=None):
+    def __init__(self, heap_base: int | None = None, heap_size: int | None = None):
         super().__init__()
 
         self.heap_base = heap_base if heap_base is not None else DEFAULT_HEAP_LOCATION

@@ -60,7 +60,7 @@ class PTChunk(Chunk):
             if next_chunk is not None:
                 self.state.memory.store(next_chunk.base, size, self.state.arch.bytes)
 
-    def set_size(self, size, is_free=None):  # pylint:disable=arguments-differ
+    def set_size(self, size, is_free: bool | None = None):  # pylint:disable=arguments-differ
         """
         Use this to set the size on a chunk. When the chunk is new (such as when a free chunk is shrunk to form an
         allocated chunk and a remainder free chunk) it is recommended that the is_free hint be used since setting the
@@ -254,7 +254,7 @@ class SimHeapPTMalloc(SimHeapFreelist):
     :ivar free_head_chunk: the head of the linked list of free chunks in the heap
     """
 
-    def __init__(self, heap_base=None, heap_size=None):
+    def __init__(self, heap_base: int | None = None, heap_size: int | None = None):
         super().__init__(heap_base, heap_size)
 
         # All of these depend on the state and so are initialized in init_state
@@ -590,7 +590,7 @@ class SimHeapPTMalloc(SimHeapFreelist):
 
         return False
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint:disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: SimHeapPTMalloc | None = None):  # pylint:disable=unused-argument
         return self._combine(others)
 
     def _map_final_page(self):
