@@ -10,6 +10,7 @@ from unittest import mock
 import angr
 from angr.analyses.decompiler import Decompiler
 from angr.analyses.decompiler.decompilation_options import PARAM_TO_OPTION, options
+from angr.analyses.decompiler.structured_codegen.c import CStructuredCodeGenerator
 from angr.llm_client import LLMClient
 from angr.llm_models import (
     FunctionNameSuggestion,
@@ -18,7 +19,7 @@ from angr.llm_models import (
     VariableTypeChange,
     VariableTypeSuggestions,
 )
-from tests.common import bin_location, set_decompiler_option
+from tests.common import bin_location, codegen_text, set_decompiler_option
 
 test_location = os.path.join(bin_location, "tests")
 
@@ -148,7 +149,7 @@ class TestDecompilerLLMSuggestVariableNames(TestDecompilerLLMRefineBase):
         """Should rename variables when the LLM suggests new names."""
         dec = self._decompile("main")
         assert dec.func.addr in dec.kb.dec_variables
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
 
         # collect current variable names
         varman = dec.kb.dec_variables[dec.func.addr]
@@ -163,7 +164,7 @@ class TestDecompilerLLMSuggestVariableNames(TestDecompilerLLMRefineBase):
             [VariableNameSuggestions(renames=[VariableRename(old_name=old_name, new_name="renamed_var")])]
         )
 
-        result = dec.llm_suggest_variable_names(llm_client=mock_client, code_text=dec.codegen.text)
+        result = dec.llm_suggest_variable_names(llm_client=mock_client, code_text=code)
         assert result is True
         assert target_var.name == "renamed_var"
         assert target_var.renamed is True
@@ -171,20 +172,20 @@ class TestDecompilerLLMSuggestVariableNames(TestDecompilerLLMRefineBase):
     def test_skips_unknown_variables(self):
         """Should skip variable names that don't match any known variable."""
         dec = self._decompile("main")
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
 
         mock_client = _make_mock_llm_client(
             [VariableNameSuggestions(renames=[VariableRename(old_name="nonexistent_var_xyz", new_name="new_name")])]
         )
 
-        result = dec.llm_suggest_variable_names(llm_client=mock_client, code_text=dec.codegen.text)
+        result = dec.llm_suggest_variable_names(llm_client=mock_client, code_text=code)
         assert result is False
 
     def test_skips_same_name_renames(self):
         """Should skip rename when old_name == new_name."""
         dec = self._decompile("main")
         assert dec.func.addr in dec.kb.dec_variables
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
 
         varman = dec.kb.dec_variables[dec.func.addr]
         unified_vars = varman.get_unified_variables(sort=None)
@@ -195,16 +196,16 @@ class TestDecompilerLLMSuggestVariableNames(TestDecompilerLLMRefineBase):
             [VariableNameSuggestions(renames=[VariableRename(old_name=old_name, new_name=old_name)])]
         )
 
-        result = dec.llm_suggest_variable_names(llm_client=mock_client, code_text=dec.codegen.text)
+        result = dec.llm_suggest_variable_names(llm_client=mock_client, code_text=code)
         assert result is False
 
     def test_returns_false_on_empty_response(self):
         """Should return False when LLM returns None."""
         dec = self._decompile("main")
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
         mock_client = _make_mock_llm_client([None])
 
-        result = dec.llm_suggest_variable_names(llm_client=mock_client, code_text=dec.codegen.text)
+        result = dec.llm_suggest_variable_names(llm_client=mock_client, code_text=code)
         assert result is False
 
     def test_returns_false_when_no_client(self):
@@ -218,7 +219,7 @@ class TestDecompilerLLMSuggestVariableNames(TestDecompilerLLMRefineBase):
         """Should ignore renames with empty new_name."""
         dec = self._decompile("main")
         assert dec.func.addr in dec.kb.dec_variables
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
 
         varman = dec.kb.dec_variables[dec.func.addr]
         unified_vars = varman.get_unified_variables(sort=None)
@@ -230,7 +231,7 @@ class TestDecompilerLLMSuggestVariableNames(TestDecompilerLLMRefineBase):
             [VariableNameSuggestions(renames=[VariableRename(old_name=old_name, new_name="")])]
         )
 
-        result = dec.llm_suggest_variable_names(llm_client=mock_client, code_text=dec.codegen.text)
+        result = dec.llm_suggest_variable_names(llm_client=mock_client, code_text=code)
         assert result is False
         assert target_var.name == original_name
 
@@ -238,7 +239,7 @@ class TestDecompilerLLMSuggestVariableNames(TestDecompilerLLMRefineBase):
         """Should rename multiple variables at once."""
         dec = self._decompile("main")
         assert dec.func.addr in dec.kb.dec_variables
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
 
         varman = dec.kb.dec_variables[dec.func.addr]
         unified_vars = varman.get_unified_variables(sort=None)
@@ -261,7 +262,7 @@ class TestDecompilerLLMSuggestVariableNames(TestDecompilerLLMRefineBase):
             ]
         )
 
-        result = dec.llm_suggest_variable_names(llm_client=mock_client, code_text=dec.codegen.text)
+        result = dec.llm_suggest_variable_names(llm_client=mock_client, code_text=code)
         assert result is True
         assert var_a.name == "alpha"
         assert var_b.name == "beta"
@@ -273,30 +274,32 @@ class TestDecompilerLLMSuggestFunctionName(TestDecompilerLLMRefineBase):
     def test_renames_function_with_default_name(self):
         """Should rename functions that are marked with is_default_name = True."""
         dec = self._decompile("main")
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
+        codegen = dec.codegen
+        assert isinstance(codegen, CStructuredCodeGenerator)
 
         # Temporarily set the name to a sub_ name
         original_name = dec.func.name
         dec.func.name = "sub_401000"
         dec.func.is_default_name = True
-        if dec.codegen.cfunc:
-            dec.codegen.cfunc.name = "sub_401000"
+        if codegen.cfunc:
+            codegen.cfunc.name = "sub_401000"
 
         mock_client = _make_mock_llm_client([FunctionNameSuggestion(function_name="check_password")])
 
         try:
-            result = dec.llm_suggest_function_name(llm_client=mock_client, code_text=dec.codegen.text)
+            result = dec.llm_suggest_function_name(llm_client=mock_client, code_text=code)
             assert result is True
             assert dec.func.name == "check_password"
-            if dec.codegen.cfunc:
-                assert dec.codegen.cfunc.name == "check_password"
+            if codegen.cfunc:
+                assert codegen.cfunc.name == "check_password"
         finally:
             dec.func.name = original_name
 
     def test_skips_named_function(self):
         """Should skip functions that already have meaningful names (not sub_/fcn.)."""
         dec = self._decompile("main")
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
 
         # Ensure "main" is marked as a non-default name
         dec.func.is_default_name = False
@@ -304,7 +307,7 @@ class TestDecompilerLLMSuggestFunctionName(TestDecompilerLLMRefineBase):
         # "main" doesn't start with sub_ or fcn., so should be skipped
         mock_client = _make_mock_llm_client([FunctionNameSuggestion(function_name="better_name")])
 
-        result = dec.llm_suggest_function_name(llm_client=mock_client, code_text=dec.codegen.text)
+        result = dec.llm_suggest_function_name(llm_client=mock_client, code_text=code)
         assert result is False
         assert dec.func.name == "main"
         # LLM should not even be called
@@ -313,7 +316,7 @@ class TestDecompilerLLMSuggestFunctionName(TestDecompilerLLMRefineBase):
     def test_returns_false_on_empty_response(self):
         """Should return False when LLM returns None."""
         dec = self._decompile("main")
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
 
         original_name = dec.func.name
         dec.func.name = "sub_401000"
@@ -322,7 +325,7 @@ class TestDecompilerLLMSuggestFunctionName(TestDecompilerLLMRefineBase):
         mock_client = _make_mock_llm_client([None])
 
         try:
-            result = dec.llm_suggest_function_name(llm_client=mock_client, code_text=dec.codegen.text)
+            result = dec.llm_suggest_function_name(llm_client=mock_client, code_text=code)
             assert result is False
         finally:
             dec.func.name = original_name
@@ -330,7 +333,7 @@ class TestDecompilerLLMSuggestFunctionName(TestDecompilerLLMRefineBase):
     def test_returns_false_on_same_name(self):
         """Should return False when LLM suggests the same name."""
         dec = self._decompile("main")
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
 
         original_name = dec.func.name
         dec.func.name = "sub_401000"
@@ -339,7 +342,7 @@ class TestDecompilerLLMSuggestFunctionName(TestDecompilerLLMRefineBase):
         mock_client = _make_mock_llm_client([FunctionNameSuggestion(function_name="sub_401000")])
 
         try:
-            result = dec.llm_suggest_function_name(llm_client=mock_client, code_text=dec.codegen.text)
+            result = dec.llm_suggest_function_name(llm_client=mock_client, code_text=code)
             assert result is False
         finally:
             dec.func.name = original_name
@@ -354,7 +357,7 @@ class TestDecompilerLLMSuggestFunctionName(TestDecompilerLLMRefineBase):
     def test_returns_false_on_empty_name(self):
         """Should return False when function_name in response is empty."""
         dec = self._decompile("main")
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
 
         original_name = dec.func.name
         dec.func.name = "sub_401000"
@@ -363,7 +366,7 @@ class TestDecompilerLLMSuggestFunctionName(TestDecompilerLLMRefineBase):
         mock_client = _make_mock_llm_client([FunctionNameSuggestion(function_name="")])
 
         try:
-            result = dec.llm_suggest_function_name(llm_client=mock_client, code_text=dec.codegen.text)
+            result = dec.llm_suggest_function_name(llm_client=mock_client, code_text=code)
             assert result is False
         finally:
             dec.func.name = original_name
@@ -376,7 +379,7 @@ class TestDecompilerLLMSuggestVariableTypes(TestDecompilerLLMRefineBase):
         """Should change variable types when LLM suggests valid C types."""
         dec = self._decompile("main")
         assert dec.func.addr in dec.kb.dec_variables
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
 
         varman = dec.kb.dec_variables[dec.func.addr]
         unified_vars = varman.get_unified_variables(sort=None)
@@ -390,7 +393,7 @@ class TestDecompilerLLMSuggestVariableTypes(TestDecompilerLLMRefineBase):
         )
 
         with mock.patch.object(dec.codegen, "reload_variable_types") as m_reload:
-            result = dec.llm_suggest_variable_types(llm_client=mock_client, code_text=dec.codegen.text)
+            result = dec.llm_suggest_variable_types(llm_client=mock_client, code_text=code)
             assert result is True
             m_reload.assert_called_once()
 
@@ -402,7 +405,7 @@ class TestDecompilerLLMSuggestVariableTypes(TestDecompilerLLMRefineBase):
         """Should skip variables with unparseable type strings."""
         dec = self._decompile("main")
         assert dec.func.addr in dec.kb.dec_variables
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
 
         varman = dec.kb.dec_variables[dec.func.addr]
         unified_vars = varman.get_unified_variables(sort=None)
@@ -417,13 +420,13 @@ class TestDecompilerLLMSuggestVariableTypes(TestDecompilerLLMRefineBase):
             ]
         )
 
-        result = dec.llm_suggest_variable_types(llm_client=mock_client, code_text=dec.codegen.text)
+        result = dec.llm_suggest_variable_types(llm_client=mock_client, code_text=code)
         assert result is False
 
     def test_skips_unknown_variable_names(self):
         """Should skip variable names that don't match any known variable."""
         dec = self._decompile("main")
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
 
         mock_client = _make_mock_llm_client(
             [
@@ -433,16 +436,16 @@ class TestDecompilerLLMSuggestVariableTypes(TestDecompilerLLMRefineBase):
             ]
         )
 
-        result = dec.llm_suggest_variable_types(llm_client=mock_client, code_text=dec.codegen.text)
+        result = dec.llm_suggest_variable_types(llm_client=mock_client, code_text=code)
         assert result is False
 
     def test_returns_false_on_empty_response(self):
         """Should return False when LLM returns None."""
         dec = self._decompile("main")
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
         mock_client = _make_mock_llm_client([None])
 
-        result = dec.llm_suggest_variable_types(llm_client=mock_client, code_text=dec.codegen.text)
+        result = dec.llm_suggest_variable_types(llm_client=mock_client, code_text=code)
         assert result is False
 
     def test_returns_false_when_no_client(self):
@@ -456,7 +459,7 @@ class TestDecompilerLLMSuggestVariableTypes(TestDecompilerLLMRefineBase):
         """Should handle pointer type suggestions."""
         dec = self._decompile("main")
         assert dec.func.addr in dec.kb.dec_variables
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
 
         varman = dec.kb.dec_variables[dec.func.addr]
         unified_vars = varman.get_unified_variables(sort=None)
@@ -470,14 +473,14 @@ class TestDecompilerLLMSuggestVariableTypes(TestDecompilerLLMRefineBase):
         )
 
         with mock.patch.object(dec.codegen, "reload_variable_types"):
-            result = dec.llm_suggest_variable_types(llm_client=mock_client, code_text=dec.codegen.text)
+            result = dec.llm_suggest_variable_types(llm_client=mock_client, code_text=code)
             assert result is True
 
     def test_multiple_type_changes(self):
         """Should change types for multiple variables at once."""
         dec = self._decompile("main")
         assert dec.func.addr in dec.kb.dec_variables
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
 
         varman = dec.kb.dec_variables[dec.func.addr]
         unified_vars = varman.get_unified_variables(sort=None)
@@ -501,14 +504,14 @@ class TestDecompilerLLMSuggestVariableTypes(TestDecompilerLLMRefineBase):
         )
 
         with mock.patch.object(dec.codegen, "reload_variable_types"):
-            result = dec.llm_suggest_variable_types(llm_client=mock_client, code_text=dec.codegen.text)
+            result = dec.llm_suggest_variable_types(llm_client=mock_client, code_text=code)
             assert result is True
 
     def test_partial_valid_types(self):
         """When some types parse and some don't, should apply the valid ones."""
         dec = self._decompile("main")
         assert dec.func.addr in dec.kb.dec_variables
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
 
         varman = dec.kb.dec_variables[dec.func.addr]
         unified_vars = varman.get_unified_variables(sort=None)
@@ -530,7 +533,7 @@ class TestDecompilerLLMSuggestVariableTypes(TestDecompilerLLMRefineBase):
         )
 
         with mock.patch.object(dec.codegen, "reload_variable_types"):
-            result = dec.llm_suggest_variable_types(llm_client=mock_client, code_text=dec.codegen.text)
+            result = dec.llm_suggest_variable_types(llm_client=mock_client, code_text=code)
             assert result is True
 
 
@@ -585,10 +588,13 @@ class TestDecompilerLLMEndToEnd(TestDecompilerLLMRefineBase):
         """Full flow: decompile -> mock LLM suggests renames -> verify text changes."""
         dec = self._decompile("main")
         assert dec.func.addr in dec.kb.dec_variables
-        assert dec.codegen is not None and dec.codegen.text is not None
+        codegen = dec.codegen
+        assert isinstance(codegen, CStructuredCodeGenerator)
+        assert codegen.text is not None
+        assert codegen.cfunc is not None
 
         # get a variable to rename
-        unified_vars = list(dec.codegen.cfunc.get_unified_local_vars())
+        unified_vars = list(codegen.cfunc.get_unified_local_vars())
         assert len(unified_vars) > 0
 
         target_var = unified_vars[0]
@@ -609,8 +615,7 @@ class TestDecompilerLLMEndToEnd(TestDecompilerLLMRefineBase):
             assert result is True
             assert target_var.name == new_name
             # the text should be regenerated and contain the new name
-            assert dec.codegen.text is not None
-            assert new_name in dec.codegen.text
+            assert new_name in codegen_text(dec)
         finally:
             self.proj.llm_client = None
 
@@ -618,10 +623,13 @@ class TestDecompilerLLMEndToEnd(TestDecompilerLLMRefineBase):
         """Full flow: decompile -> mock LLM suggests types -> verify types applied."""
         dec = self._decompile("main")
         assert dec.func.addr in dec.kb.dec_variables
-        assert dec.codegen is not None and dec.codegen.text is not None
+        codegen = dec.codegen
+        assert isinstance(codegen, CStructuredCodeGenerator)
+        assert codegen.text is not None
+        assert codegen.cfunc is not None
 
         varman = dec.kb.dec_variables[dec.func.addr]
-        unified_vars = list(dec.codegen.cfunc.get_unified_local_vars())
+        unified_vars = list(codegen.cfunc.get_unified_local_vars())
         assert len(unified_vars) > 0
 
         target_var = unified_vars[0]
@@ -655,8 +663,7 @@ class TestDecompilerLLMEndToEnd(TestDecompilerLLMRefineBase):
         """Full flow: LLM returns empty results -> no changes, no regeneration."""
         dec = self._decompile("main")
         assert dec.func.addr in dec.kb.dec_variables
-        assert dec.codegen is not None and dec.codegen.text is not None
-        original_text = dec.codegen.text
+        original_text = codegen_text(dec)
 
         # Note: only 2 completion_structured calls are made (function name skipped for "main")
         mock_client = mock.MagicMock(spec=LLMClient)
@@ -670,7 +677,7 @@ class TestDecompilerLLMEndToEnd(TestDecompilerLLMRefineBase):
             result = dec.llm_refine()
             assert result is False
             # text should remain the same (no regeneration)
-            assert dec.codegen.text == original_text
+            assert codegen_text(dec) == original_text
         finally:
             self.proj.llm_client = None
 
@@ -681,25 +688,25 @@ class TestDecompilerLLMSummarizeFunction(TestDecompilerLLMRefineBase):
     def test_returns_summary(self):
         """Should return a summary string from the LLM."""
         dec = self._decompile("main")
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
 
         mock_client = mock.MagicMock(spec=LLMClient)
         mock_client.completion.return_value = "This function authenticates a user by reading credentials."
 
-        result = dec.llm_summarize_function(llm_client=mock_client, code_text=dec.codegen.text)
+        result = dec.llm_summarize_function(llm_client=mock_client, code_text=code)
         assert result == "This function authenticates a user by reading credentials."
         mock_client.completion.assert_called_once()
 
     def test_stores_summary_in_cache(self):
         """Should store the summary in the DecompilationCache."""
         dec = self._decompile("main")
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
         assert dec.cache is not None
 
         mock_client = mock.MagicMock(spec=LLMClient)
         mock_client.completion.return_value = "This function does something useful."
 
-        result = dec.llm_summarize_function(llm_client=mock_client, code_text=dec.codegen.text)
+        result = dec.llm_summarize_function(llm_client=mock_client, code_text=code)
         assert result == "This function does something useful."
         assert dec.cache.function_summary == "This function does something useful."
 
@@ -723,34 +730,34 @@ class TestDecompilerLLMSummarizeFunction(TestDecompilerLLMRefineBase):
     def test_returns_none_on_empty_response(self):
         """Should return None when the LLM returns an empty string."""
         dec = self._decompile("main")
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
 
         mock_client = mock.MagicMock(spec=LLMClient)
         mock_client.completion.return_value = ""
 
-        result = dec.llm_summarize_function(llm_client=mock_client, code_text=dec.codegen.text)
+        result = dec.llm_summarize_function(llm_client=mock_client, code_text=code)
         assert result is None
 
     def test_returns_none_on_llm_exception(self):
         """Should return None and not raise when the LLM call fails."""
         dec = self._decompile("main")
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
 
         mock_client = mock.MagicMock(spec=LLMClient)
         mock_client.completion.side_effect = RuntimeError("LLM exploded")
 
-        result = dec.llm_summarize_function(llm_client=mock_client, code_text=dec.codegen.text)
+        result = dec.llm_summarize_function(llm_client=mock_client, code_text=code)
         assert result is None
 
     def test_strips_whitespace_from_summary(self):
         """Should strip leading/trailing whitespace from the summary."""
         dec = self._decompile("main")
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
 
         mock_client = mock.MagicMock(spec=LLMClient)
         mock_client.completion.return_value = "  \n  A summary with whitespace.  \n  "
 
-        result = dec.llm_summarize_function(llm_client=mock_client, code_text=dec.codegen.text)
+        result = dec.llm_summarize_function(llm_client=mock_client, code_text=code)
         assert result == "A summary with whitespace."
 
     def test_cache_summary_initially_none(self):
