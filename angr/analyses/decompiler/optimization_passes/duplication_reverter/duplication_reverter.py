@@ -59,8 +59,8 @@ class DuplicationReverter(StructuringOptimizationPass):
         )
 
         self.max_guarding_conditions = max_guarding_conditions
-        self.write_graph: nx.DiGraph | None = None
-        self.read_graph: nx.DiGraph | None = None
+        self.write_graph: nx.DiGraph = nx.DiGraph()
+        self.read_graph: nx.DiGraph = nx.DiGraph()
         self.candidate_blacklist = set()
 
         # cache items
@@ -107,7 +107,7 @@ class DuplicationReverter(StructuringOptimizationPass):
         # but still have a clean copy to read from
         graph = self.out_graph or self._graph
         self.write_graph = remove_labels(to_ail_supergraph(copy_graph_and_nodes(graph), allow_fake=True))
-        self.read_graph: nx.DiGraph = self.write_graph.copy()
+        self.read_graph = self.write_graph.copy()
 
         # phase 1: search for candidates to merge based on the ISD-schema
         candidate = self._search_for_deduplication_candidate()
@@ -150,11 +150,9 @@ class DuplicationReverter(StructuringOptimizationPass):
         _l.debug("Selecting the candidate: %s", candidate)
         return candidate[0], candidate[1]
 
-    def _construct_merged_candidate(
-        self, candidate: tuple[Block, Block]
-    ) -> tuple[AILMergeGraph, tuple[Block, Block]] | None:
+    def _construct_merged_candidate(self, candidate: tuple[Block, Block]) -> tuple[AILMergeGraph, tuple[Block, Block]]:
         ail_merge_graph = self.create_merged_subgraph(candidate, self.write_graph)
-        new_candidate = ail_merge_graph.starts
+        new_candidate = (ail_merge_graph.starts[0], ail_merge_graph.starts[1])
         for block in ail_merge_graph.original_ends:
             if self._block_has_goto_edge(
                 block, [b for b in ail_merge_graph.original_ends if b is not block], graph=self.write_graph
@@ -816,7 +814,7 @@ class DuplicationReverter(StructuringOptimizationPass):
 
         return []
 
-    def _block_has_goto_edge(self, block: ailment.Block, other_ends, graph=None):
+    def _block_has_goto_edge(self, block: ailment.Block, other_ends, graph: nx.DiGraph):
         # case1:
         # A -> (goto) -> B.
         # if goto edge coming from end block, from any instruction in the block

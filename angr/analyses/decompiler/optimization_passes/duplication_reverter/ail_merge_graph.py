@@ -31,7 +31,7 @@ class AILBlockSplit:
     the AILMergeGraph class.
     """
 
-    def __init__(self, original=None, up_split=None, match_split=None, down_split=None):
+    def __init__(self, original: Block, up_split=None, match_split=None, down_split=None):
         """
 
         :param original:
