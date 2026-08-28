@@ -38,7 +38,7 @@ class Typehoon(Analysis):
         self,
         constraints,
         func_var,
-        ground_truth=None,
+        ground_truth: dict[TypeVariable, SimType] | None = None,
         var_mapping: dict[SimVariable, set[TypeVariable]] | None = None,
         must_struct: set[TypeVariable] | None = None,
         stackvar_max_sizes: dict[TypeVariable, int] | None = None,

@@ -57,7 +57,7 @@ class TypeConstant:
             raise NotImplementedError
         return self.SIZE
 
-    def __repr__(self, memo=None) -> str:
+    def __repr__(self, memo: set[TypeConstant] | None = None) -> str:
         raise NotImplementedError
 
     def replace(
@@ -74,19 +74,19 @@ TypeConstant.TYPE_HASH = type_tag(TypeConstant)
 class TopType(TypeConstant):
     SIZE = 1
 
-    def __repr__(self, memo=None):
+    def __repr__(self, memo: set[TypeConstant] | None = None):
         return "TOP"
 
 
 class BottomType(TypeConstant):
     SIZE = 1
 
-    def __repr__(self, memo=None):
+    def __repr__(self, memo: set[TypeConstant] | None = None):
         return "BOT"
 
 
 class Int(TypeConstant):
-    def __repr__(self, memo=None) -> str:
+    def __repr__(self, memo: set[TypeConstant] | None = None) -> str:
         return "intbase"
 
 
@@ -97,96 +97,96 @@ class Int1(Int):
 class Int8(Int):
     SIZE = 1
 
-    def __repr__(self, memo=None) -> str:
+    def __repr__(self, memo: set[TypeConstant] | None = None) -> str:
         return "int8"
 
 
 class Int16(Int):
     SIZE = 2
 
-    def __repr__(self, memo=None) -> str:
+    def __repr__(self, memo: set[TypeConstant] | None = None) -> str:
         return "int16"
 
 
 class Int32(Int):
     SIZE = 4
 
-    def __repr__(self, memo=None) -> str:
+    def __repr__(self, memo: set[TypeConstant] | None = None) -> str:
         return "int32"
 
 
 class Fd(Int):
     SIZE = 4
 
-    def __repr__(self, memo=None) -> str:
+    def __repr__(self, memo: set[TypeConstant] | None = None) -> str:
         return "fd"
 
 
 class Int64(Int):
     SIZE = 8
 
-    def __repr__(self, memo=None) -> str:
+    def __repr__(self, memo: set[TypeConstant] | None = None) -> str:
         return "int64"
 
 
 class SInt8(Int8):
-    def __repr__(self, memo=None) -> str:
+    def __repr__(self, memo: set[TypeConstant] | None = None) -> str:
         return "sint8"
 
 
 class UInt8(Int8):
-    def __repr__(self, memo=None) -> str:
+    def __repr__(self, memo: set[TypeConstant] | None = None) -> str:
         return "uint8"
 
 
 class SInt16(Int16):
-    def __repr__(self, memo=None) -> str:
+    def __repr__(self, memo: set[TypeConstant] | None = None) -> str:
         return "sint16"
 
 
 class UInt16(Int16):
-    def __repr__(self, memo=None) -> str:
+    def __repr__(self, memo: set[TypeConstant] | None = None) -> str:
         return "uint16"
 
 
 class SInt32(Int32):
-    def __repr__(self, memo=None) -> str:
+    def __repr__(self, memo: set[TypeConstant] | None = None) -> str:
         return "sint32"
 
 
 class UInt32(Int32):
-    def __repr__(self, memo=None) -> str:
+    def __repr__(self, memo: set[TypeConstant] | None = None) -> str:
         return "uint32"
 
 
 class SInt64(Int64):
-    def __repr__(self, memo=None) -> str:
+    def __repr__(self, memo: set[TypeConstant] | None = None) -> str:
         return "sint64"
 
 
 class UInt64(Int64):
-    def __repr__(self, memo=None) -> str:
+    def __repr__(self, memo: set[TypeConstant] | None = None) -> str:
         return "uint64"
 
 
 class Int128(Int):
     SIZE = 16
 
-    def __repr__(self, memo=None):
+    def __repr__(self, memo: set[TypeConstant] | None = None):
         return "int128"
 
 
 class Int256(Int):
     SIZE = 32
 
-    def __repr__(self, memo=None):
+    def __repr__(self, memo: set[TypeConstant] | None = None):
         return "int256"
 
 
 class Int512(Int):
     SIZE = 32
 
-    def __repr__(self, memo=None):
+    def __repr__(self, memo: set[TypeConstant] | None = None):
         return "int512"
 
 
@@ -199,26 +199,26 @@ class IntVar(Int):
     def size(self) -> int:
         return self._size
 
-    def __repr__(self, memo=None):
+    def __repr__(self, memo: set[TypeConstant] | None = None):
         return "intvar"
 
 
 class Float(TypeConstant):
-    def __repr__(self, memo=None) -> str:
+    def __repr__(self, memo: set[TypeConstant] | None = None) -> str:
         return "floatbase"
 
 
 class Float32(Float):
     SIZE = 4
 
-    def __repr__(self, memo=None):
+    def __repr__(self, memo: set[TypeConstant] | None = None):
         return "float32"
 
 
 class Float64(Float):
     SIZE = 8
 
-    def __repr__(self, memo=None):
+    def __repr__(self, memo: set[TypeConstant] | None = None):
         return "float64"
 
 
@@ -261,12 +261,12 @@ class Pointer32(Pointer, Int32):
     32-bit pointers.
     """
 
-    def __init__(self, basetype=None, name: str | None = None):
+    def __init__(self, basetype: TypeConstant | None = None, name: str | None = None):
         Pointer.__init__(self, basetype, name=name)
         Int32.__init__(self, name=name)
 
     @memoize
-    def __repr__(self, memo=None):
+    def __repr__(self, memo: set[TypeConstant] | None = None):
         bt = self.basetype.__repr__(memo=memo) if isinstance(self.basetype, TypeConstant) else repr(self.basetype)
         name_str = f"{self.name}#" if self.name else ""
         return f"{name_str}ptr32({bt})"
@@ -277,19 +277,19 @@ class Pointer64(Pointer, Int64):
     64-bit pointers.
     """
 
-    def __init__(self, basetype=None, name: str | None = None):
+    def __init__(self, basetype: TypeConstant | None = None, name: str | None = None):
         Pointer.__init__(self, basetype, name=name)
         Int64.__init__(self, name=name)
 
     @memoize
-    def __repr__(self, memo=None):
+    def __repr__(self, memo: set[TypeConstant] | None = None):
         bt = self.basetype.__repr__(memo=memo) if isinstance(self.basetype, TypeConstant) else repr(self.basetype)
         name_str = f"{self.name}#" if self.name else ""
         return f"{name_str}ptr64({bt})"
 
 
 class Array(TypeConstant):
-    def __init__(self, element=None, count=None, name: str | None = None):
+    def __init__(self, element: TypeConstant | None = None, count: int | None = None, name: str | None = None):
         super().__init__(name=name)
         self.element: TypeConstant | None = element
         self.count: int | None = count
@@ -301,7 +301,7 @@ class Array(TypeConstant):
         return self.element.size * self.count
 
     @memoize
-    def __repr__(self, memo=None):
+    def __repr__(self, memo: set[TypeConstant] | None = None):
         if self.count is None:
             return f"{self.element!r}[?]"
         return f"{self.element!r}[{self.count}]"
@@ -333,7 +333,14 @@ _STRUCT_ID = itertools.count()
 
 
 class Struct(TypeConstant):
-    def __init__(self, fields=None, name=None, field_names=None, is_cppclass: bool = False, idx: int = -1):
+    def __init__(
+        self,
+        fields: dict[int, TypeConstant] | None = None,
+        name: str | None = None,
+        field_names: dict[int, str] | None = None,
+        is_cppclass: bool = False,
+        idx: int = -1,
+    ):
         super().__init__(name=name)
         self.fields = {} if fields is None else fields  # offset to type
         self.field_names = field_names
@@ -361,7 +368,7 @@ class Struct(TypeConstant):
         )
 
     @memoize
-    def __repr__(self, memo=None):
+    def __repr__(self, memo: set[TypeConstant] | None = None):
         prefix = "CppClass" if self.is_cppclass else "struct"
         prefix += f"#{self.idx}"
         if self.name:
@@ -405,7 +412,7 @@ class EnumVariant:
 
 
 class RustEnum(TypeConstant):
-    def __init__(self, name=None, variants=None):
+    def __init__(self, name: str | None = None, variants: list[EnumVariant] | None = None):
         super().__init__(name)
         self.variants = variants if variants is not None else []
 
@@ -430,7 +437,7 @@ class RustEnum(TypeConstant):
         return max(variant.size for variant in self.variants)
 
     @memoize
-    def __repr__(self, memo=None):
+    def __repr__(self, memo: set[TypeConstant] | None = None):
         prefix = "enum"
         if self.name:
             prefix = f"{prefix} {self.name}"
@@ -487,7 +494,7 @@ class Enum(TypeConstant):
         return 4  # Default to 32-bit int size
 
     @memoize
-    def __repr__(self, memo=None):
+    def __repr__(self, memo: set[TypeConstant] | None = None):
         members_str = ", ".join(f"{k}={v}" for k, v in self.members.items())
         name_str = f" {self.name}" if self.name else ""
         return f"enum#{self.idx}{name_str}{{{members_str}}}"
@@ -522,7 +529,7 @@ class Function(TypeConstant):
         self.outputs = outputs
 
     @memoize
-    def __repr__(self, memo=None):
+    def __repr__(self, memo: set[TypeConstant] | None = None):
         param_str = ", ".join(repr(param) for param in self.params)
         outputs_str = ", ".join(repr(output) for output in self.outputs)
         return f"func({param_str}) -> {outputs_str}"
@@ -576,7 +583,7 @@ class TypeVariableReference(TypeConstant):
         super().__init__(name=name)
         self.typevar = typevar
 
-    def __repr__(self, memo=None):
+    def __repr__(self, memo: set[TypeConstant] | None = None):
         return f"ref({self.typevar})"
 
     def __eq__(self, other):

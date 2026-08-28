@@ -387,7 +387,7 @@ class TypeVariable:
             return self.name == other.name
         return self.idx == other.idx
 
-    def _hash(self, visited=None):  # pylint:disable=unused-argument
+    def _hash(self, visited: set[int] | None = None):  # pylint:disable=unused-argument
         return self._cached_hash
 
     def __hash__(self):
@@ -461,7 +461,7 @@ class DerivedTypeVariable(TypeVariable):
             isinstance(other, DerivedTypeVariable) and self.type_var == other.type_var and self.labels == other.labels
         )
 
-    def _hash(self, visited=None):
+    def _hash(self, visited: set[int] | None = None):
         return self._cached_hash
 
     def __hash__(self):

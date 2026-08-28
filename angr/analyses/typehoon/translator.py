@@ -27,7 +27,14 @@ class SimTypeTempRef(sim_type.SimType):
         super().__init__()
         self.typevar = typevar
 
-    def c_repr(self, name=None, full=0, memo=None, indent: int | None = 0, name_parens: bool = True) -> str:  # pylint: disable=unused-argument
+    def c_repr(
+        self,
+        name: str | None = None,
+        full=0,
+        memo: tuple[SimType, ...] | None = None,
+        indent: int | None = 0,
+        name_parens: bool = True,
+    ) -> str:  # pylint: disable=unused-argument
         return "<SimTypeTempRef>"
 
 
