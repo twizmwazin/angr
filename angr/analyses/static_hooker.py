@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from angr.analyses.analysis import AnalysesHub, Analysis
 from angr.errors import AngrValueError
 from angr.procedures import SIM_LIBRARIES
+
+if TYPE_CHECKING:
+    from cle.backends import Backend
 
 l = logging.getLogger(name=__name__)
 
@@ -17,7 +21,7 @@ class StaticHooker(Analysis):
     Right now it only works on unstripped binaries, but hey! There's room to grow!
     """
 
-    def __init__(self, library, binary=None):
+    def __init__(self, library, binary: Backend | None = None):
         self.results = {}
         try:
             libs = SIM_LIBRARIES[library]

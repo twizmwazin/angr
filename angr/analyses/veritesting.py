@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from functools import cmp_to_key
+from typing import TYPE_CHECKING
 
 import networkx
 from claripy import ClaripyError
@@ -16,6 +17,11 @@ from angr.procedures import SIM_PROCEDURES
 from angr.sim_manager import SimulationManager
 from angr.sim_options import BYPASS_VERITESTING_EXCEPTIONS
 from angr.utils.graph import shallow_reverse
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Collection
+
+    from angr.sim_state import SimState
 
 l = logging.getLogger(name=__name__)
 
@@ -43,7 +49,7 @@ class CallTracingFilter:
 
     cfg_cache = {}
 
-    def __init__(self, project, depth, blacklist=None):
+    def __init__(self, project, depth, blacklist: list[int] | None = None):
         self.project = project
         self.blacklist = [] if blacklist is None else blacklist
         self._skipped_targets = set()
@@ -183,11 +189,11 @@ class Veritesting(Analysis):
     def __init__(
         self,
         input_state,
-        boundaries=None,
+        boundaries: Collection[int] | None = None,
         loop_unrolling_limit=10,
         enable_function_inlining=False,
-        terminator=None,
-        deviation_filter=None,
+        terminator: Callable[[SimulationManager], bool] | None = None,
+        deviation_filter: Callable[[SimState], bool] | None = None,
     ):
         """
         SSE stands for Static Symbolic Execution, and we also implemented an extended version of Veritesting (Avgerinos,

@@ -16,7 +16,7 @@ class CDG(Analysis):
     Implements a control dependence graph.
     """
 
-    def __init__(self, cfg, start=None, no_construct=False):
+    def __init__(self, cfg, start: int | None = None, no_construct=False):
         """
         Constructor.
 

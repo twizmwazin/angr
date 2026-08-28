@@ -219,7 +219,7 @@ class LoopAnalysisState:
 
         return s
 
-    def add_loop_exit_stmt(self, stmt_idx, condition=None):
+    def add_loop_exit_stmt(self, stmt_idx, condition: Condition | None = None):
         self.loop_exit_stmts.add((condition, stmt_idx))
 
 

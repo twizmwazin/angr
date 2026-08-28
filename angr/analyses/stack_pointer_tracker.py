@@ -376,7 +376,7 @@ class StackPointerTracker(Analysis, ForwardAnalysis):
         block: Block | None = None,
         track_memory=True,
         cross_insn_opt=True,
-        initial_reg_values=None,
+        initial_reg_values: dict[int, Any] | None = None,
         resilient: bool = True,
         cross_insn_opt_callback: Callable[[int, int], bool] | None = None,
     ):

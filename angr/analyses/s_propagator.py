@@ -47,6 +47,7 @@ from angr.utils.ssa import (
 )
 
 if TYPE_CHECKING:
+    from angr.analyses.stack_pointer_tracker import StackPointerTracker
     from angr.project import Project
 
 # The cache of reusable AILBlockWalker instances, which are used by is_const_*(). The cache dict itself is
@@ -108,7 +109,7 @@ class SPropagator:
         ail_manager: Manager,
         func_graph: networkx.DiGraph | None = None,
         only_consts: bool = True,
-        stack_pointer_tracker=None,
+        stack_pointer_tracker: StackPointerTracker | None = None,
         func_args: set[VirtualVariable] | None = None,
         func_addr: int | None = None,
         stack_arg_offsets: set[int] | None = None,

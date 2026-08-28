@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from angr.analyses.analysis import AnalysesHub, Analysis
 from angr.procedures import SIM_PROCEDURES
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 l = logging.getLogger(name=__name__)
 
 
 class CalleeCleanupFinder(Analysis):
-    def __init__(self, starts=None, hook_all=False):
+    def __init__(self, starts: Iterable[int] | None = None, hook_all=False):
         self.results = {}
 
         if starts is None:

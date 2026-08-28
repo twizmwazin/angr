@@ -308,7 +308,7 @@ class Analysis:
     ]
 
     @contextlib.contextmanager
-    def _resilience(self, name=None, exception=Exception):
+    def _resilience(self, name: str | None = None, exception=Exception):
         try:
             yield
         except exception:  # pylint:disable=broad-except
@@ -337,7 +337,7 @@ class Analysis:
 
         self._progressbar.start()
 
-    def _update_progress(self, percentage, text=None, **kwargs):
+    def _update_progress(self, percentage, text: str | None = None, **kwargs):
         """
         Update the progress with a percentage, including updating the progressbar as well as calling the progress
         callback.

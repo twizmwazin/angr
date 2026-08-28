@@ -13,7 +13,7 @@ class Vtable:
     This contains the addr, size and function addresses of a Vtable
     """
 
-    def __init__(self, vaddr, size, func_addrs=None):
+    def __init__(self, vaddr, size, func_addrs: list[int] | None = None):
         self.vaddr = vaddr
         self.size = size
         self.func_addrs = func_addrs or []

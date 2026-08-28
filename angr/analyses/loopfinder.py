@@ -2,10 +2,16 @@ from __future__ import annotations
 
 import contextlib
 import logging
+from typing import TYPE_CHECKING
 
 import networkx
 
 from angr.analyses.analysis import AnalysesHub, Analysis
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from angr.knowledge_plugins.functions import Function
 
 l = logging.getLogger(name=__name__)
 
@@ -38,7 +44,7 @@ class LoopFinder(Analysis):
     Extracts all the loops from all the functions in a binary.
     """
 
-    def __init__(self, functions=None, normalize=True):
+    def __init__(self, functions: Iterable[Function] | None = None, normalize=True):
         if functions is None:
             functions = self.kb.functions.values()
 

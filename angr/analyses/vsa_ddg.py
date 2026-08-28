@@ -41,8 +41,8 @@ class VSA_DDG(Analysis):
 
     def __init__(
         self,
-        vfg=None,
-        start_addr=None,
+        vfg: VFG | None = None,
+        start_addr: int | None = None,
         interfunction_level=0,
         context_sensitivity_level=2,
         keep_data=False,

@@ -18,6 +18,7 @@ from angr.utils.cpp import is_cpp_funcname_ctor
 if TYPE_CHECKING:
     from angr.analyses.reaching_definitions.function_handler import FunctionCallData
     from angr.analyses.reaching_definitions.rd_state import ReachingDefinitionsState
+    from angr.project import Project
 
 
 class PossibleObject:
@@ -27,7 +28,7 @@ class PossibleObject:
     TO DO: map the address to its uses in the registers/memory locations in the instructions
     """
 
-    def __init__(self, size, addr, class_name=None):
+    def __init__(self, size, addr, class_name: str | None = None):
         self.size = size
         # This address is only valid during RDA as we map new objects outside the already mapped region
         self.addr = addr
@@ -49,7 +50,7 @@ class NewFunctionHandler(FunctionHandler):
      if so we mark it as an instance of the class the constructor belongs to.(only for non stripped binaries)
     """
 
-    def __init__(self, max_addr=None, new_func_addr=None, project=None):
+    def __init__(self, max_addr: int, new_func_addr: int, project: Project):
         super().__init__()
         self.max_addr = max_addr
 
