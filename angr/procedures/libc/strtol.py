@@ -14,7 +14,7 @@ l = logging.getLogger(name=__name__)
 
 class strtol(angr.SimProcedure):
     @staticmethod
-    def strtol_inner(s, state, region, base, signed, read_length=None):
+    def strtol_inner(s, state, region, base, signed, read_length: int | None = None):
         """
         Inner parser for strtol-style functions.
 
@@ -61,7 +61,7 @@ class strtol(angr.SimProcedure):
         return expression, result, num_bytes
 
     @staticmethod
-    def _load_num_with_prefix(prefix, addr, region, state, base, signed, read_length=None):
+    def _load_num_with_prefix(prefix, addr, region, state, base, signed, read_length: int | None = None):
         """
         loads a number from addr, and returns a condition that addr must start with the prefix
         """
@@ -81,7 +81,7 @@ class strtol(angr.SimProcedure):
         return condition, value, total_num_bytes
 
     @staticmethod
-    def _string_to_int(s, state, region, base, signed, read_length=None):
+    def _string_to_int(s, state, region, base, signed, read_length: int | None = None):
         """
         reads values from s and generates the symbolic number that it would equal
         the first char is either a number in the given base, or the result is 0

@@ -12,7 +12,7 @@ l = logging.getLogger(name=__name__)
 class strncpy(angr.SimProcedure):
     # pylint:disable=arguments-differ
 
-    def run(self, dst_addr, src_addr, limit, src_len=None):
+    def run(self, dst_addr, src_addr, limit, src_len: claripy.ast.BV | None = None):
         strlen = angr.SIM_PROCEDURES["libc"]["strlen"]
         memcpy = angr.SIM_PROCEDURES["libc"]["memcpy"]
 

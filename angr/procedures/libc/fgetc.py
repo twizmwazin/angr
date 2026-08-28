@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import claripy
 
 import angr
 
+if TYPE_CHECKING:
+    from angr.storage.file import SimFileDescriptorBase
+
 
 class fgetc(angr.SimProcedure):
     # pylint:disable=arguments-differ
-    def run(self, stream, simfd=None):
+    def run(self, stream, simfd: SimFileDescriptorBase | None = None):
         if simfd is None:
             fileno = angr.SIM_PROCEDURES["posix"]["fileno"]
             fd = self.inline_call(fileno, stream).ret_expr

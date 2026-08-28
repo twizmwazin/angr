@@ -16,7 +16,7 @@ class strlen(angr.SimProcedure):
     # pylint:disable=arguments-differ
     max_null_index = None
 
-    def run(self, s, wchar=False, maxlen=None):
+    def run(self, s, wchar=False, maxlen: int | None = None):
         if wchar:
             null_seq = claripy.BVV(0, 16)
             char_size = 2
