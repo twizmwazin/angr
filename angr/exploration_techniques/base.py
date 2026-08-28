@@ -27,8 +27,7 @@ class ExplorationTechnique:
 
     def __init__(self):
         # this attribute will be set from above by the manager
-        if not hasattr(self, "project"):
-            self.project: angr.Project = None
+        self.project: angr.Project
 
     def setup(self, simgr):
         """
