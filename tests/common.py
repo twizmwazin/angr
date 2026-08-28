@@ -18,7 +18,9 @@ from rich.syntax import Syntax
 import angr
 import angr.sim_options as so
 from angr import Project, load_shellcode
-from angr.analyses import CongruencyCheck
+from angr.analyses import CongruencyCheck, Decompiler
+from angr.analyses.decompiler import DecompilationCache
+from angr.knowledge_plugins.functions import Function
 from angr.misc.testing import is_testing
 
 l = logging.getLogger("angr.tests.common")
@@ -182,6 +184,55 @@ def print_decompilation_result(dec):
             console.print(syntax)
         except Exception:  # pylint:disable=broad-exception-caught
             print(dec.codegen.text)
+
+
+def codegen_text(dec: Decompiler | DecompilationCache) -> str:
+    """
+    Return the decompiled code of an already-run ``Decompiler`` (or of a ``DecompilationCache``) as a plain ``str``.
+
+    This is the single narrowing point for the doubly-Optional ``dec.codegen.text``: ``Decompiler.codegen`` is
+    ``BaseStructuredCodeGenerator | None`` and ``BaseStructuredCodeGenerator.text`` is ``str | None``, so every direct
+    ``dec.codegen.text`` in a test is two unguarded Optional accesses that a type checker rejects. Narrowing here once
+    lets tests write ``code = codegen_text(dec)`` instead of repeating ``assert dec.codegen is not None`` followed by
+    ``assert dec.codegen.text is not None`` before every use of the text.
+
+    Tests that also need the ``Decompiler`` object itself (``print_decompilation_result(dec)``, ``dec.clinic``,
+    ``dec.codegen.cfunc``, ...) keep running the decompiler as they do today and just pass the result in here.
+
+    :param dec:             A ``Decompiler`` result, or a ``DecompilationCache``, whose code generation already ran.
+    :return:                The decompiled code.
+    :raises AssertionError: If decompilation produced no codegen, or the codegen produced no text.
+    """
+    assert dec.codegen is not None, f"{type(dec).__name__} produced no codegen. Errors: {dec.errors}"
+    assert dec.codegen.text is not None, f"{type(dec).__name__} produced a codegen with no text. Errors: {dec.errors}"
+    return dec.codegen.text
+
+
+def decompile_function(
+    proj: Project,
+    func: Function | str | int,
+    *,
+    fail_fast: bool = True,
+    show_progressbar: bool = False,
+    **kwargs,
+) -> str:
+    """
+    Decompile ``func`` in ``proj`` and return the decompiled code as a plain ``str``.
+
+    Shorthand for ``proj.analyses[Decompiler].prep(fail_fast=True)(func, **kwargs)`` followed by
+    :func:`codegen_text`, for the tests that only want the text. Run the decompiler yourself and call
+    :func:`codegen_text` on the result instead whenever the test also needs the ``Decompiler`` object.
+
+    :param proj:            The project owning ``func``.
+    :param func:            The function to decompile: a ``Function``, its name, or its address.
+    :param fail_fast:       Let exceptions raised inside the decompiler propagate instead of being logged.
+    :param show_progressbar: Show the decompiler progress bar.
+    :param kwargs:          Passed to ``Decompiler`` (``cfg``, ``options``, ``optimization_passes``, ...).
+    :return:                The decompiled code.
+    :raises AssertionError: If decompilation produced no codegen, or the codegen produced no text.
+    """
+    dec = proj.analyses[Decompiler].prep(fail_fast=fail_fast, show_progressbar=show_progressbar)(func, **kwargs)
+    return codegen_text(dec)
 
 
 def set_decompiler_option(decompiler_options: list[tuple] | None, params: list[tuple]) -> list[tuple]:
