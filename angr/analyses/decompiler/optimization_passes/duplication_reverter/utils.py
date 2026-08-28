@@ -93,7 +93,7 @@ def copy_graph_and_nodes(graph: nx.DiGraph):
 #
 
 
-def ail_block_from_stmts(stmts, idx=None, block_addr=None) -> Block | None:
+def ail_block_from_stmts(stmts, idx: int | None = None, block_addr: int | None = None) -> Block | None:
     if not stmts:
         return None
 

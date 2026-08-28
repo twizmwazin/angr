@@ -14,7 +14,14 @@ class Goto:
     will differ).
     """
 
-    def __init__(self, src_addr, dst_addr, src_idx=None, dst_idx=None, src_ins_addr=None):
+    def __init__(
+        self,
+        src_addr,
+        dst_addr,
+        src_idx: int | None = None,
+        dst_idx: int | None = None,
+        src_ins_addr: int | None = None,
+    ):
         self.src_addr = src_addr
         self.dst_addr = dst_addr
         self.src_idx = src_idx
@@ -43,7 +50,7 @@ class GotoManager:
     This should be populated using GotoSimplifier.
     """
 
-    def __init__(self, func, gotos=None):
+    def __init__(self, func, gotos: set[Goto] | None = None):
         self.func = func
         self.gotos: set[Goto] = gotos or set()
 
