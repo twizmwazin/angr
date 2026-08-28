@@ -1,9 +1,14 @@
 # pylint:disable=no-self-use
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 import pyvex
 
 from .errors import SimSlicerError
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Collection
 
 
 class SimLightState:
@@ -18,7 +23,13 @@ class SimLightState:
         "temps",
     )
 
-    def __init__(self, temps=None, regs=None, stack_offsets=None, options=None):
+    def __init__(
+        self,
+        temps: set[int] | dict[int, int] | None = None,
+        regs: set[int] | dict[int, int] | None = None,
+        stack_offsets: set[int] | None = None,
+        options: dict[str, bool] | None = None,
+    ):
         self.temps = temps if temps is not None else set()
         self.regs = regs if regs is not None else set()
         self.stack_offsets = stack_offsets if stack_offsets is not None else set()
@@ -34,11 +45,11 @@ class SimSlicer:
         self,
         arch,
         statements,
-        target_tmps=None,
-        target_regs=None,
-        target_stack_offsets=None,
-        inslice_callback=None,
-        inslice_callback_infodict=None,
+        target_tmps: Collection[int] | None = None,
+        target_regs: Collection[int] | None = None,
+        target_stack_offsets: Collection[int] | None = None,
+        inslice_callback: Callable[[int, pyvex.IRStmt.IRStmt, dict[str, Any] | None], None] | None = None,
+        inslice_callback_infodict: dict[str, Any] | None = None,
         include_imarks: bool = True,
     ):
         self._arch = arch

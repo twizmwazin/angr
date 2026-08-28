@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from .errors import SimStateOptionsError
 
 _NO_DEFAULT_VALUE = "_NO_DEFAULT_VALUE"  # please god don't use this value as the default value of your state option
@@ -18,7 +20,7 @@ class StateOption:
         "types",
     )
 
-    def __init__(self, name, types, default=_NO_DEFAULT_VALUE, description=None):
+    def __init__(self, name, types, default=_NO_DEFAULT_VALUE, description: str | None = None):
         self.name = name
         self.types = tuple(types)
         self.default = default
@@ -369,7 +371,7 @@ class SimStateOptions:
         return "\n".join(total)
 
     @classmethod
-    def register_option(cls, name, types, default=None, description=None):
+    def register_option(cls, name, types, default: Any = None, description: str | None = None):
         """
         Register a state option.
 
@@ -390,7 +392,7 @@ class SimStateOptions:
         cls.OPTIONS[name] = o
 
     @classmethod
-    def register_bool_option(cls, name, description=None):
+    def register_bool_option(cls, name, description: str | None = None):
         """
         Register a Boolean switch as state option.
         This is equivalent to cls.register_option(name, set([bool]), description=description)

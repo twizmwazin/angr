@@ -257,7 +257,7 @@ class VaultDict(Vault):
     A Vault that uses a dictionary for storage.
     """
 
-    def __init__(self, d=None):
+    def __init__(self, d: dict[str, bytes] | shelve.Shelf | None = None):
         super().__init__()
         self._dict = {} if d is None else d
 
@@ -279,7 +279,7 @@ class VaultDict(Vault):
     def is_stored(self, i):
         return i in self._dict
 
-    def keys(self):
+    def keys(self) -> collections.abc.Set[str]:
         return self._dict.keys()
 
 
@@ -288,7 +288,7 @@ class VaultDir(Vault):
     A Vault that uses a directory for storage.
     """
 
-    def __init__(self, d=None):
+    def __init__(self, d: str | None = None):
         super().__init__()
         self._dir = tempfile.mkdtemp() if d is None else d
         with contextlib.suppress(FileExistsError):
@@ -316,7 +316,7 @@ class VaultShelf(VaultDict):
     A Vault that uses a shelve.Shelf for storage.
     """
 
-    def __init__(self, path=None):
+    def __init__(self, path: str | None = None):
         self._path = tempfile.mktemp() if path is None else path
         s = shelve.open(self._path, protocol=-1)  # noqa: SIM115
         super().__init__(s)
@@ -332,7 +332,7 @@ class VaultDirShelf(VaultDict):
     else it references.
     """
 
-    def __init__(self, d=None):
+    def __init__(self, d: str | None = None):
         super().__init__()
         self._d = tempfile.mkdtemp() if d is None else d
         self._dict = None  # will be initialized at each call to store() or load()
