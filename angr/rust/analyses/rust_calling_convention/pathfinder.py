@@ -103,7 +103,7 @@ class Pathfinder:
             graph.add_edge(u, v)
         return graph
 
-    def find_backward_path(self, block, max_length=None):
+    def find_backward_path(self, block, max_length: int | None = None):
         visited = {block}
         path = [block]
         try:
@@ -119,7 +119,7 @@ class Pathfinder:
             pass
         return path
 
-    def find_forward_path(self, block, max_length=None):
+    def find_forward_path(self, block, max_length: int | None = None):
         visited = {block}
         path = [block]
         try:

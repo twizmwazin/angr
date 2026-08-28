@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import traceback
 from collections import OrderedDict
+from typing import TYPE_CHECKING
 
 from angr.ailment import Manager
 from angr.ailment.block import Block
@@ -37,6 +38,9 @@ from angr.sim_type import SimTypeFunction
 from .fact_collector import FactCollector
 from .rust_calling_convention_model import RustCallingConventionModel
 
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
 l = logging.getLogger(name=__name__)
 
 
@@ -61,12 +65,12 @@ class RustCallingConventionAnalysis(Analysis):
         func,
         *,
         ail_manager: Manager,
-        callsite_path=None,
-        post_callsite_path=None,
-        is_call_expr=None,
+        callsite_path: Sequence[Block] | None = None,
+        post_callsite_path: Sequence[Block] | None = None,
+        is_call_expr: bool | None = None,
         depth=0,
         max_depth=8,
-        callsite_discriminant_hint=None,
+        callsite_discriminant_hint: tuple[int, bool] | None = None,
     ):
         self.func: Function = func
         self.ail_manager = ail_manager

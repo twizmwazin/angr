@@ -4,10 +4,14 @@ import logging
 import os
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from angr.analyses.analysis import AnalysesHub, Analysis
 from angr.rust.utils.demangler import demangle
 from angr.rust.utils.rust_sigs import get_default_sig_dir
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 l = logging.getLogger(name=__name__)
 
@@ -20,7 +24,7 @@ class RustcVersionIdentification(Analysis):
 
     OPT_LEVELS = ["0", "1", "2", "3"]
 
-    def __init__(self, sig_dirs=None):
+    def __init__(self, sig_dirs: Sequence[Path] | None = None):
         super().__init__()
 
         self.sig_dirs = []

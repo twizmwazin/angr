@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from angr.ailment import Assignment
 from angr.ailment.expression import Call, FunctionLikeMacro, StringLiteral, VirtualVariable
 from angr.analyses.analysis import AnalysesHub, Analysis
 from angr.rust.sim_type import RustSimTypeFunction, RustSimTypeStrRef, is_composite_type
 
+if TYPE_CHECKING:
+    from angr.analyses.decompiler.variable_map import VariableMap
+
 
 class RustTypeHintsAnalysis(Analysis):
     """Collect type hints from Rust-specific patterns in the AIL graph."""
 
-    def __init__(self, func, graph, variable_map=None):
+    def __init__(self, func, graph, variable_map: VariableMap | None = None):
         self._func = func
         self._graph = graph
         self._variable_map = variable_map

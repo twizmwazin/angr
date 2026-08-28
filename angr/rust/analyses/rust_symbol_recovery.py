@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from angr.analyses.analysis import AnalysesHub, Analysis
 from angr.rust.utils.demangler import demangle
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 l = logging.getLogger(name=__name__)
 
@@ -18,7 +22,7 @@ class RustSymbolRecovery(Analysis):
 
     OPT_LEVELS = ["0", "1", "2", "3"]
 
-    def __init__(self, sig_dirs=None):
+    def __init__(self, sig_dirs: Sequence[Path] | None = None):
         super().__init__()
 
         self.rust_symbols = {}
