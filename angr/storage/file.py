@@ -79,7 +79,15 @@ class SimFileBase(SimStatePlugin):
     seekable = False
     pos = None
 
-    def __init__(self, name=None, writable=True, ident=None, concrete=False, file_exists=True, **kwargs):
+    def __init__(
+        self,
+        name: str | bytes | None = None,
+        writable=True,
+        ident: str | None = None,
+        concrete=False,
+        file_exists=True,
+        **kwargs,
+    ):
         self.name = name
         self.ident = ident
         self.writable = writable
@@ -132,7 +140,7 @@ class SimFileBase(SimStatePlugin):
         """
         raise NotImplementedError
 
-    def write(self, pos, data, size=None, **kwargs):
+    def write(self, pos, data, size: int | claripy.ast.BV | None = None, **kwargs):
         """
         Write some data to the file.
 
@@ -184,14 +192,14 @@ class SimFile(SimFileBase, DefaultMemory):  # TODO: pick a better base class omg
 
     def __init__(
         self,
-        name=None,
-        content=None,
-        size=None,
-        has_end=None,
+        name: str | bytes | None = None,
+        content: bytes | str | claripy.ast.Base | SimActionObject | None = None,
+        size: int | claripy.ast.BV | None = None,
+        has_end: bool | None = None,
         seekable=True,
         writable=True,
-        ident=None,
-        concrete=None,
+        ident: str | None = None,
+        concrete: bool | None = None,
         **kwargs,
     ):
         kwargs["memory_id"] = kwargs.get("memory_id", "file")
@@ -319,7 +327,7 @@ class SimFile(SimFileBase, DefaultMemory):  # TODO: pick a better base class omg
         # note: this assumes that constraints cannot be removed
         return self.load(pos, passed_max_size, disable_actions=disable_actions, inspect=inspect), size, size + pos
 
-    def write(self, pos, data, size=None, events=True, **kwargs):
+    def write(self, pos, data, size: int | claripy.ast.BV | None = None, events=True, **kwargs):
         if events:
             self.state.history.add_event("fs_write", filename=self.name, data=data, size=size, pos=pos)
 
@@ -344,7 +352,7 @@ class SimFile(SimFileBase, DefaultMemory):  # TODO: pick a better base class omg
         o.file_exists = self.file_exists
         return o
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: SimFile | None = None):  # pylint: disable=unused-argument
         if not all(type(o) is type(self) for o in others):
             raise SimMergeError("Cannot merge files of disparate type")
 
@@ -370,7 +378,13 @@ class SimFileStream(SimFile):
     :ivar pos:      The current position in the file.
     """
 
-    def __init__(self, name=None, content=None, pos=0, **kwargs):
+    def __init__(
+        self,
+        name: str | bytes | None = None,
+        content: bytes | str | claripy.ast.Base | SimActionObject | None = None,
+        pos=0,
+        **kwargs,
+    ):
         super().__init__(name=name, content=content, **kwargs)
         self.pos = pos
 
@@ -390,7 +404,7 @@ class SimFileStream(SimFile):
             self.pos = pos
         return data, size, pos
 
-    def write(self, _, data, size=None, **kwargs):
+    def write(self, _, data, size: int | claripy.ast.BV | None = None, **kwargs):
         self.pos = super().write(self.pos, data, size, **kwargs)
 
     @SimStatePlugin.memo
@@ -399,7 +413,7 @@ class SimFileStream(SimFile):
         c.pos = self.pos
         return c
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: SimFile | None = None):  # pylint: disable=unused-argument
         self.pos = claripy.ite_cases(zip(merge_conditions[1:], [o.pos for o in others]), self.pos)
         return super().merge(others, merge_conditions, common_ancestor=common_ancestor)
 
@@ -425,7 +439,15 @@ class SimPackets(SimFileBase):
     :ivar content:      A list of packets, as tuples of content ASTs and size ASTs.
     """
 
-    def __init__(self, name, write_mode=None, content=None, writable=True, ident=None, **kwargs):
+    def __init__(
+        self,
+        name,
+        write_mode: bool | None = None,
+        content: list | None = None,
+        writable=True,
+        ident: str | None = None,
+        **kwargs,
+    ):
         super().__init__(name, writable=writable, ident=ident, **kwargs)
 
         self.write_mode = write_mode
@@ -570,7 +592,7 @@ class SimPackets(SimFileBase):
         self.content.append(packet)
         return (*packet, pos + 1)
 
-    def write(self, pos, data, size=None, events=True, **kwargs):
+    def write(self, pos, data, size: int | claripy.ast.BV | None = None, events=True, **kwargs):
         """
         Write a packet to the stream.
 
@@ -626,7 +648,7 @@ class SimPackets(SimFileBase):
         o.sanitized = getattr(self, "sanitized", 0)
         return o
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: SimPackets | None = None):  # pylint: disable=unused-argument
         for o in others:
             if o.write_mode is None:
                 continue
@@ -681,7 +703,7 @@ class SimPacketsStream(SimPackets):
             self.pos = pos
         return data, size, pos
 
-    def write(self, _, data, size=None, **kwargs):
+    def write(self, _, data, size: int | claripy.ast.BV | None = None, **kwargs):
         self.pos = super().write(self.pos, data, size, **kwargs)
 
     @SimStatePlugin.memo
@@ -690,7 +712,7 @@ class SimPacketsStream(SimPackets):
         c.pos = self.pos
         return c
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: SimPackets | None = None):  # pylint: disable=unused-argument
         if any(o.pos != self.pos for o in others):
             raise SimMergeError("Can't merge SimPacketsStreams with disparate positions")
         return super().merge(others, merge_conditions, common_ancestor=common_ancestor)
@@ -761,7 +783,7 @@ class SimFileDescriptorBase(SimStatePlugin):
         """
         raise NotImplementedError
 
-    def write_data(self, data, size=None, **kwargs):
+    def write_data(self, data, size: int | claripy.ast.BV | None = None, **kwargs):
         """
         Write some data, provided as an argument into the file.
 
@@ -894,7 +916,7 @@ class SimFileDescriptor(SimFileDescriptorBase):
         data, realsize, self._pos = self.file.read(self._pos, size)
         return data, realsize
 
-    def write_data(self, data, size=None, **kwargs):
+    def write_data(self, data, size: int | claripy.ast.BV | None = None, **kwargs):
         if self.flags & Flags.O_APPEND and self.file.seekable:
             self._pos = self.file.size
 
@@ -979,7 +1001,7 @@ class SimFileDescriptor(SimFileDescriptorBase):
         c._pos = self._pos
         return c
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: SimFileDescriptor | None = None):  # pylint: disable=unused-argument
         # do NOT merge file content - descriptors do not have ownership, prevent duplicate merging
         if not all(type(o) is type(self) for o in others):
             l.error("Cannot merge SimFileDescriptors of disparate types")
@@ -1025,7 +1047,7 @@ class SimFileDescriptorDuplex(SimFileDescriptorBase):
         data, realsize, self._read_pos = self._read_file.read(self._read_pos, size)
         return data, realsize
 
-    def write_data(self, data, size=None, **kwargs):
+    def write_data(self, data, size: int | claripy.ast.BV | None = None, **kwargs):
         data = _deps_unpack(data)[0]
         if size is None:
             size = len(data) // self.state.arch.byte_width if isinstance(data, claripy.ast.Bits) else len(data)
@@ -1089,7 +1111,7 @@ class SimFileDescriptorDuplex(SimFileDescriptorBase):
         c._write_pos = self._write_pos
         return c
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: SimFileDescriptorDuplex | None = None):  # pylint: disable=unused-argument
         # do NOT merge storage mechanisms here - fs and posix handle that
         if not all(type(o) is type(self) for o in others):
             raise SimMergeError("Cannot merge SimFileDescriptors of disparate types")
@@ -1132,7 +1154,7 @@ class SimPacketsSlots(SimFileBase):
 
     seekable = False
 
-    def __init__(self, name, read_sizes, ident=None, **kwargs):
+    def __init__(self, name, read_sizes, ident: str | None = None, **kwargs):
         super().__init__(name, writable=False, ident=ident)
 
         self.read_sizes = read_sizes
@@ -1169,7 +1191,7 @@ class SimPacketsSlots(SimFileBase):
         self.read_data.append(data)
         return data, real_size, None
 
-    def write(self, pos, data, size=None, **kwargs):
+    def write(self, pos, data, size: int | claripy.ast.BV | None = None, **kwargs):
         raise SimFileError("Trying to write to SimPacketsSlots? Illegal")
 
     @property
@@ -1182,7 +1204,7 @@ class SimPacketsSlots(SimFileBase):
         o.read_data = list(self.read_data)
         return o
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor: SimPacketsSlots | None = None):  # pylint: disable=unused-argument
         if any(self.read_sizes != o.read_sizes for o in others):
             raise SimMergeError("Can't merge SimPacketsSlots with disparate reads")
         already_read_sizes = [len(x) for x in self.read_data]

@@ -31,7 +31,7 @@ class SimMemoryObject:
         "object",
     )
 
-    def __init__(self, obj, base, endness, length=None, byte_width=8):
+    def __init__(self, obj, base, endness, length: int | None = None, byte_width=8):
         if type(obj) is bytes:
             assert byte_width == 8
 
@@ -158,7 +158,7 @@ class SimLabeledMemoryObject(SimMemoryObject):
 
     __slots__ = ("label",)
 
-    def __init__(self, obj, base, endness, length=None, byte_width=8, label=None):
+    def __init__(self, obj, base, endness, length: int | None = None, byte_width=8, label: dict | None = None):
         super().__init__(obj, base, endness, length=length, byte_width=byte_width)
         self.label = label
 
