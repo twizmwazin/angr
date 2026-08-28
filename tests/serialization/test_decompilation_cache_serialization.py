@@ -28,7 +28,7 @@ from angr.analyses.decompiler.optimization_passes.expr_op_swapper import OpDescr
 from angr.analyses.decompiler.optimization_passes.static_vvar_rewriter import FixedBuffer, FixedBufferPtr
 from angr.analyses.decompiler.peephole_optimizations import EXPR_OPTS
 from angr.analyses.decompiler.structured_codegen import DummyStructuredCodeGenerator
-from angr.analyses.decompiler.structured_codegen.c import CConstruct
+from angr.analyses.decompiler.structured_codegen.c import CConstruct, CStructuredCodeGenerator
 from angr.analyses.decompiler.structured_codegen.c_serialize import (
     _DISPLAY_OPTION_ATTRS,
     _DISPLAY_OPTION_FIELD_FIRST,
@@ -50,7 +50,7 @@ from angr.utils.ail_serialization import (
     parse_static_buffers,
     parse_static_vvars,
 )
-from tests.common import bin_location
+from tests.common import bin_location, codegen_text
 
 test_location = os.path.join(bin_location, "tests")
 
@@ -196,15 +196,19 @@ class TestDecompilationCacheEndToEnd(unittest.TestCase):
     def setUpClass(cls):
         cls.proj = angr.Project(os.path.join(test_location, "x86_64", "fauxware"), auto_load_libs=False)
         cls.cfg = cls.proj.analyses.CFGFast(normalize=True)
-        cls.func = cls.proj.kb.functions.function(name="authenticate")
+        func = cls.proj.kb.functions.function(name="authenticate")
+        assert func is not None, "fauxware has no function named 'authenticate'"
+        cls.func = func
         cls.decompiler = cls.proj.analyses.Decompiler(cls.func, cfg=cls.cfg.model, generate_code=True)
 
     def test_codegen_roundtrip(self):
         codegen = self.decompiler.codegen
+        assert isinstance(codegen, CStructuredCodeGenerator), f"decompilation produced no C codegen: {codegen!r}"
         blob = codegen.serialize()
         back = type(codegen).parse(blob, project=self.proj, kb=self.proj.kb)
         assert back.text == codegen.text
         assert back.cfunc is not None
+        assert codegen.cfunc is not None
         assert back.cfunc.name == codegen.cfunc.name
         assert back.cfunc.addr == codegen.cfunc.addr
         assert back.flavor == codegen.flavor
@@ -212,6 +216,7 @@ class TestDecompilationCacheEndToEnd(unittest.TestCase):
         assert back.cfunc.idx == codegen.cfunc.idx
         assert back.cfunc.ident == codegen.cfunc.ident
 
+        assert codegen.map_pos_to_node is not None
         live_nodes = {
             id(elem.obj): elem.obj for _, elem in codegen.map_pos_to_node.items() if isinstance(elem.obj, CConstruct)
         }
@@ -228,6 +233,7 @@ class TestDecompilationCacheEndToEnd(unittest.TestCase):
 
     def test_clinic_roundtrip(self):
         clinic = self.decompiler.clinic
+        assert clinic is not None, "decompilation produced no clinic"
         back = type(clinic).parse(
             clinic.serialize(),
             project=self.proj,
@@ -236,6 +242,7 @@ class TestDecompilationCacheEndToEnd(unittest.TestCase):
             cfg=clinic._cfg,
         )
         # the fields the decompiler's cache-reuse path consumes round-trip
+        assert clinic.cc_graph is not None and clinic.graph is not None
         assert back.cc_graph.number_of_nodes() == clinic.cc_graph.number_of_nodes()
         assert back.graph.number_of_nodes() == clinic.graph.number_of_nodes()
         assert back.graph.number_of_edges() == clinic.graph.number_of_edges()
@@ -303,6 +310,7 @@ class TestDecompilationCacheEndToEnd(unittest.TestCase):
             self.func, cfg=self.cfg.model, peephole_optimizations=list(EXPR_OPTS[:2]), regen_clinic=True
         )
         clinic = dec.clinic
+        assert clinic is not None, "decompilation produced no clinic"
         # simulate a peephole pass defined by an analysis/plugin that is not imported
         clinic.unresolvable_peephole_optimizations = ["PluginOnlyPeephole"]
 
@@ -328,6 +336,7 @@ class TestDecompilationCacheEndToEnd(unittest.TestCase):
 
     def test_decompilation_cache_roundtrip(self):
         cache = self.decompiler.cache
+        assert cache is not None, "decompilation produced no cache"
         blob = cache.serialize()
         back = DecompilationCache.parse(
             blob,
@@ -339,7 +348,7 @@ class TestDecompilationCacheEndToEnd(unittest.TestCase):
         assert back.addr == cache.addr
         assert back.errors == cache.errors
         assert back.function_summary == cache.function_summary
-        assert back.codegen.text == cache.codegen.text
+        assert codegen_text(back) == codegen_text(cache)
         # version and timestamp are set at decompile time and round-trip verbatim
         assert cache.version == angr.__version__
         assert cache.timestamp > 0
@@ -351,6 +360,7 @@ class TestDecompilationCacheEndToEnd(unittest.TestCase):
 
     def test_cache_hit_on_deserialized_cache(self):
         cache = self.decompiler.cache
+        assert cache is not None, "decompilation produced no cache"
         blob = cache.serialize()
         parsed_cache = DecompilationCache.parse(
             blob,
@@ -366,7 +376,7 @@ class TestDecompilationCacheEndToEnd(unittest.TestCase):
 
         # Second decompile run with the same inputs should consume the deserialized cache.
         d2 = self.proj.analyses.Decompiler(self.func, cfg=self.cfg.model, generate_code=True)
-        assert d2.codegen.text == self.decompiler.codegen.text
+        assert codegen_text(d2) == codegen_text(self.decompiler)
 
     def test_full_reuse_fast_path(self):
         # With use_cache=True and regen_clinic=False (both defaults), a valid cache short-circuits the pipeline and
@@ -374,24 +384,28 @@ class TestDecompilationCacheEndToEnd(unittest.TestCase):
         proj = angr.Project(os.path.join(test_location, "x86_64", "fauxware"), auto_load_libs=False)
         cfg = proj.analyses.CFGFast(normalize=True)
         func = proj.kb.functions.function(name="authenticate")
+        assert func is not None, "fauxware has no function named 'authenticate'"
         d1 = proj.analyses.Decompiler(func, cfg=cfg.model)
         cache = proj.kb.decompilations[(func.addr, "pseudocode")]
 
         d2 = proj.analyses.Decompiler(func, cfg=cfg.model)
         assert d2.codegen is d1.codegen
         assert d2.clinic is d1.clinic
-        assert d2.codegen.text == d1.codegen.text
-        assert d2.codegen.version == cache.version == angr.__version__
-        assert d2.codegen.timestamp == cache.timestamp > 0
+        assert codegen_text(d2) == codegen_text(d1)
+        d2_codegen = d2.codegen
+        assert d2_codegen is not None
+        assert d2_codegen.version == cache.version == angr.__version__
+        assert d2_codegen.timestamp == cache.timestamp > 0
 
     def test_regen_clinic_forces_fresh_decompilation(self):
         proj = angr.Project(os.path.join(test_location, "x86_64", "fauxware"), auto_load_libs=False)
         cfg = proj.analyses.CFGFast(normalize=True)
         func = proj.kb.functions.function(name="authenticate")
+        assert func is not None, "fauxware has no function named 'authenticate'"
         d1 = proj.analyses.Decompiler(func, cfg=cfg.model)
         d2 = proj.analyses.Decompiler(func, cfg=cfg.model, regen_clinic=True)
         assert d2.codegen is not d1.codegen
-        assert d2.codegen.text == d1.codegen.text
+        assert codegen_text(d2) == codegen_text(d1)
 
 
 class TestSpillingDecompilationDict(unittest.TestCase):
@@ -401,10 +415,17 @@ class TestSpillingDecompilationDict(unittest.TestCase):
     def setUpClass(cls):
         cls.proj = angr.Project(os.path.join(test_location, "x86_64", "fauxware"), auto_load_libs=False)
         cls.cfg = cls.proj.analyses.CFGFast(normalize=True)
-        cls.auth_func = cls.proj.kb.functions.function(name="authenticate")
-        cls.main_func = cls.proj.kb.functions.function(name="main")
+        auth_func = cls.proj.kb.functions.function(name="authenticate")
+        main_func = cls.proj.kb.functions.function(name="main")
+        assert auth_func is not None and main_func is not None, "fauxware is missing 'authenticate' or 'main'"
+        cls.auth_func = auth_func
+        cls.main_func = main_func
         cls.auth_dec = cls.proj.analyses.Decompiler(cls.auth_func, cfg=cls.cfg.model, generate_code=True)
         cls.main_dec = cls.proj.analyses.Decompiler(cls.main_func, cfg=cls.cfg.model, generate_code=True)
+        auth_cache, main_cache = cls.auth_dec.cache, cls.main_dec.cache
+        assert auth_cache is not None and main_cache is not None, "decompilation produced no cache"
+        cls.auth_cache = auth_cache
+        cls.main_cache = main_cache
 
     def test_default_backing_store_is_spilling(self):
         assert isinstance(self.proj.kb.decompilations.cached, SpillingDecompilationDict)
@@ -413,8 +434,8 @@ class TestSpillingDecompilationDict(unittest.TestCase):
         d = SpillingDecompilationDict(self.proj.kb, cache_limit=1)
         auth_key = (self.auth_func.addr, "pseudocode")
         main_key = (self.main_func.addr, "pseudocode")
-        d[auth_key] = self.auth_dec.cache
-        d[main_key] = self.main_dec.cache
+        d[auth_key] = self.auth_cache
+        d[main_key] = self.main_cache
 
         # the LRU (authenticate) entry must have been spilled
         assert auth_key in d._spilled
@@ -425,10 +446,10 @@ class TestSpillingDecompilationDict(unittest.TestCase):
 
         # reloading the spilled entry deserializes it with full codegen and version/timestamp
         back = d[auth_key]
-        assert back is not self.auth_dec.cache
-        assert back.codegen.text == self.auth_dec.cache.codegen.text
-        assert back.version == self.auth_dec.cache.version
-        assert back.timestamp == self.auth_dec.cache.timestamp
+        assert back is not self.auth_cache
+        assert codegen_text(back) == codegen_text(self.auth_cache)
+        assert back.version == self.auth_cache.version
+        assert back.timestamp == self.auth_cache.timestamp
         # ... and the reload evicted the other entry in turn
         assert main_key in d._spilled
 
@@ -436,8 +457,8 @@ class TestSpillingDecompilationDict(unittest.TestCase):
         d = SpillingDecompilationDict(self.proj.kb, cache_limit=1)
         auth_key = (self.auth_func.addr, "pseudocode")
         main_key = (self.main_func.addr, "pseudocode")
-        d[auth_key] = self.auth_dec.cache
-        d[main_key] = self.main_dec.cache
+        d[auth_key] = self.auth_cache
+        d[main_key] = self.main_cache
 
         # reload authenticate (spills main), mutate it in place, then spill it again by touching main
         d[auth_key].errors.append("synthetic error")
@@ -454,7 +475,7 @@ class TestSpillingDecompilationDict(unittest.TestCase):
 
         # inserting another entry evicts the dummy cache, which cannot be serialized and must be parked in memory
         main_key = (self.main_func.addr, "pseudocode")
-        d[main_key] = self.main_dec.cache
+        d[main_key] = self.main_cache
         assert dummy_key in d._unspillable
         assert d[dummy_key] is dummy_cache
         assert len(d) == 2
@@ -463,8 +484,8 @@ class TestSpillingDecompilationDict(unittest.TestCase):
         d = SpillingDecompilationDict(self.proj.kb, cache_limit=1)
         auth_key = (self.auth_func.addr, "pseudocode")
         main_key = (self.main_func.addr, "pseudocode")
-        d[auth_key] = self.auth_dec.cache
-        d[main_key] = self.main_dec.cache
+        d[auth_key] = self.auth_cache
+        d[main_key] = self.main_cache
 
         del d[auth_key]  # spilled entry
         del d[main_key]  # in-memory entry
@@ -477,8 +498,8 @@ class TestSpillingDecompilationDict(unittest.TestCase):
         d = SpillingDecompilationDict(self.proj.kb, cache_limit=1)
         auth_key = (self.auth_func.addr, "pseudocode")
         main_key = (self.main_func.addr, "pseudocode")
-        d[auth_key] = self.auth_dec.cache
-        d[main_key] = self.main_dec.cache
+        d[auth_key] = self.auth_cache
+        d[main_key] = self.main_cache
 
         serialized, unserializable = d.export_serialized()
         assert not unserializable
@@ -488,21 +509,21 @@ class TestSpillingDecompilationDict(unittest.TestCase):
         d2.bulk_import_serialized(serialized)
         assert set(d2) == {auth_key, main_key}
         assert d2._spilled == {auth_key, main_key}
-        assert d2[auth_key].codegen.text == self.auth_dec.cache.codegen.text
+        assert codegen_text(d2[auth_key]) == codegen_text(self.auth_cache)
 
     def test_pickle_roundtrip(self):
         d = SpillingDecompilationDict(self.proj.kb, cache_limit=1)
         auth_key = (self.auth_func.addr, "pseudocode")
         main_key = (self.main_func.addr, "pseudocode")
-        d[auth_key] = self.auth_dec.cache
-        d[main_key] = self.main_dec.cache
+        d[auth_key] = self.auth_cache
+        d[main_key] = self.main_cache
         assert auth_key in d._spilled
 
         # serializable entries pickle as protobuf bytes: live caches hold unpicklable analysis internals
         back = pickle.loads(pickle.dumps(d, -1))
         assert set(back) == {auth_key, main_key}
         assert back._spilled == {auth_key, main_key}
-        assert back[auth_key].codegen.text == self.auth_dec.cache.codegen.text
+        assert codegen_text(back[auth_key]) == codegen_text(self.auth_cache)
 
     def test_cache_hit_after_spill(self):
         manager = self.proj.kb.decompilations
@@ -510,12 +531,12 @@ class TestSpillingDecompilationDict(unittest.TestCase):
         try:
             d = SpillingDecompilationDict(self.proj.kb, cache_limit=1)
             manager.cached = d
-            manager[(self.auth_func.addr, "pseudocode")] = self.auth_dec.cache
-            manager[(self.main_func.addr, "pseudocode")] = self.main_dec.cache
+            manager[(self.auth_func.addr, "pseudocode")] = self.auth_cache
+            manager[(self.main_func.addr, "pseudocode")] = self.main_cache
             assert (self.auth_func.addr, "pseudocode") in d._spilled
 
             d2 = self.proj.analyses.Decompiler(self.auth_func, cfg=self.cfg.model, generate_code=True)
-            assert d2.codegen.text == self.auth_dec.codegen.text
+            assert codegen_text(d2) == codegen_text(self.auth_dec)
         finally:
             manager.cached = old_cached
 
