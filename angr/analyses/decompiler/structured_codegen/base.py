@@ -3,10 +3,14 @@ from __future__ import annotations
 
 from enum import Enum
 from itertools import count
+from typing import TYPE_CHECKING
 
 from sortedcontainers import SortedDict
 
 from angr.sim_variable import SimVariable
+
+if TYPE_CHECKING:
+    from angr.analyses.decompiler.notes import DecompilationNote
 
 IdentType = tuple[int, int, str]
 
@@ -138,14 +142,21 @@ class InstructionMapping:
 
 
 class BaseStructuredCodeGenerator:
-    def __init__(self, flavor=None, notes=None, expr_comments=None, stmt_comments=None, const_formats=None):
+    def __init__(
+        self,
+        flavor: str | None = None,
+        notes: dict[str, DecompilationNote] | None = None,
+        expr_comments: dict[int, str] | None = None,
+        stmt_comments: dict[int, str] | None = None,
+        const_formats: dict[IdentType, dict[str, bool]] | None = None,
+    ):
         self.flavor = flavor
         self.text = None
         self.map_pos_to_node = None
         self.map_pos_to_addr = None
         self.map_addr_to_pos = None
         self.map_ast_to_pos: dict[SimVariable, set[PositionMappingElement]] | None = None
-        self.notes = notes if notes is not None else {}
+        self.notes: dict[str, DecompilationNote] = notes if notes is not None else {}
         self.expr_comments: dict[int, str] = expr_comments if expr_comments is not None else {}
         self.stmt_comments: dict[int, str] = stmt_comments if stmt_comments is not None else {}
         self.const_formats: dict[IdentType, dict[str, bool]] = const_formats if const_formats is not None else {}
