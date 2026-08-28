@@ -15,7 +15,9 @@ import archinfo
 from sortedcontainers import SortedDict
 
 import angr
+from angr.analyses import Decompiler
 from angr.analyses.decompiler.clinic import Clinic
+from angr.analyses.decompiler.structured_codegen import CStructuredCodeGenerator
 from angr.analyses.typehoon.simple_solver import SimpleSolver, map_offsets_to_bases
 from angr.analyses.typehoon.translator import TypeTranslator
 from angr.analyses.typehoon.typeconsts import (
@@ -46,6 +48,7 @@ from angr.analyses.typehoon.typevars import (
 from angr.knowledge_plugins.functions.function import PrototypeSource
 from angr.sim_type import (
     SimStruct,
+    SimType,
     SimTypeArray,
     SimTypeBottom,
     SimTypeChar,
@@ -55,9 +58,24 @@ from angr.sim_type import (
     SimTypeNum,
     SimTypePointer,
 )
-from tests.common import bin_location, print_decompilation_result
+from angr.sim_variable import SimMemoryVariable
+from tests.common import bin_location, codegen_text, print_decompilation_result
 
 test_location = os.path.join(bin_location, "tests")
+
+
+def cextern_types(dec: Decompiler) -> dict[int, SimType | None]:
+    """
+    Map the address of every extern (global) variable in ``dec``'s decompilation to the type inferred for it.
+    """
+    codegen = dec.codegen
+    assert isinstance(codegen, CStructuredCodeGenerator)
+    assert codegen.cexterns is not None
+    types: dict[int, SimType | None] = {}
+    for cvar in codegen.cexterns:
+        assert isinstance(cvar.variable, SimMemoryVariable)
+        types[cvar.variable.addr] = cvar.variable_type
+    return types
 
 
 class TestTypehoon(unittest.TestCase):
@@ -92,11 +110,11 @@ class TestTypehoon(unittest.TestCase):
         proj.analyses.CompleteCallingConventions()
 
         dec = proj.analyses.Decompiler(main_func)
-        assert dec.codegen is not None and dec.codegen.text is not None
-        assert "->field_0 = 10;" in dec.codegen.text
-        assert "->field_4 = 20;" in dec.codegen.text
-        assert "->field_8 = 0x30303030;" in dec.codegen.text
-        assert "->field_c = 0;" in dec.codegen.text
+        code = codegen_text(dec)
+        assert "->field_0 = 10;" in code
+        assert "->field_4 = 20;" in code
+        assert "->field_8 = 0x30303030;" in code
+        assert "->field_c = 0;" in code
 
     def test_function_call_argument_type_propagation(self):
         # ensure that UNICODE_STRING is propagated to stack variables from calls to RtlInitUnicodeString
@@ -107,9 +125,9 @@ class TestTypehoon(unittest.TestCase):
         proj.analyses.CompleteCallingConventions()
 
         dec = proj.analyses.Decompiler(main_func, cfg=cfg.model)
-        assert dec.codegen is not None and dec.codegen.text is not None
+        code = codegen_text(dec)
         print_decompilation_result(dec)
-        assert dec.codegen.text.count("UNICODE_STRING v") == 2
+        assert code.count("UNICODE_STRING v") == 2
 
     def test_type_inference_auto_update_and_back_propagation(self):
         bin_path = os.path.join(test_location, "x86_64", "bomb")
@@ -132,7 +150,7 @@ class TestTypehoon(unittest.TestCase):
             func_phase2, fail_fast=True, options=[("constrain_callee_prototypes", True)]
         )
         print_decompilation_result(dec_phase2)
-        assert dec_phase2.codegen is not None and dec_phase2.codegen.text is not None
+        codegen_text(dec_phase2)  # phase_2 must have decompiled into code
         assert func_phase2.prototype_source == PrototypeSource.CCA_DECOMPILER
 
         # (char*, char*) -> ?
@@ -151,7 +169,7 @@ class TestTypehoon(unittest.TestCase):
         dec_read6numbers = proj.analyses.Decompiler(
             func_read6numbers, fail_fast=True, options=[("constrain_callee_prototypes", True)]
         )
-        assert dec_read6numbers.codegen is not None and dec_read6numbers.codegen.text is not None
+        codegen_text(dec_read6numbers)  # read_six_numbers must have decompiled into code
         print_decompilation_result(dec_read6numbers)
         assert func_read6numbers.prototype_source == PrototypeSource.CCA_DECOMPILER
         assert isinstance(func_read6numbers.prototype, SimTypeFunction)
@@ -170,9 +188,9 @@ class TestTypehoon(unittest.TestCase):
         dec_phase2 = proj.analyses.Decompiler(
             func_phase2, fail_fast=True, options=[("constrain_callee_prototypes", True)], regen_clinic=True
         )
-        assert dec_phase2.codegen is not None and dec_phase2.codegen.text is not None
+        code = codegen_text(dec_phase2)
         print_decompilation_result(dec_phase2)
-        assert re.search(r"  int v\d+\[6];", dec_phase2.codegen.text) is not None
+        assert re.search(r"  int v\d+\[6];", code) is not None
 
     def test_type_inference_basic_case_0(self):
         func_f = TypeVariable(name="F")
@@ -269,11 +287,11 @@ class TestTypehoon(unittest.TestCase):
         func = cfg.kb.functions["Cipher"]
         p.analyses.CompleteCallingConventions()
         dec = p.analyses.Decompiler(func, cfg=cfg.model)
-        assert dec.codegen is not None and dec.codegen.text is not None
-        print(dec.codegen.text)
+        code = codegen_text(dec)
+        print(code)
 
         # no masking should exist in the decompilation; all redundant variable type casts are removed
-        assert "& 0x" not in dec.codegen.text
+        assert "& 0x" not in code
 
         assert dec.clinic is not None and dec.clinic.typehoon is not None
         assert 0 < max(dec.clinic.typehoon.eqclass_constraints_count) < 350
@@ -284,12 +302,8 @@ class TestTypehoon(unittest.TestCase):
         p.analyses.CompleteCallingConventions()
         func = cfg.kb.functions[0x403140]
         dec = p.analyses.Decompiler(func, cfg=cfg.model)
-        assert (
-            dec.codegen is not None
-            and dec.codegen.text is not None
-            and dec.clinic is not None
-            and dec.clinic.typehoon is not None
-        )
+        codegen_text(dec)  # the function must have decompiled into code
+        assert dec.clinic is not None and dec.clinic.typehoon is not None
 
         # it has exactly one struct class that looks like the following:
         # struct struct_0 {
@@ -324,15 +338,11 @@ class TestTypehoon(unittest.TestCase):
         p.analyses.CompleteCallingConventions()
         func = cfg.kb.functions[0x4030F0]
         dec = p.analyses.Decompiler(func, cfg=cfg.model)
-        assert (
-            dec.codegen is not None
-            and dec.codegen.text is not None
-            and dec.clinic is not None
-            and dec.clinic.typehoon is not None
-        )
+        code = codegen_text(dec)
+        assert dec.clinic is not None and dec.clinic.typehoon is not None
         print_decompilation_result(dec)
-        assert "->field_0 = NULL;\n" in dec.codegen.text
-        assert "->field_8 = NULL;\n" in dec.codegen.text
+        assert "->field_0 = NULL;\n" in code
+        assert "->field_8 = NULL;\n" in code
 
         # it has five struct classes (I would love to have one, but we don't have enough information to force that):
         #
@@ -402,14 +412,14 @@ class TestTypehoon(unittest.TestCase):
         func = cfg.kb.functions["G_CheckSpot"]
         dec = proj.analyses.Decompiler(func, cfg=cfg.model)
         bodyqueslot_addr = proj.loader.find_symbol("bodyqueslot").rebased_addr
-        cexterns = {cvar.variable.addr: cvar.variable_type for cvar in dec.codegen.cexterns}
+        cexterns = cextern_types(dec)
         assert isinstance(cexterns[bodyqueslot_addr], SimTypeInt)
 
         # Test displayplayer from G_Responder
         func = cfg.kb.functions["G_Responder"]
         dec = proj.analyses.Decompiler(func, cfg=cfg.model)
         displayplayer_addr = proj.loader.find_symbol("displayplayer").rebased_addr
-        cexterns = {cvar.variable.addr: cvar.variable_type for cvar in dec.codegen.cexterns}
+        cexterns = cextern_types(dec)
         assert isinstance(cexterns[displayplayer_addr], SimTypeInt)
 
         # Test joyxmove, mousex, and gametic from G_DoLoadLevel
@@ -418,7 +428,7 @@ class TestTypehoon(unittest.TestCase):
         joyxmove_addr = proj.loader.find_symbol("joyxmove").rebased_addr
         mousex_addr = proj.loader.find_symbol("mousex").rebased_addr
         gametic_addr = proj.loader.find_symbol("gametic").rebased_addr
-        cexterns = {cvar.variable.addr: cvar.variable_type for cvar in dec.codegen.cexterns}
+        cexterns = cextern_types(dec)
         assert isinstance(cexterns[joyxmove_addr], SimTypeInt)
         assert isinstance(cexterns[mousex_addr], SimTypeInt)
         assert isinstance(cexterns[gametic_addr], SimTypeInt)
@@ -432,13 +442,9 @@ class TestTypehoon(unittest.TestCase):
         func = cfg.functions[0x18003CA70]
         assert func is not None
         dec = proj.analyses.Decompiler(func, cfg=cfg)
-        assert (
-            dec.codegen is not None
-            and dec.codegen.text is not None
-            and dec.clinic is not None
-            and dec.clinic.typehoon is not None
-        )
-        # print(dec.codegen.text)
+        codegen_text(dec)  # the function must have decompiled into code
+        assert dec.clinic is not None and dec.clinic.typehoon is not None
+        # print(codegen_text(dec))
         sols = dec.clinic.typehoon.simtypes_solution
         all_sols = {v.label for v in sols.values()}
         assert "HKEY" in all_sols
