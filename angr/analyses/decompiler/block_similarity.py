@@ -116,7 +116,7 @@ def is_similar(
 #
 
 
-def _kmp_search_ail_obj(search_pattern, stmt_seq, graph=None, partial=True):
+def _kmp_search_ail_obj(search_pattern, stmt_seq, graph: nx.DiGraph | None = None, partial=True):
     """
     Uses the Knuth-Morris-Pratt algorithm for searching.
     Found: https://code.activestate.com/recipes/117214/.
@@ -148,7 +148,9 @@ def _kmp_search_ail_obj(search_pattern, stmt_seq, graph=None, partial=True):
             yield start_pos
 
 
-def index_of_similar_stmts(search_stmts, other_stmts, graph=None, all_positions=False) -> int | None:
+def index_of_similar_stmts(
+    search_stmts, other_stmts, graph: nx.DiGraph | None = None, all_positions=False
+) -> int | None:
     """
     Returns the index of the first occurrence of the search_stmts (a list of Statement) in other_stmts (a list of
     Statement). If all_positions is True, returns a list of all positions.
@@ -163,7 +165,7 @@ def index_of_similar_stmts(search_stmts, other_stmts, graph=None, all_positions=
     return positions.pop() if not all_positions else positions
 
 
-def in_other(stmts, other, graph=None):
+def in_other(stmts, other, graph: nx.DiGraph | None = None):
     """
     Returns True if the stmts (a list of Statement) is found as a subsequence in other
 
@@ -174,7 +176,7 @@ def in_other(stmts, other, graph=None):
 
 
 def longest_ail_subseq(
-    stmts_list: list[list[Statement]], graph=None
+    stmts_list: list[list[Statement]], graph: nx.DiGraph | None = None
 ) -> tuple[list[Statement] | None, list[int] | None]:
     """
     Given a list of List[Statement], it returns the longest List[Statement] that is a subsequence of all the lists.
