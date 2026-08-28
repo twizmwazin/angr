@@ -19,6 +19,8 @@ from angr.ailment.expression import (
     VirtualVariableCategory,
 )
 from angr.ailment.statement import CAS, DirtyStatement, Jump, Store, WeakAssignment
+from angr.analyses.decompiler.decompiler import Decompiler
+from angr.analyses.decompiler.structured_codegen.c import CStructuredCodeGenerator
 from angr.analyses.decompiler.structured_codegen.rust import RustExpression, RustStructuredCodeGenerator
 from angr.analyses.decompiler.structurer_nodes import (
     IncompleteSwitchCaseHeadStatement,
@@ -27,7 +29,7 @@ from angr.analyses.decompiler.structurer_nodes import (
 )
 from angr.rust.sim_type import RustSimTypeInt, RustSimTypeStrRef
 from angr.sim_type import SimTypeBottom
-from tests.common import bin_location, load_project_with_scoped_cfg, print_decompilation_result
+from tests.common import bin_location, codegen_text, load_project_with_scoped_cfg, print_decompilation_result
 
 test_location = os.path.join(bin_location, "tests")
 
@@ -45,13 +47,16 @@ class TestRustCodegenHandlers(unittest.TestCase):
     handler silently drops whatever the statement contained.
     """
 
+    proj: angr.Project
+    codegen: RustStructuredCodeGenerator
+
     @classmethod
     def setUpClass(cls):
         # any binary will do: we only need a constructed Rust code generator to drive handlers with
         proj = angr.Project(os.path.join(test_location, "x86_64", "fauxware"), auto_load_libs=False)
         cfg = proj.analyses.CFGFast(normalize=True, show_progressbar=False)
-        dec = proj.analyses.Decompiler(proj.kb.functions["main"], cfg=cfg.model, flavor="rust", fail_fast=True)
-        assert dec.codegen is not None
+        dec = proj.analyses[Decompiler].prep(fail_fast=True)(proj.kb.functions["main"], cfg=cfg.model, flavor="rust")
+        assert isinstance(dec.codegen, RustStructuredCodeGenerator)
         cls.proj = proj
         cls.codegen = dec.codegen
 
@@ -66,8 +71,8 @@ class TestRustCodegenHandlers(unittest.TestCase):
         """A missing handler degrades silently, so guard the whole class rather than one node type at a time."""
         proj = self.proj
         cfg = proj.kb.cfgs.get_most_accurate()
-        c_dec = proj.analyses.Decompiler(proj.kb.functions["main"], cfg=cfg, flavor="pseudocode", fail_fast=True)
-        assert c_dec.codegen is not None
+        c_dec = proj.analyses[Decompiler].prep(fail_fast=True)(proj.kb.functions["main"], cfg=cfg, flavor="pseudocode")
+        assert isinstance(c_dec.codegen, CStructuredCodeGenerator)
 
         missing = set(c_dec.codegen._handlers) - set(self.codegen._handlers)
         assert not missing, f"Rust backend has no handler for {sorted(str(k) for k in missing)}"
@@ -172,11 +177,10 @@ class TestRustCodegenHandlers(unittest.TestCase):
         proj, cfg = load_project_with_scoped_cfg(bin_path, 0x410920, expand_call_tree=False, run_ccc=False)
         proj.analyses.RustSymbolRecovery()
         proj.analyses.TypeDBLoader()
-        dec = proj.analyses.Decompiler(0x410920, cfg=cfg.model, flavor="rust", fail_fast=True)
-        assert dec.codegen is not None and dec.codegen.text is not None
+        dec = proj.analyses[Decompiler].prep(fail_fast=True)(0x410920, cfg=cfg.model, flavor="rust")
+        text = codegen_text(dec)
         print_decompilation_result(dec)
 
-        text = dec.codegen.text
         assert PLACEHOLDER not in text
         # the bit-insertions that used to be dropped are rendered now
         assert "_INSERT(" in text
