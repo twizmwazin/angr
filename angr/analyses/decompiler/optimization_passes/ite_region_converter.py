@@ -158,10 +158,17 @@ class ITERegionConverter(OptimizationPass):
 
     @staticmethod
     def _has_qualified_phi_assignments(
-        block: Block, block0: Block, stmt0: Assignment | Call, block1: Block, stmt1: Assignment | Call
+        block: Block,
+        block0: Block,
+        stmt0: Assignment | SideEffectStatement,
+        block1: Block,
+        stmt1: Assignment | SideEffectStatement,
     ):
         vvar0 = stmt0.dst if isinstance(stmt0, Assignment) else stmt0.ret_expr
         vvar1 = stmt1.dst if isinstance(stmt1, Assignment) else stmt1.ret_expr
+        # both statements passed _is_assigning_to_vvar(), so their destinations are always vvars
+        assert isinstance(vvar0, VirtualVariable)
+        assert isinstance(vvar1, VirtualVariable)
 
         addr0 = block0.addr, block0.idx
         addr1 = block1.addr, block1.idx
@@ -171,6 +178,7 @@ class ITERegionConverter(OptimizationPass):
         for stmt in block.statements:
             if not is_phi_assignment(stmt):
                 continue
+            assert isinstance(stmt, Assignment) and isinstance(stmt.src, Phi)
             src_vars = {src: vvar.varid if vvar is not None else None for src, vvar in stmt.src.src_and_vvars}
             if src_vars.get(addr0) == vvar0.varid and src_vars.get(addr1) == vvar1.varid:
                 # this is the phi assignment that assigns stmt0.dst and stmt1.dst to a new variable
@@ -213,6 +221,9 @@ class ITERegionConverter(OptimizationPass):
         true_stmt_dst = true_stmt.dst if isinstance(true_stmt, Assignment) else true_stmt.ret_expr
         false_stmt_src = false_stmt.src if isinstance(false_stmt, Assignment) else false_stmt
         false_stmt_dst = false_stmt.dst if isinstance(false_stmt, Assignment) else false_stmt.ret_expr
+        # both statements passed _is_assigning_to_vvar(), so their destinations are always vvars
+        assert isinstance(true_stmt_dst, VirtualVariable)
+        assert isinstance(false_stmt_dst, VirtualVariable)
 
         addr_obj = true_stmt_src if "ins_addr" in true_stmt_src.tags else true_stmt
         ternary_expr = ITE(
