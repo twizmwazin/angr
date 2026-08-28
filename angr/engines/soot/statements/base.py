@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from archinfo.arch_soot import SootAddressDescriptor
 
 from angr.engines.soot.exceptions import IncorrectLocationException
 from angr.engines.soot.expressions import translate_expr
 from angr.engines.soot.values import translate_value
+
+if TYPE_CHECKING:
+    from angr.engines.soot.values.base import SimSootValue
 
 l = logging.getLogger("angr.engines.soot.statements.if")
 
@@ -71,7 +75,7 @@ class SimSootStmt:
     # Invocations
     #
 
-    def _add_invoke_target(self, invoke_expr, ret_var=None):
+    def _add_invoke_target(self, invoke_expr, ret_var: SimSootValue | None = None):
         self.invoke_expr = invoke_expr
         self.invoke_expr.ret_var = ret_var
 

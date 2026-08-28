@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 import claripy
 
@@ -8,6 +9,14 @@ from angr.engines.soot.values import SimSootValue_ArrayBaseRef
 
 from .base import SimSootExpr
 from .newArray import SimSootExpr_NewArray
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from archinfo.arch_soot import SootNullConstant
+
+    from angr.engines.soot.values.base import SimSootValue
+    from angr.sim_state import SimState
 
 l = logging.getLogger("angr.engines.soot.expressions.newmultiarray")
 
@@ -27,7 +36,12 @@ class SimSootExpr_NewMultiArray(SimSootExpr):
         )
 
     @staticmethod
-    def new_array(state, element_type, size, default_value_generator=None):
+    def new_array(
+        state,
+        element_type,
+        size,
+        default_value_generator: Callable[[SimState], claripy.ast.Base | SimSootValue | SootNullConstant] | None = None,
+    ):
         """
         Allocates a new multi array in memory and returns the reference to the base.
         """

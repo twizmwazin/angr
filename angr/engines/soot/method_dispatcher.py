@@ -14,7 +14,7 @@ def resolve_method(
     method_name,
     class_name,
     params=(),
-    ret_type=None,
+    ret_type: str | None = None,
     include_superclasses=True,
     init_class=True,
     raise_exception_if_not_found=False,

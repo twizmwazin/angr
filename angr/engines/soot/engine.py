@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 import claripy
 from archinfo.arch_soot import (
@@ -24,6 +25,12 @@ from .exceptions import BlockTerminationNotice, IncorrectLocationException
 from .statements import SimSootStmt_Return, SimSootStmt_ReturnVoid, translate_stmt
 from .values import SimSootValue_Local, SimSootValue_ParamRef
 
+if TYPE_CHECKING:
+    from archinfo.arch_soot import SootClassDescriptor, SootNullConstant
+    from pysoot.sootir.soot_method import SootMethod
+
+    from .values.base import SimSootValue
+
 l = logging.getLogger("angr.engines.soot.engine")
 
 # pylint: disable=arguments-differ
@@ -34,7 +41,7 @@ class SootMixin(SuccessorsEngine, ProcedureMixin):
     Execution engine based on Soot.
     """
 
-    def lift_soot(self, addr=None, the_binary=None, **kwargs):  # pylint: disable=unused-argument, no-self-use
+    def lift_soot(self, addr: SootAddressDescriptor | None = None, the_binary=None, **kwargs):  # pylint: disable=unused-argument, no-self-use
         assert isinstance(addr, SootAddressDescriptor)
 
         method, stmt_idx = addr.method, addr.stmt_idx
@@ -122,7 +129,7 @@ class SootMixin(SuccessorsEngine, ProcedureMixin):
         successors.processed = True
         return None
 
-    def _handle_soot_block(self, state, successors, block, starting_stmt_idx, method=None):
+    def _handle_soot_block(self, state, successors, block, starting_stmt_idx, method: SootMethod | None = None):
         stmt = stmt_idx = None
         for tindex, stmt in enumerate(block.statements[starting_stmt_idx:]):
             stmt_idx = starting_stmt_idx + tindex
@@ -199,7 +206,12 @@ class SootMixin(SuccessorsEngine, ProcedureMixin):
         return False
 
     @classmethod
-    def _add_return_exit(cls, state, successors, return_val=None):
+    def _add_return_exit(
+        cls,
+        state,
+        successors,
+        return_val: claripy.ast.Base | SimSootValue | SootNullConstant | SootClassDescriptor | None = None,
+    ):
         ret_state = state.copy()
         cls.prepare_return_state(ret_state, return_val)
         successors.add_successor(ret_state, state.callstack.ret_addr, claripy.true(), "Ijk_Ret")
@@ -257,7 +269,7 @@ class SootMixin(SuccessorsEngine, ProcedureMixin):
         raise IncorrectLocationException
 
     @classmethod
-    def setup_callsite(cls, state, args, ret_addr, ret_var=None):
+    def setup_callsite(cls, state, args, ret_addr, ret_var: SimSootValue | None = None):
         # push new callstack frame
         state.callstack.push(state.callstack.copy())
         state.callstack.ret_addr = ret_addr
@@ -281,7 +293,9 @@ class SootMixin(SuccessorsEngine, ProcedureMixin):
             state.javavm_memory.store(param_ref, arg.value)
 
     @staticmethod
-    def prepare_return_state(state, ret_value=None):
+    def prepare_return_state(
+        state, ret_value: claripy.ast.Base | SimSootValue | SootNullConstant | SootClassDescriptor | None = None
+    ):
         # pop callstack
         ret_var = state.callstack.invoke_return_variable
         procedure_data = state.callstack.procedure_data

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 import claripy
 
@@ -10,13 +11,26 @@ from angr.errors import SimEngineError
 from .base import SimSootValue
 from .constants import SimSootValue_IntConstant
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from archinfo.arch_soot import SootNullConstant
+
+    from angr.sim_state import SimState
+
 l = logging.getLogger("angr.engines.soot.values.arrayref")
 
 
 class SimSootValue_ArrayBaseRef(SimSootValue):
     __slots__ = ["_default_value_generator", "element_type", "id", "size", "type"]
 
-    def __init__(self, heap_alloc_id, element_type, size, default_value_generator=None):
+    def __init__(
+        self,
+        heap_alloc_id,
+        element_type,
+        size,
+        default_value_generator: Callable[[SimState], claripy.ast.Base | SimSootValue | SootNullConstant] | None = None,
+    ):
         self.id = f"{heap_alloc_id}.array_{element_type}"
         self.element_type = element_type
         self.size = size
