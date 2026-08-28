@@ -309,8 +309,8 @@ class StaticVVarRewriter(OptimizationPass):
     def __init__(
         self,
         *args,
-        static_buffers: dict[str, FixedBuffer] | None = None,
-        static_vvars: dict[int, FixedBufferPtr | Const] | None = None,
+        static_buffers: dict[str, FixedBuffer],
+        static_vvars: dict[int, FixedBufferPtr | Const],
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
