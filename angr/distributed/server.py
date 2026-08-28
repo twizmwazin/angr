@@ -135,7 +135,7 @@ class Server:
     #
 
     def on_worker_exit(self, worker_id, stashes):
-        if self._worker_exit_args_lock is not None:
+        if self._worker_exit_args_lock is not None and self._worker_exit_args is not None:
             # callback is enabled
             # we add this check since passing Python objects between processes is definitely not fast
             with self._worker_exit_args_lock:
