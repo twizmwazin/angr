@@ -104,8 +104,10 @@ class CallSiteMaker:
             self.result_block = self.block
             return
 
-        # every branch above establishes that call_expr is a call: SideEffectStatement is only ever built around a
-        # Call expression, and the other branches test for it explicitly
+        # every branch above establishes that call_expr is call-shaped. The branches below test for it explicitly;
+        # a SideEffectStatement wraps either a Call or a FunctionLikeMacro (see AILSimplifier). Note that
+        # isinstance(..., Expr.Call) deliberately matches Call, Macro and FunctionLikeMacro alike -- that is exactly
+        # the set of variants carrying .target/.args -- so do not tighten this into an exact-variant check.
         assert isinstance(call_expr, Expr.Call)
 
         if isinstance(call_expr.target, str):

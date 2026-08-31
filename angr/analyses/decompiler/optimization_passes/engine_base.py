@@ -124,7 +124,9 @@ class SimplifierAILEngine(
         return stmt
 
     def _handle_stmt_SideEffectStatement(self, stmt):
-        # this handler rebuilds the wrapped expression as a Call, so it only ever applies to call expressions
+        # this handler unconditionally reads .target/.args, which exist only on the Call, Macro and
+        # FunctionLikeMacro variants -- exactly the set isinstance(..., Expr.Call) matches. AILSimplifier does
+        # wrap FunctionLikeMacro in a SideEffectStatement, so do not tighten this into an exact-variant check.
         call = stmt.expr
         assert isinstance(call, ailment.expression.Call)
 
