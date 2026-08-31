@@ -91,6 +91,7 @@ class PCodeIRSBConverter(Converter):
     """
 
     _current_op: PcodeOp
+    _ins_addr: int | None = None
 
     @staticmethod
     def convert(irsb: IRSB, manager: Manager):  # pylint:disable=arguments-differ
@@ -107,6 +108,7 @@ class PCodeIRSBConverter(Converter):
         self._irsb = irsb
         self._manager = manager
         self._statements = []
+        self._ins_addr = None
         self._next_ins_addr = None
         self._current_behavior = None
         self._statement_idx = 0
@@ -137,10 +139,6 @@ class PCodeIRSBConverter(Converter):
             OpCode.FLOAT_FLOAT2FLOAT: self._convert_float2float,
         }
 
-        manager.tyenv = None
-        manager.block_addr = irsb.addr
-        manager.vex_stmt_idx = DEFAULT_STATEMENT  # Reset after loop. Necessary?
-
     def _convert(self) -> Block:
         """
         Convert the given IRSB to an AIL Block
@@ -150,7 +148,7 @@ class PCodeIRSBConverter(Converter):
         for op in self._irsb._ops:
             self._current_op = op
             if op.opcode == pypcode.OpCode.IMARK:
-                self._manager.ins_addr = op.inputs[0].offset
+                self._ins_addr = op.inputs[0].offset
                 self._next_ins_addr = op.inputs[-1].offset + op.inputs[-1].size
             else:
                 assert self._irsb.behaviors is not None
@@ -202,7 +200,7 @@ class PCodeIRSBConverter(Converter):
                 bits=self._current_op.output.size * 8 if self._current_op.output is not None else 1,
             )
         else:
-            out = UnaryOp(self._manager.next_atom(), op, in1, ins_addr=self._manager.ins_addr)
+            out = UnaryOp(self._manager.next_atom(), op, in1, ins_addr=self._ins_addr)
 
         stmt = self._set_value(self._current_op.output, out)
         self._statements.append(stmt)
@@ -228,7 +226,7 @@ class PCodeIRSBConverter(Converter):
             signed = op.startswith("Cmp") and op.endswith("s")
             if signed and op.endswith("s"):
                 op = op[:-1]
-            out = BinaryOp(self._manager.next_atom(), op, [in1, in2], signed, ins_addr=self._manager.ins_addr)
+            out = BinaryOp(self._manager.next_atom(), op, [in1, in2], signed, ins_addr=self._ins_addr)
 
         # Zero-extend 1-bit results
         zextend_ops = {
@@ -301,7 +299,7 @@ class PCodeIRSBConverter(Converter):
                 offset,
                 size,
                 reg_name=varnode.getRegisterName(),
-                ins_addr=self._manager.ins_addr,
+                ins_addr=self._ins_addr,
             )
         if space_name == "unique":
             offset = self._remap_temp(varnode.offset, varnode.size, is_write)
@@ -324,9 +322,9 @@ class PCodeIRSBConverter(Converter):
                         "Shr",
                         [t, Const(self._manager.next_atom(), right_shift_amount * 8, 8)],
                         False,
-                        ins_addr=self._manager.ins_addr,
+                        ins_addr=self._ins_addr,
                     )
-                return Convert(self._manager.next_atom(), t.bits, size, False, t, ins_addr=self._manager.ins_addr)
+                return Convert(self._manager.next_atom(), t.bits, size, False, t, ins_addr=self._ins_addr)
 
             return Tmp(self._manager.next_atom(), offset, size)
         if space_name.lower() in ["ram", "mem"]:
@@ -338,7 +336,7 @@ class PCodeIRSBConverter(Converter):
                 addr,
                 varnode.size,
                 self._irsb.arch.memory_endness,
-                ins_addr=self._manager.ins_addr,
+                ins_addr=self._ins_addr,
             )
         raise NotImplementedError
 
@@ -356,9 +354,7 @@ class PCodeIRSBConverter(Converter):
         space_name = varnode.space.name
 
         if space_name in ["register", "unique"]:
-            return Assignment(
-                self._statement_idx, self._convert_varnode(varnode, True), value, ins_addr=self._manager.ins_addr
-            )
+            return Assignment(self._statement_idx, self._convert_varnode(varnode, True), value, ins_addr=self._ins_addr)
         if space_name.lower() in ["ram", "mem"]:
             addr = Const(self._manager.next_atom(), varnode.offset, self._irsb.arch.bits)
             return Store(
@@ -367,7 +363,7 @@ class PCodeIRSBConverter(Converter):
                 value,
                 varnode.size,
                 self._irsb.arch.memory_endness,
-                ins_addr=self._manager.ins_addr,
+                ins_addr=self._ins_addr,
             )
         raise NotImplementedError
 
@@ -431,7 +427,7 @@ class PCodeIRSBConverter(Converter):
 
         cval = Const(self._manager.next_atom(), 0, self._current_op.inputs[0].size * 8)
 
-        expr = BinaryOp(self._manager.next_atom(), "CmpEQ", [inp, cval], signed=False, ins_addr=self._manager.ins_addr)
+        expr = BinaryOp(self._manager.next_atom(), "CmpEQ", [inp, cval], signed=False, ins_addr=self._ins_addr)
 
         stmt = self._set_value(out, expr)
         self._statements.append(stmt)
@@ -456,7 +452,7 @@ class PCodeIRSBConverter(Converter):
                 off,
                 self._current_op.output.size,
                 self._irsb.arch.memory_endness,
-                ins_addr=self._manager.ins_addr,
+                ins_addr=self._ins_addr,
             )
             stmt = self._set_value(out, res)
         self._statements.append(stmt)
@@ -485,7 +481,7 @@ class PCodeIRSBConverter(Converter):
                 data,
                 self._current_op.inputs[2].size,
                 self._irsb.arch.memory_endness,
-                ins_addr=self._manager.ins_addr,
+                ins_addr=self._ins_addr,
             )
         self._statements.append(stmt)
 
@@ -506,7 +502,7 @@ class PCodeIRSBConverter(Converter):
                 last_stmt.false_target = dest
                 return
 
-        stmt = Jump(self._statement_idx, dest, ins_addr=self._manager.ins_addr)
+        stmt = Jump(self._statement_idx, dest, ins_addr=self._ins_addr)
         self._statements.append(stmt)
 
     def _convert_cbranch(self) -> None:
@@ -530,7 +526,7 @@ class PCodeIRSBConverter(Converter):
         else:
             # there will be a Jump statement that follows the cbranch
             fallthru = None
-        stmt = ConditionalJump(self._statement_idx, condition, dest, fallthru, ins_addr=self._manager.ins_addr)
+        stmt = ConditionalJump(self._statement_idx, condition, dest, fallthru, ins_addr=self._ins_addr)
         self._statements.append(stmt)
 
     def _convert_ret(self) -> None:
@@ -540,8 +536,8 @@ class PCodeIRSBConverter(Converter):
         stmt = Return(
             self._statement_idx,
             [],
-            ins_addr=self._manager.ins_addr,
-            vex_block_addr=self._manager.block_addr,
+            ins_addr=self._ins_addr,
+            vex_block_addr=self._irsb.addr,
             vex_stmt_idx=DEFAULT_STATEMENT,
         )
         self._statements.append(stmt)
@@ -551,7 +547,7 @@ class PCodeIRSBConverter(Converter):
         Convert a p-code indirect branch operation
         """
         dest = self._get_value(self._current_op.inputs[0])
-        stmt = Jump(self._statement_idx, dest, ins_addr=self._manager.ins_addr)
+        stmt = Jump(self._statement_idx, dest, ins_addr=self._ins_addr)
         self._statements.append(stmt)
 
     def _convert_call(self) -> None:
@@ -562,7 +558,7 @@ class PCodeIRSBConverter(Converter):
         ret_expr = (
             None
             if ret_reg_offset is None
-            else Register(None, ret_reg_offset, self._irsb.arch.bits, ins_addr=self._manager.ins_addr)
+            else Register(None, ret_reg_offset, self._irsb.arch.bits, ins_addr=self._ins_addr)
         )  # ???
         if self._irsb.next is not None:
             dest = Const(self._manager.next_atom(), self._irsb.next.con.value, self._irsb.arch.bits)
@@ -571,16 +567,16 @@ class PCodeIRSBConverter(Converter):
         call_expr = Call(
             self._manager.next_atom(),
             dest,
-            ins_addr=self._manager.ins_addr,
-            vex_block_addr=self._manager.block_addr,
+            ins_addr=self._ins_addr,
+            vex_block_addr=self._irsb.addr,
             vex_stmt_idx=DEFAULT_STATEMENT,
         )
         stmt = SideEffectStatement(
             self._manager.next_atom(),
             call_expr,
             ret_expr=ret_expr,
-            ins_addr=self._manager.ins_addr,
-            vex_block_addr=self._manager.block_addr,
+            ins_addr=self._ins_addr,
+            vex_block_addr=self._irsb.addr,
             vex_stmt_idx=DEFAULT_STATEMENT,
         )
         self._statements.append(stmt)
@@ -590,21 +586,21 @@ class PCodeIRSBConverter(Converter):
         Convert a p-code indirect call operation
         """
         ret_reg_offset = self._irsb.arch.ret_offset
-        ret_expr = Register(None, ret_reg_offset, self._irsb.arch.bits, ins_addr=self._manager.ins_addr)  # ???
+        ret_expr = Register(None, ret_reg_offset, self._irsb.arch.bits, ins_addr=self._ins_addr)  # ???
         dest = self._get_value(self._current_op.inputs[0])
         call_expr = Call(
             self._manager.next_atom(),
             dest,
-            ins_addr=self._manager.ins_addr,
-            vex_block_addr=self._manager.block_addr,
+            ins_addr=self._ins_addr,
+            vex_block_addr=self._irsb.addr,
             vex_stmt_idx=DEFAULT_STATEMENT,
         )
         stmt = SideEffectStatement(
             self._manager.next_atom(),
             call_expr,
             ret_expr=ret_expr,
-            ins_addr=self._manager.ins_addr,
-            vex_block_addr=self._manager.block_addr,
+            ins_addr=self._ins_addr,
+            vex_block_addr=self._irsb.addr,
             vex_stmt_idx=DEFAULT_STATEMENT,
         )
         self._statements.append(stmt)
