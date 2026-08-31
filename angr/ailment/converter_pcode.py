@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 
 import pypcode
 from pypcode import OpCode, PcodeOp, Varnode
@@ -90,8 +91,6 @@ class PCodeIRSBConverter(Converter):
     Converts a p-code IRSB to an AIL block
     """
 
-    _current_op: PcodeOp
-
     @staticmethod
     def convert(irsb: IRSB, manager: Manager):  # pylint:disable=arguments-differ
         """
@@ -115,7 +114,7 @@ class PCodeIRSBConverter(Converter):
         self._unique_tracker: dict[int, tuple[int, int]] = {}
         self._unique_counter = 0
 
-        self._special_op_handlers = {
+        self._special_op_handlers: dict[OpCode, Callable[[PcodeOp], None]] = {
             OpCode.COPY: self._convert_copy,
             OpCode.INT_ZEXT: self._convert_zext,
             OpCode.INT_SEXT: self._convert_sext,
@@ -148,28 +147,25 @@ class PCodeIRSBConverter(Converter):
         self._statement_idx = 0
 
         for op in self._irsb._ops:
-            self._current_op = op
             if op.opcode == pypcode.OpCode.IMARK:
                 self._manager.ins_addr = op.inputs[0].offset
                 self._next_ins_addr = op.inputs[-1].offset + op.inputs[-1].size
             else:
                 assert self._irsb.behaviors is not None
-                self._current_behavior = self._irsb.behaviors.get_behavior_for_opcode(self._current_op.opcode)
-                self._convert_current_op()
+                self._current_behavior = self._irsb.behaviors.get_behavior_for_opcode(op.opcode)
+                self._convert_op(op)
             self._statement_idx += 1
 
-            if (
-                "sparc:" in self._irsb.arch.name
-                and self._irsb.arch.bits == 32
-                and self._current_op.opcode == OpCode.CALL
-            ):
+            if "sparc:" in self._irsb.arch.name and self._irsb.arch.bits == 32 and op.opcode == OpCode.CALL:
                 break
 
         return Block(self._irsb.addr, self._irsb.size, statements=self._statements)
 
-    def _convert_current_op(self) -> None:
+    def _convert_op(self, op: PcodeOp) -> None:
         """
-        Convert the current op to corresponding AIL statement
+        Convert the given op to corresponding AIL statement
+
+        :param op: The op to convert
         """
         assert self._current_behavior is not None
 
@@ -177,58 +173,62 @@ class PCodeIRSBConverter(Converter):
 
         if is_special:
             try:
-                self._special_op_handlers[self._current_behavior.opcode]()
+                self._special_op_handlers[self._current_behavior.opcode](op)
             except NotImplementedError as ex:
                 log.warning("Unsupported opcode: %s", ex)
         elif self._current_behavior.is_unary:
-            self._convert_unary()
+            self._convert_unary(op)
         else:
-            self._convert_binary()
+            self._convert_binary(op)
 
-    def _convert_unary(self) -> None:
+    def _convert_unary(self, op: PcodeOp) -> None:
         """
-        Convert the current unary op to corresponding AIL statement
-        """
-        opcode = self._current_op.opcode
+        Convert the given unary op to corresponding AIL statement
 
-        op = opcode_to_generic_name.get(opcode)
-        in1 = self._get_value(self._current_op.inputs[0])
-        if op is None:
+        :param op: The op to convert
+        """
+        opcode = op.opcode
+
+        op_name = opcode_to_generic_name.get(opcode)
+        in1 = self._get_value(op.inputs[0])
+        if op_name is None:
             log.warning("p-code: Unsupported opcode of type %s", opcode.__name__)
             out = DirtyExpression(
                 self._manager.next_atom(),
                 opcode.__name__,
                 [],
-                bits=self._current_op.output.size * 8 if self._current_op.output is not None else 1,
+                bits=op.output.size * 8 if op.output is not None else 1,
             )
         else:
-            out = UnaryOp(self._manager.next_atom(), op, in1, ins_addr=self._manager.ins_addr)
+            out = UnaryOp(self._manager.next_atom(), op_name, in1, ins_addr=self._manager.ins_addr)
 
-        stmt = self._set_value(self._current_op.output, out)
+        stmt = self._set_value(op.output, out)
         self._statements.append(stmt)
 
-    def _convert_binary(self) -> None:
+    def _convert_binary(self, op: PcodeOp) -> None:
         """
-        Convert the current binary op to corresponding AIL statement
+        Convert the given binary op to corresponding AIL statement
+
+        :param op: The op to convert
         """
-        opcode = self._current_op.opcode
-        op = opcode_to_generic_name.get(opcode)
-        in1 = self._get_value(self._current_op.inputs[0])
-        in2 = self._get_value(self._current_op.inputs[1])
-        if op is None:
+        opcode = op.opcode
+        op_name = opcode_to_generic_name.get(opcode)
+        in1 = self._get_value(op.inputs[0])
+        in2 = self._get_value(op.inputs[1])
+        if op_name is None:
             log.warning("p-code: Unsupported opcode of type %s.", opcode.__name__)
             out = DirtyExpression(
                 self._manager.next_atom(),
                 opcode.__name__,
                 [],
-                bits=self._current_op.output.size * 8 if self._current_op.output is not None else 1,
+                bits=op.output.size * 8 if op.output is not None else 1,
             )
         else:
             # fix op name for signed comparisons
-            signed = op.startswith("Cmp") and op.endswith("s")
-            if signed and op.endswith("s"):
-                op = op[:-1]
-            out = BinaryOp(self._manager.next_atom(), op, [in1, in2], signed, ins_addr=self._manager.ins_addr)
+            signed = op_name.startswith("Cmp") and op_name.endswith("s")
+            if signed and op_name.endswith("s"):
+                op_name = op_name[:-1]
+            out = BinaryOp(self._manager.next_atom(), op_name, [in1, in2], signed, ins_addr=self._manager.ins_addr)
 
         # Zero-extend 1-bit results
         zextend_ops = {
@@ -240,9 +240,9 @@ class PCodeIRSBConverter(Converter):
             OpCode.INT_LESSEQUAL,
         }
         if opcode in zextend_ops:
-            out = Convert(self._manager.next_atom(), 1, self._current_op.output.size * 8, False, out)
+            out = Convert(self._manager.next_atom(), 1, op.output.size * 8, False, out)
 
-        stmt = self._set_value(self._current_op.output, out)
+        stmt = self._set_value(op.output, out)
         self._statements.append(stmt)
 
     def _map_register_name(self, varnode: Varnode) -> int:
@@ -383,119 +383,133 @@ class PCodeIRSBConverter(Converter):
         """
         return self._convert_varnode(varnode, False)
 
-    def _convert_copy(self) -> None:
+    def _convert_copy(self, op: PcodeOp) -> None:
         """
         Convert copy operation
+
+        :param op: The op to convert
         """
-        out = self._current_op.output
-        inp = self._get_value(self._current_op.inputs[0])
+        out = op.output
+        inp = self._get_value(op.inputs[0])
         stmt = self._set_value(out, inp)
         self._statements.append(stmt)
 
-    def _convert_zext(self) -> None:
+    def _convert_zext(self, op: PcodeOp) -> None:
         """
         Convert zext operation
+
+        :param op: The op to convert
         """
-        out = self._current_op.output
+        out = op.output
         inp = Convert(
             self._manager.next_atom(),
-            self._current_op.inputs[0].size * 8,
+            op.inputs[0].size * 8,
             out.size * 8,
             False,
-            self._get_value(self._current_op.inputs[0]),
+            self._get_value(op.inputs[0]),
         )
         stmt = self._set_value(out, inp)
         self._statements.append(stmt)
 
-    def _convert_sext(self) -> None:
+    def _convert_sext(self, op: PcodeOp) -> None:
         """
         Convert the signed extension operation
+
+        :param op: The op to convert
         """
-        out = self._current_op.output
+        out = op.output
         inp = Convert(
             self._manager.next_atom(),
-            self._current_op.inputs[0].size * 8,
+            op.inputs[0].size * 8,
             out.size * 8,
             False,
-            self._get_value(self._current_op.inputs[0]),
+            self._get_value(op.inputs[0]),
         )
         stmt = self._set_value(out, inp)
         self._statements.append(stmt)
 
-    def _convert_negate(self) -> None:
+    def _convert_negate(self, op: PcodeOp) -> None:
         """
         Convert bool negate operation
-        """
-        out = self._current_op.output
-        inp = self._get_value(self._current_op.inputs[0])
 
-        cval = Const(self._manager.next_atom(), 0, self._current_op.inputs[0].size * 8)
+        :param op: The op to convert
+        """
+        out = op.output
+        inp = self._get_value(op.inputs[0])
+
+        cval = Const(self._manager.next_atom(), 0, op.inputs[0].size * 8)
 
         expr = BinaryOp(self._manager.next_atom(), "CmpEQ", [inp, cval], signed=False, ins_addr=self._manager.ins_addr)
 
         stmt = self._set_value(out, expr)
         self._statements.append(stmt)
 
-    def _convert_load(self) -> None:
+    def _convert_load(self, op: PcodeOp) -> None:
         """
         Convert a p-code load operation
+
+        :param op: The op to convert
         """
-        spc = self._current_op.inputs[0].getSpaceFromConst()
-        out = self._current_op.output
+        spc = op.inputs[0].getSpaceFromConst()
+        out = op.output
         spc_name = spc.name.lower()
         assert spc_name in {"ram", "mem", "register"}
         if spc_name == "register":
             # load from register
-            res = self._get_value(self._current_op.inputs[1])
+            res = self._get_value(op.inputs[1])
             stmt = self._set_value(out, res)
         else:
             # load from memory
-            off = self._get_value(self._current_op.inputs[1])
+            off = self._get_value(op.inputs[1])
             res = Load(
                 self._manager.next_atom(),
                 off,
-                self._current_op.output.size,
+                op.output.size,
                 self._manager.arch.memory_endness,
                 ins_addr=self._manager.ins_addr,
             )
             stmt = self._set_value(out, res)
         self._statements.append(stmt)
 
-    def _convert_store(self) -> None:
+    def _convert_store(self, op: PcodeOp) -> None:
         """
         Convert a p-code store operation
+
+        :param op: The op to convert
         """
-        spc = self._current_op.inputs[0].getSpaceFromConst()
+        spc = op.inputs[0].getSpaceFromConst()
         spc_name = spc.name.lower()
         assert spc_name in {"ram", "mem", "register"}
         if spc_name == "register":
             # store to register
-            out = self._current_op.inputs[2]
-            res = self._get_value(self._current_op.inputs[1])
+            out = op.inputs[2]
+            res = self._get_value(op.inputs[1])
             stmt = self._set_value(out, res)
         else:
             # store to memory
-            off = self._get_value(self._current_op.inputs[1])
-            data = self._get_value(self._current_op.inputs[2])
+            off = self._get_value(op.inputs[1])
+            data = self._get_value(op.inputs[2])
             log.debug("Storing %s at offset %s", data, off)
             # self.state.memory.store(off, data, endness=self.project.arch.memory_endness)
             stmt = Store(
                 self._statement_idx,
                 off,
                 data,
-                self._current_op.inputs[2].size,
+                op.inputs[2].size,
                 self._manager.arch.memory_endness,
                 ins_addr=self._manager.ins_addr,
             )
         self._statements.append(stmt)
 
-    def _convert_branch(self) -> None:
+    def _convert_branch(self, op: PcodeOp) -> None:
         """
         Convert a p-code branch operation
+
+        :param op: The op to convert
         """
-        if self._current_op.inputs[0].space == "const":
+        if op.inputs[0].space == "const":
             raise NotImplementedError("p-code relative branch not supported yet")
-        dest_addr = self._current_op.inputs[0].offset
+        dest_addr = op.inputs[0].offset
 
         # special handling: if the previous statement is a ConditionalJump with a None destination address, then we
         # back-patch the previous statement
@@ -509,18 +523,20 @@ class PCodeIRSBConverter(Converter):
         stmt = Jump(self._statement_idx, dest, ins_addr=self._manager.ins_addr)
         self._statements.append(stmt)
 
-    def _convert_cbranch(self) -> None:
+    def _convert_cbranch(self, op: PcodeOp) -> None:
         """
         Convert a p-code conditional branch operation
+
+        :param op: The op to convert
         """
-        if self._current_op.inputs[0].space == "const":
+        if op.inputs[0].space == "const":
             raise NotImplementedError("p-code relative branch not supported yet")
-        dest_addr = self._current_op.inputs[0].offset
-        cond = self._get_value(self._current_op.inputs[1])
+        dest_addr = op.inputs[0].offset
+        cond = self._get_value(op.inputs[1])
         cval = Const(self._manager.next_atom(), 0, cond.bits)
         condition = BinaryOp(self._manager.next_atom(), "CmpNE", [cond, cval], signed=False)
         dest = Const(self._manager.next_atom(), dest_addr, self._manager.arch.bits)
-        if self._irsb._ops[-1] is self._current_op:
+        if self._irsb._ops[-1] is op:
             # if the cbranch op is the last op, then we need to generate a fallthru target
             fallthru = Const(
                 self._manager.next_atom(),
@@ -533,9 +549,11 @@ class PCodeIRSBConverter(Converter):
         stmt = ConditionalJump(self._statement_idx, condition, dest, fallthru, ins_addr=self._manager.ins_addr)
         self._statements.append(stmt)
 
-    def _convert_ret(self) -> None:
+    def _convert_ret(self, op: PcodeOp) -> None:  # pylint:disable=unused-argument
         """
         Convert a p-code return operation
+
+        :param op: The op to convert
         """
         stmt = Return(
             self._statement_idx,
@@ -546,17 +564,21 @@ class PCodeIRSBConverter(Converter):
         )
         self._statements.append(stmt)
 
-    def _convert_branchind(self) -> None:
+    def _convert_branchind(self, op: PcodeOp) -> None:
         """
         Convert a p-code indirect branch operation
+
+        :param op: The op to convert
         """
-        dest = self._get_value(self._current_op.inputs[0])
+        dest = self._get_value(op.inputs[0])
         stmt = Jump(self._statement_idx, dest, ins_addr=self._manager.ins_addr)
         self._statements.append(stmt)
 
-    def _convert_call(self) -> None:
+    def _convert_call(self, op: PcodeOp) -> None:  # pylint:disable=unused-argument
         """
         Convert a p-code call operation
+
+        :param op: The op to convert
         """
         ret_reg_offset = self._manager.arch.ret_offset
         ret_expr = (
@@ -585,13 +607,15 @@ class PCodeIRSBConverter(Converter):
         )
         self._statements.append(stmt)
 
-    def _convert_callind(self) -> None:
+    def _convert_callind(self, op: PcodeOp) -> None:
         """
         Convert a p-code indirect call operation
+
+        :param op: The op to convert
         """
         ret_reg_offset = self._manager.arch.ret_offset
         ret_expr = Register(None, ret_reg_offset, self._manager.arch.bits, ins_addr=self._manager.ins_addr)  # ???
-        dest = self._get_value(self._current_op.inputs[0])
+        dest = self._get_value(op.inputs[0])
         call_expr = Call(
             self._manager.next_atom(),
             dest,
@@ -609,54 +633,58 @@ class PCodeIRSBConverter(Converter):
         )
         self._statements.append(stmt)
 
-    def _convert_int2float(self) -> None:
+    def _convert_int2float(self, op: PcodeOp) -> None:
         """
         Convert INT2FLOAT operation.
+
+        :param op: The op to convert
         """
-        out = self._current_op.output
+        out = op.output
         inp = Convert(
             self._manager.next_atom(),
-            self._current_op.inputs[0].size * 8,
+            op.inputs[0].size * 8,
             out.size * 8,
             True,
-            self._get_value(self._current_op.inputs[0]),
+            self._get_value(op.inputs[0]),
             from_type=Convert.TYPE_INT,
             to_type=Convert.TYPE_FP,
         )
         stmt = self._set_value(out, inp)
         self._statements.append(stmt)
 
-    def _convert_float2float(self) -> None:
+    def _convert_float2float(self, op: PcodeOp) -> None:
         """
         Convert FLOAT2FLOAT operation.
+
+        :param op: The op to convert
         """
-        out = self._current_op.output
+        out = op.output
         inp = Convert(
             self._manager.next_atom(),
-            self._current_op.inputs[0].size * 8,
+            op.inputs[0].size * 8,
             out.size * 8,
             True,
-            self._get_value(self._current_op.inputs[0]),
+            self._get_value(op.inputs[0]),
             from_type=Convert.TYPE_FP,
             to_type=Convert.TYPE_FP,
         )
         stmt = self._set_value(out, inp)
         self._statements.append(stmt)
 
-    def _convert_callother(self) -> None:
+    def _convert_callother(self, op: PcodeOp) -> None:
         raise NotImplementedError("CALLOTHER emulation not currently supported")
 
-    def _convert_multiequal(self) -> None:
+    def _convert_multiequal(self, op: PcodeOp) -> None:
         raise NotImplementedError("MULTIEQUAL appearing in unheritaged code?")
 
-    def _convert_indirect(self) -> None:
+    def _convert_indirect(self, op: PcodeOp) -> None:
         raise NotImplementedError("INDIRECT appearing in unheritaged code?")
 
-    def _convert_segment_op(self) -> None:
+    def _convert_segment_op(self, op: PcodeOp) -> None:
         raise NotImplementedError("SEGMENTOP emulation not currently supported")
 
-    def _convert_cpool_ref(self) -> None:
+    def _convert_cpool_ref(self, op: PcodeOp) -> None:
         raise NotImplementedError("Cannot currently emulate cpool operator")
 
-    def _convert_new(self) -> None:
+    def _convert_new(self, op: PcodeOp) -> None:
         raise NotImplementedError("Cannot currently emulate new operator")
