@@ -83,8 +83,9 @@ class TestFlipBooleanCmp(unittest.TestCase):
 
         func = None
         proj = angr.load_shellcode(b"\x90\x90", "AMD64")
-        ri = proj.analyses.RegionIdentifier(func, graph=graph)
-        rs = proj.analyses.RecursiveStructurer(ri.region, ail_manager=Manager())
+        manager = Manager()
+        ri = proj.analyses.RegionIdentifier(func, graph=graph, ail_manager=manager)
+        rs = proj.analyses.RecursiveStructurer(ri.region, ail_manager=manager)
         seq = rs.result
 
         assert isinstance(seq, SequenceNode)
@@ -152,8 +153,9 @@ class TestFlipBooleanCmp(unittest.TestCase):
 
         func = None
         proj = angr.load_shellcode(b"\x90\x90", "AMD64")
-        ri = proj.analyses.RegionIdentifier(func, graph=graph)
-        rs = proj.analyses.RecursiveStructurer(ri.region, ail_manager=Manager())
+        manager = Manager()
+        ri = proj.analyses.RegionIdentifier(func, graph=graph, ail_manager=manager)
+        rs = proj.analyses.RecursiveStructurer(ri.region, ail_manager=manager)
         seq = rs.result
 
         assert isinstance(seq, SequenceNode)

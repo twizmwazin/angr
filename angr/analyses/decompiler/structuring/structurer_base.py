@@ -65,7 +65,8 @@ class StructurerBase(Analysis):
         case_entry_to_switch_head: dict[int, int] | None = None,
         parent_region=None,
         jump_tables: dict[int, IndirectJump] | None = None,
-        ail_manager: Manager | None = None,
+        *,
+        ail_manager: Manager,
         **kwargs,
     ):
         self._region: RegionOverlay = region
@@ -74,7 +75,7 @@ class StructurerBase(Analysis):
         self._case_entry_to_switch_head = case_entry_to_switch_head
         self._parent_region = parent_region
         self.jump_tables = jump_tables or {}
-        self.ail_manager = ail_manager if ail_manager is not None else Manager()
+        self.ail_manager = ail_manager
 
         self.cond_proc = (
             condition_processor

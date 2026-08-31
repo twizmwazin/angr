@@ -50,7 +50,8 @@ class RegionIdentifier(Analysis):
         func: Function,
         cond_proc: ConditionProcessor | None = None,
         graph: networkx.DiGraph[Block] | None = None,
-        ail_manager: Manager | None = None,
+        *,
+        ail_manager: Manager,
         update_graph=True,
         largest_successor_tree_outside_loop=True,
         force_loop_single_exit=True,
@@ -62,7 +63,7 @@ class RegionIdentifier(Analysis):
         self.entry_node_addr: tuple[int, int | None] | None = (
             entry_node_addr if entry_node_addr is not None else (func.addr, None) if func is not None else None
         )
-        self.ail_manager = ail_manager if ail_manager is not None else Manager()
+        self.ail_manager = ail_manager
         self.cond_proc = (
             cond_proc
             if cond_proc is not None

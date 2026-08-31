@@ -7,7 +7,7 @@ from typing import Literal
 
 import networkx
 
-from angr.ailment import Address, Block
+from angr.ailment import Address, Block, Manager
 from angr.ailment.expression import (
     Register,
     StackBaseOffset,
@@ -42,7 +42,8 @@ class Ssailification(Analysis):  # pylint:disable=abstract-method
         canonical_size: int = 8,
         stack_pointer_tracker=None,
         func_addr: int | None = None,
-        ail_manager=None,
+        *,
+        ail_manager: Manager,
         ssa_stackvars: bool = False,
         ssa_tmps: bool = False,
         func_args: set[VirtualVariable] | None = None,
@@ -88,7 +89,7 @@ class Ssailification(Analysis):  # pylint:disable=abstract-method
             ssa_tmps,
             set(),
             self.kb.functions.get,
-            variable_map=variable_map_of(self._ail_manager) if self._ail_manager is not None else None,
+            variable_map=variable_map_of(self._ail_manager),
         )
 
         # calculate virtual variables and phi nodes

@@ -72,7 +72,7 @@ class TestStructurer(unittest.TestCase):
             ]
         )
 
-        ri = angr.analyses.decompiler.RegionIdentifier(None, graph=g)  # pyright: ignore[reportArgumentType]
+        ri = angr.analyses.decompiler.RegionIdentifier(None, graph=g, ail_manager=Manager())  # pyright: ignore[reportArgumentType]
         region = ri.region
         assert region is not None
         assert len(region.graph.nodes()) == 2  # pyright: ignore[reportOptionalMemberAccess]
@@ -111,7 +111,7 @@ class TestStructurer(unittest.TestCase):
             ]
         )
 
-        ri = angr.analyses.decompiler.RegionIdentifier(None, graph=g)  # pyright: ignore[reportArgumentType]
+        ri = angr.analyses.decompiler.RegionIdentifier(None, graph=g, ail_manager=Manager())  # pyright: ignore[reportArgumentType]
         region = ri.region
         assert region is not None
         assert len(region.graph.nodes()) == 2  # pyright: ignore[reportOptionalMemberAccess]
@@ -126,7 +126,7 @@ class TestStructurer(unittest.TestCase):
         clinic = p.analyses.Clinic(main_func)
 
         # recover regions
-        ri = p.analyses.RegionIdentifier(main_func, graph=clinic.graph)
+        ri = p.analyses.RegionIdentifier(main_func, graph=clinic.graph, ail_manager=clinic._ail_manager)
 
         # structure it
         st = p.analyses[DreamStructurer].prep()(ri.region, ail_manager=clinic._ail_manager)
@@ -148,7 +148,7 @@ class TestStructurer(unittest.TestCase):
         clinic = p.analyses.Clinic(main_func)
 
         # recover regions
-        ri = p.analyses.RegionIdentifier(main_func, graph=clinic.graph)
+        ri = p.analyses.RegionIdentifier(main_func, graph=clinic.graph, ail_manager=clinic._ail_manager)
 
         # structure it
         p.analyses[DreamStructurer].prep()(ri.region, ail_manager=clinic._ail_manager)
@@ -163,10 +163,10 @@ class TestStructurer(unittest.TestCase):
         clinic = p.analyses.Clinic(main_func)
 
         # recover regions
-        ri = p.analyses.RegionIdentifier(main_func, graph=clinic.graph)
+        ri = p.analyses.RegionIdentifier(main_func, graph=clinic.graph, ail_manager=clinic._ail_manager)
 
         # structure it
-        rs = p.analyses.RecursiveStructurer(ri.region, ail_manager=Manager())
+        rs = p.analyses.RecursiveStructurer(ri.region, ail_manager=clinic._ail_manager)
 
         # simplify it
         s = p.analyses.RegionSimplifier(main_func, rs.result, clinic._ail_manager)
@@ -186,10 +186,10 @@ class TestStructurer(unittest.TestCase):
         clinic = p.analyses.Clinic(test_func)
 
         # recover regions
-        ri = p.analyses.RegionIdentifier(test_func, graph=clinic.graph)
+        ri = p.analyses.RegionIdentifier(test_func, graph=clinic.graph, ail_manager=clinic._ail_manager)
 
         # structure it
-        rs = p.analyses.RecursiveStructurer(ri.region, ail_manager=Manager())
+        rs = p.analyses.RecursiveStructurer(ri.region, ail_manager=clinic._ail_manager)
 
         # simplify it
         s = p.analyses.RegionSimplifier(test_func, rs.result, clinic._ail_manager)
@@ -212,10 +212,10 @@ class TestStructurer(unittest.TestCase):
         clinic = p.analyses.Clinic(test_func)
 
         # recover regions
-        ri = p.analyses.RegionIdentifier(test_func, graph=clinic.graph)
+        ri = p.analyses.RegionIdentifier(test_func, graph=clinic.graph, ail_manager=clinic._ail_manager)
 
         # structure it
-        rs = p.analyses.RecursiveStructurer(ri.region, ail_manager=Manager())
+        rs = p.analyses.RecursiveStructurer(ri.region, ail_manager=clinic._ail_manager)
 
         # simplify it
         s = p.analyses.RegionSimplifier(test_func, rs.result, clinic._ail_manager)
@@ -237,10 +237,10 @@ class TestStructurer(unittest.TestCase):
         clinic = p.analyses.Clinic(test_func)
 
         # recover regions
-        ri = p.analyses.RegionIdentifier(test_func, graph=clinic.graph)
+        ri = p.analyses.RegionIdentifier(test_func, graph=clinic.graph, ail_manager=clinic._ail_manager)
 
         # structure it
-        rs = p.analyses.RecursiveStructurer(ri.region, ail_manager=Manager())
+        rs = p.analyses.RecursiveStructurer(ri.region, ail_manager=clinic._ail_manager)
 
         # simplify it
         s = p.analyses.RegionSimplifier(test_func, rs.result, clinic._ail_manager)
@@ -263,10 +263,10 @@ class TestStructurer(unittest.TestCase):
         clinic = p.analyses.Clinic(test_func)
 
         # recover regions
-        ri = p.analyses.RegionIdentifier(test_func, graph=clinic.graph)
+        ri = p.analyses.RegionIdentifier(test_func, graph=clinic.graph, ail_manager=clinic._ail_manager)
 
         # structure it
-        rs = p.analyses.RecursiveStructurer(ri.region, ail_manager=Manager())
+        rs = p.analyses.RecursiveStructurer(ri.region, ail_manager=clinic._ail_manager)
 
         # simplify it
         s = p.analyses.RegionSimplifier(test_func, rs.result, clinic._ail_manager)

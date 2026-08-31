@@ -8,6 +8,7 @@ import os
 import unittest
 
 import angr
+from angr.ailment import Manager
 from tests.common import bin_location
 
 test_location = os.path.join(bin_location, "tests")
@@ -20,7 +21,7 @@ class TestRegionIdentifier(unittest.TestCase):
 
         main_func = cfg.kb.functions["main"]
 
-        _ = p.analyses.RegionIdentifier(main_func)
+        _ = p.analyses.RegionIdentifier(main_func, ail_manager=Manager())
 
     def test_make_supergraph_update_entrynode(self):
         proj = angr.Project(
