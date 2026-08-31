@@ -323,7 +323,11 @@ class DreamStructurer(StructurerBase):
         region = OverlayManager(loop_region_graph).root
         region.head = loop_head
         structurer = self.project.analyses[DreamStructurer].prep()(
-            region, condition_processor=self.cond_proc, func=self.function, jump_tables=self.jump_tables
+            region,
+            condition_processor=self.cond_proc,
+            func=self.function,
+            jump_tables=self.jump_tables,
+            ail_manager=self.ail_manager,
         )
         seq = structurer.result
 

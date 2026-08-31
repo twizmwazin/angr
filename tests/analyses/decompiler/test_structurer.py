@@ -129,7 +129,7 @@ class TestStructurer(unittest.TestCase):
         ri = p.analyses.RegionIdentifier(main_func, graph=clinic.graph)
 
         # structure it
-        st = p.analyses[DreamStructurer].prep()(ri.region)
+        st = p.analyses[DreamStructurer].prep()(ri.region, ail_manager=clinic._ail_manager)
 
         # simplify it
         _ = p.analyses.RegionSimplifier(main_func, st.result, clinic._ail_manager)
@@ -151,7 +151,7 @@ class TestStructurer(unittest.TestCase):
         ri = p.analyses.RegionIdentifier(main_func, graph=clinic.graph)
 
         # structure it
-        p.analyses[DreamStructurer].prep()(ri.region)
+        p.analyses[DreamStructurer].prep()(ri.region, ail_manager=clinic._ail_manager)
 
     def test_simple(self):
         p = angr.Project(os.path.join(test_location, "x86_64", "all"), auto_load_libs=False, load_debug_info=True)
