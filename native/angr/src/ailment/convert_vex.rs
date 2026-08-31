@@ -2178,12 +2178,6 @@ impl VEXIRSBConverter {
         let arch = irsb.getattr("arch")?;
         let tyenv = irsb.getattr("tyenv")?;
         let block_addr: i64 = irsb.getattr("addr")?.extract()?;
-        // Keep manager state in sync with the legacy converter.
-        {
-            let mut m = manager.borrow_mut();
-            m.tyenv = Some(tyenv.clone().unbind());
-            m.block_addr = Some(block_addr);
-        }
         let reader = PyReader {
             irsb: irsb.clone(),
             tyenv,

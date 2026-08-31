@@ -1,10 +1,10 @@
 //! Rust port of `angr.ailment.manager.Manager`.
 //!
-//! The manager hands out monotonically increasing atom indices and carries
-//! the per-conversion scratch state (current instruction address, VEX
-//! statement index, type environment, block address). Porting it to Rust
-//! lets the VEX converter bump the atom counter natively (no Python call per
-//! atom). The public Python API mirrors the original class exactly.
+//! The manager hands out monotonically increasing atom indices, which serve as
+//! the identity of every AIL node: `__eq__` and `__hash__` fold `idx` in at
+//! every node, and `VariableMap` keys its side tables on it. One manager is
+//! built per `Clinic` invocation and threaded through every pass, so those
+//! indices stay unique for the whole decompilation.
 
 use pyo3::prelude::*;
 
@@ -23,10 +23,6 @@ pub struct Manager {
     /// Attached by Clinic so that optimization passes, peephole optimizations,
     /// and region simplifiers can use VariableMap.
     pub variable_map: Option<Py<PyAny>>,
-    pub ins_addr: Option<i64>,
-    pub vex_stmt_idx: Option<i64>,
-    pub tyenv: Option<Py<PyAny>>,
-    pub block_addr: Option<i64>,
 }
 
 #[pymethods]
@@ -36,10 +32,6 @@ impl Manager {
         Self {
             atom_ctr: 0,
             variable_map: None,
-            ins_addr: None,
-            vex_stmt_idx: None,
-            tyenv: None,
-            block_addr: None,
         }
     }
 
