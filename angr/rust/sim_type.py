@@ -385,7 +385,8 @@ class RustSimStruct(RustSimType, SimStruct):
         fget = SimStruct.size.fget
         if fget is None:
             return 0
-        size = fget(self)
+        # astroid models property.fget with an empty body, so pylint assumes the call returns nothing
+        size = fget(self)  # pylint: disable=assignment-from-no-return
         if size == 0:
             return 0
         assert self._arch is not None

@@ -194,9 +194,12 @@ ignore-patterns = [
 ]
 
 [tool.pylint.typecheck]
-# Protobuf message classes are created at runtime, so member access on the
-# generated modules cannot be verified statically.
-ignored-modules = ["angr.protos.*"]
+# angr.protos: protobuf message classes are created at runtime, so member access
+# on the generated modules cannot be verified statically.
+# angr.rustylib: compiled extension whose submodules exist only as .pyi stubs;
+# astroid cannot locate stub-only submodules, so every import of them would be
+# reported as import-error. pyright checks both against the stubs.
+ignored-modules = ["angr.protos.*", "angr.rustylib.*"]
 
 [tool.pylint."messages control"]
 disable = [
