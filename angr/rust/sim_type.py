@@ -383,7 +383,9 @@ class RustSimStruct(RustSimType, SimStruct):
         if not self.fields:
             return 0
         fget = SimStruct.size.fget
-        size = fget(self) if fget else 0
+        if fget is None:
+            return 0
+        size = fget(self)
         if size == 0:
             return 0
         assert self._arch is not None

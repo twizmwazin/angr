@@ -18,7 +18,7 @@ file_counter = itertools.count()
 dialogue_counter = itertools.count()
 
 
-class Flags:  # pylint: disable=W0232,
+class Flags:
     O_RDONLY = 0
     O_WRONLY = 1
     O_RDWR = 2
