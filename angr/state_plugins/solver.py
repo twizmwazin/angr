@@ -71,13 +71,13 @@ def timed_function(f):
 
 # pylint:disable=global-variable-undefined
 def enable_timing():
-    global _timing_enabled
+    global _timing_enabled  # noqa: PLW0603
     _timing_enabled = True
     lt.setLevel(1)
 
 
 def disable_timing():
-    global _timing_enabled
+    global _timing_enabled  # noqa: PLW0603
     _timing_enabled = False
 
 
@@ -371,8 +371,8 @@ class SimSolver(SimStatePlugin):
         self,
         name,
         size,
-        min=None,
-        max=None,
+        min=None,  # noqa: A002
+        max=None,  # noqa: A002
         stride=None,
         uninitialized=False,
         explicit_name=False,
@@ -1011,8 +1011,8 @@ class SimSolver(SimStatePlugin):
             raise SimValueError(f"Concretized {len(r)} values (must be exactly {n}) in eval_exact")
         return r
 
-    min_int = min
-    max_int = max
+    min_int = min  # noqa: A003
+    max_int = max  # noqa: A003
 
     #
     # Other methods

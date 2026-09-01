@@ -280,7 +280,7 @@ class CompleteCallingConventionsAnalysis(Analysis):
 
             if self.project.simos is not None and isinstance(self.project.simos, SimWindows):
                 # delayed import
-                from angr.procedures.definitions import load_win32api_definitions
+                from angr.procedures.definitions import load_win32api_definitions  # noqa: PLC0415
 
                 Initializer.get().register(load_win32api_definitions)
 

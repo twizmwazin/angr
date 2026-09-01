@@ -2846,7 +2846,7 @@ class CFGBase(Analysis):
         :return: True if the entire block is a single-byte or multi-byte nop instruction, False otherwise.
         """
 
-        if arch.name == "X86" or arch.name == "AMD64":
+        if arch.name in {"X86", "AMD64"}:
             block_bytes_set = set(block.bytes)
             if block_bytes_set == {0x90}:
                 return True

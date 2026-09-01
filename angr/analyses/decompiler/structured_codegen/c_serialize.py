@@ -681,7 +681,7 @@ def parse_codegen(msg, *, project=None, kb=None, func=None):
     cg.cnode2ailexpr = None
     cg._handlers = None  # callers that want to re-render should construct a fresh CStructuredCodeGenerator
     # indent_delta (from the indent_size option) is not serialized; restore the default so re-rendering works.
-    from .c import INDENT_DELTA  # pylint:disable=import-outside-toplevel
+    from .c import INDENT_DELTA  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
 
     cg.indent_delta = INDENT_DELTA
     # Wire the CFunction's variable manager only when kb.dec_variables already has one; creating an empty manager

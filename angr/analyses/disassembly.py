@@ -154,7 +154,7 @@ class Hook(DisassemblyPiece):
     def __init__(self, block):
         self.addr = block.addr
         simproc_name = str(block.sim_procedure)
-        self.name = simproc_name.split()[-1].strip("'<>")
+        self.name = simproc_name.rsplit(maxsplit=1)[-1].strip("'<>")
         self.short_name = simproc_name.strip("'<>").split(".")[-1]
 
     def _render(self, formatting):
@@ -366,10 +366,10 @@ class Instruction(DisassemblyPiece):
             else:
                 # Check if we are inside braces or parentheses. Do not forget
                 # that we are iterating in reverse order!
-                if c == "]" or c == ")":
+                if c in {"]", ")"}:
                     nested_mem = True
 
-                elif c == "[" or c == "(":
+                elif c in {"[", "("}:
                     nested_mem = False
 
                 if cur_operand is None:

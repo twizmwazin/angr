@@ -406,5 +406,5 @@ class AngrObjectFactory:
 
     cc.SimRegArg = SimRegArg
     cc.SimStackArg = SimStackArg
-    callable.PointerWrapper = PointerWrapper
+    callable.PointerWrapper = PointerWrapper  # noqa: A003
     call_state.PointerWrapper = PointerWrapper

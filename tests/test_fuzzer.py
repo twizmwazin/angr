@@ -98,7 +98,7 @@ RETURN_ADDR = 0x100
 DATA_ADDR = 0x200
 
 
-def _apply_fn(state: angr.SimState, input: bytes):  # pylint: disable=redefined-builtin
+def _apply_fn(state: angr.SimState, input: bytes):  # pylint: disable=redefined-builtin  # noqa: A002
     # Feed the fuzzed byte into rax so the binary can branch on it.
     state.regs.rax = input[0] if input else 0
     # Set the return address so the executor's breakpoint fires on normal return.
@@ -109,7 +109,7 @@ def _apply_fn(state: angr.SimState, input: bytes):  # pylint: disable=redefined-
     cc.return_addr.set_value(state, RETURN_ADDR)
 
 
-def _apply_fn_memory(state: angr.SimState, input: bytes):  # pylint: disable=redefined-builtin
+def _apply_fn_memory(state: angr.SimState, input: bytes):  # pylint: disable=redefined-builtin  # noqa: A002
     # Store the fuzzed byte at DATA_ADDR and point rdi at it.
     state.memory.store(DATA_ADDR, bytes([input[0] if input else 0]))
     state.regs.rdi = DATA_ADDR

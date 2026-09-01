@@ -56,8 +56,8 @@ def _is_windows_appcontainer() -> bool:
     if sys.platform != "win32":
         return False
 
-    import ctypes  # pylint:disable=import-outside-toplevel
-    from ctypes import wintypes  # pylint:disable=import-outside-toplevel
+    import ctypes  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
+    from ctypes import wintypes  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
 
     TOKEN_QUERY = 0x0008
     TokenIsAppContainer = 29  # TOKEN_INFORMATION_CLASS
@@ -284,7 +284,7 @@ class RuntimeDb(KnowledgeBasePlugin):
         if sys.platform == "win32" or self._pin_fd is not None or self._lmdb_path is None:
             return
 
-        import fcntl  # pylint:disable=import-outside-toplevel
+        import fcntl  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
 
         try:
             fd = os.open(os.path.join(self._lmdb_path, PIN_FILENAME), os.O_RDWR | os.O_CREAT, 0o644)
@@ -312,7 +312,7 @@ class RuntimeDb(KnowledgeBasePlugin):
             return
 
         # Linux/MacOS
-        import fcntl  # pylint:disable=import-outside-toplevel
+        import fcntl  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
 
         # release our own pin first
         os.close(self._pin_fd)

@@ -109,7 +109,7 @@ class SootBlockProcessor:
         expr = self._expr(right_op)
         if expr is not None:
             try:
-                from pysoot.sootir.soot_value import SootLocal
+                from pysoot.sootir.soot_value import SootLocal  # noqa: PLC0415
             except ImportError:
                 l.error("Please install PySoot before analyzing Java byte code.")
                 raise
@@ -172,7 +172,7 @@ class SootBlockProcessor:
         # Try to annotate the variable when applicable
         try:
             try:
-                from pysoot.sootir.soot_value import SootValue
+                from pysoot.sootir.soot_value import SootValue  # noqa: PLC0415
             except ImportError:
                 l.error("Please install PySoot before analyzing Java byte code.")
                 raise

@@ -3,7 +3,7 @@ from __future__ import annotations
 import angr
 
 
-class open(angr.SimProcedure):  # pylint:disable=W0622
+class open(angr.SimProcedure):  # pylint:disable=W0622  # noqa: A001
     # pylint:disable=arguments-differ,unused-argument
 
     def run(self, p_addr, flags, mode):

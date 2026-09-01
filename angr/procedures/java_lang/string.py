@@ -15,7 +15,7 @@ class StringConcat(JavaSimProcedure):
     __provides__ = (("java.lang.String", "concat(java.lang.String)"),)
 
     def run(self, str_1_ref, str_2_ref):  # pylint: disable=arguments-differ
-        log.debug(f"Called SimProcedure java.string.concat with args: {str_1_ref} {str_2_ref}")
+        log.debug("Called SimProcedure java.string.concat with args: %s %s", str_1_ref, str_2_ref)
         str_1 = self.state.memory.load(str_1_ref)
         str_2 = self.state.memory.load(str_2_ref)
         return claripy.StrConcat(str_1, str_2)
@@ -37,7 +37,7 @@ class StringSplit(JavaSimProcedure):
         return self.this_ref
 
     def run(self, this_ref, separator_ref):
-        log.debug(f"Called SimProcedure java.lang.String.split with args: {this_ref}, {separator_ref}")
+        log.debug("Called SimProcedure java.lang.String.split with args: %s, %s", this_ref, separator_ref)
         self.this_ref = this_ref
         this = self.state.memory.load(this_ref)
         separator = self.state.memory.load(separator_ref)
@@ -64,7 +64,7 @@ class StringLength(JavaSimProcedure):
     __provides__ = (("java.lang.String", "length()"),)
 
     def run(self, this_str):
-        log.debug(f"Called SimProcedure java.lang.String.length with args: {this_str}")
+        log.debug("Called SimProcedure java.lang.String.length with args: %s", this_str)
 
         return claripy.StrLen(self.state.memory.load(this_str))
 
@@ -73,7 +73,7 @@ class StringCharAt(JavaSimProcedure):
     __provides__ = (("java.lang.String", "charAt(int)"),)
 
     def run(self, this_str, index):
-        log.debug(f"Called SimProcedure java.lang.String.charAt with args: {this_str} {index}")
+        log.debug("Called SimProcedure java.lang.String.charAt with args: %s %s", this_str, index)
 
         char_str = claripy.StrSubstr(index, claripy.BVV(1, 32), self.state.memory.load(this_str))
         return SimSootValue_StringRef.new_string(self.state, char_str)

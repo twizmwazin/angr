@@ -640,7 +640,7 @@ class SimPackets(SimFileBase):
                 raise SimMergeError("Cannot merge SimPackets with disparate number of packets")
 
         for i, default in enumerate(self.content):
-            max_data_length = max(len(default[0]), max(len(o.content[i][0]) for o in others))
+            max_data_length = max(len(default[0]), *(len(o.content[i][0]) for o in others))
             merged_data = claripy.ite_cases(
                 zip(
                     merge_conditions[1:],

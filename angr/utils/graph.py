@@ -1106,7 +1106,7 @@ class DirectedGraphHelper[T]:
         if self._node_order is None and self._cyclic_graph:
             self._generate_node_order()
 
-            from angr.analyses.decompiler.region_overlay import (  # pylint:disable=import-outside-toplevel
+            from angr.analyses.decompiler.region_overlay import (  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
                 RegionOverlayGraph,
             )
 

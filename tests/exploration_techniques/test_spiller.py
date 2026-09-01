@@ -34,7 +34,7 @@ def priority_key(state):
 
 class TestSpiller(unittest.TestCase):
     @classmethod
-    def setUp(self):
+    def setUp(cls):
         # clean up AST cache in claripy, because a cached AST might believe it
         # has been stored in ana after we clean up the ana storage
 

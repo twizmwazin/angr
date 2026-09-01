@@ -59,11 +59,11 @@ class LLMClient:
         For ``AgentKind.STRING``, a single string-output agent is cached on the instance.
         For ``AgentKind.STRUCTURED``, agents are cached per ``output_type``.
         """
-        global Agent
+        global Agent  # noqa: PLW0603
 
         if Agent is None:
             try:
-                from pydantic_ai import Agent  # type: ignore
+                from pydantic_ai import Agent  # type: ignore  # noqa: PLC0415
             except ImportError:
                 raise ImportError(
                     "pydantic-ai is required for LLM support. You can install it with: pip install angr[llm] or "
@@ -84,15 +84,15 @@ class LLMClient:
     def infer_provider(self, provider: str) -> Provider[Any]:
         """Infer the provider from the provider name."""
         if provider.startswith("gateway/"):
-            from pydantic_ai.providers.gateway import gateway_provider  # type: ignore
+            from pydantic_ai.providers.gateway import gateway_provider  # type: ignore  # noqa: PLC0415
 
             upstream_provider = provider.removeprefix("gateway/")
             return gateway_provider(upstream_provider)
         if provider in ("google-vertex", "google-gla"):
-            from pydantic_ai.providers.google import GoogleProvider
+            from pydantic_ai.providers.google import GoogleProvider  # noqa: PLC0415
 
             return GoogleProvider(vertexai=provider == "google-vertex")
-        from pydantic_ai.providers import infer_provider_class
+        from pydantic_ai.providers import infer_provider_class  # noqa: PLC0415
 
         provider_class = infer_provider_class(provider)
         return provider_class(api_key=self.api_key)  # type: ignore
@@ -100,16 +100,16 @@ class LLMClient:
     def _build_model(self) -> Model | str:
         """Build a pydantic-ai model object from the configured settings."""
         if self.api_base:
-            global OpenAIChatModel, OpenAIProvider
+            global OpenAIChatModel, OpenAIProvider  # noqa: PLW0603
 
             if OpenAIChatModel is None or OpenAIProvider is None:
-                from pydantic_ai.models.openai import OpenAIChatModel  # type: ignore
-                from pydantic_ai.providers.openai import OpenAIProvider  # type: ignore
+                from pydantic_ai.models.openai import OpenAIChatModel  # type: ignore  # noqa: PLC0415
+                from pydantic_ai.providers.openai import OpenAIProvider  # type: ignore  # noqa: PLC0415
 
             provider = OpenAIProvider(base_url=self.api_base, api_key=self.api_key or "no-key")
             return OpenAIChatModel(self.model, provider=provider)
 
-        from pydantic_ai.models import infer_model
+        from pydantic_ai.models import infer_model  # noqa: PLC0415
 
         model_name = self.model
         if ":" not in model_name:
@@ -136,7 +136,7 @@ class LLMClient:
         return cls(model=model, api_key=api_key, api_base=api_base)
 
     def _model_settings(self) -> ModelSettings:
-        from pydantic_ai.settings import ModelSettings  # type:ignore
+        from pydantic_ai.settings import ModelSettings  # type:ignore  # noqa: PLC0415
 
         return ModelSettings(temperature=self.temperature, max_tokens=self.max_tokens)
 
@@ -161,7 +161,7 @@ class LLMClient:
         """
 
         try:
-            from pydantic_ai import UserError
+            from pydantic_ai import UserError  # noqa: PLC0415
         except ImportError:
             raise ImportError(
                 "pydantic-ai is required for LLM support. You can install it with: pip install angr[llm] or "

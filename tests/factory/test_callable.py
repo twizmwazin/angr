@@ -86,7 +86,7 @@ class TestCallable(unittest.TestCase):
         assert result.concrete_value == sum(range(12))
 
     def run_manyfloatsum(self, arch):
-        global type_cache
+        global type_cache  # noqa: PLW0603
         if type_cache is None:
             with open(os.path.join(bin_location, "tests_src", "manyfloatsum.c")) as fp:
                 type_cache = parse_defns(fp.read())
@@ -121,7 +121,7 @@ class TestCallable(unittest.TestCase):
     CONCRETE_ARG_VALUE = 1.5
 
     def run_manyfloatsum_symbolic(self, arch):
-        global type_cache
+        global type_cache  # noqa: PLW0603
         if type_cache is None:
             with open(os.path.join(bin_location, "tests_src", "manyfloatsum.c")) as fp:
                 type_cache = parse_defns(fp.read())

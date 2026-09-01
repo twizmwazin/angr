@@ -87,7 +87,7 @@ dev = [
     "pytest-split>=0.10.0",
     "pytest-timeout>=2.3.1",
     "pytest-xdist>=3.6.1",
-    "ruff>=0.11.7",
+    "ruff>=0.16.5",
     "sortedcontainers-stubs>=2.4.3",
 ]
 docs = ["furo", "myst-parser", "sphinx", "sphinx-autodoc-typehints"]
@@ -147,6 +147,38 @@ extend-select = [
     "SIM",
     "TID252",
     "UP",
+    # Ruff equivalents of the pylint checks angr enables. Rules that are already
+    # part of ruff's default set (ruff >= 0.16) are not repeated here. Equivalents
+    # with too many existing violations to baseline are left out for now:
+    # SLF001 (protected-access), ARG (unused-argument), D101/D106
+    # (missing-class-docstring).
+    "A001", "A002", "A003",  # redefined-builtin
+    "B904",                  # raise-missing-from
+    "C416",                  # unnecessary-comprehension
+    "COM818",                # trailing-comma-tuple
+    "E401",                  # multiple-imports
+    "E402",                  # wrong-import-position
+    "E711", "E712",          # singleton-comparison
+    "E731",                  # unnecessary-lambda-assignment
+    "F403",                  # wildcard-import
+    "G001", "G002", "G003",  # logging-format-interpolation, logging-not-lazy
+    "G004",                  # logging-fstring-interpolation
+    "ISC001", "ISC002",      # implicit-str-concat
+    "N804", "N805",          # bad-classmethod-argument, no-self-argument, bad-mcs-*-argument
+    "PLC0207",               # use-maxsplit-arg
+    "PLC0415",               # import-outside-toplevel
+    "PLC1802",               # use-implicit-booleaness-not-len
+    "PLC2401", "PLC2403",    # non-ascii-name, non-ascii-module-import
+    "PLE0237",               # assigning-non-slot
+    "PLE0241",               # duplicate-bases
+    "PLE0302",               # unexpected-special-method-signature
+    "PLR1714",               # consider-using-in
+    "PLW0108",               # unnecessary-lambda
+    "PLW0603",               # global-statement
+    "PLW3301",               # nested-min-max
+    "Q000",                  # inconsistent-quotes
+    "S113",                  # missing-timeout
+    "S307",                  # eval-used
 ]
 ignore = [
     "BLE001", # Catching Exception

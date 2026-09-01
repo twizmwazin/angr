@@ -4559,18 +4559,18 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
 
     @classmethod
     def _get_cmsg(cls):
-        from angr.protos import codegen_pb2  # pylint:disable=import-outside-toplevel
+        from angr.protos import codegen_pb2  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
 
         return codegen_pb2.Codegen()  # pylint:disable=no-member
 
     def serialize_to_cmessage(self):
-        from . import c_serialize  # pylint:disable=import-outside-toplevel
+        from . import c_serialize  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
 
         return c_serialize.serialize_codegen(self)
 
     @classmethod
     def parse_from_cmessage(cls, cmsg, *, project=None, kb=None, func=None, **kwargs):
-        from . import c_serialize  # pylint:disable=import-outside-toplevel
+        from . import c_serialize  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
 
         return c_serialize.parse_codegen(cmsg, project=project, kb=kb, func=func)
 
@@ -4825,6 +4825,6 @@ register_analysis(CStructuredCodeGenerator, "CStructuredCodeGenerator")
 
 # Register protobuf serializer/parser pairs for every concrete CConstruct subclass. Imported after all classes are
 # defined so that ``c_serialize.register_all`` can reference them by name.
-from . import c_serialize as _c_serialize  # pylint: disable=wrong-import-position
+from . import c_serialize as _c_serialize  # noqa: E402  # pylint: disable=wrong-import-position
 
 _c_serialize.register_all()

@@ -69,7 +69,7 @@ class PickledStatesDb(PickledStatesBase):
     """
 
     def __init__(self, db_str="sqlite:///:memory:"):
-        from .spiller_db import Base, OperationalError, create_engine, sessionmaker, sqlalchemy
+        from .spiller_db import Base, OperationalError, create_engine, sessionmaker, sqlalchemy  # noqa: PLC0415
 
         if sqlalchemy is None:
             raise ImportError(
@@ -89,7 +89,7 @@ class PickledStatesDb(PickledStatesBase):
         pass
 
     def add(self, prio, sid, taken=False, stash="spilled"):  # pylint:disable=arguments-differ
-        from .spiller_db import PickledState
+        from .spiller_db import PickledState  # noqa: PLC0415
 
         record = PickledState(id=sid, priority=prio, taken=taken, stash=stash)
         session = self.Session()
@@ -98,7 +98,7 @@ class PickledStatesDb(PickledStatesBase):
         session.close()
 
     def pop_n(self, n, stash="spilled"):  # pylint:disable=arguments-differ
-        from .spiller_db import PickledState
+        from .spiller_db import PickledState  # noqa: PLC0415
 
         session = self.Session()
         q = (
@@ -119,7 +119,7 @@ class PickledStatesDb(PickledStatesBase):
         return ss
 
     def get_recent_n(self, n, stash="spilled"):
-        from .spiller_db import PickledState
+        from .spiller_db import PickledState  # noqa: PLC0415
 
         session = self.Session()
         q = session.query(PickledState).filter_by(stash=stash).order_by(PickledState.timestamp.desc()).limit(n).all()
@@ -131,7 +131,7 @@ class PickledStatesDb(PickledStatesBase):
         return ss
 
     def count(self):
-        from .spiller_db import PickledState
+        from .spiller_db import PickledState  # noqa: PLC0415
 
         session = self.Session()
         q = session.query(PickledState).count()
@@ -148,8 +148,8 @@ class Spiller(ExplorationTechnique):
     def __init__(
         self,
         src_stash="active",
-        min=5,
-        max=10,  # pylint:disable=redefined-builtin
+        min=5,  # noqa: A002
+        max=10,  # pylint:disable=redefined-builtin  # noqa: A002
         staging_stash="spill_stage",
         staging_min=10,
         staging_max=20,

@@ -57,7 +57,7 @@ class fdprintf(Func):
         interesting_chars = set()
         for p in pg.active:
             for g in p.history.jump_guards:
-                if g.op == "__ne__" or g.op == "__eq__":
+                if g.op in {"__ne__", "__eq__"}:
                     for a in g.args:
                         if not a.symbolic:
                             interesting_chars.add(s.solver.eval(a))

@@ -207,7 +207,7 @@ class TestRuntimeDbMultiProcessCleanup(unittest.TestCase):
     def test_pin_held_by_another_locker_prevents_removal(self):
         # simulate another process pinning the directory: flock conflicts apply across open file descriptions,
         # so a second descriptor in this process behaves exactly like another process
-        import fcntl  # pylint:disable=import-outside-toplevel
+        import fcntl  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
 
         with tempfile.TemporaryDirectory() as tmpdir:
             rtdb_path = os.path.join(tmpdir, "rtdb")

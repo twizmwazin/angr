@@ -114,7 +114,7 @@ def protect_stdio_from_forked_children() -> None:
     """
     Make forked worker processes safe to use from a process whose stdin/stdout are a protocol channel.
     """
-    global _stdio_fork_hook_installed  # pylint:disable=global-statement
+    global _stdio_fork_hook_installed  # pylint:disable=global-statement  # noqa: PLW0603
 
     if _stdio_fork_hook_installed:
         return

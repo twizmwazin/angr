@@ -37,7 +37,7 @@ def _t():
 
 
 def _on_func_return(func, start: float) -> None:
-    global depth
+    global depth  # noqa: PLW0603
 
     millisec = _t() - start
     sec = millisec / 1000
@@ -57,7 +57,7 @@ def timethis(func):
     @wraps(func)
     def timed_func(*args, **kwargs):
         if TIMING:
-            global depth
+            global depth  # noqa: PLW0603
 
             depth += 1
             start = _t()

@@ -14,7 +14,7 @@ def detect_test_env():
         except ValueError:
             return False
 
-        if frame_module == "__main__" or frame_module == "__console__":
+        if frame_module in {"__main__", "__console__"}:
             return False
         if frame_module is not None and any(
             frame_module.startswith(module_name + ".") for module_name in TESTER_MODULE_NAMES

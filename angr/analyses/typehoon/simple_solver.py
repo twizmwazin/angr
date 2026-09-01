@@ -2365,6 +2365,6 @@ class SimpleSolver:
         """
         Dump the constraint graph to a file.
         """
-        from networkx.drawing.nx_agraph import write_dot  # pylint:disable=import-outside-toplevel
+        from networkx.drawing.nx_agraph import write_dot  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
 
         write_dot(graph, filename)

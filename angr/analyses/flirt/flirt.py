@@ -42,7 +42,7 @@ class FlirtAnalysis(Analysis):
         dry_run: bool = False,
         match_named_functions: bool = False,
     ):
-        from angr.flirt import FLIRT_SIGNATURES_BY_ARCH  # pylint:disable=import-outside-toplevel
+        from angr.flirt import FLIRT_SIGNATURES_BY_ARCH  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
 
         self._is_arm = is_arm_arch(self.project.arch)
         self._all_suggestions: dict[str, dict[str, dict[int, str]]] = {}
@@ -107,7 +107,10 @@ class FlirtAnalysis(Analysis):
                 self.matched_suggestions[lib] = (sig_, sig_to_suggestions[max_suggestion_sig_path])
 
     def _find_hits_by_strings(self, regions: list[bytes]) -> Generator[FlirtSignature]:
-        from angr.flirt import LIBRARY_TO_SIGNATURES, STRING_TO_LIBRARIES  # pylint:disable=import-outside-toplevel
+        from angr.flirt import (  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
+            LIBRARY_TO_SIGNATURES,
+            STRING_TO_LIBRARIES,
+        )
 
         library_hits: dict[str, int] = defaultdict(int)
         for s, libs in STRING_TO_LIBRARIES.items():

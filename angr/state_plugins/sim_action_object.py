@@ -40,7 +40,7 @@ def _all_objects(a):
 
 
 def ast_preserving_op(f, *args):
-    a = f(_raw_ast(*args)) if len(args) else f()
+    a = f(_raw_ast(*args)) if args else f()
 
     if isinstance(a, claripy.ast.Base):
         tmp_deps = frozenset.union(frozenset(), *(a.tmp_deps for a in _all_objects(args)))

@@ -98,7 +98,7 @@ class SpillingDecompilationDict(collections.abc.MutableMapping):
 
     def _load_from_lmdb(self, key: CacheKey) -> DecompilationCache:
         self._flush_pending()
-        from angr.analyses.decompiler.decompilation_cache import DecompilationCache
+        from angr.analyses.decompiler.decompilation_cache import DecompilationCache  # noqa: PLC0415
 
         assert self._db is not None
         with self._kb.rtdb.begin_txn(self._db) as txn:

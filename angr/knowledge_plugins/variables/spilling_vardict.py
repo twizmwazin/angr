@@ -91,7 +91,7 @@ class SpillingVariableInternalDict(collections.abc.MutableMapping):
 
     def _load_from_lmdb(self, key: int) -> VariableManagerInternal:
 
-        from .variable_manager import VariableManagerInternal  # pylint:disable=import-outside-toplevel
+        from .variable_manager import VariableManagerInternal  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
 
         self._flush_pending()
 

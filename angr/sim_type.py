@@ -281,7 +281,7 @@ class TypeRef(SimType):
     def ty(self):
         return self.type
 
-    @type.setter
+    @type.setter  # noqa: A003
     def type(self, val):
         self._type = val
         self._arch = val._arch
@@ -3930,7 +3930,7 @@ _type_parser_singleton = None
 
 
 def type_parser_singleton() -> pycparser.CParser:
-    global _type_parser_singleton  # pylint:disable=global-statement
+    global _type_parser_singleton  # pylint:disable=global-statement  # noqa: PLW0603
     if pycparser is not None and _type_parser_singleton is None:
         _type_parser_singleton = pycparser.CParser()
     assert _type_parser_singleton is not None

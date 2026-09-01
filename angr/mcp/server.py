@@ -853,4 +853,4 @@ def create_server() -> FastMCP:
 
 # Imported last: edit_tools registers its tools on ``mcp`` and imports the helpers defined above,
 # so it has to come after them.
-from . import edit_tools  # noqa: F401  pylint:disable=wrong-import-position,unused-import
+from . import edit_tools  # noqa: E402, F401  # pylint:disable=wrong-import-position,unused-import

@@ -397,7 +397,9 @@ class SimLibrary:
         if proto is None:
             return None
         if deref:
-            from angr.utils.types import dereference_simtype_by_lib  # pylint:disable=import-outside-toplevel
+            from angr.utils.types import (  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
+                dereference_simtype_by_lib,
+            )
 
             proto = dereference_simtype_by_lib(proto, self.name)
             assert isinstance(proto, SimTypeFunction)
@@ -776,7 +778,9 @@ class SimSyscallLibrary(SimLibrary):
         if proto is None:
             return None
         if deref:
-            from angr.utils.types import dereference_simtype_by_lib  # pylint:disable=import-outside-toplevel
+            from angr.utils.types import (  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
+                dereference_simtype_by_lib,
+            )
 
             proto = dereference_simtype_by_lib(proto, self.name)
             assert isinstance(proto, SimTypeFunction)
@@ -955,7 +959,7 @@ def load_external_definitions():
     declare SimLibrary() objects and call .set_library_names() to register themselves in angr.SIM_LIBRARIES.
     """
 
-    global _EXTERNAL_DEFINITIONS_DIRS
+    global _EXTERNAL_DEFINITIONS_DIRS  # noqa: PLW0603
 
     if _EXTERNAL_DEFINITIONS_DIRS is None and "ANGR_EXTERNAL_DEFINITIONS_DIRS" in os.environ:
         _EXTERNAL_DEFINITIONS_DIRS = os.environ["ANGR_EXTERNAL_DEFINITIONS_DIRS"].strip('"').split(";")
@@ -974,7 +978,9 @@ def load_external_definitions():
 
 
 def _update_libkernel32(lib: SimLibrary):
-    from angr.procedures.procedure_dict import SIM_PROCEDURES as P  # pylint:disable=import-outside-toplevel
+    from angr.procedures.procedure_dict import (  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
+        SIM_PROCEDURES as P,
+    )
 
     lib.add_all_from_dict(P["win32"])
     lib.add_alias("EncodePointer", "DecodePointer")
@@ -990,7 +996,9 @@ def _update_libkernel32(lib: SimLibrary):
 
 
 def _update_libntdll(lib: SimLibrary):
-    from angr.procedures.procedure_dict import SIM_PROCEDURES as P  # pylint:disable=import-outside-toplevel
+    from angr.procedures.procedure_dict import (  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
+        SIM_PROCEDURES as P,
+    )
 
     lib.add("RtlEncodePointer", P["win32"]["EncodePointer"])
     lib.add("RtlDecodePointer", P["win32"]["EncodePointer"])
@@ -998,20 +1006,26 @@ def _update_libntdll(lib: SimLibrary):
 
 
 def _update_libuser32(lib: SimLibrary):
-    from angr.procedures.procedure_dict import SIM_PROCEDURES as P  # pylint:disable=import-outside-toplevel
+    from angr.procedures.procedure_dict import (  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
+        SIM_PROCEDURES as P,
+    )
 
     lib.add_all_from_dict(P["win_user32"])
     lib.add("wsprintfA", P["libc"]["sprintf"], cc=angr.calling_conventions.SimCCCdecl(archinfo.ArchX86()))
 
 
 def _update_libntoskrnl(lib: SimLibrary):
-    from angr.procedures.procedure_dict import SIM_PROCEDURES as P  # pylint:disable=import-outside-toplevel
+    from angr.procedures.procedure_dict import (  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
+        SIM_PROCEDURES as P,
+    )
 
     lib.add_all_from_dict(P["win32_kernel"])
 
 
 def _update_glibc(libc: SimLibrary):
-    from angr.procedures.procedure_dict import SIM_PROCEDURES as P  # pylint:disable=import-outside-toplevel
+    from angr.procedures.procedure_dict import (  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
+        SIM_PROCEDURES as P,
+    )
 
     libc.add_all_from_dict(P["libc"])
     libc.add_all_from_dict(P["posix"])

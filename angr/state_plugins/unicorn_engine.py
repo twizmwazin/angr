@@ -748,20 +748,20 @@ class Unicorn(SimStatePlugin):
 
     def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
         self.cooldown_nonunicorn_blocks = max(
-            self.cooldown_nonunicorn_blocks, max(o.cooldown_nonunicorn_blocks for o in others)
+            self.cooldown_nonunicorn_blocks, *(o.cooldown_nonunicorn_blocks for o in others)
         )
-        self.cooldown_symbolic_stop = max(self.cooldown_symbolic_stop, max(o.cooldown_symbolic_stop for o in others))
+        self.cooldown_symbolic_stop = max(self.cooldown_symbolic_stop, *(o.cooldown_symbolic_stop for o in others))
         self.cooldown_unsupported_stop = max(
-            self.cooldown_unsupported_stop, max(o.cooldown_unsupported_stop for o in others)
+            self.cooldown_unsupported_stop, *(o.cooldown_unsupported_stop for o in others)
         )
         self.countdown_nonunicorn_blocks = max(
-            self.countdown_nonunicorn_blocks, max(o.countdown_nonunicorn_blocks for o in others)
+            self.countdown_nonunicorn_blocks, *(o.countdown_nonunicorn_blocks for o in others)
         )
-        self.countdown_symbolic_stop = max(self.countdown_symbolic_stop, max(o.countdown_symbolic_stop for o in others))
+        self.countdown_symbolic_stop = max(self.countdown_symbolic_stop, *(o.countdown_symbolic_stop for o in others))
         self.countdown_unsupported_stop = max(
-            self.countdown_unsupported_stop, max(o.countdown_unsupported_stop for o in others)
+            self.countdown_unsupported_stop, *(o.countdown_unsupported_stop for o in others)
         )
-        self.countdown_stop_point = max(self.countdown_stop_point, max(o.countdown_stop_point for o in others))
+        self.countdown_stop_point = max(self.countdown_stop_point, *(o.countdown_stop_point for o in others))
 
         # get a fresh unicount, just in case
         self._unicount = next(_unicounter)
@@ -901,7 +901,7 @@ class Unicorn(SimStatePlugin):
             )
         elif arch == "i386":
             self.uc.hook_add(unicorn.UC_HOOK_INTR, self._hook_intr_x86, None, 1, 0)
-        elif arch == "mips" or arch == "mipsel":
+        elif arch in {"mips", "mipsel"}:
             self.uc.hook_add(unicorn.UC_HOOK_INTR, self._hook_intr_mips, None, 1, 0)
         elif arch == "arm":
             # EDG says: Unicorn's ARM support has no concept of interrupts.

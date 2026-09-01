@@ -17,7 +17,7 @@ class ListInit(JavaSimProcedure):
     __provides__ = (("java.util.List", "<init>()"), ("java.util.LinkedList", "<init>()"))
 
     def run(self, this_ref):
-        log.debug(f"Called SimProcedure java.util.List.<init> with args: {this_ref}")
+        log.debug("Called SimProcedure java.util.List.<init> with args: %s", this_ref)
 
         array_ref = SimSootExpr_NewArray.new_array(self.state, "java.lang.Object", claripy.BVV(1000, 32))
         this_ref.store_field(self.state, ELEMS, "java.lang.Object[]", array_ref)
@@ -28,7 +28,7 @@ class ListAdd(JavaSimProcedure):
     __provides__ = (("java.util.List", "add(java.lang.Object)"), ("java.util.LinkedList", "add(java.lang.Object)"))
 
     def run(self, this_ref, obj_ref):
-        log.debug(f"Called SimProcedure java.util.List.add with args: {this_ref} {obj_ref}")
+        log.debug("Called SimProcedure java.util.List.add with args: %s %s", this_ref, obj_ref)
 
         if this_ref.symbolic:
             return claripy.BoolS("list.append")
@@ -41,7 +41,7 @@ class ListAdd(JavaSimProcedure):
             new_array_len = claripy.BVV(self.state.solver.eval(array_len) + 1, 32)
             this_ref.store_field(self.state, SIZE, "int", new_array_len)
         except KeyError:
-            log.warning(f"Could not add element to list {this_ref}")
+            log.warning("Could not add element to list %s", this_ref)
 
         return claripy.BoolV(1)
 
@@ -50,7 +50,7 @@ class ListGet(JavaSimProcedure):
     __provides__ = (("java.util.List", "get(int)"), ("java.util.LinkedList", "get(int)"))
 
     def run(self, this_ref, index):
-        log.debug(f"Called SimProcedure java.util.List.get with args: {this_ref} {index}")
+        log.debug("Called SimProcedure java.util.List.get with args: %s %s", this_ref, index)
 
         if this_ref.symbolic:
             return SimSootValue_ThisRef.new_object(self.state, "java.lang.Object", symbolic=True)
@@ -69,7 +69,7 @@ class ListGetFirst(JavaSimProcedure):
     __provides__ = (("java.util.LinkedList", "getFirst()"),)
 
     def run(self, this_ref):
-        log.debug(f"Called SimProcedure java.util.List.getFirst with args: {this_ref}")
+        log.debug("Called SimProcedure java.util.List.getFirst with args: %s", this_ref)
 
         if this_ref.symbolic:
             return SimSootValue_ThisRef.new_object(self.state, "java.lang.Object", symbolic=True)
@@ -89,7 +89,7 @@ class ListSize(JavaSimProcedure):
     __provides__ = (("java.util.List", "size()"), ("java.util.LinkedList", "size()"))
 
     def run(self, this_ref):
-        log.debug(f"Called SimProcedure java.util.List.size with args: {this_ref}")
+        log.debug("Called SimProcedure java.util.List.size with args: %s", this_ref)
 
         if this_ref.symbolic:
             return claripy.BVS("list_size", 32)

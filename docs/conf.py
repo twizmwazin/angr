@@ -213,7 +213,7 @@ def _patch_directive_header_for_reexports() -> None:
     renderer and set ``options.no_index = True`` whenever the props' documenting
     module differs from the object's canonical ``__module__``.
     """
-    from sphinx.ext.autodoc import _generate, _renderer
+    from sphinx.ext.autodoc import _generate, _renderer  # noqa: PLC0415
 
     original = _renderer._directive_header_lines
 

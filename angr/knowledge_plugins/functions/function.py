@@ -1611,8 +1611,12 @@ class Function(Serializable):
         """
         Draw the graph and save it to a PNG file.
         """
-        from matplotlib import pyplot  # pylint: disable=import-error,import-outside-toplevel,consider-using-from-import
-        from networkx.drawing.nx_agraph import graphviz_layout  # pylint: disable=import-error,import-outside-toplevel
+        from matplotlib import (  # pylint: disable=import-error,import-outside-toplevel,consider-using-from-import  # noqa: PLC0415
+            pyplot,
+        )
+        from networkx.drawing.nx_agraph import (  # pylint: disable=import-error,import-outside-toplevel  # noqa: PLC0415
+            graphviz_layout,
+        )
 
         tmp_graph = networkx.classes.digraph.DiGraph()
         for from_block, to_block in self.transition_graph.edges():

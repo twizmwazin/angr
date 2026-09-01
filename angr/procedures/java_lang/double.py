@@ -13,7 +13,7 @@ class ParseDouble(JavaSimProcedure):
     __provides__ = (("java.lang.Double", "parseDouble(java.lang.String)"),)
 
     def run(self, str_ref):
-        log.debug(f"Called SimProcedure java.lang.Double.parseDouble with args: {str_ref}")
+        log.debug("Called SimProcedure java.lang.Double.parseDouble with args: %s", str_ref)
         str_ = self.state.memory.load(str_ref)
 
         if str_.concrete:

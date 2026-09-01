@@ -617,7 +617,7 @@ if not TYPE_CHECKING:
         @staticmethod
         def from_bytes(data: bytes):
             """Deserialize an Expression from bytes."""
-            from angr.rustylib.ailment import (  # pylint:disable=import-error,import-outside-toplevel
+            from angr.rustylib.ailment import (  # pylint:disable=import-error,import-outside-toplevel  # noqa: PLC0415
                 Expression as _RustExpression,
             )
 

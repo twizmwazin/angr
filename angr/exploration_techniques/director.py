@@ -146,7 +146,7 @@ class ExecuteAddressGoal(BaseGoal):
 
         # crawl the graph to see if we can reach the target address next
         for src, dst in self._dfs_edges(cfg.graph, node, max_steps=peek_blocks):
-            if src.addr == self.addr or dst.addr == self.addr:
+            if self.addr in (src.addr, dst.addr):
                 l.debug("State %s will reach %#x.", state, self.addr)
                 return True
 

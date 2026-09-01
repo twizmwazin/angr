@@ -1095,7 +1095,7 @@ class Decompiler(Analysis):
                             If False (default), exceptions are caught and the method returns False.
         """
 
-        from angr.llm_models import VariableNameSuggestions  # pylint:disable=import-outside-toplevel
+        from angr.llm_models import VariableNameSuggestions  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
 
         if llm_client is None:
             llm_client = self.project.llm_client
@@ -1157,7 +1157,7 @@ class Decompiler(Analysis):
         :param raise_exc:   If True, exceptions from the LLM call are propagated to the caller.
         """
 
-        from angr.llm_models import FunctionNameSuggestion  # pylint:disable=import-outside-toplevel
+        from angr.llm_models import FunctionNameSuggestion  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
 
         if llm_client is None:
             llm_client = self.project.llm_client
@@ -1208,7 +1208,7 @@ class Decompiler(Analysis):
         :param raise_exc:   If True, exceptions from the LLM call are propagated to the caller.
         """
 
-        from angr.llm_models import VariableTypeSuggestions  # pylint:disable=import-outside-toplevel
+        from angr.llm_models import VariableTypeSuggestions  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
 
         if llm_client is None:
             llm_client = self.project.llm_client

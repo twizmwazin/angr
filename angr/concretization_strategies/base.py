@@ -9,7 +9,7 @@ class SimConcretizationStrategy:
     memory index concretization behavior can be modified.
     """
 
-    def __init__(self, filter=None, exact=True):  # pylint:disable=redefined-builtin
+    def __init__(self, filter=None, exact=True):  # pylint:disable=redefined-builtin  # noqa: A002
         """
         Initializes the base SimConcretizationStrategy.
 

@@ -23,7 +23,7 @@ def setup_terminal():
         if not isinstance(sys.stdout, colorama.ansitowin32.StreamWrapper):
             colorama.init()
 
-    global ansi_color_enabled  # pylint:disable=global-statement
+    global ansi_color_enabled  # pylint:disable=global-statement  # noqa: PLW0603
     # https://no-color.org/
     no_color = os.environ.get("NO_COLOR", "")
     ansi_color_enabled = isatty and not no_color

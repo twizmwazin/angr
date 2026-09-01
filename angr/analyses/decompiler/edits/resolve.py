@@ -251,7 +251,9 @@ def concrete_variables(varman, resolved: ResolvedVariable) -> list[SimVariable]:
 
 
 def _iter_global_cvars(codegen, cfunc):
-    from angr.analyses.decompiler.structured_codegen.c import CVariable  # pylint:disable=import-outside-toplevel
+    from angr.analyses.decompiler.structured_codegen.c import (  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
+        CVariable,
+    )
 
     if codegen.cexterns:
         yield from codegen.cexterns

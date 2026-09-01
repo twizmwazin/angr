@@ -25,7 +25,14 @@ class TechniqueBuilder(ExplorationTechnique):
     """
 
     def __init__(
-        self, setup=None, step_state=None, step=None, successors=None, filter=None, selector=None, complete=None
+        self,
+        setup=None,
+        step_state=None,
+        step=None,
+        successors=None,
+        filter=None,  # noqa: A002
+        selector=None,
+        complete=None,
     ):
         super().__init__()
         self.setup = _its_a_func(setup) or super().setup

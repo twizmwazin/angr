@@ -24,7 +24,7 @@ HITS_CASE_1, HITS_CASE_2, MISSES = 0, 0, 0
 
 
 def enable_profiling():
-    global PROFILING, HITS_CASE_1, HITS_CASE_2, MISSES
+    global PROFILING, HITS_CASE_1, HITS_CASE_2, MISSES  # noqa: PLW0603
 
     PROFILING = True
     HITS_CASE_1 = 0
@@ -33,7 +33,7 @@ def enable_profiling():
 
 
 def disable_profiling():
-    global PROFILING
+    global PROFILING  # noqa: PLW0603
     PROFILING = False
 
 
@@ -73,7 +73,7 @@ class MipsElfFastResolver(IndirectJumpResolver):
         :return: If it was resolved and targets alongside it
         :rtype: tuple
         """
-        global MISSES
+        global MISSES  # noqa: PLW0603
 
         resolved, resolved_targets = self._resolve(cfg, addr, func_addr, block, jumpkind, max_level=2)
         if resolved:
@@ -97,7 +97,7 @@ class MipsElfFastResolver(IndirectJumpResolver):
         :rtype: tuple
         """
 
-        global HITS_CASE_1, HITS_CASE_2
+        global HITS_CASE_1, HITS_CASE_2  # noqa: PLW0603
 
         func = cfg.kb.functions.function(addr=func_addr)
         b = Blade(

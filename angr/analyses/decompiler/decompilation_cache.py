@@ -47,7 +47,7 @@ def _simvar_to_bytes(v) -> bytes:
 
 
 def _simvar_from_bytes(b: bytes):
-    import angr.sim_variable as sv_mod  # pylint:disable=import-outside-toplevel
+    import angr.sim_variable as sv_mod  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
 
     sep = b.index(b"\0")
     return getattr(sv_mod, b[:sep].decode("ascii")).parse(b[sep + 1 :])
@@ -65,7 +65,7 @@ def _serialize_binop_operators(binop_operators, out_msg, set_flag=None) -> None:
 
 
 def _parse_binop_operators(entries):
-    from angr.analyses.decompiler.optimization_passes.expr_op_swapper import (  # pylint:disable=import-outside-toplevel
+    from angr.analyses.decompiler.optimization_passes.expr_op_swapper import (  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
         OpDescriptor,
     )
 
@@ -74,7 +74,7 @@ def _parse_binop_operators(entries):
 
 def _serialize_parameters(params: dict, out_msg) -> None:
     """Translate the 15-key parameters dict into a DecompilationParameters cmessage."""
-    from angr.analyses.decompiler.optimization_pass_registry import (  # pylint:disable=import-outside-toplevel
+    from angr.analyses.decompiler.optimization_pass_registry import (  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
         pass_to_name,
     )
 
@@ -121,8 +121,10 @@ def _parse_parameters(msg) -> dict:
     None and collection fields come back empty, except peephole_optimizations where None means "use the default
     peephole set". This matches the decompiler's normalized _cache_parameters, which _can_use_decompilation_cache
     compares key by key against the deserialized cache."""
-    from angr.analyses.decompiler.decompilation_options import PARAM_TO_OPTION  # pylint:disable=import-outside-toplevel
-    from angr.analyses.decompiler.optimization_pass_registry import (  # pylint:disable=import-outside-toplevel
+    from angr.analyses.decompiler.decompilation_options import (  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
+        PARAM_TO_OPTION,
+    )
+    from angr.analyses.decompiler.optimization_pass_registry import (  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
         name_to_pass,
     )
 
@@ -188,7 +190,7 @@ class DecompilationCache(Serializable):
     )
 
     def __init__(self, addr):
-        import angr  # pylint:disable=import-outside-toplevel,cyclic-import
+        import angr  # pylint:disable=import-outside-toplevel,cyclic-import  # noqa: PLC0415
 
         self.parameters: dict[str, Any] = {}
         # angr version and creation time of this decompilation
@@ -279,8 +281,10 @@ class DecompilationCache(Serializable):
         """Parse a DecompilationCache from a cmessage. Runtime back-references (project, kb, function, cfg) are
         passed through to the embedded Clinic / codegen parsers so the parsed cache is functional for cache-hit
         validity checks. Decompilation variables live on kb.dec_variables."""
-        from .notes import DecompilationNote  # pylint:disable=import-outside-toplevel
-        from .structured_codegen.c import CStructuredCodeGenerator  # pylint:disable=import-outside-toplevel
+        from .notes import DecompilationNote  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
+        from .structured_codegen.c import (  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
+            CStructuredCodeGenerator,
+        )
 
         cache = cls(cmsg.addr)
         # cfg is not serialized; reattach from kwargs so cache-validity checks still work.

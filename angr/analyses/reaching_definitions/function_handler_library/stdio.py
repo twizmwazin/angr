@@ -260,7 +260,7 @@ def handle_scanf(
         if fmt == "%s":
             buf_atom = state.deref(atom, 1)
             buf_data = b"\0"
-        elif fmt == "%u" or fmt == "%d":
+        elif fmt in {"%u", "%d"}:
             buf_atom = state.deref(atom, 4, state.arch.memory_endness)
         elif fmt == "%c":
             buf_atom = state.deref(atom, 1, state.arch.memory_endness)

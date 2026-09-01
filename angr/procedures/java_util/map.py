@@ -30,7 +30,7 @@ class MapInit(JavaSimProcedure):
     __provides__ = (("java.util.Map", "<init>()"), ("java.util.HashMap", "<init>()"))
 
     def run(self, this_ref):
-        log.debug(f"Called SimProcedure java.util.Map.<init> with args: {this_ref}")
+        log.debug("Called SimProcedure java.util.Map.<init> with args: %s", this_ref)
         # init map size
         this_ref.store_field(self.state, MAP_SIZE, "int", claripy.BVV(0, 32))
         array_ref = SimSootExpr_NewArray.new_array(self.state, "java.lang.Object", claripy.BVV(1000, 32))
@@ -44,7 +44,7 @@ class MapPut(JavaSimProcedure):
     )
 
     def run(self, this_ref, key_ref, value_ref):
-        log.debug(f"Called SimProcedure java.util.Map.add with args: {this_ref} {key_ref} {value_ref}")
+        log.debug("Called SimProcedure java.util.Map.add with args: %s %s %s", this_ref, key_ref, value_ref)
 
         if this_ref.symbolic:
             return SimSootExpr_NullConstant
@@ -70,7 +70,7 @@ class MapGet(JavaSimProcedure):
     __provides__ = (("java.util.Map", "get(java.lang.Object)"), ("java.util.HashMap", "get(java.lang.Object)"))
 
     def run(self, this_ref, key_ref):
-        log.debug(f"Called SimProcedure java.util.Map.get with args: {this_ref} {key_ref}")
+        log.debug("Called SimProcedure java.util.Map.get with args: %s %s", this_ref, key_ref)
 
         if this_ref.symbolic:
             return SimSootValue_ThisRef(self.state, "java.lang.Object", symbolic=True)
@@ -85,7 +85,7 @@ class MapSize(JavaSimProcedure):
     __provides__ = (("java.util.Map", "size()"), ("java.util.HashMap", "size()"))
 
     def run(self, this_ref):
-        log.debug(f"Called SimProcedure java.util.Map.size with args: {this_ref}")
+        log.debug("Called SimProcedure java.util.Map.size with args: %s", this_ref)
 
         if this_ref.symbolic:
             return claripy.BVS("map_size", 32)
@@ -100,7 +100,7 @@ class MapContainsKey(JavaSimProcedure):
     )
 
     def run(self, this_ref, key_ref):
-        log.debug(f"Called SimProcedure java.util.Map.containsKey with args: {this_ref} {key_ref}")
+        log.debug("Called SimProcedure java.util.Map.containsKey with args: %s %s", this_ref, key_ref)
 
         if this_ref.symbolic:
             return claripy.BoolS("contains_key")
@@ -117,7 +117,7 @@ class MapKeySet(JavaSimProcedure):
     __provides__ = (("java.util.Map", "keySet()"), ("java.util.HashMap", "keySet()"))
 
     def run(self, this_ref):
-        log.debug(f"Called SimProcedure java.util.Map.keySet with args: {this_ref}")
+        log.debug("Called SimProcedure java.util.Map.keySet with args: %s", this_ref)
 
         if this_ref.symbolic:
             return SimSootValue_ThisRef.new_object(self.state, "java.util.Set", symbolic=True)

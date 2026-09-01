@@ -1099,7 +1099,7 @@ class ConditionProcessor:
 
     @staticmethod
     def claripy_ast_to_sympy_expr(ast, memo=None):
-        import sympy  # pylint:disable=import-outside-toplevel
+        import sympy  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
 
         if ast.op == "And":
             return sympy.And(*(ConditionProcessor.claripy_ast_to_sympy_expr(arg, memo=memo) for arg in ast.args))
@@ -1122,7 +1122,7 @@ class ConditionProcessor:
 
     @staticmethod
     def sympy_expr_to_claripy_ast(expr, memo: dict):
-        import sympy  # pylint:disable=import-outside-toplevel
+        import sympy  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
 
         if expr.is_Symbol:
             return memo[expr]
@@ -1140,7 +1140,7 @@ class ConditionProcessor:
 
     @staticmethod
     def simplify_condition(cond, depth_limit=8, variables_limit=8):
-        import sympy  # pylint:disable=import-outside-toplevel
+        import sympy  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
 
         memo = {}
         if cond.depth > depth_limit or len(cond.variables) > variables_limit:
@@ -1228,7 +1228,7 @@ class ConditionProcessor:
 
     @staticmethod
     def _extract_terms(ast: claripy.ast.Bool) -> Generator[claripy.ast.Bool]:
-        if ast.op == "And" or ast.op == "Or":
+        if ast.op in {"And", "Or"}:
             for arg in ast.args:
                 yield from ConditionProcessor._extract_terms(arg)
         elif ast.op == "Not":

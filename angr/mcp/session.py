@@ -150,7 +150,7 @@ _session_manager: SessionManager | None = None
 
 def get_session_manager() -> SessionManager:
     """Get or create the global session manager."""
-    global _session_manager  # pylint: disable=global-statement
+    global _session_manager  # pylint: disable=global-statement  # noqa: PLW0603
 
     if _session_manager is None:
         _session_manager = SessionManager()

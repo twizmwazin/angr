@@ -108,7 +108,9 @@ class TestProtectStdioFromForkedChildren:
 
     def test_is_idempotent(self):
         """Calling it repeatedly must not stack up fork hooks."""
-        from angr.utils.mp import protect_stdio_from_forked_children  # pylint:disable=import-outside-toplevel
+        from angr.utils.mp import (  # pylint:disable=import-outside-toplevel  # noqa: PLC0415
+            protect_stdio_from_forked_children,
+        )
 
         protect_stdio_from_forked_children()
         protect_stdio_from_forked_children()

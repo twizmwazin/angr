@@ -85,7 +85,7 @@ class Worker:
     def run(self, initializer: Initializer):
         initializer.initialize()
 
-        from angr.exploration_techniques.spiller import (
+        from angr.exploration_techniques.spiller import (  # noqa: PLC0415
             PickledStatesDb,
             Spiller,
         )  # pylint:disable=import-outside-toplevel
