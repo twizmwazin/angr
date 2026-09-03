@@ -11,16 +11,16 @@ repository = { workspace = true }
 
 [dependencies]
 ahash = "0.8.12"
-anyhow = { workspace = true }
 clarirs-num = { path = "../clarirs-num" }
 num-bigint = "0.4.6"
 num-traits = "0.2"
-smallvec = { version = "1.15.1", features = ["serde"] }
 thiserror = { workspace = true }
 
+[dev-dependencies]
+anyhow = { workspace = true }
+smallvec = "1.15.1"
+
 [features]
-default = ["runtime-checks"]
-runtime-checks = []
 panic-on-hash-collision = []
 
 [lints]
