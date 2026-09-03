@@ -192,6 +192,9 @@ impl<'c, S: Solver<'c>> Solver<'c> for CompositeSolver<'c, S> {
     }
 
     fn satisfiable_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
+        if self.unsat {
+            return Ok(false);
+        }
         if extra.is_empty() {
             return self.satisfiable();
         }
@@ -270,11 +273,17 @@ impl<'c, S: Solver<'c>> Solver<'c> for CompositeSolver<'c, S> {
     }
 
     fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+        if self.unsat {
+            return Ok(false);
+        }
         let vars = expr.variables().clone();
         self.with_solver_for(&vars, |s| s.has_true(expr))
     }
 
     fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+        if self.unsat {
+            return Ok(false);
+        }
         let vars = expr.variables().clone();
         self.with_solver_for(&vars, |s| s.has_false(expr))
     }
@@ -377,6 +386,100 @@ mod tests {
         solver.clear()?;
         assert!(solver.children.is_empty());
         assert!(solver.var_to_child.is_empty());
+        Ok(())
+    }
+
+    #[derive(Clone)]
+    struct AlwaysSat<'c> {
+        ctx: &'c Context<'c>,
+        added: Vec<AstRef<'c>>,
+    }
+
+    impl<'c> HasContext<'c> for AlwaysSat<'c> {
+        fn context(&self) -> &'c Context<'c> {
+            self.ctx
+        }
+    }
+
+    impl<'c> Solver<'c> for AlwaysSat<'c> {
+        fn add(&mut self, constraint: &AstRef<'c>) -> Result<(), ClarirsError> {
+            self.added.push(constraint.clone());
+            Ok(())
+        }
+
+        fn clear(&mut self) -> Result<(), ClarirsError> {
+            self.added.clear();
+            Ok(())
+        }
+
+        fn constraints(&self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+            Ok(self.added.clone())
+        }
+
+        fn simplify(&mut self) -> Result<(), ClarirsError> {
+            Ok(())
+        }
+
+        fn satisfiable(&mut self) -> Result<bool, ClarirsError> {
+            Ok(true)
+        }
+
+        fn is_true(&mut self, _: &AstRef<'c>) -> Result<bool, ClarirsError> {
+            Ok(true)
+        }
+
+        fn is_false(&mut self, _: &AstRef<'c>) -> Result<bool, ClarirsError> {
+            Ok(true)
+        }
+
+        fn has_true(&mut self, _: &AstRef<'c>) -> Result<bool, ClarirsError> {
+            Ok(true)
+        }
+
+        fn has_false(&mut self, _: &AstRef<'c>) -> Result<bool, ClarirsError> {
+            Ok(true)
+        }
+
+        fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+            Ok(expr.clone())
+        }
+
+        fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+            Ok(expr.clone())
+        }
+
+        fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+            Ok(expr.clone())
+        }
+
+        fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+            Ok(expr.clone())
+        }
+
+        fn eval_n(&mut self, expr: &AstRef<'c>, _: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+            Ok(vec![expr.clone()])
+        }
+    }
+
+    #[test]
+    fn test_composite_solver_unsat_flag_covers_every_query() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let template = AlwaysSat {
+            ctx: &ctx,
+            added: Vec::new(),
+        };
+        let mut solver = CompositeSolver::new(&ctx, template);
+        let x = ctx.bvs("x", 8)?;
+        solver.add(&ctx.ugt(&x, &ctx.bvv(BitVec::from((0, 8)))?)?)?;
+        solver.add(&ctx.false_()?)?;
+
+        // The child would answer every query positively; the unsat flag
+        // must win for the extra-constraint and witness queries too.
+        let query = ctx.eq_(&x, &ctx.bvv(BitVec::from((1, 8)))?)?;
+        assert!(!solver.satisfiable_with_extra(std::slice::from_ref(&query))?);
+        assert!(!solver.has_true(&query)?);
+        assert!(!solver.has_false(&query)?);
+
         Ok(())
     }
 }
