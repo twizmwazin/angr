@@ -3,7 +3,7 @@ use std::ops::{Add, Div, Mul, Neg, Sub};
 
 use super::{BitVec, BitVecError};
 use num_bigint::{BigInt, BigUint};
-use num_traits::{One, ToPrimitive, Zero};
+use num_traits::ToPrimitive;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct FSort {
@@ -155,13 +155,6 @@ impl Float {
         match self {
             Float::F32(f) => *f == 0.0 || *f == -0.0,
             Float::F64(f) => *f == 0.0 || *f == -0.0,
-        }
-    }
-
-    pub fn is_subnormal(&self) -> bool {
-        match self {
-            Float::F32(f) => f.is_subnormal(),
-            Float::F64(f) => f.is_subnormal(),
         }
     }
 
@@ -344,10 +337,6 @@ impl Float {
         }
     }
 
-    pub fn convert_to_format(&self, fsort: FSort, fprm: FPRM) -> Result<Self, BitVecError> {
-        self.to_fsort(fsort, fprm)
-    }
-
     pub fn from_bigint_with_rounding(
         value: &BigInt,
         fsort: FSort,
@@ -364,26 +353,6 @@ impl Float {
     ) -> Result<Self, BitVecError> {
         let float_value = value.to_f64().ok_or(BitVecError::ConversionError)?;
         Float::from_f64_with_rounding(float_value, fprm, fsort)
-    }
-
-    pub fn shift_with_grs(value: BigUint, shift: u32) -> (BigUint, bool, bool) {
-        if shift == 0 {
-            return (value, false, false);
-        }
-
-        let k = shift as usize;
-        let mask = (&BigUint::one() << k) - BigUint::one();
-        let shifted_out = &value & &mask;
-
-        let guard = ((&shifted_out >> (k - 1)) & BigUint::one()) == BigUint::one();
-
-        let sticky = if k > 1 {
-            (&shifted_out & ((&BigUint::one() << (k - 1)) - BigUint::one())) != BigUint::zero()
-        } else {
-            false
-        };
-
-        (value >> k, guard, sticky)
     }
 
     pub fn sqrt(&self) -> Self {
@@ -512,24 +481,6 @@ pub fn recompose_f64(sign: u8, exponent: u16, mantissa: u64) -> f64 {
     f64::from_bits(bits)
 }
 
-pub fn decompose_f64_big_endian(value: f64) -> (u8, u16, u64) {
-    let bits: u64 = value.to_bits().to_be();
-    let sign: u8 = (bits >> 63) as u8;
-    let exponent: u16 = ((bits >> 52) & 0x7FF) as u16;
-    let mantissa: u64 = bits & 0xFFFFFFFFFFFFF;
-
-    (sign, exponent, mantissa)
-}
-
-pub fn recompose_f64_big_endian(sign: u8, exponent: u16, mantissa: u64) -> f64 {
-    let sign_bit: u64 = (sign as u64) << 63;
-    let exponent_bits: u64 = ((exponent as u64) & 0x7FF) << 52;
-    let mantissa_bits: u64 = mantissa & 0xFFFFFFFFFFFFF;
-    let bits: u64 = sign_bit | exponent_bits | mantissa_bits;
-
-    f64::from_bits(bits.to_be())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -558,15 +509,6 @@ mod tests {
                 assert!(recomposed.is_nan());
             } else {
                 assert_eq!(value, recomposed);
-            }
-
-            let (sign_be, exponent_be, mantissa_be) = decompose_f64_big_endian(value);
-            let recomposed_be = recompose_f64_big_endian(sign_be, exponent_be, mantissa_be);
-
-            if value.is_nan() {
-                assert!(recomposed_be.is_nan());
-            } else {
-                assert_eq!(value, recomposed_be);
             }
         }
     }

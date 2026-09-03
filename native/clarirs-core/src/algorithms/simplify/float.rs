@@ -94,7 +94,7 @@ pub(crate) fn simplify_float<'c>(
             match arc.op() {
                 AstOp::FPV(float_val) if float_val.fsort() == *fsort => Ok(arc),
                 AstOp::FPV(float_val) => {
-                    let converted_value = float_val.convert_to_format(*fsort, *fprm)?;
+                    let converted_value = float_val.to_fsort(*fsort, *fprm)?;
                     Ok(ctx.fpv(converted_value)?)
                 }
                 _ => Ok(ctx.fp_to_fp(arc, *fsort, *fprm)?),
