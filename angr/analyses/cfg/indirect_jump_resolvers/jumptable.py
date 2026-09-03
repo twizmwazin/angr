@@ -794,6 +794,7 @@ class JumpTableResolver(IndirectJumpResolver):
         # cached memory read addresses that are used to initialize uninitialized registers
         # should be cleared before every symbolic execution run on the slice
         self._cached_memread_addrs = {}
+        self._blank_template = None
 
         self._find_bss_region()
 
@@ -2267,29 +2268,48 @@ class JumpTableResolver(IndirectJumpResolver):
             )
             print(s)
 
-    def _initial_state(self, block_addr, cfg, func_addr: int):
-        add_options = {
-            o.DO_RET_EMULATION,
-            o.TRUE_RET_EMULATION_GUARD,
-            o.AVOID_MULTIVALUED_READS,
-            # Keep IP symbolic to avoid unnecessary concretization
-            o.KEEP_IP_SYMBOLIC,
-            o.NO_IP_CONCRETIZATION,
-            # be quiet!!!!!!
-            o.SYMBOL_FILL_UNCONSTRAINED_REGISTERS,
-            o.SYMBOL_FILL_UNCONSTRAINED_MEMORY,
-        }
-        state = self.project.factory.blank_state(
-            addr=block_addr,
-            mode="static",
-            add_options=add_options,
-            remove_options={
-                o.CGC_ZERO_FILL_UNCONSTRAINED_MEMORY,
-                o.UNINITIALIZED_ACCESS_AWARENESS,
+    def _template_state(self):
+        """
+        A blank state with the resolver's options and register setup, built once per resolver. Building a blank
+        state is expensive (SimOS setup, e.g. the TIB/PEB structures on Windows) while copying one is cheap, so
+        :meth:`_initial_state` copies this template instead of calling ``blank_state()`` per slice source.
+        """
+        template = self._blank_template
+        if template is None:
+            add_options = {
+                o.DO_RET_EMULATION,
+                o.TRUE_RET_EMULATION_GUARD,
+                o.AVOID_MULTIVALUED_READS,
+                # Keep IP symbolic to avoid unnecessary concretization
+                o.KEEP_IP_SYMBOLIC,
+                o.NO_IP_CONCRETIZATION,
+                # be quiet!!!!!!
+                o.SYMBOL_FILL_UNCONSTRAINED_REGISTERS,
+                o.SYMBOL_FILL_UNCONSTRAINED_MEMORY,
             }
-            | o.refs,
-        )
-        state.regs._sp = 0x7FFF_FFF0
+            template = self.project.factory.blank_state(
+                mode="static",
+                add_options=add_options,
+                remove_options={
+                    o.CGC_ZERO_FILL_UNCONSTRAINED_MEMORY,
+                    o.UNINITIALIZED_ACCESS_AWARENESS,
+                }
+                | o.refs,
+            )
+            template.regs._sp = 0x7FFF_FFF0
+            # FIXME:
+            # this is a hack: for certain architectures, we do not initialize the base pointer, since the jump table
+            # on those architectures may use the bp register to store value
+            if self.project.arch.name != "S390X":
+                template.regs.bp = template.arch.initial_sp + 0x2000
+            self._blank_template = template
+        return template
+
+    def _initial_state(self, block_addr, cfg, func_addr: int):
+        state = self._template_state().copy()
+        state.regs.ip = block_addr
+        state.scratch.ins_addr = block_addr
+        state.scratch.bbl_addr = block_addr
 
         # any read from an uninitialized segment should be unconstrained
         if self._bss_regions:
@@ -2321,12 +2341,6 @@ class JumpTableResolver(IndirectJumpResolver):
                 mips_gp_write_bp = BP(when=BP_AFTER, enabled=True, action=mips_gp_hook.gp_register_write_hook)
                 state.inspect.add_breakpoint("reg_read", mips_gp_read_bp)
                 state.inspect.add_breakpoint("reg_write", mips_gp_write_bp)
-
-        # FIXME:
-        # this is a hack: for certain architectures, we do not initialize the base pointer, since the jump table on
-        # those architectures may use the bp register to store value
-        if self.project.arch.name != "S390X":
-            state.regs.bp = state.arch.initial_sp + 0x2000
 
         return state
 
