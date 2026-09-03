@@ -192,6 +192,9 @@ impl<'c, S: Solver<'c>> Solver<'c> for CompositeSolver<'c, S> {
     }
 
     fn satisfiable_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
+        if self.unsat {
+            return Ok(false);
+        }
         if extra.is_empty() {
             return self.satisfiable();
         }
@@ -270,11 +273,17 @@ impl<'c, S: Solver<'c>> Solver<'c> for CompositeSolver<'c, S> {
     }
 
     fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+        if self.unsat {
+            return Ok(false);
+        }
         let vars = expr.variables().clone();
         self.with_solver_for(&vars, |s| s.has_true(expr))
     }
 
     fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+        if self.unsat {
+            return Ok(false);
+        }
         let vars = expr.variables().clone();
         self.with_solver_for(&vars, |s| s.has_false(expr))
     }

@@ -124,12 +124,11 @@ impl<'c, S: Solver<'c>> HasContext<'c> for ReplacementSolver<'c, S> {
 
 impl<'c, S: Solver<'c>> Solver<'c> for ReplacementSolver<'c, S> {
     fn add(&mut self, constraint: &AstRef<'c>) -> Result<(), ClarirsError> {
-        if self.auto_replace {
-            self.try_extract_replacement(constraint);
-        }
-
         self.original_constraints.push(constraint.clone());
         let replaced = self.apply_replacements(constraint)?;
+        if self.auto_replace {
+            self.try_extract_replacement(&replaced);
+        }
         self.inner.add(&replaced)
     }
 

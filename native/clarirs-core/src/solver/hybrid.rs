@@ -181,9 +181,9 @@ impl<'c, A: Solver<'c>, E: Solver<'c>> Solver<'c> for HybridSolver<'c, A, E> {
         if !expr.symbolic() {
             return self.approximate.has_true(expr);
         }
-        // If approximate says definitely true, trust it (over-approximation is safe here)
+        // The approximation over-approximates: only its negative answers are conclusive.
         match self.approximate.has_true(expr) {
-            Ok(true) => Ok(true),
+            Ok(false) => Ok(false),
             _ => self.exact.has_true(expr),
         }
     }
@@ -193,7 +193,7 @@ impl<'c, A: Solver<'c>, E: Solver<'c>> Solver<'c> for HybridSolver<'c, A, E> {
             return self.approximate.has_false(expr);
         }
         match self.approximate.has_false(expr) {
-            Ok(true) => Ok(true),
+            Ok(false) => Ok(false),
             _ => self.exact.has_false(expr),
         }
     }
