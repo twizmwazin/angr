@@ -17,16 +17,6 @@ pub enum ComparisonResult {
 }
 
 impl ComparisonResult {
-    /// Returns true if the result is True
-    pub fn is_true(&self) -> bool {
-        matches!(self, ComparisonResult::True)
-    }
-
-    /// Returns true if the result is False
-    pub fn is_false(&self) -> bool {
-        matches!(self, ComparisonResult::False)
-    }
-
     /// Returns true if the result is Maybe
     pub fn is_maybe(&self) -> bool {
         matches!(self, ComparisonResult::Maybe)
@@ -1052,55 +1042,6 @@ impl StridedInterval {
 
                 StridedInterval::new(*bits1, new_stride, new_lower, new_upper)
             }
-        }
-    }
-
-    /// Return the complement of the interval (all values not in the interval)
-    pub fn complement(&self) -> Self {
-        if self.is_empty() {
-            return Self::top(self.bits());
-        }
-
-        if self.is_top() {
-            return Self::empty(self.bits());
-        }
-
-        // Handle the case of a singleton value
-        if self.is_integer()
-            && let StridedInterval::Normal {
-                lower_bound,
-                upper_bound,
-                bits,
-                ..
-            } = self
-        {
-            let lower = modular_add(upper_bound, &BigUint::one(), *bits);
-            let upper = modular_sub(lower_bound, &BigUint::one(), *bits);
-            return Self::new(*bits, BigUint::one(), lower, upper);
-        }
-
-        // For the general case
-        match self {
-            StridedInterval::Normal {
-                bits,
-                stride,
-                lower_bound,
-                upper_bound,
-            } => {
-                if *stride > BigUint::one() {
-                    // Complex case: we need to calculate the values between the intervals
-                    // For simplicity, we'll return a conservative approximation
-                    // A more precise implementation could return a set of intervals
-                    let lower = modular_add(upper_bound, &BigUint::one(), *bits);
-                    let upper = modular_sub(lower_bound, &BigUint::one(), *bits);
-                    return Self::new(*bits, BigUint::one(), lower, upper);
-                }
-                // For stride 1, simply invert the range
-                let lower = modular_add(upper_bound, &BigUint::one(), *bits);
-                let upper = modular_sub(lower_bound, &BigUint::one(), *bits);
-                Self::new(*bits, BigUint::one(), lower, upper)
-            }
-            _ => Self::empty(self.bits()),
         }
     }
 
@@ -3235,11 +3176,6 @@ mod si_set_op_tests {
         let result = a.intersection(&b);
         assert!(result.is_empty());
     }
-}
-
-#[cfg(test)]
-mod si_comparison_op_tests {
-    // TODO
 }
 
 #[cfg(test)]

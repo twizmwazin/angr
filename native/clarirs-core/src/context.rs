@@ -75,15 +75,6 @@ impl std::fmt::Display for InternedString {
     }
 }
 
-impl serde::Serialize for InternedString {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        self.0.serialize(serializer)
-    }
-}
-
 impl Ord for InternedString {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.0.cmp(&other.0)
@@ -102,14 +93,6 @@ pub struct Context<'c> {
     pub(crate) excavate_ite_cache: AstCache<'c>,
     string_interner: RwLock<HashMap<Arc<str>, Arc<str>>>,
 }
-
-impl PartialEq for Context<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        std::ptr::eq(self, other)
-    }
-}
-
-impl Eq for Context<'_> {}
 
 unsafe impl Send for Context<'_> {}
 unsafe impl Sync for Context<'_> {}

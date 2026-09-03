@@ -1,12 +1,8 @@
-use std::sync::PoisonError;
-
 use clarirs_num::BitVecError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ClarirsError {
-    #[error("Cache lock poisoned")]
-    CacheLockPoisoned,
     #[error("Unsupported operation: {0}")]
     UnsupportedOperation(String),
     #[error("Invalid arguments: {0}")]
@@ -33,14 +29,6 @@ pub enum ClarirsError {
     EmptyTraversal,
     #[error("Backend error ({0}): {1}")]
     BackendError(&'static str, String),
-    #[error("Missing child at index {0}")]
-    MissingChild(usize),
-}
-
-impl<T> From<PoisonError<T>> for ClarirsError {
-    fn from(_: PoisonError<T>) -> Self {
-        ClarirsError::CacheLockPoisoned
-    }
 }
 
 impl From<BitVecError> for ClarirsError {
@@ -58,9 +46,6 @@ impl From<BitVecError> for ClarirsError {
                 lower,
                 length,
             },
-            BitVecError::InvalidChopSize { size, bits } => {
-                ClarirsError::InvalidChopSize { size, bits }
-            }
             BitVecError::DivisionByZero => ClarirsError::DivisionByZero,
             BitVecError::ConversionError => {
                 ClarirsError::ConversionError("BitVec conversion error".to_string())

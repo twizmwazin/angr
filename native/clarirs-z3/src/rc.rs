@@ -1,5 +1,5 @@
 use std::ffi::CStr;
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 use std::rc::{Rc, Weak};
 
 use crate::{Z3_CONTEXT, check_z3_error, require};
@@ -77,6 +77,7 @@ impl RcAst {
     }
 
     /// Returns the `DeclKind` of this AST node (assumes it is an application).
+    #[cfg(test)]
     pub fn decl_kind(&self) -> DeclKind {
         Z3_CONTEXT.with(|&ctx| unsafe {
             let app = Z3_to_app(ctx, self.raw()).expect("decl_kind: not an application");
@@ -86,6 +87,7 @@ impl RcAst {
     }
 
     /// Returns the number of arguments (assumes it is an application).
+    #[cfg(test)]
     pub fn num_args(&self) -> u32 {
         Z3_CONTEXT.with(|&ctx| unsafe {
             let app = Z3_to_app(ctx, self.raw()).expect("num_args: not an application");
@@ -95,6 +97,7 @@ impl RcAst {
 
     /// Returns the argument at `index` as a new `RcAst`, or `None` if out of
     /// bounds or the node is not an application.
+    #[cfg(test)]
     pub fn arg(&self, index: u32) -> Option<RcAst> {
         Z3_CONTEXT.with(|&ctx| unsafe {
             let ast_kind = Z3_get_ast_kind(ctx, self.raw());
@@ -112,6 +115,7 @@ impl RcAst {
 
     /// Returns the symbol name if this is an uninterpreted constant, or `None`
     /// otherwise.
+    #[cfg(test)]
     pub fn symbol_name(&self) -> Option<String> {
         Z3_CONTEXT.with(|&ctx| unsafe {
             if Z3_get_ast_kind(ctx, self.raw()) != AstKind::App {
@@ -291,12 +295,6 @@ impl WeakAst {
     }
 }
 
-impl From<&RcAst> for WeakAst {
-    fn from(ast: &RcAst) -> Self {
-        ast.downgrade()
-    }
-}
-
 /// A cache from clarirs AST hashes to Z3 ASTs with [`WeakAst`] values, so it
 /// never keeps a Z3 AST alive on its own. An entry stays live while its node
 /// is reachable from any Rust-held [`RcAst`] (handles retain their children);
@@ -392,13 +390,6 @@ impl RcParamSet {
     }
 }
 
-impl Clone for RcParamSet {
-    fn clone(&self) -> Self {
-        Z3_CONTEXT.with(|&ctx| unsafe { Z3_params_inc_ref(ctx, self.0) });
-        RcParamSet(self.0)
-    }
-}
-
 impl Deref for RcParamSet {
     type Target = Z3_params;
 
@@ -491,13 +482,6 @@ impl RcSolver {
     }
 }
 
-impl Clone for RcSolver {
-    fn clone(&self) -> Self {
-        Z3_CONTEXT.with(|&ctx| unsafe { Z3_solver_inc_ref(ctx, self.0) });
-        RcSolver(self.0)
-    }
-}
-
 impl Drop for RcSolver {
     fn drop(&mut self) {
         Z3_CONTEXT.with(|&ctx| unsafe { Z3_solver_dec_ref(ctx, self.0) });
@@ -508,26 +492,6 @@ impl From<Z3_solver> for RcSolver {
     fn from(solver: Z3_solver) -> Self {
         Z3_CONTEXT.with(|&ctx| unsafe { Z3_solver_inc_ref(ctx, solver) });
         RcSolver(solver)
-    }
-}
-
-impl From<RcSolver> for Z3_solver {
-    fn from(solver: RcSolver) -> Self {
-        solver.0
-    }
-}
-
-impl Deref for RcSolver {
-    type Target = Z3_solver;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for RcSolver {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
     }
 }
 
@@ -597,13 +561,6 @@ impl RcOptimize {
     }
 }
 
-impl Clone for RcOptimize {
-    fn clone(&self) -> Self {
-        Z3_CONTEXT.with(|&ctx| unsafe { Z3_optimize_inc_ref(ctx, self.0) });
-        RcOptimize(self.0)
-    }
-}
-
 impl Drop for RcOptimize {
     fn drop(&mut self) {
         Z3_CONTEXT.with(|&ctx| unsafe { Z3_optimize_dec_ref(ctx, self.0) });
@@ -614,26 +571,6 @@ impl From<Z3_optimize> for RcOptimize {
     fn from(optimize: Z3_optimize) -> Self {
         Z3_CONTEXT.with(|&ctx| unsafe { Z3_optimize_inc_ref(ctx, optimize) });
         RcOptimize(optimize)
-    }
-}
-
-impl From<RcOptimize> for Z3_optimize {
-    fn from(optimize: RcOptimize) -> Self {
-        optimize.0
-    }
-}
-
-impl Deref for RcOptimize {
-    type Target = Z3_optimize;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for RcOptimize {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
     }
 }
 
@@ -658,13 +595,6 @@ impl RcModel {
     }
 }
 
-impl Clone for RcModel {
-    fn clone(&self) -> Self {
-        Z3_CONTEXT.with(|&ctx| unsafe { Z3_model_inc_ref(ctx, self.0) });
-        RcModel(self.0)
-    }
-}
-
 impl Drop for RcModel {
     fn drop(&mut self) {
         Z3_CONTEXT.with(|&ctx| unsafe { Z3_model_dec_ref(ctx, self.0) });
@@ -675,26 +605,6 @@ impl From<Z3_model> for RcModel {
     fn from(model: Z3_model) -> Self {
         Z3_CONTEXT.with(|&ctx| unsafe { Z3_model_inc_ref(ctx, model) });
         RcModel(model)
-    }
-}
-
-impl From<RcModel> for Z3_model {
-    fn from(model: RcModel) -> Self {
-        model.0
-    }
-}
-
-impl Deref for RcModel {
-    type Target = Z3_model;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for RcModel {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
     }
 }
 
@@ -715,13 +625,6 @@ impl RcAstVector {
     }
 }
 
-impl Clone for RcAstVector {
-    fn clone(&self) -> Self {
-        Z3_CONTEXT.with(|&ctx| unsafe { Z3_ast_vector_inc_ref(ctx, self.0) });
-        RcAstVector(self.0)
-    }
-}
-
 impl Drop for RcAstVector {
     fn drop(&mut self) {
         Z3_CONTEXT.with(|&ctx| unsafe { Z3_ast_vector_dec_ref(ctx, self.0) });
@@ -732,26 +635,6 @@ impl From<Z3_ast_vector> for RcAstVector {
     fn from(ast_vector: Z3_ast_vector) -> Self {
         Z3_CONTEXT.with(|&ctx| unsafe { Z3_ast_vector_inc_ref(ctx, ast_vector) });
         RcAstVector(ast_vector)
-    }
-}
-
-impl From<RcAstVector> for Z3_ast_vector {
-    fn from(ast_vector: RcAstVector) -> Self {
-        ast_vector.0
-    }
-}
-
-impl Deref for RcAstVector {
-    type Target = Z3_ast_vector;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for RcAstVector {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
     }
 }
 

@@ -7,4 +7,3 @@ pub mod prelude;
 pub mod smtlib;
 pub mod solver;
 pub mod solver_mixins;
-pub mod util;
