@@ -124,12 +124,11 @@ impl<'c, S: Solver<'c>> HasContext<'c> for ReplacementSolver<'c, S> {
 
 impl<'c, S: Solver<'c>> Solver<'c> for ReplacementSolver<'c, S> {
     fn add(&mut self, constraint: &AstRef<'c>) -> Result<(), ClarirsError> {
-        if self.auto_replace {
-            self.try_extract_replacement(constraint);
-        }
-
         self.original_constraints.push(constraint.clone());
         let replaced = self.apply_replacements(constraint)?;
+        if self.auto_replace {
+            self.try_extract_replacement(&replaced);
+        }
         self.inner.add(&replaced)
     }
 
@@ -354,6 +353,101 @@ mod tests {
 
         solver.clear()?;
         assert!(solver.constraints()?.is_empty());
+
+        Ok(())
+    }
+
+    #[derive(Clone)]
+    struct Recording<'c> {
+        ctx: &'c Context<'c>,
+        added: Vec<AstRef<'c>>,
+    }
+
+    impl<'c> HasContext<'c> for Recording<'c> {
+        fn context(&self) -> &'c Context<'c> {
+            self.ctx
+        }
+    }
+
+    impl<'c> Solver<'c> for Recording<'c> {
+        fn add(&mut self, constraint: &AstRef<'c>) -> Result<(), ClarirsError> {
+            self.added.push(constraint.clone());
+            Ok(())
+        }
+
+        fn clear(&mut self) -> Result<(), ClarirsError> {
+            self.added.clear();
+            Ok(())
+        }
+
+        fn constraints(&self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+            Ok(self.added.clone())
+        }
+
+        fn simplify(&mut self) -> Result<(), ClarirsError> {
+            Ok(())
+        }
+
+        fn satisfiable(&mut self) -> Result<bool, ClarirsError> {
+            Ok(true)
+        }
+
+        fn is_true(&mut self, _: &AstRef<'c>) -> Result<bool, ClarirsError> {
+            Ok(false)
+        }
+
+        fn is_false(&mut self, _: &AstRef<'c>) -> Result<bool, ClarirsError> {
+            Ok(false)
+        }
+
+        fn has_true(&mut self, _: &AstRef<'c>) -> Result<bool, ClarirsError> {
+            Ok(false)
+        }
+
+        fn has_false(&mut self, _: &AstRef<'c>) -> Result<bool, ClarirsError> {
+            Ok(false)
+        }
+
+        fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+            Ok(expr.clone())
+        }
+
+        fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+            Ok(expr.clone())
+        }
+
+        fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+            Ok(expr.clone())
+        }
+
+        fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+            Ok(expr.clone())
+        }
+
+        fn eval_n(&mut self, expr: &AstRef<'c>, _: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+            Ok(vec![expr.clone()])
+        }
+    }
+
+    #[test]
+    fn test_replacement_solver_contradicting_equalities() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let inner = Recording {
+            ctx: &ctx,
+            added: Vec::new(),
+        };
+        let mut solver = ReplacementSolver::new(inner);
+        let x = ctx.bvs("x", 8)?;
+        let five = ctx.bvv(BitVec::from((5, 8)))?;
+        let six = ctx.bvv(BitVec::from((6, 8)))?;
+
+        solver.add(&ctx.eq_(&x, &five)?)?;
+        solver.add(&ctx.eq_(&x, &six)?)?;
+
+        // The first equality still stands, and the second reaches the inner
+        // solver rewritten under it, as a contradiction.
+        assert_eq!(solver.eval(&x)?, five);
+        assert_eq!(solver.inner().added[1].simplify()?, ctx.false_()?);
 
         Ok(())
     }
