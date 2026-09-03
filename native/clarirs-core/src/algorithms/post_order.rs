@@ -1,6 +1,7 @@
 use crate::cache::Cache;
 use crate::prelude::*;
-use std::collections::VecDeque;
+
+use super::walk::walk;
 
 /// Walks the AST in post-order (children before parents), providing transformed
 /// children to each callback.
@@ -21,79 +22,10 @@ use std::collections::VecDeque;
 /// cache, pass `&()` as the cache.
 pub fn walk_post_order<'c, T>(
     ast: AstRef<'c>,
-    mut callback: impl FnMut(AstRef<'c>, &[T]) -> Result<T, ClarirsError>,
+    callback: impl FnMut(AstRef<'c>, &[T]) -> Result<T, ClarirsError>,
     cache: &impl Cache<u64, T>,
 ) -> Result<T, ClarirsError> {
-    // For each node, we need to track:
-    // 1. The node itself
-    // 2. Whether all its children have been processed
-    // 3. The transformed results of its children
-    struct NodeState<'c, T> {
-        node: AstRef<'c>,
-        children_processed: usize,
-        num_children: usize,
-        child_results: Vec<T>,
-    }
-
-    let mut stack = Vec::new();
-    let mut result_queue = VecDeque::new();
-
-    // Start with the root node
-    let num_children = ast.child_iter().len();
-    stack.push(NodeState {
-        node: ast,
-        children_processed: 0,
-        num_children,
-        child_results: Vec::new(),
-    });
-
-    while let Some(mut state) = stack.pop() {
-        if state.children_processed == state.num_children {
-            // All children processed, process this node
-            result_queue.push_back(cache.get_or_insert(state.node.hash(), || {
-                callback(state.node.clone(), &state.child_results)
-            })?);
-        } else {
-            // Process next child
-            let child = state.node.get_child(state.children_processed).unwrap();
-            state.children_processed += 1;
-
-            // If the child's result is already cached (from an earlier walk or
-            // from a shared subtree visited earlier in this walk), reuse it
-            // instead of re-traversing the subtree. ASTs are DAGs, so a shared
-            // subtree is reachable from multiple parents; reusing the cached
-            // result avoids re-running the traversal once per parent.
-            if let Some(cached) = cache.get(&child.hash()) {
-                state.child_results.push(cached);
-                stack.push(state);
-                continue;
-            }
-
-            // Push parent back on stack
-            stack.push(state);
-
-            // Push child on stack
-            let num_children = child.child_iter().len();
-            stack.push(NodeState {
-                node: child,
-                children_processed: 0,
-                num_children,
-                child_results: Vec::new(),
-            });
-        }
-
-        // If we just finished processing a child, add its result to its parent
-        if !result_queue.is_empty()
-            && !stack.is_empty()
-            && let Some(parent) = stack.last_mut()
-            && parent.children_processed > 0
-        {
-            parent.child_results.push(result_queue.pop_front().unwrap());
-        }
-    }
-
-    // The final result should be the only one in the queue
-    result_queue.pop_front().ok_or(ClarirsError::EmptyTraversal)
+    walk(ast, |_| Ok(None), callback, cache)
 }
 
 #[cfg(test)]

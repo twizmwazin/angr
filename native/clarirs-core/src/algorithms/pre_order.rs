@@ -1,6 +1,7 @@
-use ahash::HashMap;
-
+use crate::cache::GenericCache;
 use crate::prelude::*;
+
+use super::walk::walk;
 
 /// Walks the AST in pre-order, with the option to short-circuit subtrees.
 ///
@@ -16,88 +17,10 @@ use crate::prelude::*;
 /// encounters reuse the cached result.
 pub fn walk_pre_order<'c>(
     ast: AstRef<'c>,
-    mut pre_visit: impl FnMut(&AstRef<'c>) -> Result<Option<AstRef<'c>>, ClarirsError>,
-    mut post_visit: impl FnMut(AstRef<'c>, &[AstRef<'c>]) -> Result<AstRef<'c>, ClarirsError>,
+    pre_visit: impl FnMut(&AstRef<'c>) -> Result<Option<AstRef<'c>>, ClarirsError>,
+    post_visit: impl FnMut(AstRef<'c>, &[AstRef<'c>]) -> Result<AstRef<'c>, ClarirsError>,
 ) -> Result<AstRef<'c>, ClarirsError> {
-    struct NodeState<'c> {
-        node: AstRef<'c>,
-        num_children: usize,
-        child_results: Vec<AstRef<'c>>,
-    }
-
-    let mut cache: HashMap<u64, AstRef<'c>> = HashMap::default();
-    let mut stack: Vec<NodeState<'c>> = Vec::new();
-    let mut last_result: Option<AstRef<'c>> = None;
-
-    let num_children = ast.child_iter().len();
-    stack.push(NodeState {
-        node: ast,
-        num_children,
-        child_results: Vec::with_capacity(num_children),
-    });
-
-    while let Some(mut state) = stack.pop() {
-        // Collect result from a completed child
-        if let Some(result) = last_result.take() {
-            state.child_results.push(result);
-        }
-
-        let children_done = state.child_results.len();
-
-        if children_done == 0 {
-            // First visit — check cache, then pre_visit
-            if let Some(cached) = cache.get(&state.node.hash()) {
-                last_result = Some(cached.clone());
-                continue;
-            }
-
-            match pre_visit(&state.node)? {
-                Some(result) => {
-                    cache.insert(state.node.hash(), result.clone());
-                    last_result = Some(result);
-                    continue;
-                }
-                None if state.num_children == 0 => {
-                    // Leaf node — call post_visit immediately
-                    let result = post_visit(state.node.clone(), &[])?;
-                    cache.insert(state.node.hash(), result.clone());
-                    last_result = Some(result);
-                    continue;
-                }
-                None => {
-                    // Descend into first child
-                    let child = state.node.get_child(0).unwrap();
-                    let n = child.child_iter().len();
-                    stack.push(state);
-                    stack.push(NodeState {
-                        node: child,
-                        num_children: n,
-                        child_results: Vec::with_capacity(n),
-                    });
-                    continue;
-                }
-            }
-        }
-
-        if children_done < state.num_children {
-            // Process next child
-            let child = state.node.get_child(children_done).unwrap();
-            let n = child.child_iter().len();
-            stack.push(state);
-            stack.push(NodeState {
-                node: child,
-                num_children: n,
-                child_results: Vec::with_capacity(n),
-            });
-        } else {
-            // All children done — call post_visit
-            let result = post_visit(state.node.clone(), &state.child_results)?;
-            cache.insert(state.node.hash(), result.clone());
-            last_result = Some(result);
-        }
-    }
-
-    last_result.ok_or(ClarirsError::EmptyTraversal)
+    walk(ast, pre_visit, post_visit, &GenericCache::default())
 }
 
 #[cfg(test)]
