@@ -1,4 +1,3 @@
-use std::fmt;
 use std::sync::Arc;
 
 use crate::{algorithms::walk, prelude::*};
@@ -300,22 +299,6 @@ pub fn constraints_to_smtlib(constraints: &[AstRef<'_>]) -> Result<String, Clari
     Ok(out)
 }
 
-impl fmt::Display for SmtLibDisplay<'_, '_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0.to_smtlib())
-    }
-}
-
-/// Wrapper to display an AST as SMT-LIB via `fmt::Display`.
-///
-/// # Example
-/// ```ignore
-/// use clarirs_core::smtlib::SmtLibDisplay;
-/// let ast = ctx.bvs("x", 64).unwrap();
-/// println!("{}", SmtLibDisplay(&ast));
-/// ```
-pub struct SmtLibDisplay<'a, 'c>(pub &'a AstRef<'c>);
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -429,14 +412,6 @@ mod tests {
         let ctx = Context::new();
         let s = ctx.stringv("say \"hi\"").unwrap();
         assert_eq!(s.to_smtlib(), "\"say \\\"hi\\\"\"");
-    }
-
-    #[test]
-    fn test_smtlib_display_wrapper() {
-        let ctx = Context::new();
-        let x = ctx.bvs("x", 64).unwrap();
-        let displayed = format!("{}", SmtLibDisplay(&x));
-        assert_eq!(displayed, "x");
     }
 
     #[test]
