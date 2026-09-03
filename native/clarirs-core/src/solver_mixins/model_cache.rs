@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::algorithms::collect_vars::collect_vars;
 use crate::prelude::*;
+use crate::solver::forward_solver_methods;
 
 /// Upper bound on the number of distinct models retained. Bounds the work each
 /// query may do scanning the cache; once reached, no new models are stored
@@ -236,9 +237,7 @@ impl<'c, S: Solver<'c>> Solver<'c> for ModelCacheMixin<'c, S> {
         self.inner.clear()
     }
 
-    fn constraints(&self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        self.inner.constraints()
-    }
+    forward_solver_methods!(inner; constraints);
 
     fn simplify(&mut self) -> Result<(), ClarirsError> {
         // Simplification rewrites the constraints; drop cached models rather
@@ -279,37 +278,11 @@ impl<'c, S: Solver<'c>> Solver<'c> for ModelCacheMixin<'c, S> {
         self.inner.satisfiable_with_extra(extra)
     }
 
-    fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        self.inner.is_true(expr)
-    }
-
-    fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        self.inner.is_false(expr)
-    }
-
-    fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        self.inner.has_true(expr)
-    }
-
-    fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        self.inner.has_false(expr)
-    }
-
-    fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.inner.min_unsigned(expr)
-    }
-
-    fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.inner.max_unsigned(expr)
-    }
-
-    fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.inner.min_signed(expr)
-    }
-
-    fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.inner.max_signed(expr)
-    }
+    forward_solver_methods!(
+        inner;
+        is_true, is_false, has_true, has_false,
+        min_unsigned, max_unsigned, min_signed, max_signed
+    );
 
     fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
         if n == 0 {

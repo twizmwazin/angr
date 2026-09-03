@@ -1,6 +1,5 @@
-use std::collections::BTreeSet;
-
 use crate::prelude::*;
+use crate::solver::{forward_query, forward_solver_methods};
 
 /// A hybrid solver that combines an approximate solver with an exact solver.
 ///
@@ -133,18 +132,12 @@ impl<'c, A: Solver<'c>, E: Solver<'c>> Solver<'c> for HybridSolver<'c, A, E> {
         self.exact.clear()
     }
 
-    fn constraints(&self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        self.exact.constraints()
-    }
-
     fn simplify(&mut self) -> Result<(), ClarirsError> {
         let _ = self.approximate.simplify();
         self.exact.simplify()
     }
 
-    fn variables(&self) -> Result<BTreeSet<InternedString>, ClarirsError> {
-        self.exact.variables()
-    }
+    forward_solver_methods!(exact; constraints, variables);
 
     fn satisfiable(&mut self) -> Result<bool, ClarirsError> {
         // Try approximate first - if it says definitely unsat, trust it.
@@ -162,20 +155,10 @@ impl<'c, A: Solver<'c>, E: Solver<'c>> Solver<'c> for HybridSolver<'c, A, E> {
         self.exact.satisfiable_with_extra(extra)
     }
 
-    fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        if !expr.symbolic() {
-            return self.approximate.is_true(expr);
-        }
-        // For symbolic expressions, always consult exact solver
-        self.exact.is_true(expr)
-    }
-
-    fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        if !expr.symbolic() {
-            return self.approximate.is_false(expr);
-        }
-        self.exact.is_false(expr)
-    }
+    forward_query!(
+        |expr| if (!expr.symbolic()) { self.approximate } else { self.exact };
+        is_true, is_false, min_unsigned, max_unsigned, min_signed, max_signed
+    );
 
     fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
         if !expr.symbolic() {
@@ -196,34 +179,6 @@ impl<'c, A: Solver<'c>, E: Solver<'c>> Solver<'c> for HybridSolver<'c, A, E> {
             Ok(true) => Ok(true),
             _ => self.exact.has_false(expr),
         }
-    }
-
-    fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        if !expr.symbolic() {
-            return self.approximate.min_unsigned(expr);
-        }
-        self.exact.min_unsigned(expr)
-    }
-
-    fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        if !expr.symbolic() {
-            return self.approximate.max_unsigned(expr);
-        }
-        self.exact.max_unsigned(expr)
-    }
-
-    fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        if !expr.symbolic() {
-            return self.approximate.min_signed(expr);
-        }
-        self.exact.min_signed(expr)
-    }
-
-    fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        if !expr.symbolic() {
-            return self.approximate.max_signed(expr);
-        }
-        self.exact.max_signed(expr)
     }
 
     fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
