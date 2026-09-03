@@ -216,11 +216,6 @@ impl<'c> AstNode<'c> {
         self.op.is_false()
     }
 
-    /// Returns true if both nodes have the same sort (type and size).
-    pub fn check_same_sort(&self, other: &Self) -> bool {
-        self.ast_type == other.ast_type
-    }
-
     // Runtime-checked accessors: each returns the node back only if its cached
     // type tag matches, for validating ASTs that cross an API boundary.
 
@@ -230,14 +225,6 @@ impl<'c> AstNode<'c> {
 
     pub fn into_bitvec(self: Arc<Self>) -> Option<Arc<Self>> {
         self.ast_type.is_bitvec().then_some(self)
-    }
-
-    pub fn into_float(self: Arc<Self>) -> Option<Arc<Self>> {
-        self.ast_type.is_float().then_some(self)
-    }
-
-    pub fn into_string(self: Arc<Self>) -> Option<Arc<Self>> {
-        self.ast_type.is_string().then_some(self)
     }
 }
 

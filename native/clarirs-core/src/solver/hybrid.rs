@@ -98,11 +98,6 @@ impl<'c, A: Solver<'c>, E: Solver<'c>> HybridSolver<'c, A, E> {
         &self.approximate
     }
 
-    /// Get a mutable reference to the approximate solver.
-    pub fn approximate_mut(&mut self) -> &mut A {
-        &mut self.approximate
-    }
-
     /// Get a reference to the exact solver.
     pub fn exact(&self) -> &E {
         &self.exact
