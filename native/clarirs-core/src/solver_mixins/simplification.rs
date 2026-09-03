@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use crate::solver::{forward_query, forward_solver_methods};
 
 /// A mixin that simplifies expressions before passing them to the underlying solver.
 #[derive(Clone, Debug)]
@@ -39,21 +40,7 @@ impl<'c, S: Solver<'c>> Solver<'c> for SimplificationMixin<'c, S> {
         self.inner.add(&simplified)
     }
 
-    fn clear(&mut self) -> Result<(), ClarirsError> {
-        self.inner.clear()
-    }
-
-    fn constraints(&self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        self.inner.constraints()
-    }
-
-    fn simplify(&mut self) -> Result<(), ClarirsError> {
-        self.inner.simplify()
-    }
-
-    fn satisfiable(&mut self) -> Result<bool, ClarirsError> {
-        self.inner.satisfiable()
-    }
+    forward_solver_methods!(inner; clear, constraints, simplify, satisfiable);
 
     fn satisfiable_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
         let simplified = extra
@@ -63,41 +50,11 @@ impl<'c, S: Solver<'c>> Solver<'c> for SimplificationMixin<'c, S> {
         self.inner.satisfiable_with_extra(&simplified)
     }
 
-    fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        self.inner.is_true(&expr.simplify()?)
-    }
-
-    fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        self.inner.is_false(&expr.simplify()?)
-    }
-
-    fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        self.inner.has_true(&expr.simplify()?)
-    }
-
-    fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        self.inner.has_false(&expr.simplify()?)
-    }
-
-    fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.inner.min_unsigned(&expr.simplify()?)
-    }
-
-    fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.inner.max_unsigned(&expr.simplify()?)
-    }
-
-    fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.inner.min_signed(&expr.simplify()?)
-    }
-
-    fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.inner.max_signed(&expr.simplify()?)
-    }
-
-    fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        self.inner.eval_n(&expr.simplify()?, n)
-    }
+    forward_query!(
+        self.inner; |expr| &expr.simplify()?;
+        is_true, is_false, has_true, has_false,
+        min_unsigned, max_unsigned, min_signed, max_signed, eval_n
+    );
 
     fn batch_eval(&mut self, exprs: &[AstRef<'c>]) -> Result<Vec<AstRef<'c>>, ClarirsError> {
         let simplified = exprs

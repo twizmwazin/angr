@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use crate::solver::{forward_query, forward_solver_methods};
 
 /// A mixin that checks if expressions are concrete and returns them directly
 /// without invoking the underlying solver. This can significantly improve
@@ -37,25 +38,7 @@ impl<'c, S: Solver<'c>> HasContext<'c> for ConcreteEarlyResolutionMixin<'c, S> {
 }
 
 impl<'c, S: Solver<'c>> Solver<'c> for ConcreteEarlyResolutionMixin<'c, S> {
-    fn add(&mut self, constraint: &AstRef<'c>) -> Result<(), ClarirsError> {
-        self.inner.add(constraint)
-    }
-
-    fn clear(&mut self) -> Result<(), ClarirsError> {
-        self.inner.clear()
-    }
-
-    fn constraints(&self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        self.inner.constraints()
-    }
-
-    fn simplify(&mut self) -> Result<(), ClarirsError> {
-        self.inner.simplify()
-    }
-
-    fn satisfiable(&mut self) -> Result<bool, ClarirsError> {
-        self.inner.satisfiable()
-    }
+    forward_solver_methods!(inner; add, clear, constraints, simplify, satisfiable);
 
     fn satisfiable_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
         // Concretely-false extras decide the result without the solver.
@@ -102,45 +85,18 @@ impl<'c, S: Solver<'c>> Solver<'c> for ConcreteEarlyResolutionMixin<'c, S> {
         self.inner.has_false(expr)
     }
 
-    fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        if expr.concrete() {
-            let simplified = expr.simplify_ext(false, true)?;
-            if matches!(simplified.op(), AstOp::BVV(..)) {
-                return Ok(simplified);
+    forward_query!(
+        self.inner; |expr| {
+            if expr.concrete() {
+                let simplified = expr.simplify_ext(false, true)?;
+                if matches!(simplified.op(), AstOp::BVV(..)) {
+                    return Ok(simplified);
+                }
             }
-        }
-        self.inner.min_unsigned(expr)
-    }
-
-    fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        if expr.concrete() {
-            let simplified = expr.simplify_ext(false, true)?;
-            if matches!(simplified.op(), AstOp::BVV(..)) {
-                return Ok(simplified);
-            }
-        }
-        self.inner.max_unsigned(expr)
-    }
-
-    fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        if expr.concrete() {
-            let simplified = expr.simplify_ext(false, true)?;
-            if matches!(simplified.op(), AstOp::BVV(..)) {
-                return Ok(simplified);
-            }
-        }
-        self.inner.min_signed(expr)
-    }
-
-    fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        if expr.concrete() {
-            let simplified = expr.simplify_ext(false, true)?;
-            if matches!(simplified.op(), AstOp::BVV(..)) {
-                return Ok(simplified);
-            }
-        }
-        self.inner.max_signed(expr)
-    }
+            expr
+        };
+        min_unsigned, max_unsigned, min_signed, max_signed
+    );
 
     fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
         // If concrete, try to resolve the value without invoking the solver
@@ -162,12 +118,8 @@ impl<'c, S: Solver<'c>> Solver<'c> for ConcreteEarlyResolutionMixin<'c, S> {
         self.inner.eval_n(expr, n)
     }
 
-    fn batch_eval(&mut self, exprs: &[AstRef<'c>]) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        // Forward as a batch so the backend can draw every value from a single
-        // model (concrete expressions are handled cheaply there too), rather
-        // than falling back to the per-expression default.
-        self.inner.batch_eval(exprs)
-    }
+    // Forwarded as a batch so the backend can draw every value from a single model.
+    forward_solver_methods!(inner; batch_eval);
 }
 
 #[cfg(test)]

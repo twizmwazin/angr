@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::prelude::*;
+use crate::solver::{forward_query, forward_solver_methods};
 
 /// A solver mixin that applies expression replacements before delegating to
 /// the inner solver. This mirrors claripy's `ReplacementFrontend`.
@@ -142,13 +143,7 @@ impl<'c, S: Solver<'c>> Solver<'c> for ReplacementSolver<'c, S> {
         Ok(self.original_constraints.clone())
     }
 
-    fn simplify(&mut self) -> Result<(), ClarirsError> {
-        self.inner.simplify()
-    }
-
-    fn satisfiable(&mut self) -> Result<bool, ClarirsError> {
-        self.inner.satisfiable()
-    }
+    forward_solver_methods!(inner; simplify, satisfiable);
 
     fn satisfiable_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
         let replaced = extra
@@ -158,50 +153,11 @@ impl<'c, S: Solver<'c>> Solver<'c> for ReplacementSolver<'c, S> {
         self.inner.satisfiable_with_extra(&replaced)
     }
 
-    fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.is_true(&replaced)
-    }
-
-    fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.is_false(&replaced)
-    }
-
-    fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.has_true(&replaced)
-    }
-
-    fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.has_false(&replaced)
-    }
-
-    fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.min_unsigned(&replaced)
-    }
-
-    fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.max_unsigned(&replaced)
-    }
-
-    fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.min_signed(&replaced)
-    }
-
-    fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.max_signed(&replaced)
-    }
-
-    fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.eval_n(&replaced, n)
-    }
+    forward_query!(
+        self.inner; |expr| &self.apply_replacements(expr)?;
+        is_true, is_false, has_true, has_false,
+        min_unsigned, max_unsigned, min_signed, max_signed, eval_n
+    );
 }
 
 #[cfg(test)]

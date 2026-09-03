@@ -1,6 +1,7 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use crate::prelude::*;
+use crate::solver::forward_query;
 
 /// A composite solver that partitions constraints by their variables.
 ///
@@ -259,65 +260,20 @@ impl<'c, S: Solver<'c>> Solver<'c> for CompositeSolver<'c, S> {
         }
     }
 
-    fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        let vars = expr.variables().clone();
-        self.with_solver_for(&vars, |s| s.is_true(expr))
-    }
+    forward_query!(
+        |expr| self.with_solver_for(expr.variables());
+        is_true, is_false, has_true, has_false
+    );
 
-    fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        let vars = expr.variables().clone();
-        self.with_solver_for(&vars, |s| s.is_false(expr))
-    }
-
-    fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        let vars = expr.variables().clone();
-        self.with_solver_for(&vars, |s| s.has_true(expr))
-    }
-
-    fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        let vars = expr.variables().clone();
-        self.with_solver_for(&vars, |s| s.has_false(expr))
-    }
-
-    fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        if self.unsat {
-            return Err(ClarirsError::Unsat);
-        }
-        let vars = expr.variables().clone();
-        self.with_solver_for(&vars, |s| s.min_unsigned(expr))
-    }
-
-    fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        if self.unsat {
-            return Err(ClarirsError::Unsat);
-        }
-        let vars = expr.variables().clone();
-        self.with_solver_for(&vars, |s| s.max_unsigned(expr))
-    }
-
-    fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        if self.unsat {
-            return Err(ClarirsError::Unsat);
-        }
-        let vars = expr.variables().clone();
-        self.with_solver_for(&vars, |s| s.min_signed(expr))
-    }
-
-    fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        if self.unsat {
-            return Err(ClarirsError::Unsat);
-        }
-        let vars = expr.variables().clone();
-        self.with_solver_for(&vars, |s| s.max_signed(expr))
-    }
-
-    fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        if self.unsat {
-            return Err(ClarirsError::Unsat);
-        }
-        let vars = expr.variables().clone();
-        self.with_solver_for(&vars, |s| s.eval_n(expr, n))
-    }
+    forward_query!(
+        |expr| self.with_solver_for({
+            if self.unsat {
+                return Err(ClarirsError::Unsat);
+            }
+            expr.variables()
+        });
+        min_unsigned, max_unsigned, min_signed, max_signed, eval_n
+    );
 }
 
 #[cfg(test)]
