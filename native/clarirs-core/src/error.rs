@@ -58,9 +58,6 @@ impl From<BitVecError> for ClarirsError {
                 lower,
                 length,
             },
-            BitVecError::InvalidChopSize { size, bits } => {
-                ClarirsError::InvalidChopSize { size, bits }
-            }
             BitVecError::DivisionByZero => ClarirsError::DivisionByZero,
             BitVecError::ConversionError => {
                 ClarirsError::ConversionError("BitVec conversion error".to_string())
