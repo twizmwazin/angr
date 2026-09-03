@@ -770,8 +770,4 @@ pub trait AstFactory<'c>: Sized {
     fn false_(&'c self) -> Result<AstRef<'c>, ClarirsError> {
         self.boolv(false)
     }
-
-    fn fpv_from_f64(&'c self, value: f64) -> Result<AstRef<'c>, ClarirsError> {
-        self.fpv(Float::from(value))
-    }
 }

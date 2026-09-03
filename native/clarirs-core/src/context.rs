@@ -94,14 +94,6 @@ pub struct Context<'c> {
     string_interner: RwLock<HashMap<Arc<str>, Arc<str>>>,
 }
 
-impl PartialEq for Context<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        std::ptr::eq(self, other)
-    }
-}
-
-impl Eq for Context<'_> {}
-
 unsafe impl Send for Context<'_> {}
 unsafe impl Sync for Context<'_> {}
 
