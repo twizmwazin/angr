@@ -12,6 +12,7 @@ import math
 import operator
 import re
 from functools import partial
+from typing import cast
 
 import pyvex
 
@@ -1240,7 +1241,7 @@ class SimIROp:
         mask, width_code = args
         if not isinstance(width_code, claripy.ast.Base) or width_code.op != "BVV":
             raise SimOperationError(f"{self.name} requires a concrete element width")
-        elem_bits = 8 << (width_code.args[0] & 3)
+        elem_bits = 8 << (cast(int, width_code.args[0]) & 3)
         count = self._output_size_bits // elem_bits
         # lane 0 is the least significant, so build most-significant first
         lanes = [
@@ -1268,7 +1269,7 @@ class SimIROp:
         _dst, src1, src2, imm8 = args
         if not isinstance(imm8, claripy.ast.Base) or imm8.op != "BVV":
             raise SimOperationError(f"{self.name} requires a concrete predicate")
-        pred = imm8.args[0] & 7
+        pred = cast(int, imm8.args[0]) & 7
         signed = self._vector_signed == "S"
         elem_bits = self._vector_size
         count = self._vector_count
@@ -1331,7 +1332,7 @@ class SimIROp:
         a, b, c, imm8 = args
         if not isinstance(imm8, claripy.ast.Base) or imm8.op != "BVV":
             raise SimOperationError(f"{self.name} requires a concrete truth table")
-        table = imm8.args[0] & 0xFF
+        table = cast(int, imm8.args[0]) & 0xFF
 
         # OR together the minterms the table selects; each minterm is the
         # bitwise AND of the three sources in their true or complemented form.

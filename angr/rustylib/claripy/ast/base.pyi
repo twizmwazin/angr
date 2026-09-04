@@ -4,6 +4,12 @@ from collections.abc import Sequence
 from typing import Any, Self
 
 from angr.rustylib.claripy.annotation import Annotation
+from angr.rustylib.claripy.ast.fp import RM, FSort
+
+# What ``Base.args`` can hold: child ASTs, plus the leaf values and op
+# parameters that are not ASTs (names, widths, extract bounds, concrete
+# values, and the float sort/rounding mode of the FP ops).
+type ArgType = Base | int | float | bool | str | FSort | RM
 
 class Base:
     @property
@@ -13,7 +19,7 @@ class Base:
     @property
     def op(self) -> str: ...
     @property
-    def args(self) -> tuple[Any, ...]: ...
+    def args(self) -> tuple[ArgType, ...]: ...
     @property
     def variables(self) -> frozenset[str]: ...
     @property
@@ -53,4 +59,4 @@ class Base:
     def clear_annotations(self) -> Self: ...
     def clear_annotation_type(self, annotation_type: type[Annotation]) -> Self: ...
 
-__all__ = ["Base"]
+__all__ = ["ArgType", "Base"]

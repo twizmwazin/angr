@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from archinfo.arch_soot import SootAddressDescriptor
 
@@ -444,10 +444,13 @@ class SimSuccessors:
                 fallback = True
                 break
 
-            if cond.args[0].symbolic is True and cond.args[1].symbolic is False:
-                variable, value = cond.args
-            elif cond.args[0].symbolic is False and cond.args[1].symbolic is True:
-                value, variable = cond.args
+            # "__eq__" always has exactly two AST operands
+            lhs = cast(claripy.ast.Base, cond.args[0])
+            rhs = cast(claripy.ast.Base, cond.args[1])
+            if lhs.symbolic is True and rhs.symbolic is False:
+                variable, value = lhs, rhs
+            elif lhs.symbolic is False and rhs.symbolic is True:
+                value, variable = lhs, rhs
             else:
                 # Cannot determine variable and value. Fallback
                 fallback = True
