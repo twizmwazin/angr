@@ -9,6 +9,7 @@ import logging
 import sys
 import threading
 import time
+from typing import cast
 
 import archinfo
 import cffi  # lmao
@@ -1103,9 +1104,9 @@ class Unicorn(SimStatePlugin):
         if perm.op != "BVV":
             perm = 7
         elif options.ENABLE_NX not in self.state.options:
-            perm = perm.args[0] | 4
+            perm = cast(int, perm.args[0]) | 4
         else:
-            perm = perm.args[0]
+            perm = cast(int, perm.args[0])
 
         # this should return two memoryviews: the page data and its symbolic-ness bitmap, one bit per byte
         # if they are writable they are direct references to the state backing store and can be mapped directly --

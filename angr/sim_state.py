@@ -5,7 +5,7 @@ import itertools
 import logging
 import weakref
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from archinfo import Arch
 from archinfo.arch_soot import SootAddressDescriptor
@@ -346,7 +346,8 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
         :return: an expression
         """
         try:
-            return self.regs._ip
+            # A register read is a bitvector; a Soot state's "ip" register is a SootAddressDescriptor.
+            return cast("IPTypeSym", self.regs._ip)
         except AttributeError as e:
             raise TypeError(str(e)) from e
 
@@ -375,7 +376,7 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
         ip = self._ip
         if isinstance(ip, SootAddressDescriptor):
             return ip
-        return self.solver.eval_one(self.regs._ip)
+        return cast("IPTypeConc", self.solver.eval_one(self.regs._ip))
 
     @addr.setter
     def addr(self, v: int | SootAddressDescriptor | tuple[int, int | None]):
@@ -780,7 +781,7 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
                 bp_value = self.solver.eval(bp_sim)
                 result = f"SP = 0x{sp_value:08x}, BP = 0x{bp_value:08x}\n"
             if depth is None:
-                # bp_value cannot be None here
+                assert bp_value is not None  # BP is concrete on this path
                 depth = (bp_value - sp_value) // var_size + 1  # Print one more value
             pointer_value = sp_value
             for i in range(depth):

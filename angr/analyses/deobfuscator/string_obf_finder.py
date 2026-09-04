@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 import string
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import capstone
 import networkx
@@ -523,7 +523,7 @@ class StringObfuscationFinder(Analysis):
                 if not action.actual_addrs:
                     if action.addr is None or not action.addr.ast.concrete:
                         continue
-                    actual_addrs = [action.addr.ast.concrete_value]
+                    actual_addrs = [cast(int, action.addr.ast.concrete_value)]
                 else:
                     actual_addrs = action.actual_addrs
                 if action.type == "mem":

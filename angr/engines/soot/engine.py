@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING, cast
 
 from archinfo.arch_soot import (
     ArchSoot,
@@ -23,6 +24,9 @@ from angr.state_plugins.inspect import BP_AFTER, BP_BEFORE
 from .exceptions import BlockTerminationNotice, IncorrectLocationException
 from .statements import SimSootStmt_Return, SimSootStmt_ReturnVoid, translate_stmt
 from .values import SimSootValue_Local, SimSootValue_ParamRef
+
+if TYPE_CHECKING:
+    from cle.backends import Soot
 
 l = logging.getLogger("angr.engines.soot.engine")
 
@@ -82,7 +86,7 @@ class SootMixin(SuccessorsEngine, ProcedureMixin):
                 self.process_procedure(state, successors, procedure)
                 return None
 
-        binary = state.regs._ip_binary
+        binary = cast("Soot", state.regs._ip_binary)
         method = binary.get_soot_method(addr.method, none_if_missing=True)
 
         # TODO make the skipping of code in "android.*" classes optional
@@ -241,7 +245,8 @@ class SootMixin(SuccessorsEngine, ProcedureMixin):
     def _get_next_linear_instruction(state, stmt_idx):
         addr = state.addr.copy()
         addr.stmt_idx = stmt_idx
-        method = state.regs._ip_binary.get_soot_method(addr.method)
+        method = cast("Soot", state.regs._ip_binary).get_soot_method(addr.method)
+        assert method is not None  # get_soot_method raises rather than returning None here
         current_bb = method.blocks[addr.block_idx]
         new_stmt_idx = addr.stmt_idx + 1
         if new_stmt_idx < len(current_bb.statements):

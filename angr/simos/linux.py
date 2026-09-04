@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import cast
 
 from archinfo import ArchAArch64, ArchAMD64, ArchARM, ArchMIPS32, ArchMIPS64, ArchPPC32, ArchPPC64, ArchX86
 from cle import MetaELF
@@ -178,7 +179,7 @@ class SimLinux(SimUserland):
                     if self.project._eager_ifunc_resolution:
                         # Resolve it!
                         resolver = self.project.factory.callable(gotvalue, "void *x()", concrete_only=True)
-                        result = resolver().concrete_value
+                        result = cast(int, resolver().concrete_value)
                         self.project.loader.memory.pack_word(gotaddr, result)
                     else:
                         # Replace it with an ifunc-resolve simprocedure!
