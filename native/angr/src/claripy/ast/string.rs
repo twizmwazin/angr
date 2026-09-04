@@ -66,14 +66,6 @@ impl PyAstString {
         Ok(PyAstString::new(py, &inner_with_annotations)?.unbind())
     }
 
-    #[getter]
-    pub fn concrete_value(&self) -> Result<Option<String>, ClaripyError> {
-        Ok(match self.inner.simplify_ext(false, false)?.op() {
-            AstOp::StringV(value) => Some(value.clone()),
-            _ => None,
-        })
-    }
-
     pub fn __add__<'py>(
         &self,
         py: Python<'py>,

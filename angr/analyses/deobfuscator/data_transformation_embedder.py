@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import networkx
 
@@ -597,7 +597,7 @@ class DataTransformationEmbedder(Analysis):
             if isinstance(old_assignment, Call):  # TODO: Ensure it's a buffer-allocating call
                 assign_stmt = Assignment(None, old_vvar, old_assignment, ins_addr=addr)
                 stmts.append(assign_stmt)
-                buffer_addr = v.concrete_value
+                buffer_addr = cast(int, v.concrete_value)
                 str_id = self.project.kb.custom_strings.allocate(known_buffers[buffer_addr])
                 src_expr = Const(self.clinic._ail_manager.next_atom(), str_id, v.size(), ins_addr=addr)
                 self.clinic.variable_map.set_custom_string(src_expr)
@@ -607,7 +607,7 @@ class DataTransformationEmbedder(Analysis):
                 )
                 stmts.append(memcpy_stmt)
             else:
-                const_expr = Const(None, v.concrete_value, v.size(), ins_addr=addr)
+                const_expr = Const(None, cast(int, v.concrete_value), v.size(), ins_addr=addr)
                 assign_stmt = Assignment(None, old_vvar, const_expr, ins_addr=addr)
                 stmts.append(assign_stmt)
 
