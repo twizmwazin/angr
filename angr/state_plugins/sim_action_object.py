@@ -114,11 +114,11 @@ class SimActionObject:
     def __setstate__(self, data):
         self.ast, self.reg_deps, self.tmp_deps = data
 
-    def __len__(self) -> int | None:
-        return len(self.ast)
+    def __len__(self) -> int:
+        return len(self._bv)
 
     def __getitem__(self, k: int):
-        return self.ast[k]
+        return self._bv[k]
 
     def to_claripy(self) -> claripy.ast.Base:
         return self.ast
@@ -136,12 +136,12 @@ class SimActionObject:
         return self.ast.op
 
     @property
-    def args(self) -> tuple[ArgType, ...]:
+    def args(self) -> list[ArgType]:
         return self.ast.args
 
     @property
-    def length(self) -> int | None:
-        return self.ast.length
+    def length(self) -> int:
+        return self._bv.length
 
     @property
     def variables(self) -> frozenset[str]:
@@ -152,134 +152,134 @@ class SimActionObject:
         return self.ast.symbolic
 
     @property
-    def annotations(self) -> tuple[Annotation, ...]:
+    def annotations(self) -> list[Annotation]:
         return self.ast.annotations
 
     @property
     def depth(self) -> int:
         return self.ast.depth
 
+    @property
+    def _bv(self) -> claripy.ast.BV:
+        """
+        The wrapped AST as a bitvector, for the operator forwarders below. A SimActionObject can wrap any
+        AST -- a comparison produces one over a Bool -- but only bitvectors support these operations, and
+        claripy raises for the rest either way.
+        """
+        return self.ast  # type: ignore[reportReturnType]
+
     # Arithmetic operations
     def __add__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__add__, other)
+        return ast_preserving_op(self._bv.__add__, other)
 
     def __radd__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__radd__, other)
+        return ast_preserving_op(self._bv.__radd__, other)
 
     def __truediv__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__truediv__, other)
+        return ast_preserving_op(self._bv.__truediv__, other)
 
     def __rtruediv__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__rtruediv__, other)
+        return ast_preserving_op(self._bv.__rtruediv__, other)
 
     def __floordiv__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__floordiv__, other)
+        return ast_preserving_op(self._bv.__floordiv__, other)
 
     def __rfloordiv__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__rfloordiv__, other)
+        return ast_preserving_op(self._bv.__rfloordiv__, other)
 
     def __mul__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__mul__, other)
+        return ast_preserving_op(self._bv.__mul__, other)
 
     def __rmul__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__rmul__, other)
+        return ast_preserving_op(self._bv.__rmul__, other)
 
     def __sub__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__sub__, other)
+        return ast_preserving_op(self._bv.__sub__, other)
 
     def __rsub__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__rsub__, other)
-
-    def __pow__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__pow__, other)
-
-    def __rpow__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__rpow__, other)
+        return ast_preserving_op(self._bv.__rsub__, other)
 
     def __mod__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__mod__, other)
+        return ast_preserving_op(self._bv.__mod__, other)
 
     def __rmod__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__rmod__, other)
+        return ast_preserving_op(self._bv.__rmod__, other)
 
     def SDiv(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.SDiv, other)
+        return ast_preserving_op(self._bv.SDiv, other)
 
     def SMod(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.SMod, other)
+        return ast_preserving_op(self._bv.SMod, other)
 
     def __neg__(self) -> SimActionObject:
-        return ast_preserving_op(self.ast.__neg__)
-
-    def __abs__(self) -> SimActionObject:
-        return ast_preserving_op(self.ast.__abs__)
+        return ast_preserving_op(self._bv.__neg__)
 
     # Comparison -> SimActionObjects
     def __eq__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__eq__, other)
+        return ast_preserving_op(self._bv.__eq__, other)
 
     def __ne__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__ne__, other)
+        return ast_preserving_op(self._bv.__ne__, other)
 
     def __ge__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__ge__, other)
+        return ast_preserving_op(self._bv.__ge__, other)
 
     def __le__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__le__, other)
+        return ast_preserving_op(self._bv.__le__, other)
 
     def __gt__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__gt__, other)
+        return ast_preserving_op(self._bv.__gt__, other)
 
     def __lt__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__lt__, other)
+        return ast_preserving_op(self._bv.__lt__, other)
 
     # Bitwise operations
     def __invert__(self) -> SimActionObject:
-        return ast_preserving_op(self.ast.__invert__)
+        return ast_preserving_op(self._bv.__invert__)
 
     def __or__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__or__, other)
+        return ast_preserving_op(self._bv.__or__, other)
 
     def __ror__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__ror__, other)
+        return ast_preserving_op(self._bv.__ror__, other)
 
     def __and__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__and__, other)
+        return ast_preserving_op(self._bv.__and__, other)
 
     def __rand__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__rand__, other)
+        return ast_preserving_op(self._bv.__rand__, other)
 
     def __xor__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__xor__, other)
+        return ast_preserving_op(self._bv.__xor__, other)
 
     def __rxor__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__rxor__, other)
+        return ast_preserving_op(self._bv.__rxor__, other)
 
     def __lshift__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__lshift__, other)
+        return ast_preserving_op(self._bv.__lshift__, other)
 
     def __rlshift__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__rlshift__, other)
+        return ast_preserving_op(self._bv.__rlshift__, other)
 
     def __rshift__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__rshift__, other)
+        return ast_preserving_op(self._bv.__rshift__, other)
 
     def __rrshift__(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.__rrshift__, other)
+        return ast_preserving_op(self._bv.__rrshift__, other)
 
     # Set operations
     def union(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.union, other)
+        return ast_preserving_op(self._bv.union, other)
 
     def intersection(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.intersection, other)
+        return ast_preserving_op(self._bv.intersection, other)
 
     def widen(self, other) -> SimActionObject:
-        return ast_preserving_op(self.ast.widen, other)
+        return ast_preserving_op(self._bv.widen, other)
 
     # Bits-specific methods
     def raw_to_bv(self) -> SimActionObject:
-        return ast_preserving_op(self.ast.raw_to_bv)
+        return ast_preserving_op(self._bv.raw_to_bv)
 
     def bv_to_fp(self) -> SimActionObject:
-        return ast_preserving_op(self.ast.raw_to_fp)
+        return ast_preserving_op(self._bv.raw_to_fp)
