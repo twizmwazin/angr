@@ -150,6 +150,26 @@ impl Base {
             .collect()
     }
 
+    /// The Python value of this AST if it is concrete, otherwise None. Implemented once here rather
+    /// than per sort, since it is the same function in each: simplify, then match the one concrete op
+    /// that sort has. The stub narrows the return type per subclass.
+    #[getter]
+    pub fn concrete_value<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> Result<Option<Bound<'py, PyAny>>, ClaripyError> {
+        Ok(match self.inner.simplify_ext(false, false)?.op() {
+            AstOp::BoolV(value) => Some(value.into_bound_py_any(py)?),
+            AstOp::BVV(value) => Some(value.to_biguint().into_bound_py_any(py)?),
+            AstOp::FPV(value) => value
+                .to_f64()
+                .map(|value| value.into_bound_py_any(py))
+                .transpose()?,
+            AstOp::StringV(value) => Some(value.into_bound_py_any(py)?),
+            _ => None,
+        })
+    }
+
     pub fn hash(&self) -> u64 {
         self.inner.hash()
     }

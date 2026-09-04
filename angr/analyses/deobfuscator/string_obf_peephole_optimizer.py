@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 from angr import claripy
 from angr.ailment.expression import Call, Const
 from angr.analyses.decompiler.peephole_optimizations import EXPR_OPTS
@@ -37,7 +39,7 @@ class StringObfType1PeepholeOptimizer(PeepholeOptimizationExprBase):
 
                 if out.concrete:
                     return Const(
-                        None, out.concrete_value, self.project.arch.bits, **expr.tags
+                        None, cast(int, out.concrete_value), self.project.arch.bits, **expr.tags
                     )  # FIXME: use out.bits when the function prototype recovery is more reliable
 
         return None
