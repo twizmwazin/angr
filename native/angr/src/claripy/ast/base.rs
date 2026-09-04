@@ -126,6 +126,26 @@ impl Base {
             .collect()
     }
 
+    /// The Python value of this AST if it is concrete, otherwise None. Every sort-specific subclass
+    /// overrides this with its own, narrowly typed, version; this is what the shared `Base` and `Bits`
+    /// code paths see.
+    #[getter]
+    pub fn concrete_value<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> Result<Option<Bound<'py, PyAny>>, ClaripyError> {
+        Ok(match self.inner.simplify_ext(false, false)?.op() {
+            AstOp::BoolV(value) => Some(value.into_bound_py_any(py)?),
+            AstOp::BVV(value) => Some(value.to_biguint().into_bound_py_any(py)?),
+            AstOp::FPV(value) => value
+                .to_f64()
+                .map(|value| value.into_bound_py_any(py))
+                .transpose()?,
+            AstOp::StringV(value) => Some(value.into_bound_py_any(py)?),
+            _ => None,
+        })
+    }
+
     pub fn hash(&self) -> u64 {
         self.inner.hash()
     }

@@ -4,6 +4,12 @@ from collections.abc import Sequence
 from typing import Any, Self
 
 from angr.rustylib.claripy.annotation import Annotation
+from angr.rustylib.claripy.ast.fp import RM, FSort
+
+# What ``Base.args`` can hold: child ASTs, plus the leaf values and op
+# parameters that are not ASTs (names, widths, extract bounds, concrete
+# values, and the float sort/rounding mode of the FP ops).
+type ArgType = Base | int | float | bool | str | FSort | RM
 
 class Base:
     @property
@@ -11,17 +17,19 @@ class Base:
     @property
     def _encoded_name(self) -> bytes | None: ...
     @property
-    def _errored(self) -> set[Any]: ...
-    @property
     def op(self) -> str: ...
     @property
-    def args(self) -> list[Any]: ...
+    def args(self) -> list[ArgType]: ...
     @property
     def variables(self) -> frozenset[str]: ...
     @property
     def symbolic(self) -> bool: ...
     @property
     def concrete(self) -> bool: ...
+    # Implemented once here, dispatching on the AST type. The sort-specific subclasses narrow the
+    # return type rather than reimplementing it: a BV only ever wraps a bitvector AST, and so on.
+    @property
+    def concrete_value(self) -> bool | int | float | str | None: ...
     @property
     def annotations(self) -> list[Annotation]: ...
     @property
@@ -49,4 +57,4 @@ class Base:
     def clear_annotations(self) -> Self: ...
     def clear_annotation_type(self, annotation_type: type[Annotation]) -> Self: ...
 
-__all__ = ["Base"]
+__all__ = ["ArgType", "Base"]

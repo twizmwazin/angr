@@ -314,14 +314,6 @@ impl FP {
         self.size()
     }
 
-    #[getter]
-    pub fn concrete_value(&self) -> Result<Option<f64>, ClaripyError> {
-        Ok(match self.inner.simplify_ext(false, false)?.op() {
-            AstOp::FPV(value) => value.to_f64(),
-            _ => None,
-        })
-    }
-
     pub fn raw_to_bv(self_: Bound<'_, FP>) -> Result<Bound<'_, BV>, ClaripyError> {
         BV::new(
             self_.py(),

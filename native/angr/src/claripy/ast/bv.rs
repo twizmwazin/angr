@@ -27,6 +27,17 @@ ast_wrapper!(BV, PY_BV_CACHE, |base, inner| {
         .add_subclass(BV { inner })
 });
 
+impl BV {
+    /// The concrete value of this bitvector, or None if it is symbolic. Python reads
+    /// `concrete_value` off `Base`; this is for Rust callers that want the integer itself.
+    pub fn concrete_value(&self) -> Result<Option<BigUint>, ClaripyError> {
+        Ok(match self.inner.simplify_ext(false, false)?.op() {
+            AstOp::BVV(bv) => Some(bv.to_biguint()),
+            _ => None,
+        })
+    }
+}
+
 #[pymethods]
 impl BV {
     #[new]
@@ -200,14 +211,6 @@ impl BV {
     #[getter]
     pub fn length(&self) -> usize {
         self.size()
-    }
-
-    #[getter]
-    pub fn concrete_value(&self) -> Result<Option<BigUint>, ClaripyError> {
-        Ok(match self.inner.simplify_ext(false, false)?.op() {
-            AstOp::BVV(bv) => Some(bv.to_biguint()),
-            _ => None,
-        })
     }
 
     pub fn __getitem__<'py>(

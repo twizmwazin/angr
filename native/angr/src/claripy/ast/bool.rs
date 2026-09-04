@@ -199,14 +199,6 @@ impl Bool {
         Ok(self.inner.simplify()?.is_false())
     }
 
-    #[getter]
-    pub fn concrete_value(&self) -> Result<Option<bool>, ClaripyError> {
-        Ok(match self.inner.simplify_ext(false, false)?.op() {
-            AstOp::BoolV(value) => Some(*value),
-            _ => None,
-        })
-    }
-
     pub fn __invert__<'py>(&self, py: Python<'py>) -> Result<Bound<'py, Bool>, ClaripyError> {
         Bool::new(py, &GLOBAL_CONTEXT.not(&self.inner)?.simplify()?)
     }
