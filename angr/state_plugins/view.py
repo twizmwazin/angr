@@ -20,15 +20,19 @@ l = logging.getLogger(name=__name__)
 
 
 class SimRegNameView(SimStatePlugin):
-    def __getattr__(self, k) -> claripy.ast.base.Base:
+    def __getattr__(self, k) -> claripy.ast.BV:
         """
         Get the value of a register.
+
+        Registers are a flat bitvector-valued memory region, so a register read is a BV. The one exception
+        is the JavaVM/Soot state, whose "registers" hold loader objects and Soot address descriptors; those
+        few call sites narrow the result themselves.
 
         :param str k: Name of the register. Prefix it with "_" prevents SimInspect being triggered and SimActions being
                       created.
         :param v:     Value to set to the register.
         :return:      Value of the register.
-        :rtype:       claripy.ast.Base
+        :rtype:       claripy.ast.BV
         """
 
         state: SimState = super().__getattribute__("state")
