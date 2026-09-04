@@ -368,9 +368,9 @@ class Balancer:
     def _unpack_truisms_not(c: Bool) -> set[Bool]:
         arg = cast(Bool, c.args[0])
         if arg.op == "And":
-            return Balancer._unpack_truisms(claripy.Or(*[claripy.Not(a) for a in arg.args]))
+            return Balancer._unpack_truisms(claripy.Or(*[claripy.Not(a) for a in cast(list[Bool], arg.args)]))
         if arg.op == "Or":
-            return Balancer._unpack_truisms(claripy.And(*[claripy.Not(a) for a in arg.args]))
+            return Balancer._unpack_truisms(claripy.And(*[claripy.Not(a) for a in cast(list[Bool], arg.args)]))
         return set()
 
     @staticmethod
@@ -475,7 +475,7 @@ class Balancer:
         old_lhs = cast(BV, truism.args[0])
         new_lhs = cast(BV, old_lhs.args[0])
         old_rhs = cast(BV, truism.args[1])
-        other_adds = old_lhs.args[1:]
+        other_adds = cast(list[BV], old_lhs.args)[1:]
         new_rhs = claripy.Add(old_rhs, *other_adds)
         return Bool(truism.op, (new_lhs, new_rhs))
 
@@ -753,7 +753,7 @@ class Balancer:
         lhs, rhs = cast(tuple[BV, BV], truism.args)
         if rhs.cardinality == 1:
             val = claripy.vsa.eval(rhs, 1)[0]
-            max_int = claripy.BVV((1 << len(lhs)) - 1, len(lhs)).args[0]
+            max_int = (1 << len(lhs)) - 1
 
             if val == 0:
                 self._add_lower_bound(lhs, val + 1)

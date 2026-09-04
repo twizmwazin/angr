@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, cast
 
 from sortedcontainers import SortedDict
 
@@ -185,7 +185,7 @@ class UltraPage(MemoryObjectMixin, PageBase):
             self.symbolic_bitmap.clear_range(addr, addr + size)
 
             # store
-            ival = data if type(data) is int else data.object.args[0]
+            ival = data if type(data) is int else cast(int, data.object.args[0])
 
             assert memory.state.arch.byte_width == 8
             # TODO: Make UltraPage support architectures with greater byte_widths (but are still multiples of 8)

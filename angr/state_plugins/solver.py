@@ -4,7 +4,7 @@ import functools
 import logging
 import os
 import time
-from typing import TypeVar, overload
+from typing import Any, TypeVar, overload
 
 from angr import claripy
 from angr import sim_options as o
@@ -118,7 +118,11 @@ def _concrete_bool(e):
     return None
 
 
-def _concrete_value(e):
+def _concrete_value(e) -> Any:
+    """
+    The Python value behind a concrete claripy leaf, or None if there isn't one. Returns ``Any`` because
+    the value's type follows the AST's sort (int for a BVV, bool for a BoolV, float for an FPV, ...).
+    """
     # shortcuts for speed improvement
     if isinstance(e, (int, float, bool)):
         return e
