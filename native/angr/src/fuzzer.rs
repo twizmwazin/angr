@@ -148,8 +148,7 @@ impl Fuzzer {
             tuple_list!(observer),
             Some(Duration::from_millis(timeout.unwrap_or(0))),
             engine,
-        )
-        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        )?;
 
         Ok(Fuzzer {
             fuzzer_state,
