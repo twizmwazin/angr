@@ -345,7 +345,7 @@ class FunctionHandler:
             for vs in data.address_multi.values():
                 for val in vs:
                     if val is not None and val.op == "BVV":
-                        data.address = val.args[0]
+                        data.address = cast(int, val.args[0])
                         break
                 if data.address is not None:
                     break
