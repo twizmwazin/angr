@@ -49,6 +49,13 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1
         with:
           components: clippy, rustfmt
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v5
+        with:
+          python-version: "3.12"
+      # native/angr/build.rs reads the VEX IROp enum out of pyvex. A wheel build
+      # gets the pinned pyvex from pyproject.toml's build requirements; cargo run
+      # on its own needs one here. Any release will do: it only has to compile.
+      - run: python -m pip install pyvex
       - run: cargo clippy --all-targets --all-features -- -D warnings
       - run: cargo fmt --all -- --check
 
@@ -65,6 +72,8 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v5
         with:
           python-version: "3.12"
+      # native/angr/build.rs reads the VEX IROp enum out of pyvex
+      - run: python -m pip install pyvex
       # Windows is the one platform where gh-release links against an import library rather than
       # statically, so the libz3.dll it downloaded has to be findable when the tests run
       - name: Put the downloaded libz3.dll on PATH
