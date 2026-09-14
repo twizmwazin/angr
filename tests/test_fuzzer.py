@@ -5,7 +5,10 @@ import os.path
 import struct
 import tempfile
 
+import pytest
+
 import angr
+from angr.engines.icicle import UberIcicleEngine
 from angr.procedures.glibc.__libc_start_main import (
     __libc_start_main as _libc_start_main,
 )
@@ -96,6 +99,18 @@ ret
 
 RETURN_ADDR = 0x100
 DATA_ADDR = 0x200
+
+
+class _RecordingEngine(UberIcicleEngine):
+    """An icicle engine that counts how many times the fuzzer stepped through it."""
+
+    def __init__(self, project):
+        super().__init__(project)
+        self.process_count = 0
+
+    def process(self, state, **kwargs):
+        self.process_count += 1
+        return super().process(state, **kwargs)
 
 
 def _apply_fn(state: angr.SimState, input: bytes):  # pylint: disable=redefined-builtin
@@ -464,3 +479,94 @@ class TestFuzzer:
         fuzzer.run_once()
         live_solutions = fuzzer.solutions()
         assert len(live_solutions) >= 1, "Stack buffer overflow should produce a solution"
+
+    def test_custom_engine_instance(self):
+        """An engine instance passed to the fuzzer is used instead of the default one."""
+        project = angr.load_shellcode(SHELLCODE, "amd64")
+        base_state = project.factory.entry_state()
+        corpus = InMemoryCorpus.from_list([b"\x00", b"A", b"B", b"C"])
+        solutions = InMemoryCorpus()
+
+        engine = _RecordingEngine(project)
+        fuzzer = Fuzzer(base_state, corpus, solutions, _apply_fn, 0, 0, max_mutations=2, engine=engine)
+
+        new_corpus_entry = fuzzer.run_once()
+        live_corpus = fuzzer.corpus()
+        assert isinstance(live_corpus, InMemoryCorpus)
+        assert 0 <= new_corpus_entry < len(live_corpus)
+        assert engine.process_count > 0, "The given engine should have executed the target"
+
+    def test_custom_engine_class(self):
+        """An engine class is instantiated once with the project and reused across executions."""
+        built = []
+
+        class _Engine(_RecordingEngine):
+            def __init__(self, project):
+                super().__init__(project)
+                built.append(self)
+
+        project = angr.load_shellcode(SHELLCODE, "amd64")
+        base_state = project.factory.entry_state()
+        corpus = InMemoryCorpus.from_list([b"\x00", b"A", b"B", b"C"])
+        solutions = InMemoryCorpus()
+
+        fuzzer = Fuzzer(base_state, corpus, solutions, _apply_fn, 0, 0, max_mutations=2, engine=_Engine)
+
+        fuzzer.run_once()
+        fuzzer.run_once()
+        assert len(built) == 1, "The engine class should be instantiated exactly once"
+        assert built[0].project is project
+        assert built[0].process_count > 0, "The built engine should have executed the target"
+
+    def test_custom_engine_factory(self):
+        """Any callable building an engine from the project is accepted."""
+        built = []
+
+        def make_engine(project):
+            engine = _RecordingEngine(project)
+            built.append(engine)
+            return engine
+
+        project = angr.load_shellcode(SHELLCODE, "amd64")
+        base_state = project.factory.entry_state()
+        corpus = InMemoryCorpus.from_list([b"\x00", b"A", b"B", b"C"])
+        solutions = InMemoryCorpus()
+
+        fuzzer = Fuzzer(base_state, corpus, solutions, _apply_fn, 0, 0, max_mutations=2, engine=make_engine)
+
+        fuzzer.run_once()
+        assert len(built) == 1
+        assert built[0].process_count > 0, "The built engine should have executed the target"
+
+    def test_custom_engine_finds_solution(self):
+        """A custom engine still reports crashes as solutions."""
+        project = angr.load_shellcode(SHELLCODE_WITH_CRASH, "amd64")
+        base_state = project.factory.entry_state()
+        corpus = InMemoryCorpus.from_list([b"\x00"])
+        solutions = InMemoryCorpus()
+
+        engine = _RecordingEngine(project)
+        fuzzer = Fuzzer(
+            base_state,
+            corpus,
+            solutions,
+            _apply_fn,
+            0,
+            0,
+            max_mutations=1,
+            mutator=DeterministicMutator([b"\x43"]),
+            engine=engine,
+        )
+
+        fuzzer.run_once()
+        assert len(fuzzer.solutions()) >= 1, "Expected at least one solution from crash path"
+
+    def test_invalid_engine_rejected(self):
+        """Something that is neither an engine nor a callable is rejected up front."""
+        project = angr.load_shellcode(SHELLCODE, "amd64")
+        base_state = project.factory.entry_state()
+        corpus = InMemoryCorpus.from_list([b"\x00"])
+        solutions = InMemoryCorpus()
+
+        with pytest.raises(TypeError):
+            Fuzzer(base_state, corpus, solutions, _apply_fn, 0, 0, max_mutations=1, engine=42)

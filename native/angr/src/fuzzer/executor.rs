@@ -15,6 +15,7 @@ pub struct PyExecutorInner<S> {
     apply_fn: Py<PyAny>,
     observers: OT,
     timeout: Option<Duration>,
+    engine: Option<Py<PyAny>>,
     cached_engine: Option<Py<PyAny>>,
     emulator_cls: Py<PyAny>,
     phantom: std::marker::PhantomData<S>,
@@ -26,10 +27,20 @@ impl<S> PyExecutorInner<S> {
         apply_fn: Bound<PyAny>,
         observers: OT,
         timeout: Option<Duration>,
+        engine: Option<Bound<PyAny>>,
     ) -> PyResult<Self> {
         if !apply_fn.is_callable() {
             return Err(pyo3::exceptions::PyTypeError::new_err(
                 "Expected a callable function",
+            ));
+        }
+        if let Some(engine) = &engine
+            && !engine.is_callable()
+            && !engine.hasattr("process")?
+        {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "Expected engine to be a SuccessorsEngine, or a callable taking a project and \
+                 returning one",
             ));
         }
         let emulator_cls = base_state
@@ -42,6 +53,7 @@ impl<S> PyExecutorInner<S> {
             apply_fn: apply_fn.unbind(),
             observers,
             timeout,
+            engine: engine.map(Bound::unbind),
             cached_engine: None,
             emulator_cls,
             phantom: std::marker::PhantomData,
@@ -69,23 +81,28 @@ impl Executor<EM, I, S, Z> for PyExecutorInner<S> {
                 let apply_fn = self.apply_fn.bind(py);
                 apply_fn.call1((&copied_state, input.as_ref()))?;
 
-                // Step 2: Get or create the icicle engine (reuse across iterations)
-                let icicle_engine = if let Some(ref cached) = self.cached_engine {
+                // Step 2: Get or create the engine (reuse across iterations)
+                let engine = if let Some(ref cached) = self.cached_engine {
                     cached.bind(py).clone()
                 } else {
-                    let project = copied_state.getattr("project")?;
-                    let engine = py
-                        .import("angr.engines.icicle")?
-                        .getattr("UberIcicleEngine")?
-                        .call1((project,))?;
+                    let engine = match self.engine.as_ref().map(|engine| engine.bind(py)) {
+                        Some(engine) if !engine.is_callable() => engine.clone(),
+                        Some(factory) => {
+                            let project = copied_state.getattr("project")?;
+                            factory.call1((project,))?
+                        }
+                        None => {
+                            let project = copied_state.getattr("project")?;
+                            py.import("angr.engines.icicle")?
+                                .getattr("UberIcicleEngine")?
+                                .call1((project,))?
+                        }
+                    };
                     self.cached_engine = Some(engine.clone().unbind());
                     engine
                 };
 
-                let emulator = self
-                    .emulator_cls
-                    .bind(py)
-                    .call1((&icicle_engine, &copied_state))?;
+                let emulator = self.emulator_cls.bind(py).call1((&engine, &copied_state))?;
 
                 // Step 2.5: Set breakpoints to detect normal returns.
                 // If the user set state.globals['_fuzzer_breakpoints'] (a list of
