@@ -142,14 +142,15 @@ impl Fuzzer {
         };
         let stages = tuple_list!(stage);
 
+        // The error is already a Python exception: pass it through rather than
+        // flattening a TypeError about the engine into a RuntimeError.
         let executor = PyExecutorInner::new(
             base_state,
             apply_fn,
             tuple_list!(observer),
             Some(Duration::from_millis(timeout.unwrap_or(0))),
             engine,
-        )
-        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        )?;
 
         Ok(Fuzzer {
             fuzzer_state,
