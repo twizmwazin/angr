@@ -2,6 +2,8 @@ from collections.abc import Callable
 from datetime import timedelta
 from typing import Self
 
+from angr.engines.successors import SuccessorsEngine
+from angr.project import Project
 from angr.sim_state import SimState
 
 class InMemoryCorpus:
@@ -76,9 +78,16 @@ class Fuzzer:
         seed: int | None = None,
         max_mutations: int | None = None,
         mutator: HavocMutator | DeterministicMutator | None = None,
+        engine: SuccessorsEngine | Callable[[Project], SuccessorsEngine] | None = None,
     ):
         """
         Initialize the fuzzer with the given parameters.
+
+        :param engine: The engine used to execute each input, given either as an engine or as a
+            callable building one from the project (an engine class qualifies). It is built at
+            most once and reused across executions, and is responsible for maintaining the
+            state's ``edge_hitmap`` plugin, which the fuzzer reads back as coverage feedback.
+            Defaults to :class:`angr.engines.icicle.UberIcicleEngine`.
         """
 
     def corpus(self) -> InMemoryCorpus | OnDiskCorpus: ...
