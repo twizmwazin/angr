@@ -36,25 +36,15 @@ impl<'c, S: Solver<'c>> HasContext<'c> for ConcreteEarlyResolutionMixin<'c, S> {
     }
 }
 
-impl<'c, S: Solver<'c>> Solver<'c> for ConcreteEarlyResolutionMixin<'c, S> {
-    fn add(&mut self, constraint: &AstRef<'c>) -> Result<(), ClarirsError> {
-        self.inner.add(constraint)
+impl<'c, S: Solver<'c>> crate::solver::SolverMixin<'c> for ConcreteEarlyResolutionMixin<'c, S> {
+    type Inner = S;
+
+    fn wrapped(&self) -> &S {
+        &self.inner
     }
 
-    fn clear(&mut self) -> Result<(), ClarirsError> {
-        self.inner.clear()
-    }
-
-    fn constraints(&self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        self.inner.constraints()
-    }
-
-    fn simplify(&mut self) -> Result<(), ClarirsError> {
-        self.inner.simplify()
-    }
-
-    fn satisfiable(&mut self) -> Result<bool, ClarirsError> {
-        self.inner.satisfiable()
+    fn wrapped_mut(&mut self) -> &mut S {
+        &mut self.inner
     }
 
     fn satisfiable_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
@@ -89,7 +79,7 @@ impl<'c, S: Solver<'c>> Solver<'c> for ConcreteEarlyResolutionMixin<'c, S> {
     fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
         // If the expression is concrete, has_true is equivalent to is_true
         if expr.concrete() {
-            return self.is_true(expr);
+            return Solver::is_true(self, expr);
         }
         self.inner.has_true(expr)
     }
@@ -97,7 +87,7 @@ impl<'c, S: Solver<'c>> Solver<'c> for ConcreteEarlyResolutionMixin<'c, S> {
     fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
         // If the expression is concrete, has_false is equivalent to is_false
         if expr.concrete() {
-            return self.is_false(expr);
+            return Solver::is_false(self, expr);
         }
         self.inner.has_false(expr)
     }
@@ -160,13 +150,6 @@ impl<'c, S: Solver<'c>> Solver<'c> for ConcreteEarlyResolutionMixin<'c, S> {
             }
         }
         self.inner.eval_n(expr, n)
-    }
-
-    fn batch_eval(&mut self, exprs: &[AstRef<'c>]) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        // Forward as a batch so the backend can draw every value from a single
-        // model (concrete expressions are handled cheaply there too), rather
-        // than falling back to the per-expression default.
-        self.inner.batch_eval(exprs)
     }
 }
 

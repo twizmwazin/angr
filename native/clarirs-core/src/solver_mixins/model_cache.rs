@@ -218,7 +218,17 @@ impl<'c, S: Solver<'c>> HasContext<'c> for ModelCacheMixin<'c, S> {
     }
 }
 
-impl<'c, S: Solver<'c>> Solver<'c> for ModelCacheMixin<'c, S> {
+impl<'c, S: Solver<'c>> crate::solver::SolverMixin<'c> for ModelCacheMixin<'c, S> {
+    type Inner = S;
+
+    fn wrapped(&self) -> &S {
+        &self.inner
+    }
+
+    fn wrapped_mut(&mut self) -> &mut S {
+        &mut self.inner
+    }
+
     fn add(&mut self, constraint: &AstRef<'c>) -> Result<(), ClarirsError> {
         // Adding a constraint only tightens the set. A satisfiable result may
         // no longer hold, so drop it; an unsatisfiable result stays
@@ -234,10 +244,6 @@ impl<'c, S: Solver<'c>> Solver<'c> for ModelCacheMixin<'c, S> {
         self.sat = None;
         self.models.clear();
         self.inner.clear()
-    }
-
-    fn constraints(&self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        self.inner.constraints()
     }
 
     fn simplify(&mut self) -> Result<(), ClarirsError> {
@@ -264,7 +270,7 @@ impl<'c, S: Solver<'c>> Solver<'c> for ModelCacheMixin<'c, S> {
 
     fn satisfiable_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
         if extra.is_empty() {
-            return self.satisfiable();
+            return Solver::satisfiable(self);
         }
         // If the persistent set alone is unsatisfiable, so is any extension.
         if self.sat == Some(false) {
@@ -277,38 +283,6 @@ impl<'c, S: Solver<'c>> Solver<'c> for ModelCacheMixin<'c, S> {
         // Cache miss: defer to the inner solver, which can check the extra
         // constraints incrementally (e.g. via Z3 assumptions).
         self.inner.satisfiable_with_extra(extra)
-    }
-
-    fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        self.inner.is_true(expr)
-    }
-
-    fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        self.inner.is_false(expr)
-    }
-
-    fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        self.inner.has_true(expr)
-    }
-
-    fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        self.inner.has_false(expr)
-    }
-
-    fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.inner.min_unsigned(expr)
-    }
-
-    fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.inner.max_unsigned(expr)
-    }
-
-    fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.inner.min_signed(expr)
-    }
-
-    fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.inner.max_signed(expr)
     }
 
     fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {

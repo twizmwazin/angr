@@ -122,7 +122,21 @@ impl<'c, S: Solver<'c>> HasContext<'c> for ReplacementSolver<'c, S> {
     }
 }
 
-impl<'c, S: Solver<'c>> Solver<'c> for ReplacementSolver<'c, S> {
+impl<'c, S: Solver<'c>> crate::solver::SolverMixin<'c> for ReplacementSolver<'c, S> {
+    type Inner = S;
+
+    fn wrapped(&self) -> &S {
+        &self.inner
+    }
+
+    fn wrapped_mut(&mut self) -> &mut S {
+        &mut self.inner
+    }
+
+    fn rewrite(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+        self.apply_replacements(expr)
+    }
+
     fn add(&mut self, constraint: &AstRef<'c>) -> Result<(), ClarirsError> {
         if self.auto_replace {
             self.try_extract_replacement(constraint);
@@ -140,67 +154,6 @@ impl<'c, S: Solver<'c>> Solver<'c> for ReplacementSolver<'c, S> {
 
     fn constraints(&self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
         Ok(self.original_constraints.clone())
-    }
-
-    fn simplify(&mut self) -> Result<(), ClarirsError> {
-        self.inner.simplify()
-    }
-
-    fn satisfiable(&mut self) -> Result<bool, ClarirsError> {
-        self.inner.satisfiable()
-    }
-
-    fn satisfiable_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
-        let replaced = extra
-            .iter()
-            .map(|c| self.apply_replacements(c))
-            .collect::<Result<Vec<_>, _>>()?;
-        self.inner.satisfiable_with_extra(&replaced)
-    }
-
-    fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.is_true(&replaced)
-    }
-
-    fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.is_false(&replaced)
-    }
-
-    fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.has_true(&replaced)
-    }
-
-    fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.has_false(&replaced)
-    }
-
-    fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.min_unsigned(&replaced)
-    }
-
-    fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.max_unsigned(&replaced)
-    }
-
-    fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.min_signed(&replaced)
-    }
-
-    fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.max_signed(&replaced)
-    }
-
-    fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.eval_n(&replaced, n)
     }
 }
 
