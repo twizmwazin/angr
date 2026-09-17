@@ -30,81 +30,27 @@ impl<'c, S: Solver<'c>> HasContext<'c> for SimplificationMixin<'c, S> {
     }
 }
 
-impl<'c, S: Solver<'c>> Solver<'c> for SimplificationMixin<'c, S> {
+impl<'c, S: Solver<'c>> crate::solver::SolverMixin<'c> for SimplificationMixin<'c, S> {
+    type Inner = S;
+
+    fn wrapped(&self) -> &S {
+        &self.inner
+    }
+
+    fn wrapped_mut(&mut self) -> &mut S {
+        &mut self.inner
+    }
+
+    fn rewrite(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+        expr.simplify()
+    }
+
     fn add(&mut self, constraint: &AstRef<'c>) -> Result<(), ClarirsError> {
         let simplified = constraint.simplify()?;
         if simplified.is_true() {
             return Ok(());
         }
         self.inner.add(&simplified)
-    }
-
-    fn clear(&mut self) -> Result<(), ClarirsError> {
-        self.inner.clear()
-    }
-
-    fn constraints(&self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        self.inner.constraints()
-    }
-
-    fn simplify(&mut self) -> Result<(), ClarirsError> {
-        self.inner.simplify()
-    }
-
-    fn satisfiable(&mut self) -> Result<bool, ClarirsError> {
-        self.inner.satisfiable()
-    }
-
-    fn satisfiable_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
-        let simplified = extra
-            .iter()
-            .map(|c| c.simplify())
-            .collect::<Result<Vec<_>, _>>()?;
-        self.inner.satisfiable_with_extra(&simplified)
-    }
-
-    fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        self.inner.is_true(&expr.simplify()?)
-    }
-
-    fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        self.inner.is_false(&expr.simplify()?)
-    }
-
-    fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        self.inner.has_true(&expr.simplify()?)
-    }
-
-    fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        self.inner.has_false(&expr.simplify()?)
-    }
-
-    fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.inner.min_unsigned(&expr.simplify()?)
-    }
-
-    fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.inner.max_unsigned(&expr.simplify()?)
-    }
-
-    fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.inner.min_signed(&expr.simplify()?)
-    }
-
-    fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.inner.max_signed(&expr.simplify()?)
-    }
-
-    fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        self.inner.eval_n(&expr.simplify()?, n)
-    }
-
-    fn batch_eval(&mut self, exprs: &[AstRef<'c>]) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        let simplified = exprs
-            .iter()
-            .map(|expr| expr.simplify())
-            .collect::<Result<Vec<_>, _>>()?;
-        self.inner.batch_eval(&simplified)
     }
 }
 
