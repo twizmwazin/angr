@@ -1943,7 +1943,7 @@ dependencies = [
 [[package]]
 name = "smtrs-aig"
 version = "0.1.0"
-source = "git+https://github.com/twizmwazin/smtrs.git?rev=89cb7b9f9898f4ac90e9429a35a5602b27c0404f#89cb7b9f9898f4ac90e9429a35a5602b27c0404f"
+source = "git+https://github.com/twizmwazin/smtrs.git?rev=97ebd2505d2ea9121efb6ec82f2c9e1adf741e12#97ebd2505d2ea9121efb6ec82f2c9e1adf741e12"
 dependencies = [
  "rustc-hash",
  "smtrs-core",
@@ -1953,7 +1953,7 @@ dependencies = [
 [[package]]
 name = "smtrs-bitblast"
 version = "0.1.0"
-source = "git+https://github.com/twizmwazin/smtrs.git?rev=89cb7b9f9898f4ac90e9429a35a5602b27c0404f#89cb7b9f9898f4ac90e9429a35a5602b27c0404f"
+source = "git+https://github.com/twizmwazin/smtrs.git?rev=97ebd2505d2ea9121efb6ec82f2c9e1adf741e12#97ebd2505d2ea9121efb6ec82f2c9e1adf741e12"
 dependencies = [
  "rustc-hash",
  "smtrs-aig",
@@ -1964,12 +1964,12 @@ dependencies = [
 [[package]]
 name = "smtrs-cdcl"
 version = "0.1.0"
-source = "git+https://github.com/twizmwazin/smtrs.git?rev=89cb7b9f9898f4ac90e9429a35a5602b27c0404f#89cb7b9f9898f4ac90e9429a35a5602b27c0404f"
+source = "git+https://github.com/twizmwazin/smtrs.git?rev=97ebd2505d2ea9121efb6ec82f2c9e1adf741e12#97ebd2505d2ea9121efb6ec82f2c9e1adf741e12"
 
 [[package]]
 name = "smtrs-core"
 version = "0.1.0"
-source = "git+https://github.com/twizmwazin/smtrs.git?rev=89cb7b9f9898f4ac90e9429a35a5602b27c0404f#89cb7b9f9898f4ac90e9429a35a5602b27c0404f"
+source = "git+https://github.com/twizmwazin/smtrs.git?rev=97ebd2505d2ea9121efb6ec82f2c9e1adf741e12#97ebd2505d2ea9121efb6ec82f2c9e1adf741e12"
 dependencies = [
  "rustc-hash",
 ]
@@ -1977,7 +1977,7 @@ dependencies = [
 [[package]]
 name = "smtrs-fp"
 version = "0.1.0"
-source = "git+https://github.com/twizmwazin/smtrs.git?rev=89cb7b9f9898f4ac90e9429a35a5602b27c0404f#89cb7b9f9898f4ac90e9429a35a5602b27c0404f"
+source = "git+https://github.com/twizmwazin/smtrs.git?rev=97ebd2505d2ea9121efb6ec82f2c9e1adf741e12#97ebd2505d2ea9121efb6ec82f2c9e1adf741e12"
 dependencies = [
  "rustc-hash",
  "smtrs-core",
@@ -1986,7 +1986,7 @@ dependencies = [
 [[package]]
 name = "smtrs-rewrite"
 version = "0.1.0"
-source = "git+https://github.com/twizmwazin/smtrs.git?rev=89cb7b9f9898f4ac90e9429a35a5602b27c0404f#89cb7b9f9898f4ac90e9429a35a5602b27c0404f"
+source = "git+https://github.com/twizmwazin/smtrs.git?rev=97ebd2505d2ea9121efb6ec82f2c9e1adf741e12#97ebd2505d2ea9121efb6ec82f2c9e1adf741e12"
 dependencies = [
  "rustc-hash",
  "smtrs-core",
@@ -1995,7 +1995,7 @@ dependencies = [
 [[package]]
 name = "smtrs-sat"
 version = "0.1.0"
-source = "git+https://github.com/twizmwazin/smtrs.git?rev=89cb7b9f9898f4ac90e9429a35a5602b27c0404f#89cb7b9f9898f4ac90e9429a35a5602b27c0404f"
+source = "git+https://github.com/twizmwazin/smtrs.git?rev=97ebd2505d2ea9121efb6ec82f2c9e1adf741e12#97ebd2505d2ea9121efb6ec82f2c9e1adf741e12"
 dependencies = [
  "smtrs-cdcl",
 ]
@@ -2003,7 +2003,7 @@ dependencies = [
 [[package]]
 name = "smtrs-solver"
 version = "0.1.0"
-source = "git+https://github.com/twizmwazin/smtrs.git?rev=89cb7b9f9898f4ac90e9429a35a5602b27c0404f#89cb7b9f9898f4ac90e9429a35a5602b27c0404f"
+source = "git+https://github.com/twizmwazin/smtrs.git?rev=97ebd2505d2ea9121efb6ec82f2c9e1adf741e12#97ebd2505d2ea9121efb6ec82f2c9e1adf741e12"
 dependencies = [
  "rustc-hash",
  "smtrs-aig",
@@ -2018,7 +2018,7 @@ dependencies = [
 [[package]]
 name = "smtrs-str"
 version = "0.1.0"
-source = "git+https://github.com/twizmwazin/smtrs.git?rev=89cb7b9f9898f4ac90e9429a35a5602b27c0404f#89cb7b9f9898f4ac90e9429a35a5602b27c0404f"
+source = "git+https://github.com/twizmwazin/smtrs.git?rev=97ebd2505d2ea9121efb6ec82f2c9e1adf741e12#97ebd2505d2ea9121efb6ec82f2c9e1adf741e12"
 dependencies = [
  "rustc-hash",
  "smtrs-core",

@@ -14,10 +14,10 @@ clarirs-core = { path = "../clarirs-core" }
 # Pure-Rust SMT solver built for angr's query shape. `smtrs-solver` is built
 # without its `batsat` differential-testing backend, which is the one part of
 # the stack that is not `Send`.
-smtrs-core = { git = "https://github.com/twizmwazin/smtrs.git", rev = "89cb7b9f9898f4ac90e9429a35a5602b27c0404f" }
-smtrs-solver = { git = "https://github.com/twizmwazin/smtrs.git", rev = "89cb7b9f9898f4ac90e9429a35a5602b27c0404f", default-features = false }
-smtrs-fp = { git = "https://github.com/twizmwazin/smtrs.git", rev = "89cb7b9f9898f4ac90e9429a35a5602b27c0404f" }
-smtrs-str = { git = "https://github.com/twizmwazin/smtrs.git", rev = "89cb7b9f9898f4ac90e9429a35a5602b27c0404f" }
+smtrs-core = { git = "https://github.com/twizmwazin/smtrs.git", rev = "97ebd2505d2ea9121efb6ec82f2c9e1adf741e12" }
+smtrs-solver = { git = "https://github.com/twizmwazin/smtrs.git", rev = "97ebd2505d2ea9121efb6ec82f2c9e1adf741e12", default-features = false }
+smtrs-fp = { git = "https://github.com/twizmwazin/smtrs.git", rev = "97ebd2505d2ea9121efb6ec82f2c9e1adf741e12" }
+smtrs-str = { git = "https://github.com/twizmwazin/smtrs.git", rev = "97ebd2505d2ea9121efb6ec82f2c9e1adf741e12" }
 rustc-hash = "2"
 smallvec = "1.15"
 num-bigint = "0.4"
