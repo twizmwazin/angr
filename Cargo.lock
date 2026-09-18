@@ -67,8 +67,8 @@ version = "0.1.0"
 dependencies = [
  "clarirs-core",
  "clarirs-num",
+ "clarirs-smtrs",
  "clarirs-vsa",
- "clarirs-z3",
  "dashmap",
  "fixedbitset 0.5.7",
  "icicle-fuzzing",
@@ -280,6 +280,20 @@ dependencies = [
  "serde_json",
  "smallvec",
  "thiserror",
+]
+
+[[package]]
+name = "clarirs-smtrs"
+version = "0.1.0"
+dependencies = [
+ "clarirs-core",
+ "num-bigint",
+ "rustc-hash",
+ "smallvec",
+ "smtrs-core",
+ "smtrs-fp",
+ "smtrs-solver",
+ "smtrs-str",
 ]
 
 [[package]]
@@ -1937,6 +1951,81 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b3dc8af474f516a851ff4bd12db780f948b9250ad37211e4eec0bccea54e01b"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "smtrs-aig"
+version = "0.1.0"
+dependencies = [
+ "rustc-hash",
+ "smtrs-core",
+ "smtrs-sat",
+]
+
+[[package]]
+name = "smtrs-bitblast"
+version = "0.1.0"
+dependencies = [
+ "rustc-hash",
+ "smtrs-aig",
+ "smtrs-core",
+ "smtrs-sat",
+]
+
+[[package]]
+name = "smtrs-cdcl"
+version = "0.1.0"
+
+[[package]]
+name = "smtrs-core"
+version = "0.1.0"
+dependencies = [
+ "rustc-hash",
+]
+
+[[package]]
+name = "smtrs-fp"
+version = "0.1.0"
+dependencies = [
+ "rustc-hash",
+ "smtrs-core",
+]
+
+[[package]]
+name = "smtrs-rewrite"
+version = "0.1.0"
+dependencies = [
+ "rustc-hash",
+ "smtrs-core",
+]
+
+[[package]]
+name = "smtrs-sat"
+version = "0.1.0"
+dependencies = [
+ "smtrs-cdcl",
+]
+
+[[package]]
+name = "smtrs-solver"
+version = "0.1.0"
+dependencies = [
+ "rustc-hash",
+ "smtrs-aig",
+ "smtrs-bitblast",
+ "smtrs-core",
+ "smtrs-fp",
+ "smtrs-rewrite",
+ "smtrs-sat",
+ "smtrs-str",
+]
+
+[[package]]
+name = "smtrs-str"
+version = "0.1.0"
+dependencies = [
+ "rustc-hash",
+ "smtrs-core",
 ]
 
 [[package]]

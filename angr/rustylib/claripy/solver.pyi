@@ -105,8 +105,13 @@ class Solver:
 class SolverConcrete(Solver):
     def __init__(self) -> None: ...
 
-class SolverZ3(Solver):
+class SolverSmtrs(Solver):
+    """The exact backend on its own: a persistent smtrs engine with no caching mixin."""
+
     def __init__(self) -> None: ...
+
+# The exact backend was z3 before smtrs; the old name still works.
+SolverZ3 = SolverSmtrs
 
 class SolverCacheless(Solver):
     def __init__(self, timeout: int | None = None, track: bool = False) -> None: ...
@@ -130,6 +135,7 @@ __all__ = [
     "SolverConcrete",
     "SolverHybrid",
     "SolverReplacement",
+    "SolverSmtrs",
     "SolverVSA",
     "SolverZ3",
 ]

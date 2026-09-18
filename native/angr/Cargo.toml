@@ -17,7 +17,7 @@ crate-type = ["cdylib"]
 clarirs-core = { path = "../clarirs-core", features = ["runtime-checks"] }
 clarirs-num = { path = "../clarirs-num" }
 clarirs-vsa = { path = "../clarirs-vsa" }
-clarirs-z3 = { path = "../clarirs-z3" }
+clarirs-smtrs = { path = "../clarirs-smtrs" }
 dashmap = "6.2.1"
 log = "0.4.32"
 thiserror = { workspace = true }

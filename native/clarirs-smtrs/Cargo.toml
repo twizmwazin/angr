@@ -1,0 +1,26 @@
+[package]
+name = "clarirs-smtrs"
+version = "0.1.0"
+edition = "2024"
+description = "smtrs solver backend for clarirs"
+license = { workspace = true }
+readme = { workspace = true }
+keywords = { workspace = true }
+categories = { workspace = true }
+repository = { workspace = true }
+
+[dependencies]
+clarirs-core = { path = "../clarirs-core" }
+# Pure-Rust SMT solver built for angr's query shape. `smtrs-solver` is built
+# without its `batsat` differential-testing backend, which is the one part of
+# the stack that is not `Send`.
+smtrs-core = { path = "../../../smtrs/crates/smtrs-core" }
+smtrs-solver = { path = "../../../smtrs/crates/smtrs-solver", default-features = false }
+smtrs-fp = { path = "../../../smtrs/crates/smtrs-fp" }
+smtrs-str = { path = "../../../smtrs/crates/smtrs-str" }
+rustc-hash = "2"
+smallvec = "1.15"
+num-bigint = "0.4"
+
+[lints]
+workspace = true

@@ -23,14 +23,13 @@ angr_modules = [
     "pypcode",
     "pyvex",
     "unicorn",
-    "z3",
 ]
 native_modules = {
     "angr": lambda: angr.state_plugins.unicorn_engine._UC_NATIVE,  # pylint: disable=undefined-variable
     "pyvex": lambda: pyvex.pvc,  # pylint: disable=undefined-variable
     "unicorn": lambda: unicorn.unicorn._uc,  # pylint: disable=undefined-variable
 }
-python_packages = {"z3": "z3-solver"}
+python_packages: dict[str, str] = {}
 
 
 def get_venv():

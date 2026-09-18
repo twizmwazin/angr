@@ -4,8 +4,19 @@ members = [
     "native/angr",
     "native/clarirs-core",
     "native/clarirs-num",
+    "native/clarirs-smtrs",
     "native/clarirs-vsa",
     "native/clarirs-z3",
+]
+# The extension solves with `clarirs-smtrs`. `clarirs-z3` stays buildable as
+# a differential oracle (`cargo test -p clarirs-z3`) but needs libz3, so it is
+# left out of the default build and test set.
+default-members = [
+    "native/angr",
+    "native/clarirs-core",
+    "native/clarirs-num",
+    "native/clarirs-smtrs",
+    "native/clarirs-vsa",
 ]
 
 [workspace.dependencies]
