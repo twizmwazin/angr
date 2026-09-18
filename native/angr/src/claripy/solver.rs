@@ -6,8 +6,8 @@ use clarirs_core::solver::HybridSolver;
 use clarirs_core::solver_mixins::{
     ConcreteEarlyResolutionMixin, ModelCacheMixin, SimplificationMixin,
 };
+use clarirs_smtrs::SmtrsSolver;
 use clarirs_vsa::VSASolver;
-use clarirs_z3::Z3Solver;
 use num_bigint::BigInt;
 use pyo3::types::PyTuple;
 
@@ -28,13 +28,14 @@ fn wrap_solver<'c, S: Solver<'c>>(
     SimplificationMixin::new(ConcreteEarlyResolutionMixin::new(solver))
 }
 
-// Wrap a Z3 solver in the caching stack used by the default `Solver` (and the
+// Wrap an smtrs solver in the caching stack used by the default `Solver` (and the
 // composite/replacement/hybrid frontends, mirroring claripy): a
 // `ModelCacheMixin` just above the backend caches satisfiability and models.
 // `SolverCacheless` uses `wrap_solver` directly to omit this layer.
-fn wrap_z3_cached<'c>(
-    solver: Z3Solver<'c>,
-) -> SimplificationMixin<'c, ConcreteEarlyResolutionMixin<'c, ModelCacheMixin<'c, Z3Solver<'c>>>> {
+fn wrap_smtrs_cached<'c>(
+    solver: SmtrsSolver<'c>,
+) -> SimplificationMixin<'c, ConcreteEarlyResolutionMixin<'c, ModelCacheMixin<'c, SmtrsSolver<'c>>>>
+{
     wrap_solver(ModelCacheMixin::new(solver))
 }
 
@@ -49,7 +50,7 @@ impl PySolver {
     /// `&mut self.inner` directly, avoiding a clone.
     ///
     /// When `exact` is `Some(true)` and this is a Hybrid solver, the closure
-    /// receives only the exact (Z3) backend. When `Some(false)`, only the
+    /// receives only the exact (smtrs) backend. When `Some(false)`, only the
     /// approximate (VSA) backend. Otherwise the full hybrid dispatch is used.
     fn with_extra_constraints<T>(
         &mut self,
@@ -68,7 +69,7 @@ impl PySolver {
         if has_extra || needs_sub_solver {
             let mut solver = match (exact, &self.inner) {
                 (Some(true), DynSolver::Hybrid(h)) => {
-                    DynSolver::Z3(h.inner().inner().exact().clone())
+                    DynSolver::Smtrs(h.inner().inner().exact().clone())
                 }
                 (Some(false), DynSolver::Hybrid(h)) => {
                     DynSolver::Vsa(h.inner().inner().approximate().clone())
@@ -91,7 +92,7 @@ impl PySolver {
     #[pyo3(signature = (timeout = None, track = false))]
     fn new(timeout: Option<u32>, track: bool) -> Result<PyClassInitializer<Self>, ClaripyError> {
         Ok(PyClassInitializer::from(PySolver {
-            inner: DynSolver::Z3(wrap_z3_cached(Z3Solver::new_with_options(
+            inner: DynSolver::Smtrs(wrap_smtrs_cached(SmtrsSolver::new_with_options(
                 &GLOBAL_CONTEXT,
                 timeout,
                 track,
@@ -107,20 +108,18 @@ impl PySolver {
                 DynSolver::Concrete(..) => {
                     DynSolver::Concrete(ConcreteSolver::new(&GLOBAL_CONTEXT))
                 }
-                DynSolver::Z3(..) => DynSolver::Z3(wrap_z3_cached(Z3Solver::new_with_options(
-                    &GLOBAL_CONTEXT,
-                    self.timeout,
-                    self.unsat_core,
-                ))),
-                DynSolver::Z3Cacheless(..) => DynSolver::Z3Cacheless(wrap_solver(
-                    Z3Solver::new_with_options(&GLOBAL_CONTEXT, self.timeout, self.unsat_core),
+                DynSolver::Smtrs(..) => DynSolver::Smtrs(wrap_smtrs_cached(
+                    SmtrsSolver::new_with_options(&GLOBAL_CONTEXT, self.timeout, self.unsat_core),
+                )),
+                DynSolver::SmtrsCacheless(..) => DynSolver::SmtrsCacheless(wrap_solver(
+                    SmtrsSolver::new_with_options(&GLOBAL_CONTEXT, self.timeout, self.unsat_core),
                 )),
                 DynSolver::Vsa(..) => DynSolver::Vsa(wrap_solver(VSASolver::new(&GLOBAL_CONTEXT))),
                 DynSolver::Hybrid(..) => {
                     DynSolver::Hybrid(wrap_solver(HybridSolver::new_with_options(
                         &GLOBAL_CONTEXT,
                         wrap_solver(VSASolver::new(&GLOBAL_CONTEXT)),
-                        wrap_z3_cached(Z3Solver::new_with_options(
+                        wrap_smtrs_cached(SmtrsSolver::new_with_options(
                             &GLOBAL_CONTEXT,
                             self.timeout,
                             self.unsat_core,
@@ -130,7 +129,7 @@ impl PySolver {
                 }
                 DynSolver::Replacement(..) => {
                     DynSolver::Replacement(ReplacementSolver::new_with_options(
-                        wrap_z3_cached(Z3Solver::new_with_options(
+                        wrap_smtrs_cached(SmtrsSolver::new_with_options(
                             &GLOBAL_CONTEXT,
                             self.timeout,
                             self.unsat_core,
@@ -140,7 +139,7 @@ impl PySolver {
                 }
                 DynSolver::Composite(..) => DynSolver::Composite(CompositeSolver::new(
                     &GLOBAL_CONTEXT,
-                    wrap_z3_cached(Z3Solver::new_with_options(
+                    wrap_smtrs_cached(SmtrsSolver::new_with_options(
                         &GLOBAL_CONTEXT,
                         self.timeout,
                         self.unsat_core,
@@ -226,18 +225,18 @@ impl PySolver {
                     unsat_core: self.unsat_core,
                 },
             )?),
-            DynSolver::Z3(z3_solver) => Ok(Bound::new(
+            DynSolver::Smtrs(smtrs_solver) => Ok(Bound::new(
                 py,
                 PySolver {
-                    inner: DynSolver::Z3(z3_solver.clone()),
+                    inner: DynSolver::Smtrs(smtrs_solver.clone()),
                     timeout: self.timeout,
                     unsat_core: self.unsat_core,
                 },
             )?),
-            DynSolver::Z3Cacheless(z3_solver) => Ok(Bound::new(
+            DynSolver::SmtrsCacheless(smtrs_solver) => Ok(Bound::new(
                 py,
                 PySolver {
-                    inner: DynSolver::Z3Cacheless(z3_solver.clone()),
+                    inner: DynSolver::SmtrsCacheless(smtrs_solver.clone()),
                     timeout: self.timeout,
                     unsat_core: self.unsat_core,
                 },
@@ -332,8 +331,8 @@ impl PySolver {
         Ok((
             matches!(
                 self.inner,
-                DynSolver::Z3(..)
-                    | DynSolver::Z3Cacheless(..)
+                DynSolver::Smtrs(..)
+                    | DynSolver::SmtrsCacheless(..)
                     | DynSolver::Hybrid(..)
                     | DynSolver::Replacement(..)
                     | DynSolver::Composite(..)
@@ -896,8 +895,8 @@ impl PySolver {
         // Get the solver type
         let solver_type = match &self.inner {
             DynSolver::Concrete(..) => "Concrete",
-            DynSolver::Z3(..) => "Z3",
-            DynSolver::Z3Cacheless(..) => "Z3Cacheless",
+            DynSolver::Smtrs(..) => "Smtrs",
+            DynSolver::SmtrsCacheless(..) => "SmtrsCacheless",
             DynSolver::Vsa(..) => "Vsa",
             DynSolver::Hybrid(..) => "Hybrid",
             DynSolver::Replacement(..) => "Replacement",
@@ -942,28 +941,28 @@ impl PySolver {
         // Create a new solver based on the type
         self.inner = match solver_type.as_str() {
             "Concrete" => DynSolver::Concrete(ConcreteSolver::new(&GLOBAL_CONTEXT)),
-            "Z3" => DynSolver::Z3(wrap_z3_cached(Z3Solver::new_with_timeout(
+            // "Z3"/"Z3Cacheless" are what pickles from the z3-backed angr say.
+            "Smtrs" | "Z3" => DynSolver::Smtrs(wrap_smtrs_cached(SmtrsSolver::new_with_timeout(
                 &GLOBAL_CONTEXT,
                 self.timeout,
             ))),
-            "Z3Cacheless" => DynSolver::Z3Cacheless(wrap_solver(Z3Solver::new_with_timeout(
-                &GLOBAL_CONTEXT,
-                self.timeout,
-            ))),
+            "SmtrsCacheless" | "Z3Cacheless" => DynSolver::SmtrsCacheless(wrap_solver(
+                SmtrsSolver::new_with_timeout(&GLOBAL_CONTEXT, self.timeout),
+            )),
             "Vsa" => DynSolver::Vsa(wrap_solver(VSASolver::new(&GLOBAL_CONTEXT))),
             "Hybrid" => DynSolver::Hybrid(wrap_solver(HybridSolver::new_with_options(
                 &GLOBAL_CONTEXT,
                 wrap_solver(VSASolver::new(&GLOBAL_CONTEXT)),
-                wrap_z3_cached(Z3Solver::new_with_timeout(&GLOBAL_CONTEXT, self.timeout)),
+                wrap_smtrs_cached(SmtrsSolver::new_with_timeout(&GLOBAL_CONTEXT, self.timeout)),
                 approximate_first,
             ))),
             "Replacement" => DynSolver::Replacement(ReplacementSolver::new_with_options(
-                wrap_z3_cached(Z3Solver::new_with_timeout(&GLOBAL_CONTEXT, self.timeout)),
+                wrap_smtrs_cached(SmtrsSolver::new_with_timeout(&GLOBAL_CONTEXT, self.timeout)),
                 auto_replace,
             )),
             "Composite" => DynSolver::Composite(CompositeSolver::new(
                 &GLOBAL_CONTEXT,
-                wrap_z3_cached(Z3Solver::new_with_timeout(&GLOBAL_CONTEXT, self.timeout)),
+                wrap_smtrs_cached(SmtrsSolver::new_with_timeout(&GLOBAL_CONTEXT, self.timeout)),
             )),
             _ => {
                 return Err(ClaripyError::TypeError(format!(
@@ -997,15 +996,15 @@ impl PyConcreteSolver {
     }
 }
 
-#[pyclass(extends = PySolver, name = "SolverZ3", module = "angr.rustylib.claripy.solver")]
-pub struct PyZ3Solver;
+#[pyclass(extends = PySolver, name = "SolverSmtrs", module = "angr.rustylib.claripy.solver")]
+pub struct PySmtrsSolver;
 
 #[pymethods]
-impl PyZ3Solver {
+impl PySmtrsSolver {
     #[new]
     fn new() -> Result<PyClassInitializer<Self>, ClaripyError> {
         Ok(PyClassInitializer::from(PySolver {
-            inner: DynSolver::Z3(wrap_z3_cached(Z3Solver::new_with_options(
+            inner: DynSolver::Smtrs(wrap_smtrs_cached(SmtrsSolver::new_with_options(
                 &GLOBAL_CONTEXT,
                 None,
                 false,
@@ -1026,7 +1025,7 @@ impl PyCachelessSolver {
     #[pyo3(signature = (timeout = None, track = false))]
     fn new(timeout: Option<u32>, track: bool) -> Result<PyClassInitializer<Self>, ClaripyError> {
         Ok(PyClassInitializer::from(PySolver {
-            inner: DynSolver::Z3Cacheless(wrap_solver(Z3Solver::new_with_options(
+            inner: DynSolver::SmtrsCacheless(wrap_solver(SmtrsSolver::new_with_options(
                 &GLOBAL_CONTEXT,
                 timeout,
                 track,
@@ -1070,7 +1069,11 @@ impl PyHybridSolver {
             inner: DynSolver::Hybrid(wrap_solver(HybridSolver::new_with_options(
                 &GLOBAL_CONTEXT,
                 wrap_solver(VSASolver::new(&GLOBAL_CONTEXT)),
-                wrap_z3_cached(Z3Solver::new_with_options(&GLOBAL_CONTEXT, timeout, track)),
+                wrap_smtrs_cached(SmtrsSolver::new_with_options(
+                    &GLOBAL_CONTEXT,
+                    timeout,
+                    track,
+                )),
                 approximate_first,
             ))),
             timeout,
@@ -1090,7 +1093,7 @@ impl PyReplacementSolver {
     fn new(auto_replace: bool) -> Result<PyClassInitializer<Self>, ClaripyError> {
         Ok(PyClassInitializer::from(PySolver {
             inner: DynSolver::Replacement(ReplacementSolver::new_with_options(
-                wrap_z3_cached(Z3Solver::new_with_options(&GLOBAL_CONTEXT, None, false)),
+                wrap_smtrs_cached(SmtrsSolver::new_with_options(&GLOBAL_CONTEXT, None, false)),
                 auto_replace,
             )),
             timeout: None,
@@ -1111,7 +1114,11 @@ impl PyCompositeSolver {
         Ok(PyClassInitializer::from(PySolver {
             inner: DynSolver::Composite(CompositeSolver::new(
                 &GLOBAL_CONTEXT,
-                wrap_z3_cached(Z3Solver::new_with_options(&GLOBAL_CONTEXT, timeout, track)),
+                wrap_smtrs_cached(SmtrsSolver::new_with_options(
+                    &GLOBAL_CONTEXT,
+                    timeout,
+                    track,
+                )),
             )),
             timeout,
             unsat_core: track,
@@ -1123,7 +1130,7 @@ impl PyCompositeSolver {
 pub(crate) fn import(_: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<PySolver>()?;
     m.add_class::<PyConcreteSolver>()?;
-    m.add_class::<PyZ3Solver>()?;
+    m.add_class::<PySmtrsSolver>()?;
     m.add_class::<PyCachelessSolver>()?;
     m.add_class::<PyVSASolver>()?;
     m.add_class::<PyHybridSolver>()?;

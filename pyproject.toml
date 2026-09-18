@@ -9,7 +9,6 @@ requires = [
     "pyvex==10.0.1.dev0",
     "grpcio-tools~=1.80.0",
     "protobuf>=6.31.1,<7",
-    "z3-solver==5.1.0.0",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -50,7 +49,6 @@ dependencies = [
     "sortedcontainers",
     "sympy",
     "typing-extensions",
-    "z3-solver==5.1.0.0",
     "colorama;platform_system=='Windows'",
 ]
 dynamic = ["version"]
@@ -93,6 +91,9 @@ dev = [
     "pytest-xdist>=3.6.1",
     "ruff>=0.11.7",
     "sortedcontainers-stubs>=2.4.3",
+    # Not a runtime dependency: the solver is smtrs, in the extension. The test
+    # suite uses z3's SMT-LIB parser as an independent check of Solver.to_smt2().
+    "z3-solver>=4.13",
 ]
 docs = ["furo", "myst-parser", "sphinx", "sphinx-autodoc-typehints"]
 extras = ["angr[angrdb,keystone,unicorn,llm]", "pysoot"]

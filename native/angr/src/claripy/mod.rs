@@ -303,7 +303,9 @@ pub fn claripy(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<solver::PySolver>()?;
     m.add_class::<solver::PyConcreteSolver>()?;
     m.add_class::<solver::PyVSASolver>()?;
-    m.add_class::<solver::PyZ3Solver>()?;
+    m.add_class::<solver::PySmtrsSolver>()?;
+    // The exact backend used to be z3; keep the old name working.
+    m.add("SolverZ3", py.get_type::<solver::PySmtrsSolver>())?;
     m.add_class::<solver::PyCachelessSolver>()?;
     m.add_class::<solver::PyHybridSolver>()?;
     m.add_class::<solver::PyReplacementSolver>()?;

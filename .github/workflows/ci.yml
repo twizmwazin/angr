@@ -65,11 +65,7 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v5
         with:
           python-version: "3.12"
-      # Windows is the one platform where gh-release links against an import library rather than
-      # statically, so the libz3.dll it downloaded has to be findable when the tests run
-      - name: Put the downloaded libz3.dll on PATH
-        if: startsWith(runner.os, 'windows')
-        run: |
-          cargo test --release --features z3-sys/gh-release --no-run
-          (Get-ChildItem target/release/build -Recurse -Filter libz3.dll | Select-Object -First 1).DirectoryName >> $env:GITHUB_PATH
-      - run: cargo test --release --features z3-sys/gh-release
+      # The default members: the extension and its solver stack, which is pure Rust. The
+      # retired z3 backend (`native/clarirs-z3`) is excluded from the default set because it
+      # needs libz3; run `cargo test -p clarirs-z3 --features z3-sys/gh-release` to exercise it.
+      - run: cargo test --release
