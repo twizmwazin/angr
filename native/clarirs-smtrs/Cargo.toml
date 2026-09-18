@@ -14,10 +14,10 @@ clarirs-core = { path = "../clarirs-core" }
 # Pure-Rust SMT solver built for angr's query shape. `smtrs-solver` is built
 # without its `batsat` differential-testing backend, which is the one part of
 # the stack that is not `Send`.
-smtrs-core = { path = "../../../smtrs/crates/smtrs-core" }
-smtrs-solver = { path = "../../../smtrs/crates/smtrs-solver", default-features = false }
-smtrs-fp = { path = "../../../smtrs/crates/smtrs-fp" }
-smtrs-str = { path = "../../../smtrs/crates/smtrs-str" }
+smtrs-core = { git = "https://github.com/twizmwazin/smtrs.git", rev = "89cb7b9f9898f4ac90e9429a35a5602b27c0404f" }
+smtrs-solver = { git = "https://github.com/twizmwazin/smtrs.git", rev = "89cb7b9f9898f4ac90e9429a35a5602b27c0404f", default-features = false }
+smtrs-fp = { git = "https://github.com/twizmwazin/smtrs.git", rev = "89cb7b9f9898f4ac90e9429a35a5602b27c0404f" }
+smtrs-str = { git = "https://github.com/twizmwazin/smtrs.git", rev = "89cb7b9f9898f4ac90e9429a35a5602b27c0404f" }
 rustc-hash = "2"
 smallvec = "1.15"
 num-bigint = "0.4"
