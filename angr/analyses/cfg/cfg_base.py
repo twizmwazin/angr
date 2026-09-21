@@ -290,6 +290,11 @@ class CFGBase(Analysis):
                 l.warning("You specified both base_state and skip_specific_regions. They may conflict with each other.")
             regions = [r for r in regions if not self._should_skip_region(r[0])]
 
+        # _inside_regions() finds the region with the greatest start at or below an address and checks that one's end,
+        # which is only correct when the regions are disjoint: with overlapping regions (say a whole-section window
+        # plus a small PLT range inside it) an address inside the big region can be judged by the small one and
+        # treated as unscanned. Merge overlapping and adjacent regions first.
+        regions = self._merge_regions(regions)
         self._regions_size = sum((end - start) for start, end in regions) if regions else 0
         self._regions: SortedDict = SortedDict(regions)
 
@@ -650,6 +655,20 @@ class CFGBase(Analysis):
         self._new_memory_data_addrs = set()
 
     # Methods for determining scanning scope
+
+    @staticmethod
+    def _merge_regions(regions) -> list[tuple[int, int]]:
+        """
+        Sort the given ``(start, end)`` regions and merge the ones that overlap or touch, so the result is a list of
+        disjoint regions in ascending order.
+        """
+        merged: list[tuple[int, int]] = []
+        for start, end in sorted(regions):
+            if merged and start <= merged[-1][1]:
+                merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+            else:
+                merged.append((start, end))
+        return merged
 
     def _inside_regions(self, address: int | None) -> bool:
         """
