@@ -52,9 +52,9 @@ These are sets of options, found as ``angr.options.xxx``.
        ``history.actions``. This option consumes a lot of memory, so be careful!
    * - ``approximation``
      - Options that enable approximations of constraint solves via value-set
-       analysis instead of calling into z3
+       analysis instead of calling into the SMT solver
    * - ``simplification``
-     - Options that cause data to be run through z3's simplifiers before it
+     - Options that cause data to be run through the simplifier before it
        reaches memory or register storage
    * - ``unicorn``
      - Options that enable the unicorn engine for executing on concrete data
@@ -400,12 +400,12 @@ These are individual option objects, found as ``angr.options.XXX``.
      - ``static``
      -
    * - ``SIMPLIFY_CONSTRAINTS``
-     - Run added constraints through z3's simplifcation
+     - Run added constraints through simplification
      -
      -
      -
    * - ``SIMPLIFY_EXIT_GUARD``
-     - Run branch guards through z3's simplification
+     - Run branch guards through simplification
      -
      -
      -
@@ -415,17 +415,17 @@ These are individual option objects, found as ``angr.options.XXX``.
      -
      -
    * - ``SIMPLIFY_EXIT_TARGET``
-     - Run jump/call/branch targets through z3's simplification
+     - Run jump/call/branch targets through simplification
      -
      -
      -
    * - ``SIMPLIFY_EXPRS``
-     - Run the results of IR expressions through z3's simplification
+     - Run the results of IR expressions through simplification
      -
      -
      -
    * - ``SIMPLIFY_MEMORY_READS``
-     - Run the results of memory reads through z3's simplification
+     - Run the results of memory reads through simplification
      -
      -
      -

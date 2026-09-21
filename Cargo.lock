@@ -1943,6 +1943,7 @@ dependencies = [
 [[package]]
 name = "smtrs-aig"
 version = "0.1.0"
+source = "git+https://github.com/twizmwazin/smtrs.git?rev=a565e2acb6805d81e5f5ba0be527e3ee802035e0#a565e2acb6805d81e5f5ba0be527e3ee802035e0"
 dependencies = [
  "rustc-hash",
  "smtrs-core",
@@ -1952,6 +1953,7 @@ dependencies = [
 [[package]]
 name = "smtrs-bitblast"
 version = "0.1.0"
+source = "git+https://github.com/twizmwazin/smtrs.git?rev=a565e2acb6805d81e5f5ba0be527e3ee802035e0#a565e2acb6805d81e5f5ba0be527e3ee802035e0"
 dependencies = [
  "rustc-hash",
  "smtrs-aig",
@@ -1962,10 +1964,12 @@ dependencies = [
 [[package]]
 name = "smtrs-cdcl"
 version = "0.1.0"
+source = "git+https://github.com/twizmwazin/smtrs.git?rev=a565e2acb6805d81e5f5ba0be527e3ee802035e0#a565e2acb6805d81e5f5ba0be527e3ee802035e0"
 
 [[package]]
 name = "smtrs-core"
 version = "0.1.0"
+source = "git+https://github.com/twizmwazin/smtrs.git?rev=a565e2acb6805d81e5f5ba0be527e3ee802035e0#a565e2acb6805d81e5f5ba0be527e3ee802035e0"
 dependencies = [
  "rustc-hash",
 ]
@@ -1973,6 +1977,7 @@ dependencies = [
 [[package]]
 name = "smtrs-fp"
 version = "0.1.0"
+source = "git+https://github.com/twizmwazin/smtrs.git?rev=a565e2acb6805d81e5f5ba0be527e3ee802035e0#a565e2acb6805d81e5f5ba0be527e3ee802035e0"
 dependencies = [
  "rustc-hash",
  "smtrs-core",
@@ -1981,6 +1986,7 @@ dependencies = [
 [[package]]
 name = "smtrs-rewrite"
 version = "0.1.0"
+source = "git+https://github.com/twizmwazin/smtrs.git?rev=a565e2acb6805d81e5f5ba0be527e3ee802035e0#a565e2acb6805d81e5f5ba0be527e3ee802035e0"
 dependencies = [
  "rustc-hash",
  "smtrs-core",
@@ -1989,6 +1995,7 @@ dependencies = [
 [[package]]
 name = "smtrs-sat"
 version = "0.1.0"
+source = "git+https://github.com/twizmwazin/smtrs.git?rev=a565e2acb6805d81e5f5ba0be527e3ee802035e0#a565e2acb6805d81e5f5ba0be527e3ee802035e0"
 dependencies = [
  "smtrs-cdcl",
 ]
@@ -1996,6 +2003,7 @@ dependencies = [
 [[package]]
 name = "smtrs-solver"
 version = "0.1.0"
+source = "git+https://github.com/twizmwazin/smtrs.git?rev=a565e2acb6805d81e5f5ba0be527e3ee802035e0#a565e2acb6805d81e5f5ba0be527e3ee802035e0"
 dependencies = [
  "rustc-hash",
  "smtrs-aig",
@@ -2010,6 +2018,7 @@ dependencies = [
 [[package]]
 name = "smtrs-str"
 version = "0.1.0"
+source = "git+https://github.com/twizmwazin/smtrs.git?rev=a565e2acb6805d81e5f5ba0be527e3ee802035e0#a565e2acb6805d81e5f5ba0be527e3ee802035e0"
 dependencies = [
  "rustc-hash",
  "smtrs-core",

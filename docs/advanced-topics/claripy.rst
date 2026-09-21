@@ -213,7 +213,9 @@ There are several different solvers.
    * - Solver
      - This is analogous to a ``z3.Solver()``. It is a solver that tracks
        constraints on symbolic variables and uses a constraint solver
-       (currently, Z3) to evaluate symbolic expressions.
+       (`smtrs <https://github.com/twizmwazin/smtrs>`_, a pure-Rust SMT
+       solver built into angr's native extension) to evaluate symbolic
+       expressions.
    * - SolverVSA
      - This solver uses VSA to reason about values. It is an *approximating*
        solver, but produces values without performing actual constraint solves.
