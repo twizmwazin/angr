@@ -101,7 +101,7 @@ from angr.analyses.decompiler.known_patterns.stl_accessors2 import STD_STRING_FR
 from angr.analyses.decompiler.optimization_passes import KnownPatternOutliner
 from angr.knowledge_plugins.functions.function import PrototypeSource
 from angr.sim_type import SimStruct, SimTypeArray, SimTypePointer
-from tests.common import bin_location
+from tests.common import bin_location, load_project_with_scoped_cfg
 
 STL_BIN = os.path.join(bin_location, "tests", "x86_64", "decompiler", "known_patterns_stl")
 # the glibc <ctype.h> table macros
@@ -169,10 +169,21 @@ def _decompile(
     preset: str = "fast",
     apply_patterns: bool = True,
     include_patterns: list[str] | None = None,
+    func_addr: int | None = None,
+    generate_code: bool = True,
 ):
-    proj = angr.Project(bin_path, auto_load_libs=False)
-    cfg = proj.analyses.CFGFast(normalize=True)
-    proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+    if func_addr is None:
+        proj = angr.Project(bin_path, auto_load_libs=False)
+        cfg = proj.analyses.CFGFast(normalize=True)
+        proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+    else:
+        # a KnownPatternFinder match only depends on func_addr's own AIL graph, which a whole-binary CFG + CCC
+        # cannot change beyond what func_addr's call tree already provides -- and CFG + CCC dominate the cost on a
+        # large binary (this is what test_known_patterns.py's copy_internal tests rely on). include_plt is not
+        # needed: expand_call_tree's own closure already covers every PLT stub func_addr calls.
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path, func_addr, window=0x5000, project_kwargs={"auto_load_libs": False}
+        )
     func = cfg.functions.function(name=func_name)
     assert func is not None
 
@@ -186,8 +197,10 @@ def _decompile(
         preset=preset,
         disable_opts=None if apply_patterns else [KnownPatternOutliner],
         options=options,
+        generate_code=generate_code,
     )
-    assert dec.codegen is not None and dec.codegen.text is not None
+    if generate_code:
+        assert dec.codegen is not None and dec.codegen.text is not None
     return proj, cfg, func, dec
 
 
@@ -1194,10 +1207,25 @@ class TestRemoteChasedDefinitions(TestCase):
     # at all, so no block contains the whole idiom and every arm of the chain is
     # lost. Because the computation is pure, the outlined region can recompute it.
 
+    COPY_INTERNAL = 0x405950  # copy_internal, 0x41e8 bytes; PIE base 0x400000
+
+    @classmethod
+    def setUpClass(cls):
+        # Both tests below decompile the same function and build a KnownPatternFinder on its (unstructured) AIL
+        # graph; codegen/structuring is never inspected, so generate_code=False skips it, and building the two
+        # finders once here instead of once per test halves the remaining cost.
+        cls.proj, _, cls.func, cls.dec = _decompile(
+            MV_BIN, "copy_internal", apply_patterns=False, func_addr=cls.COPY_INTERNAL, generate_code=False
+        )
+        cls.graph = _graph(cls.dec)
+        cls.finder = cls.proj.analyses[KnownPatternFinder].prep(fail_fast=True)(cls.func, cls.graph)
+        cls.finder_without = cls.proj.analyses[KnownPatternFinder].prep(fail_fast=True)(
+            cls.func, cls.graph, chase_remote_defs=False
+        )
+
     def test_cse_mask_feeding_an_if_chain_is_matched(self):
-        proj, _, func, dec = _decompile(MV_BIN, "copy_internal", apply_patterns=False)
-        with_remote = proj.analyses[KnownPatternFinder].prep(fail_fast=True)(func, _graph(dec))
-        without = proj.analyses[KnownPatternFinder].prep(fail_fast=True)(func, _graph(dec), chase_remote_defs=False)
+        with_remote = self.finder
+        without = self.finder_without
         recomputed = [m for m in with_remote.matches if m.recomputed_defs]
         assert recomputed, "no match reached its operand through a definition in another block"
         assert len(with_remote.matches) > len(without.matches)
@@ -1212,10 +1240,9 @@ class TestRemoteChasedDefinitions(TestCase):
                 assert any(isinstance(o, Const) and o.value == 0o170000 for o in expr.operands)
 
     def test_recomputed_definition_is_outlined_into_the_callee(self):
-        proj, _, func, dec = _decompile(MV_BIN, "copy_internal", apply_patterns=False)
-        finder = proj.analyses[KnownPatternFinder].prep(fail_fast=True)(func, _graph(dec))
+        finder = self.finder
         m = next(m for m in finder.matches if m.recomputed_defs)
-        block = next(b for b in _graph(dec) if (b.addr, b.idx) == m.block_loc)
+        block = next(b for b in self.graph if (b.addr, b.idx) == m.block_loc)
         before = list(block.statements)
 
         result = finder.outline(m)

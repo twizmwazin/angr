@@ -125,12 +125,17 @@ class RustDecompilationTarget(unittest.TestCase):
             if self.CALL_TREE_DEPTH is not None:
                 recover_call_tree_cfg(proj, func_addrs, depth=self.CALL_TREE_DEPTH)
             elif self.CFG_FROM_FUNCS_UNDER_TEST:
+                # symbols=False/function_prologues=False makes this real recursive descent from func_addrs instead of
+                # a whole-binary scan: eh_frame stays on so function boundaries (incl. ICF-folded jmp-stub chains
+                # that call-tree discovery can't cross) are still recovered correctly.
                 proj.analyses.CFGFast(
                     normalize=True,
                     regions=executable_regions(proj),
                     start_at_entry=False,
                     function_starts=sorted(func_addrs),
                     force_smart_scan=False,
+                    symbols=False,
+                    function_prologues=False,
                 )
             else:
                 proj.analyses.CFGFast(normalize=True)
@@ -231,6 +236,11 @@ class TestFmtNightly20250522O3(_FmtTests):
     FUNC_ADDRS = {
         "uumain": {"nightly-2025-05-22-O3": 0x496920},
     }
+    # A call-tree CFG (recover_call_tree_cfg, as the O0 class below uses) does not work here: uumain tail-calls
+    # through several ICF-folded single-instruction jmp stubs (e.g. 0x4963b0: `jmp 0x497140`) before reaching real
+    # code, and call-tree discovery only follows Ijk_Call edges in the callgraph, never plain jmp targets, so no
+    # CALL_TREE_DEPTH reaches the real body. CFG_FROM_FUNCS_UNDER_TEST keeps eh_frame-derived function boundaries but
+    # turns off symbol/prologue seeding, which is what made it cost nearly as much as a whole-binary CFG.
     CFG_FROM_FUNCS_UNDER_TEST = True
     CCC_CALL_DEPTH = 4
 
@@ -256,6 +266,10 @@ class TestFmtNightly20230522O3(_FmtTests):
     FUNC_ADDRS = {
         "parse_arguments": {"nightly-2023-05-22-O3": 0x416160},
     }
+    # A call-tree CFG (recover_call_tree_cfg, as the O0 class above uses) does not work here for the same reason as
+    # the 2025-O3 class: parse_arguments tail-calls through ICF-folded jmp stubs that call-tree discovery cannot
+    # cross (it only follows Ijk_Call edges). CFG_FROM_FUNCS_UNDER_TEST keeps eh_frame boundaries but skips
+    # symbol/prologue seeding.
     CFG_FROM_FUNCS_UNDER_TEST = True
     CCC_CALL_DEPTH = 4
 

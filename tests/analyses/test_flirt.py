@@ -16,7 +16,15 @@ class TestFlirt(unittest.TestCase):
     def test_amd64_elf_static_libc_ubuntu_2004(self):
         binary_path = os.path.join(bin_location, "tests", "x86_64", "elf_with_static_libc_ubuntu_2004_stripped")
         proj = angr.Project(binary_path, auto_load_libs=False, load_debug_info=False)
-        cfg = proj.analyses.CFGFast(show_progressbar=False)  # , detect_tail_calls=True)
+        # FLIRT names 0x415cc0 from the fileops.o module whose base function is 0x4140a0 (0x415cc0 is at module
+        # offset 0x1c20), and 0x436980 is itself a module base; neither module references other functions, so only
+        # these three functions need to exist. A whole-binary CFG of this static glibc build takes over a minute.
+        cfg = proj.analyses.CFGFast(
+            show_progressbar=False,
+            regions=[(0x4140A0, 0x416000), (0x436980, 0x436B80)],
+            function_starts=[0x4140A0, 0x415CC0, 0x436980],
+            start_at_entry=False,
+        )
         flirt_path = os.path.join(bin_location, "tests", "x86_64", "libc_ubuntu_2004.sig")
         proj.analyses.Flirt(flirt_path)
 

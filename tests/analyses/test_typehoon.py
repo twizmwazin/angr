@@ -55,7 +55,7 @@ from angr.sim_type import (
     SimTypeNum,
     SimTypePointer,
 )
-from tests.common import bin_location, print_decompilation_result
+from tests.common import bin_location, load_project_with_scoped_cfg, print_decompilation_result
 
 test_location = os.path.join(bin_location, "tests")
 
@@ -292,11 +292,19 @@ class TestTypehoon(unittest.TestCase):
         assert "typedef struct" not in dec.codegen.text
 
     def test_solving_cascading_type_constraints(self):
-        p = angr.Project(os.path.join(test_location, "x86_64", "decompiler", "tiny_aes_test.elf"), auto_load_libs=False)
-        cfg = p.analyses.CFG(data_references=True, normalize=True)
+        # Cipher calls nothing (AddRoundKey/SubBytes/ShiftRows/MixColumns are inlined, rounds unrolled), so only its
+        # own prototype matters; a whole-binary CFG + CCC of the other 16 functions is unnecessary. window=0x2200
+        # because the default 0x2000 ends just short of the function (0x1e5e bytes).
+        p, cfg = load_project_with_scoped_cfg(
+            os.path.join(test_location, "x86_64", "decompiler", "tiny_aes_test.elf"),
+            0x401780,
+            window=0x2200,
+            include_plt=True,
+            project_kwargs={"auto_load_libs": False},
+            cfg_kwargs={"data_references": True},
+        )
 
         func = cfg.kb.functions["Cipher"]
-        p.analyses.CompleteCallingConventions()
         dec = p.analyses.Decompiler(func, cfg=cfg.model)
         assert dec.codegen is not None and dec.codegen.text is not None
         print(dec.codegen.text)
@@ -431,9 +439,15 @@ class TestTypehoon(unittest.TestCase):
 
     def test_global_variable_type(self):
         bin_path = os.path.join(test_location, "x86_64", "g_game.o")
-        proj = angr.Project(bin_path, auto_load_libs=False)
-        cfg = proj.analyses.CFG(data_references=True, normalize=True)
-        proj.analyses.CompleteCallingConventions()
+        # only these three functions and their in-object callees matter for global variable typing; a whole-.text
+        # CFG + CCC of all 32 functions is unnecessary.
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            0x40180A,
+            extra_func_addrs=(0x400BB2, 0x400959),
+            project_kwargs={"auto_load_libs": False},
+            cfg_kwargs={"data_references": True},
+        )
 
         # Test bodyqueslot from G_CheckSpot
         func = cfg.kb.functions["G_CheckSpot"]
@@ -462,9 +476,16 @@ class TestTypehoon(unittest.TestCase):
 
     def test_type_inference_with_custom_label(self):
         bin_path = os.path.join(test_location, "x86_64", "windows", "ipnathlp.dll")
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(fail_fast=True, normalize=True)
+        # the labelled types come from the prototypes of imported Win32 APIs, hooked on the extern object regardless
+        # of scan regions; only 0x18003ca70's own call tree matters. A whole-binary PE CFG of this 570 KB .text
+        # takes tens of seconds to decompile a 577-byte function.
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            0x18003CA70,
+            project_kwargs={"auto_load_libs": False},
+            cfg_kwargs={"fail_fast": True},
+            run_ccc=False,
+        )
 
         func = cfg.functions[0x18003CA70]
         assert func is not None

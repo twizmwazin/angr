@@ -251,8 +251,16 @@ class TestAMD64CondOverflowBinary(unittest.TestCase):
     def test_file_overflow_checks_have_no_ccall(self):
         # file has several allocation helpers guarded by jo on UMULQ
         bin_path = os.path.join(test_location, "x86_64", "file_gcc13.3.0_O2")
-        proj = angr.Project(bin_path, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(fail_fast=True, normalize=True)
+        # the rewrite is intra-function; only the three helpers (totalling under 1 KB) matter, not the rest of this
+        # 113 KB .text. include_plt=True lets the malloc/calloc PLT callees resolve to their SimProcedures.
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            0x41E520,
+            extra_func_addrs=[0x41E5A0, 0x41EED0],
+            project_kwargs={"auto_load_libs": False},
+            include_plt=True,
+            run_ccc=False,
+        )
         for addr in (0x41E520, 0x41E5A0, 0x41EED0):
             dec = proj.analyses.Decompiler(cfg.functions[addr], cfg=cfg)
             assert dec.codegen is not None and dec.codegen.text is not None

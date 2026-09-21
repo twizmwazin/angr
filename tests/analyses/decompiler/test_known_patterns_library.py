@@ -309,9 +309,12 @@ class TestMsvcStringCstr(TestCase):
 
     def test_find_msvc_string_cstr(self):
         # the clean SSA form (no de-phi copies) is present right after Stage-1 SSA
-        proj = angr.Project(CSTR_BIN, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+        # call_tree_depth=1: the three matched diamonds only depend on the target's own SSA form plus its 9 direct
+        # callees' prototypes (which decide how the frontier value is consumed at the following call sites); the
+        # default expand_call_tree depth would re-walk most of this 182 KB static-CRT .text.
+        proj, cfg = load_project_with_scoped_cfg(
+            CSTR_BIN, self.CSTR_FUNC, call_tree_depth=1, window=0x1000, project_kwargs={"auto_load_libs": False}
+        )
         func = cfg.functions.function(addr=self.CSTR_FUNC)
         assert func is not None
         dec = proj.analyses[Decompiler].prep(fail_fast=True)(
@@ -329,9 +332,10 @@ class TestMsvcStringCstr(TestCase):
         # matching the clean SSA form at BEFORE_VARIABLE_RECOVERY, outlining a
         # value-producing diamond, and the Outliner collapsing the frontier phi so
         # the subsequent de-phi succeeds. (Also pins c_str as enabled-by-default.)
-        proj = angr.Project(CSTR_BIN, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+        # call_tree_depth=1: same scoping as test_find_msvc_string_cstr, and for the same reason.
+        proj, cfg = load_project_with_scoped_cfg(
+            CSTR_BIN, self.CSTR_FUNC, call_tree_depth=1, window=0x1000, project_kwargs={"auto_load_libs": False}
+        )
         func = cfg.functions.function(addr=self.CSTR_FUNC)
         assert func is not None
         dec = proj.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, preset="full")
@@ -724,9 +728,25 @@ class TestWdkSharedDataPatterns(TestCase):
         return dec.codegen.text
 
     def test_shared_user_data_fields(self):
+        # Every ksud_* accessor lies in 0x140001530-0x1400018f0 (each a leaf, no calls out), so one scoped project
+        # covers all six subtests instead of _full's Project+whole-binary-CFGFast+CCC rebuilt per case; a 0x400
+        # window from the first function's address covers that whole span. Function names still resolve through the
+        # (non-stripped) COFF symbol table regardless of how the CFG discovered them.
+        proj, cfg = load_project_with_scoped_cfg(
+            KSUD_BIN,
+            0x140001530,
+            window=0x400,
+            expand_call_tree=False,
+            run_ccc=False,
+            project_kwargs={"auto_load_libs": False},
+        )
         for func_name, call_name in self._CASES:
             with self.subTest(func=func_name):
-                assert call_name + "()" in self._full(KSUD_BIN, func_name)
+                func = cfg.functions.function(name=func_name)
+                assert func is not None, func_name
+                dec = proj.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, preset="full")
+                assert dec.codegen is not None and dec.codegen.text is not None
+                assert call_name + "()" in dec.codegen.text
 
     def test_nullary_accessor_takes_no_arguments(self):
         # a Load(Const) region has no live-in vvars, so the synthesized call is

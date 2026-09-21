@@ -6,8 +6,7 @@ __package__ = __package__ or "tests.analyses.decompiler"  # pylint:disable=redef
 import os.path
 import unittest
 
-import angr
-from tests.common import WORKER, bin_location, load_project_with_scoped_cfg, print_decompilation_result
+from tests.common import bin_location, load_project_with_scoped_cfg, print_decompilation_result
 
 test_location = os.path.join(bin_location, "tests")
 
@@ -39,8 +38,12 @@ class TestSSAStack(unittest.TestCase):
             "windows",
             "28ce9dfc983d8489242743635c792d3fc53a45c96316b5854301f6fa514df55e.sys",
         )
-        proj = angr.Project(bin_path)
-        cfg = proj.analyses.CFG(data_references=True, normalize=True, show_progressbar=not WORKER)
+        # the call tree of 0x14001a314 is two levels deep (one internal callee, itself only calling two imports
+        # through the IAT), so a whole-binary CFG of this 108 KB driver is not needed; auto_load_libs=False since
+        # the imported kernel DLLs (ntoskrnl.exe etc.) are never found anyway.
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path, 0x14001A314, project_kwargs={"auto_load_libs": False}, run_ccc=False
+        )
 
         func = cfg.functions[0x14001A314]
         dec = proj.analyses.Decompiler(func, fail_fast=True)
@@ -56,8 +59,15 @@ class TestSSAStack(unittest.TestCase):
             "armel",
             "chall.bin",
         )
-        proj = angr.Project(bin_path, main_opts={"backend": "blob", "arch": "ARMEL", "base_addr": 0x0})
-        cfg = proj.analyses.CFG(normalize=True, show_progressbar=not WORKER)
+        # 0x35d and its callees are all reachable through direct 'bl' instructions, so seeding just the root (instead
+        # of the whole-blob smart sweep in both ARM and Thumb modes) suffices.
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            0x35D,
+            window=0x400,
+            project_kwargs={"main_opts": {"backend": "blob", "arch": "ARMEL", "base_addr": 0x0}},
+            run_ccc=False,
+        )
 
         func = cfg.functions[0x35D]
         dec = proj.analyses.Decompiler(func, fail_fast=True)

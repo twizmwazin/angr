@@ -10,7 +10,7 @@ import unittest
 
 import angr
 from angr.sim_variable import SimStackVariable
-from tests.common import bin_location, print_decompilation_result
+from tests.common import bin_location, print_decompilation_result, recover_call_tree_cfg
 
 test_location = os.path.join(bin_location, "tests")
 
@@ -23,10 +23,15 @@ class TestStackFrameCollapse(unittest.TestCase):
     """
 
     @staticmethod
-    def _decompile(binary: str, func_name: str):
+    def _decompile(binary: str, func_name: str, roots: list[int] | None = None, depth: int = 1):
         bin_path = os.path.join(test_location, "x86_64", "decompiler", binary)
         proj = angr.Project(bin_path, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
+        if roots is not None:
+            # eh_frame gives exact per-function extents on this ELF, so a call-tree CFG reproduces the callee/caller
+            # context a whole-binary CFGFast would give without scanning the rest of the binary.
+            cfg = recover_call_tree_cfg(proj, roots, depth=depth)
+        else:
+            cfg = proj.analyses.CFGFast(normalize=True)
         func = proj.kb.functions.function(name=func_name)
         assert func is not None
         dec = proj.analyses.Decompiler(func, cfg=cfg.model)
@@ -37,7 +42,10 @@ class TestStackFrameCollapse(unittest.TestCase):
     def test_bzip2_o0_decompress_keeps_its_locals(self):
         # two statements in this function are 14 levels deep, so the block simplifier used to refuse to replace
         # the rbp register with sp-8 in them
-        dec = self._decompile("decbench_bzip2_O0", "BZ2_decompress")
+        # BZ2_decompress (0x4116df) plus its only caller BZ2_bzDecompress (0x409508) at depth=1: this covers
+        # BZ2_decompress's own direct callees and keeps its one call site in the CFG, matching what Clinic's
+        # analyze_callsites=True CCC would see from a whole-binary CFG of this 115-function, 104 KB binary.
+        dec = self._decompile("decbench_bzip2_O0", "BZ2_decompress", roots=[0x4116DF, 0x409508], depth=1)
         assert dec.codegen is not None and dec.codegen.text is not None and dec.codegen.cfunc is not None
         print_decompilation_result(dec)
         text = dec.codegen.text

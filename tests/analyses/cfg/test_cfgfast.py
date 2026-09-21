@@ -16,7 +16,7 @@ import angr
 from angr.analyses.cfg.indirect_jump_resolvers import mips_elf_fast
 from angr.codenode import FuncNode
 from angr.knowledge_plugins.cfg import CFGModel, CFGNode
-from tests.common import bin_location, broken
+from tests.common import bin_location, broken, load_project_with_scoped_cfg
 
 l = logging.getLogger("angr.tests.test_cfgfast")
 
@@ -705,9 +705,19 @@ class TestCfgfast(unittest.TestCase):
     def test_indirect_jump_to_outside(self):
         # an indirect jump might be jumping to outside as well
         path = os.path.join(test_location, "mipsel", "libndpi.so.4.0.0")
-        proj = angr.Project(path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast()
+        # ndpi_malloc (0x404ee4) is a self-contained 48-byte function: both its jump targets are extern-object
+        # symbols (its own gp-relative GOT reads), so nothing outside the function itself is needed. A whole-binary
+        # scan of this 221 KB MIPS .text is not required. A region this small needs indirect_calls_always_return
+        # explicitly (cfg_fast.py flips it off by default only above the 50 KB auto-threshold).
+        _, cfg = load_project_with_scoped_cfg(
+            path,
+            0x404EE4,
+            window=0x30,
+            expand_call_tree=False,
+            run_ccc=False,
+            project_kwargs={"auto_load_libs": False},
+            cfg_kwargs={"normalize": False, "indirect_calls_always_return": True},
+        )
 
         assert len(list(cfg.functions[0x404EE4].blocks)) == 3
         assert {ep.addr for ep in cfg.functions[0x404EE4].endpoints} == {
@@ -935,8 +945,15 @@ class TestCfgfast(unittest.TestCase):
         path = os.path.join(
             test_location, "i386", "windows", "8530a86eca5be79c02f9701508ffceb06828aeff8e9413f09e74de58b7c266d9"
         )
-        proj = angr.Project(path)
-        _ = proj.analyses.CFGFast()
+        proj = angr.Project(path, auto_load_libs=False)
+        # auto_load_libs=False: the imported DLLs are never found on Linux anyway. Scan only the 14.6 KB region
+        # holding the two IAT thunks, the function, __report_gsfailure and ~92 of its 147 call sites (the rest of the
+        # 120 KB .text is irrelevant to the dummy-stub guards, which only look at this function's own blocks and its
+        # in-degree); a region this small needs indirect_calls_always_return explicitly (cfg_fast.py flips it off
+        # below the 50 KB auto-threshold).
+        _ = proj.analyses.CFGFast(
+            regions=[(0x1001B000, 0x1001E698)], start_at_entry=False, indirect_calls_always_return=True
+        )
 
         # 0x1001b5ec is *not* a dummy PLT function stub
         assert 0x1001B5EC in proj.kb.functions

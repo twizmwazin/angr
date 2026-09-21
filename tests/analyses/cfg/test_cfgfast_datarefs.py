@@ -88,7 +88,15 @@ class TestCfgfastDataReferences(unittest.TestCase):
         path = os.path.join(test_location, "mips64", "true")
         proj = angr.Project(path, auto_load_libs=False)
 
-        cfg = proj.analyses.CFGFast(data_references=True, cross_references=True)
+        # Both xref sites are inside main (0x12000206c-0x120002208); cross_references=True runs a Propagator-based
+        # XRefs pass over every function in the CFG, so scoping to main avoids that over the ~150 other functions.
+        cfg = proj.analyses.CFGFast(
+            data_references=True,
+            cross_references=True,
+            regions=[(0x12000206C, 0x120002210)],
+            function_starts=[0x12000206C],
+            start_at_entry=False,
+        )
         memory_data = cfg.memory_data
 
         assert 0x120007DD8 in memory_data
@@ -138,7 +146,10 @@ class TestCfgfastDataReferences(unittest.TestCase):
         path = os.path.join(test_location, "armel", "sha224sum")
         proj = angr.Project(path, auto_load_libs=False)
 
-        proj.analyses.CFGFast(data_references=True)
+        # The only reference to the stub at 0x129c4 is a literal-pool word inside the function at 0x131b8, ~2.5 KB
+        # after it; the region covers the stub, that referencing function and its literal pool, instead of the other
+        # ~37 KB of .text/.plt.
+        proj.analyses.CFGFast(data_references=True, regions=[(0x12000, 0x14000)], start_at_entry=False)
         funcs = proj.kb.functions
         assert funcs.contains_addr(0x129C4)
         func = funcs[0x129C4]

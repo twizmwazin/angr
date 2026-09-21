@@ -29,8 +29,17 @@ class TestCFGFastPEMetaRegions(unittest.TestCase):
         # Delay import (dir 13): RVA 0x24ef8, size 0x40 -> inside .text
 
         cls._image_base = 0x76BE0000
-        cls.proj = angr.Project(TEST_BINARY)
-        cls.cfg = cls.proj.analyses.CFGFast(normalize=True, show_progressbar=not is_testing)
+        cls.proj = angr.Project(TEST_BINARY, auto_load_libs=False)
+        base = cls._image_base
+        # Every assertion in this class looks only at the IAT (0x1000-0x14d0), the export directory (0x3440-0x45bd)
+        # and the three exported functions (0x9261, 0xaddb, 0x15146), all inside .text; a whole-binary CFG of this
+        # 155 KB .text takes tens of seconds. Region 1 spans the IAT and export directory so the linear sweep still
+        # walks across both; regions 2-3 cover the exported functions.
+        cls.cfg = cls.proj.analyses.CFGFast(
+            normalize=True,
+            regions=[(base + 0x1000, base + 0x5000), (base + 0x9000, base + 0xD000), (base + 0x15000, base + 0x16000)],
+            show_progressbar=not is_testing,
+        )
 
     def test_iat_marked_as_data(self):
         """IAT region should be marked as pointer-array in _seg_list, not code."""

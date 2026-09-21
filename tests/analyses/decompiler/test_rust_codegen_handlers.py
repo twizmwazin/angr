@@ -27,7 +27,12 @@ from angr.analyses.decompiler.structurer_nodes import (
 )
 from angr.rust.sim_type import RustSimTypeInt, RustSimTypeStrRef
 from angr.sim_type import SimTypeBottom
-from tests.common import bin_location, load_project_with_scoped_cfg, print_decompilation_result
+from tests.common import (
+    bin_location,
+    complete_calling_conventions_for,
+    load_project_with_scoped_cfg,
+    print_decompilation_result,
+)
 
 test_location = os.path.join(bin_location, "tests")
 
@@ -85,7 +90,9 @@ class TestRustCodegenHandlers(unittest.TestCase):
             with self.subTest(binary=name):
                 proj = angr.Project(os.path.join(test_location, arch, name), auto_load_libs=False)
                 cfg = proj.analyses.CFGFast(normalize=True, data_references=True, show_progressbar=False)
-                proj.analyses.CompleteCallingConventions(recover_variables=True)
+                # only the decompiled function and its callees can affect its own rendering (both binaries are only
+                # ~1 KB of .text, so this only trims CompleteCallingConventions, not the CFG itself).
+                complete_calling_conventions_for(proj, [function_addr], recover_variables=True)
                 dec = proj.analyses.Decompiler(
                     proj.kb.functions[function_addr], cfg=cfg.model, flavor="rust", fail_fast=True
                 )

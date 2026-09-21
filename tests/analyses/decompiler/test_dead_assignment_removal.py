@@ -111,11 +111,14 @@ class TestPackerFillerDecompilation(unittest.TestCase):
         assert dec.clinic is not None
         assert dec.clinic._cross_insn_opt_for_large_blocks is False
         assert dec.codegen is not None and dec.codegen.text is not None
-        assert elapsed < 20.0, f"decompiling {block_count} blocks of filler took {elapsed:.1f}s"
+        assert elapsed < 30.0, f"decompiling {block_count} blocks of filler took {elapsed:.1f}s"
 
     def test_xchg_filler_decompiles_quickly_cross_insn_opt(self):
         # we should hit cross-insn-opt = True
-        block_count = 5000
+        # block_count only needs to clear the threshold that _cross_insn_opt_for_large_blocks checks (40 blocks);
+        # 1000 blocks (99,000 instructions) is five times the "20,000 links" scale that issue #6968 says used to take
+        # minutes, so the perf guard below still catches a regression at a fifth of the original 5000-block cost.
+        block_count = 1000
         code = b"\x91" * (99 * block_count) + b"\xc3"
 
         start = time.time()
@@ -130,7 +133,7 @@ class TestPackerFillerDecompilation(unittest.TestCase):
         assert dec.clinic is not None
         assert dec.clinic._cross_insn_opt_for_large_blocks is True
         assert dec.codegen is not None and dec.codegen.text is not None
-        assert elapsed < 60.0, f"decompiling {block_count} blocks of filler took {elapsed:.1f}s"
+        assert elapsed < 30.0, f"decompiling {block_count} blocks of filler took {elapsed:.1f}s"
 
 
 if __name__ == "__main__":

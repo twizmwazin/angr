@@ -18,7 +18,7 @@ from angr.knowledge_plugins.cfg import IndirectJumpType
 if TYPE_CHECKING:
     from angr.knowledge_plugins.cfg import IndirectJump
 
-from tests.common import bin_location
+from tests.common import bin_location, load_project_with_scoped_cfg
 
 test_location = os.path.join(bin_location, "tests")
 l = logging.getLogger("angr.tests.test_jumptables")
@@ -3040,11 +3040,17 @@ class TestJumpTableResolver(unittest.TestCase):
         ]
 
     def test_amd64_rust_jumptable_single_block_no_overbound_check(self):
-        p = angr.Project(
+        # The table at 0x40bd1b is bounded by the `and $3` on its index inside walk_dir (0x40bcf0), so only that
+        # function is needed; a whole-binary CFG of this 298 KB Rust .text takes tens of seconds. Rust's call tree
+        # from this function balloons quickly, so expand_call_tree=False (the direct callee is an extern PLT stub
+        # assumed returning either way).
+        _, cfg = load_project_with_scoped_cfg(
             os.path.join(test_location, "x86_64", "1cbbf108f44c8f4babde546d26425ca5340dccf878d306b90eb0fbec2f83ab51"),
-            auto_load_libs=False,
+            0x40BCF0,
+            project_kwargs={"auto_load_libs": False},
+            expand_call_tree=False,
+            run_ccc=False,
         )
-        cfg = p.analyses[CFGFast].prep()()
 
         assert 0x40BD1B in cfg.model.jump_tables
         assert len(cfg.model.jump_tables[0x40BD1B].jumptable_entries) == 4
@@ -3054,8 +3060,18 @@ class TestJumpTableResolver(unittest.TestCase):
         # rustc/LLVM omits the bounds check when it can prove the switch index is in range, so these jump tables have
         # no comparison to derive their size from. Their size comes from the data instead: the next address that is
         # referenced by an instruction ends the table.
-        p = angr.Project(os.path.join(test_location, "x86_64", "printenv-rust"), auto_load_libs=False)
-        cfg = p.analyses[CFGFast].prep()()
+        # Table 0x42fb90 is bounded by the reference at 0x4de403 (the next AutoStream::new) and table 0x432af4 by
+        # the reference at 0x4f6f99 (<ContextValue as PartialEq>::eq); both jumps sit in entry blocks, so a scoped
+        # CFG of those functions alone reproduces the whole-binary sizes. A whole-binary CFG of this 810 KB Rust
+        # .text takes over a minute.
+        _, cfg = load_project_with_scoped_cfg(
+            os.path.join(test_location, "x86_64", "printenv-rust"),
+            0x4DE3C0,
+            extra_func_addrs=(0x4DE400, 0x4F5770, 0x4F6F90),
+            expand_call_tree=False,
+            run_ccc=False,
+            project_kwargs={"auto_load_libs": False},
+        )
 
         self._compare(
             cfg.model.jump_tables,
@@ -3091,8 +3107,20 @@ class TestJumpTableResolver(unittest.TestCase):
         # 0x4340c0 and 0x4340e0 are adjacent unbounded jump tables. 0x4340c0 can only be sized correctly once the
         # reference to 0x4340e0 has been collected, which happens after the block at 0x502470 is first analyzed;
         # sizing it too early swallows the whole table at 0x4340e0.
-        p = angr.Project(os.path.join(test_location, "x86_64", "printenv-rust"), auto_load_libs=False)
-        cfg = p.analyses[CFGFast].prep()()
+        # Every reference that bounds these tables is local (0x4340e0 <- 0x502518, 0x434134 <- 0x502573 and
+        # 0x434154 <- 0x501d54 in anstyle_parse::state::state_change), and all three jumps sit in entry blocks, so a
+        # scoped CFG of that window reproduces the whole-binary sizes; a whole-binary CFG of this 810 KB Rust .text
+        # takes over a minute. 0x502518 is only reachable *through* table 0x4340c0's own (not yet resolved) targets,
+        # so it must be seeded directly -- otherwise it is scanned only after table 0x4340c0 is deferred-resolved,
+        # which is too late for that resolution to see the bounding reference and it swallows table 0x4340e0.
+        _, cfg = load_project_with_scoped_cfg(
+            os.path.join(test_location, "x86_64", "printenv-rust"),
+            0x502470,
+            extra_func_addrs=(0x501D50, 0x502518, 0x502570),
+            expand_call_tree=False,
+            run_ccc=False,
+            project_kwargs={"auto_load_libs": False},
+        )
 
         self._compare(
             cfg.model.jump_tables,
@@ -3283,13 +3311,14 @@ class TestJumpTableResolver(unittest.TestCase):
         }
 
     def test_secondary_jumptable_amd64(self):
-        proj = angr.Project(
-            os.path.join(
-                test_location, "x86_64", "windows", "9c75d43ec531c76caa65de86dcac0269d6727ba4ec74fe1cac1fda0e176fd2ab"
-            ),
-            auto_load_libs=False,
+        bin_path = os.path.join(
+            test_location, "x86_64", "windows", "9c75d43ec531c76caa65de86dcac0269d6727ba4ec74fe1cac1fda0e176fd2ab"
         )
-        cfg = proj.analyses.CFGFast()
+        # The two-level table is bounded by the cmp/ja in its own function (0x140051ba0), so only that function
+        # needs a CFG; a whole-binary CFG of this 755 KB driver takes tens of seconds.
+        _, cfg = load_project_with_scoped_cfg(
+            bin_path, 0x140051BA0, project_kwargs={"auto_load_libs": False}, expand_call_tree=False, run_ccc=False
+        )
         jt = cfg.model.jump_tables[0x140051BBB]
         assert jt.jumptable is True
         assert len(jt.jumptables) == 2
@@ -3314,8 +3343,17 @@ class TestJumpTableResolver(unittest.TestCase):
         bin_path = os.path.join(
             test_location, "x86_64", "windows", "50e5f670700243535f8ff558831dbbc314b215092f523355aa7a1c26205ece37"
         )
-        proj = angr.Project(bin_path)
-        cfg = proj.analyses.CFGFast(force_smart_scan=False, normalize=True)
+        proj = angr.Project(bin_path, auto_load_libs=False)
+        # The guessed table belongs to the function at 0x4137c0 (ends at 0x415792); the reference that bounds it
+        # (jmp *0x441bc4 at 0x4154f0) and its sibling tables live in the same function, so scan only that region --
+        # a whole-binary PE CFG (plus the auto_load_libs search for 5 absent system DLLs) takes tens of seconds.
+        cfg = proj.analyses.CFGFast(
+            force_smart_scan=False,
+            normalize=True,
+            regions=[(0x413000, 0x416000)],
+            function_starts=[0x4137C0],
+            start_at_entry=False,
+        )
         # the first jump table; we happen to resolve it because its shape is the same as a regular, cmp-based one
         jt0 = cfg.model.jump_tables[0x415530]
         assert len(jt0.jumptables) == 1

@@ -13,6 +13,15 @@ from angr.ailment import Block
 from angr.ailment.expression import Const
 from angr.ailment.statement import ConditionalJump, Jump, Label, Return
 from angr.analyses.decompiler.decompiler import Decompiler
+from angr.analyses.decompiler.optimization_passes import (
+    CrossJumpReverter,
+    ExprOpSwapper,
+    FlipBooleanCmp,
+    LoweredSwitchSimplifier,
+    PostStructuringPeepholeOptimizationPass,
+    ReturnDeduplicator,
+    ReturnDuplicatorLow,
+)
 from angr.analyses.decompiler.optimization_passes.duplication_reverter.duplication_reverter import DuplicationReverter
 from tests.common import bin_location, load_project_with_scoped_cfg
 
@@ -37,9 +46,29 @@ GZIP_FUNC = 0x4111A0
 
 class TestDuplicationReverter(TestCase):
     def test_a_call_that_forks_the_flow_is_an_unsupported_candidate(self):
-        proj, cfg = load_project_with_scoped_cfg(TRUE_BIN, TRUE_FUNC)
+        # (include_plt=True was tried to avoid an extra throwaway CFGFast round for sub_401d30's 12 PLT callees, but
+        # on this binary one PLT-derived region happens to share its start address with a call-tree-derived region,
+        # and the two get merged such that the larger one is lost, dropping TRUE_FUNC itself from the final CFG --
+        # so PLT discovery is left to the helper's own out-of-region call-edge handling instead.)
+        # The passes disabled below all run at the same DURING_REGION_IDENTIFICATION stage as DuplicationReverter but
+        # *after* it (full.py), so disabling them cannot change the candidate it sees; each one otherwise reruns
+        # RegionIdentifier+SAILR structuring over the whole ~200-block function.
+        proj, cfg = load_project_with_scoped_cfg(TRUE_BIN, TRUE_FUNC, project_kwargs={"auto_load_libs": False})
         func = cfg.functions[TRUE_FUNC]
-        dec = proj.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, preset="full")
+        dec = proj.analyses[Decompiler].prep(fail_fast=True)(
+            func,
+            cfg=cfg.model,
+            preset="full",
+            disable_opts=[
+                LoweredSwitchSimplifier,
+                ReturnDuplicatorLow,
+                ReturnDeduplicator,
+                CrossJumpReverter,
+                ExprOpSwapper,
+                FlipBooleanCmp,
+                PostStructuringPeepholeOptimizationPass,
+            ],
+        )
         assert dec.codegen is not None and dec.codegen.text is not None
 
     def test_blocks_share_a_region_through_the_index(self):

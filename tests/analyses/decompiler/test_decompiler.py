@@ -59,6 +59,7 @@ from tests.common import (
     WORKER,
     bin_location,
     broken,
+    complete_calling_conventions_for,
     load_project_with_scoped_cfg,
     print_decompilation_result,
     set_decompiler_option,
@@ -239,9 +240,11 @@ class TestDecompiler(unittest.TestCase):
     @for_all_structuring_algos
     def test_decompiling_dir_gcc_O0_free_ent(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "dir_gcc_-O0")
-        p = angr.Project(bin_path, auto_load_libs=False, load_debug_info=True)
-
-        cfg = p.analyses[CFGFast].prep()(normalize=True)
+        # this is a crash-only smoke test (like the sibling scoped tests on this binary above); free_ent's call
+        # tree is 3 functions, so a whole-binary CFG of the 92 KB, 400-function .text is not needed
+        p, cfg = load_project_with_scoped_cfg(
+            bin_path, 0x405F9D, project_kwargs={"load_debug_info": True}, run_ccc=False
+        )
 
         f = cfg.functions["free_ent"]
         dec = p.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
@@ -319,9 +322,17 @@ class TestDecompiler(unittest.TestCase):
     def test_decompiling_dir_gcc_O0_main(self, decompiler_options=None):
         # tests loop structuring
         bin_path = os.path.join(test_location, "x86_64", "dir_gcc_-O0")
-        p = angr.Project(bin_path, auto_load_libs=False, load_debug_info=True)
-
-        cfg = p.analyses[CFGFast].prep()(normalize=True)
+        # this is a crash-only smoke test; main calls 44 direct functions here, so even a depth-1 call-tree
+        # expansion would cover most of the 92 KB .text. Scan only main + the PLT (its callees' prototypes are
+        # recovered on demand by Clinic either way) instead of a whole-binary CFG of 400 functions.
+        p, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            0x4033E1,
+            expand_call_tree=False,
+            include_plt=True,
+            run_ccc=False,
+            project_kwargs={"load_debug_info": True},
+        )
 
         f = cfg.functions["main"]
         dec = p.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
@@ -331,9 +342,11 @@ class TestDecompiler(unittest.TestCase):
     @for_all_structuring_algos
     def test_decompiling_dir_gcc_O0_emit_ancillary_info(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "dir_gcc_-O0")
-        p = angr.Project(bin_path, auto_load_libs=False, load_debug_info=True)
-
-        cfg = p.analyses[CFGFast].prep()(normalize=True)
+        # this is a crash-only smoke test; emit_ancillary_info only calls PLT stubs (no internal callees), so a
+        # whole-binary CFG of the 92 KB, 400-function .text is not needed
+        p, cfg = load_project_with_scoped_cfg(
+            bin_path, 0x402A07, project_kwargs={"load_debug_info": True}, run_ccc=False
+        )
 
         f = cfg.functions["emit_ancillary_info"]
         dec = p.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
@@ -608,9 +621,9 @@ class TestDecompiler(unittest.TestCase):
     @for_all_structuring_algos
     def test_decompiling_true_a_x86_64_1(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "true_a")
-        p = angr.Project(bin_path, auto_load_libs=False, load_debug_info=True)
-
-        cfg = p.analyses[CFGFast].prep()(normalize=True, data_references=True)
+        # the getenv/fscanf/break assertions only depend on 0x404410 and its callees (incl. sub_404860) plus the
+        # PLT stubs; a whole-binary CFG of the stripped 13 KB .text is not needed
+        p, cfg = load_project_with_scoped_cfg(bin_path, 0x404410, include_plt=True, run_ccc=False)
 
         # since this is a case we know where DuplicationReverter eliminates some bad code, we should
         # disable it for this since we want to test the decompiler's ability to handle this case when it has
@@ -663,8 +676,11 @@ class TestDecompiler(unittest.TestCase):
     @for_all_structuring_algos
     def test_decompiling_true_mips64(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "mips64", "true")
-        p = angr.Project(bin_path, auto_load_libs=False, load_debug_info=False)
-        cfg = p.analyses[CFGFast].prep()(normalize=True, data_references=True)
+        # the four string/call assertions only need main and its direct callees (setlocale/usage reach libc through
+        # .MIPS.stubs, covered by include_plt); a whole-binary CFG of the 23 KB .text is not needed
+        p, cfg = load_project_with_scoped_cfg(
+            bin_path, 0x12000206C, include_plt=True, run_ccc=False, project_kwargs={"load_debug_info": False}
+        )
 
         all_optimization_passes = DECOMPILATION_PRESETS["full"].get_optimization_passes("MIPS64", "linux")
 
@@ -810,9 +826,9 @@ class TestDecompiler(unittest.TestCase):
     @for_all_structuring_algos
     def test_decompiling_libsoap(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "armel", "libsoap.so")
-        p = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = p.analyses[CFGFast].prep()(data_references=True, normalize=True)
+        # only dec.codegen is checked; the binary is stripped with no .ARM.exidx so window=0x4000 gives headroom
+        # for gSOAP's large serializer bodies. A whole-binary CFG of the 125 KB ARM .text takes ~35s per structurer.
+        p, cfg = load_project_with_scoped_cfg(bin_path, 0x41D000, include_plt=True, run_ccc=False, window=0x4000)
 
         func = cfg.functions[0x41D000]
         dec = p.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, options=decompiler_options)
@@ -965,9 +981,12 @@ class TestDecompiler(unittest.TestCase):
     def test_decompilation_call_expr_folding_mips64_true(self, decompiler_options=None):
         # This test is to ensure call expression folding correctly replaces call expressions in return statements
         bin_path = os.path.join(test_location, "mips64", "true")
-        p = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = p.analyses[CFGFast].prep()(data_references=True, normalize=True)
+        # the assertion only needs version_etc's call-expression folding into its return statement; version_etc_va
+        # (called just before this function in memory) is picked up by the default call-tree expansion via its
+        # out-of-region call edge. A whole-binary MIPS64 CFG of the 23 KB .text is not needed.
+        p, cfg = load_project_with_scoped_cfg(
+            bin_path, 0x120005C9C, include_plt=True, run_ccc=False, project_kwargs={"auto_load_libs": False}
+        )
 
         func_0 = cfg.functions["version_etc"]
         dec = p.analyses[Decompiler].prep(fail_fast=True)(func_0, cfg=cfg.model, options=decompiler_options)
@@ -1050,9 +1069,11 @@ class TestDecompiler(unittest.TestCase):
     @structuring_algo("sailr")
     def test_decompilation_stat_human_fstype_no_eager_returns(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "decompiler", "stat.o")
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(normalize=True, data_references=True)
+        # the switch/break/if checks are purely about this function's own control structure; the object's whole
+        # .text is only 11.6 KB so this saves little, but the single call makes no callees, so nothing is lost
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path, 0x401A70, expand_call_tree=False, run_ccc=False, project_kwargs={"auto_load_libs": False}
+        )
 
         f = proj.kb.functions[0x401A70]
 
@@ -1153,11 +1174,15 @@ class TestDecompiler(unittest.TestCase):
     def test_decompilation_x86_64_stack_arguments(self, decompiler_options=None):
         # Arguments passed on the stack should not go missing
         bin_path = os.path.join(test_location, "x86_64", "decompiler", "union")
-        p = angr.Project(bin_path, auto_load_libs=False)
+        # the snprintf stack-argument count only depends on build_date and its callees (snprintf's prototype comes
+        # from its PLT stub); a whole-binary CFG of all 83 functions + PLT is not needed. include_plt is dropped:
+        # the PLT sits right before build_date's call-tree region and the two overlapping/unsorted regions
+        # otherwise make CFGFast drop build_date's function entirely.
+        p, cfg = load_project_with_scoped_cfg(
+            bin_path, 0x401CC0, project_kwargs={"auto_load_libs": False}, run_ccc=False
+        )
 
-        cfg = p.analyses[CFGFast].prep()(data_references=True, normalize=True)
-
-        func = cfg.functions["build_date"]
+        func = cfg.functions[0x401CC0]  # build_date
 
         # no dead memdef removal
         dec = p.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, options=decompiler_options)
@@ -1378,9 +1403,16 @@ class TestDecompiler(unittest.TestCase):
     @for_all_structuring_algos
     def test_decompiling_morton_lib_handle__suback(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "decompiler", "morton.libmosquitto.so.1")
-        p = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = p.analyses[CFGFast].prep()(data_references=True, normalize=True)
+        # only the canary-removal outcome is checked, which is local to this function; a whole-binary CFG of the
+        # 72 KB .text is not needed (mirrors test_decompiling_newburry_main above)
+        p, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            0x409FD1,
+            expand_call_tree=False,
+            include_plt=True,
+            run_ccc=False,
+            project_kwargs={"auto_load_libs": False},
+        )
 
         func = cfg.functions.function(name="handle__suback", plt=False)
 
@@ -1485,11 +1517,14 @@ class TestDecompiler(unittest.TestCase):
     @for_all_structuring_algos
     def test_decompiling_nl_i386_pie(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "i386", "nl")
-        p = angr.Project(bin_path, auto_load_libs=False)
+        # the three string literals come from usage's own data references; a whole-binary CFG of 159 functions is
+        # not needed for this one function. include_plt is dropped: the PLT sits right before usage's call-tree
+        # region and the two overlapping/unsorted regions otherwise make CFGFast drop usage's function entirely.
+        p, cfg = load_project_with_scoped_cfg(
+            bin_path, 0x401F60, project_kwargs={"auto_load_libs": False}, run_ccc=False
+        )
 
-        cfg = p.analyses.CFGFast(normalize=True)
-
-        f = p.kb.functions["usage"]
+        f = p.kb.functions[0x401F60]  # usage
         d = p.analyses.Decompiler(f, cfg=cfg.model, options=decompiler_options)
         assert d.codegen is not None and isinstance(d.codegen.text, str)
         print_decompilation_result(d)
@@ -1564,11 +1599,13 @@ class TestDecompiler(unittest.TestCase):
     @for_all_structuring_algos
     def test_decompiling_x8664_mv_O2(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "mv_-O2")
-        p = angr.Project(bin_path, auto_load_libs=False)
+        # the assertions only depend on main's own condition simplification and its direct callees' names/types
+        # (Clinic recovers those on demand, and PLT stub names come from the loader either way); a whole-binary
+        # CFG of the 71 KB coreutils .text is not needed. include_plt is dropped here: the PLT sits right before
+        # main's call-tree region and the two overlapping/unsorted regions make CFGFast drop main's function entirely.
+        p, cfg = load_project_with_scoped_cfg(bin_path, 0x402B40, call_tree_depth=1, run_ccc=False)
 
-        cfg = p.analyses.CFGFast(normalize=True, show_progressbar=not WORKER)
-
-        f = p.kb.functions["main"]
+        f = p.kb.functions[0x402B40]  # main
         d = p.analyses[Decompiler].prep(show_progressbar=not WORKER)(f, cfg=cfg.model, options=decompiler_options)
         assert d.codegen is not None and isinstance(d.codegen.text, str)
 
@@ -1696,9 +1733,18 @@ class TestDecompiler(unittest.TestCase):
     @for_all_structuring_algos
     def test_decompiling_fmt_main(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "decompiler", "fmt")
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(normalize=True, data_references=True)
+        # the test sets xdectoumax's and main's prototypes by hand, so only main, xdectoumax and the PLT (for
+        # error(.../errno) are needed; expand_call_tree=False avoids scanning the rest of main's ~40-function
+        # closure. A whole-binary CFG of the 20 KB .text is not needed either way.
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            0x401900,
+            extra_func_addrs=(0x406010,),
+            expand_call_tree=False,
+            include_plt=True,
+            run_ccc=False,
+            project_kwargs={"auto_load_libs": False},
+        )
 
         xdectoumax = proj.kb.functions[0x406010]
         proj.analyses.VariableRecoveryFast(xdectoumax)
@@ -2046,11 +2092,13 @@ class TestDecompiler(unittest.TestCase):
     def test_decompiling_mv0_main(self, decompiler_options=None):
         # one of the jump tables has an entry that goes back to the loop head
         bin_path = os.path.join(test_location, "x86_64", "mv_0")
-        proj = angr.Project(bin_path, auto_load_libs=False)
+        # this is a crash-only smoke test of main's structuring; a whole-binary CFG of the 76 KB .text is not
+        # needed, only main and its direct callees (call_tree_depth=1 caps the round count since main's own
+        # transitive closure covers most of the binary). include_plt is dropped: the PLT sits right before main's
+        # call-tree region and the two overlapping/unsorted regions make CFGFast drop main's function entirely.
+        proj, cfg = load_project_with_scoped_cfg(bin_path, 0x402C40, call_tree_depth=1, run_ccc=False)
 
-        cfg = proj.analyses.CFGFast(normalize=True, data_references=True)
-
-        f = proj.kb.functions["main"]
+        f = proj.kb.functions[0x402C40]  # main
 
         # disable eager returns simplifier
         all_optimization_passes = DECOMPILATION_PRESETS["full"].get_optimization_passes(
@@ -2152,9 +2200,9 @@ class TestDecompiler(unittest.TestCase):
     def test_decompiling_tac_base_len(self, decompiler_options=None):
         # source: https://github.com/coreutils/gnulib/blob/08ba9aaebff69a02cbb794c6213314fd09dd5ec5/lib/basename-lgpl.c#L52
         bin_path = os.path.join(test_location, "x86_64", "decompiler", "tac")
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(normalize=True, data_references=True)
+        # the assertion is a constant comparison inside this 38-byte function; a whole-binary CFG of the 89 KB,
+        # 162-function .text is not needed
+        proj, cfg = load_project_with_scoped_cfg(bin_path, 0x417BA0, include_plt=True, run_ccc=False)
 
         f = proj.kb.functions["base_len"]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
@@ -2722,9 +2770,10 @@ class TestDecompiler(unittest.TestCase):
         # when that is not recognized, the chain of comparisons is only half read, the switch is left pointing at a
         # default it cannot reach, and most of the function is then dropped from the output.
         bin_path = os.path.join(test_location, "x86_64", "decompiler", "unzip_gcc17_O0.stripped")
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(normalize=True, data_references=True)
+        # the assertions are all about this one function's structuring; call_tree_depth=2 stops the call-tree
+        # expansion at ~8 functions (the default depth 8 would run 7 throwaway rounds whose cumulative scanning
+        # exceeds a whole-binary CFG of the 280 KB stripped .text)
+        proj, cfg = load_project_with_scoped_cfg(bin_path, 0x4131E7, include_plt=True, call_tree_depth=2, run_ccc=False)
         all_optimization_passes = DECOMPILATION_PRESETS["full"].get_optimization_passes(
             "AMD64", "linux", additional_opts=[LoweredSwitchSimplifier]
         )
@@ -2853,7 +2902,9 @@ class TestDecompiler(unittest.TestCase):
         proj = angr.Project(bin_path, auto_load_libs=False)
 
         cfg = proj.analyses.CFGFast(normalize=True, data_references=True)
-        proj.analyses.CompleteCallingConventions()
+        # main's call-tree closure is ~150 of the 282 functions (99% of .text with the scoped-CFG helper's 0x2000
+        # windows), so scoping the CFG itself would not help; only CCC's cost (over every function) is avoidable
+        complete_calling_conventions_for(proj, [proj.kb.functions["main"].addr])
         all_optimization_passes = DECOMPILATION_PRESETS["fast"].get_optimization_passes(
             "AMD64",
             "linux",
@@ -3055,9 +3106,14 @@ class TestDecompiler(unittest.TestCase):
     @structuring_algo("sailr")
     def test_eager_returns_simplifier_no_duplication_of_default_case(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "ls_ubuntu_2004")
-        proj = angr.Project(bin_path, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True, data_references=True)
-        f = proj.kb.functions["main"]
+        # eager-return duplication hinges on which callees are noreturn (exit@plt/error@plt, usage->exit); those
+        # SimProcedures are marked noreturn in angr's library regardless of whether CFGFast scanned their PLT stub
+        # bytes, so include_plt is dropped here: the PLT sits right before main's call-tree region and the two
+        # overlapping/unsorted regions otherwise make CFGFast drop main's function entirely. This also replaces a
+        # whole-binary CFG of the 76 KB .text. The binary is stripped, so "main" is not an ELF symbol (a whole-binary
+        # CFG only names it via the __libc_start_main heuristic, which needs _start in the CFG); look it up by address.
+        proj, cfg = load_project_with_scoped_cfg(bin_path, 0x404DF0, call_tree_depth=1, run_ccc=False)
+        f = proj.kb.functions[0x404DF0]  # main
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
 
@@ -3231,10 +3287,12 @@ class TestDecompiler(unittest.TestCase):
     @for_all_structuring_algos
     def test_proper_argument_simplification(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "true_a")
-        proj = angr.Project(bin_path, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True, data_references=True, show_progressbar=not WORKER)
-
-        proj.analyses.CompleteCallingConventions(cfg=cfg)
+        # memcpy's 3-argument prototype (from its PLT stub) and 0x404410's own callsite construction are all that's
+        # needed; 0x401D70 is memcpy's only caller, keeping Clinic's analyze_callsites facts identical to a
+        # whole-binary run. A whole-binary CFG + CCC of the 13 KB .text is not needed.
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path, 0x404410, extra_func_addrs=(0x401D70,), include_plt=True, project_kwargs={"auto_load_libs": False}
+        )
         f = proj.kb.functions[0x404410]
         d = proj.analyses[Decompiler](f, cfg=cfg.model, options=decompiler_options, save_unoptimized_graph=True)
         print_decompilation_result(d)
@@ -3767,9 +3825,9 @@ class TestDecompiler(unittest.TestCase):
     @structuring_algo("sailr")
     def test_decompiling_function_with_long_cascading_data_flows(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "netfilter_b64.sys")
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(normalize=True, data_references=True)
+        # the __ROL__/__ROR__ counts come from 0x140002918's own body (mostly IAT-import callees); a whole-binary
+        # CFG of the 304-function driver .text is not needed (PE: no PLT sections, imports resolve through the IAT)
+        proj, cfg = load_project_with_scoped_cfg(bin_path, 0x140002918, run_ccc=False)
 
         f = proj.kb.functions[0x140002918]
 
@@ -3974,7 +4032,9 @@ class TestDecompiler(unittest.TestCase):
         proj = angr.Project(bin_path, auto_load_libs=False)
         cfg = proj.analyses.CFGFast(normalize=True, data_references=True)
 
-        proj.analyses.CompleteCallingConventions(cfg=cfg, analyze_callsites=True)
+        # the object's .text is only ~10 KB so the CFG itself is cheap; only CCC's cost (analyze_callsites=True over
+        # every function) is worth avoiding -- none of parse_str's callees are reached from outside its own closure
+        complete_calling_conventions_for(proj, [proj.kb.functions["parse_str"].addr], cfg=cfg, analyze_callsites=True)
         f = proj.kb.functions["parse_str"]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
@@ -4363,8 +4423,9 @@ class TestDecompiler(unittest.TestCase):
     @structuring_algo("sailr")
     def test_incorrect_function_argument_unification(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "liblzma.so.5.6.1")
-        proj = angr.Project(bin_path, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
+        # 0x40D450 makes no calls, so its argument recovery is entirely intra-procedural; a whole-binary CFG of the
+        # stripped 164 KB .text is not needed for this 0x4a-byte function
+        proj, cfg = load_project_with_scoped_cfg(bin_path, 0x40D450, expand_call_tree=False, run_ccc=False)
         f = proj.kb.functions[0x40D450]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
@@ -4593,9 +4654,9 @@ class TestDecompiler(unittest.TestCase):
         # This testcase validates that we get as close as possible to the original source by removing the duplicated
         # graph which includes two mallocs. Other regions are deduplicated but are tested haphazardly.
         bin_path = os.path.join(test_location, "x86_64", "true_a")
-        proj = angr.Project(bin_path, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True, data_references=True)
-        proj.analyses.CompleteCallingConventions(cfg=cfg)
+        # the malloc count only depends on 0x404410's own callee closure; a whole-binary CFG + CCC of the stripped
+        # 13 KB .text is not needed
+        proj, cfg = load_project_with_scoped_cfg(bin_path, 0x404410, include_plt=True)
 
         f = proj.kb.functions[0x404410]
         d = proj.analyses[Decompiler](
@@ -4704,9 +4765,10 @@ class TestDecompiler(unittest.TestCase):
         bin_path = os.path.join(
             test_location, "x86_64", "windows", "059ef54d0a97345369d236aafb051917c50680020a1bc532236072f4d341d9e3"
         )
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(force_smart_scan=False, normalize=True, data_references=True)
+        # this is a crash-only smoke test; the region-head shape only depends on 0x442300 and the non-returning
+        # status of its direct callees (e.g. runtime.throw/panicSlice*), which call_tree_depth=1 keeps inside the
+        # scanned regions. A whole-binary CFG of the 393 KB Go .text is not needed.
+        proj, cfg = load_project_with_scoped_cfg(bin_path, 0x442300, call_tree_depth=1, run_ccc=False)
         f = proj.kb.functions[0x442300]
 
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
@@ -4747,9 +4809,9 @@ class TestDecompiler(unittest.TestCase):
         bin_path = os.path.join(
             test_location, "i386", "windows", "736cb27201273f6c4f83da362c9595b50d12333362e02bc7a77dd327cc6b045a"
         )
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(force_smart_scan=False, normalize=True)
+        # the assertions only look at 0x41D560's own switch/case structuring; a whole-binary CFG of this 253 KB
+        # PE takes ~60s CI (precedent: test_decompiling_optimized_memcpy uses the same binary)
+        proj, cfg = load_project_with_scoped_cfg(bin_path, 0x41D560, run_ccc=False)
         f = proj.kb.functions[0x41D560]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         assert d.codegen is not None and d.codegen.text is not None
@@ -4766,9 +4828,9 @@ class TestDecompiler(unittest.TestCase):
         bin_path = os.path.join(
             test_location, "i386", "windows", "736cb27201273f6c4f83da362c9595b50d12333362e02bc7a77dd327cc6b045a"
         )
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(force_smart_scan=False, normalize=True)
+        # the assertions only look at 0x41DCE0's own switch/case structuring; a whole-binary CFG of this 253 KB
+        # PE takes ~60s CI (precedent: test_decompiling_optimized_memcpy uses the same binary)
+        proj, cfg = load_project_with_scoped_cfg(bin_path, 0x41DCE0, run_ccc=False)
         f = proj.kb.functions[0x41DCE0]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         assert d.codegen is not None and d.codegen.text is not None
@@ -4830,9 +4892,9 @@ class TestDecompiler(unittest.TestCase):
         bin_path = os.path.join(
             test_location, "x86_64", "windows", "0a9bd4898d4c966cda1102952a74b3b829581c5b6bbeb4c4e6a09cefde8c0d26"
         )
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(force_smart_scan=False, normalize=True)
+        # the switch/case structuring only depends on 0x1400040C0's own body and its direct callees (default
+        # call-tree expansion); a whole-binary CFG of this 90 KB, 304-function driver .text is not needed
+        proj, cfg = load_project_with_scoped_cfg(bin_path, 0x1400040C0, run_ccc=False)
         f = proj.kb.functions[0x1400040C0]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
@@ -4884,9 +4946,9 @@ class TestDecompiler(unittest.TestCase):
         bin_path = os.path.join(
             test_location, "x86_64", "1cbbf108f44c8f4babde546d26425ca5340dccf878d306b90eb0fbec2f83ab51"
         )
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(normalize=True)
+        # create_note's only cross-function dependency is __rust_probestack (depth 1 pulls in all direct callees,
+        # including it); a whole-binary CFG of this 305 KB Rust .text is not needed to decompile one 0x5C8-byte fn
+        proj, cfg = load_project_with_scoped_cfg(bin_path, 0x40B720, include_plt=True, call_tree_depth=1, run_ccc=False)
         f = proj.kb.functions[0x40B720]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
@@ -4901,9 +4963,9 @@ class TestDecompiler(unittest.TestCase):
         bin_path = os.path.join(
             test_location, "x86_64", "1cbbf108f44c8f4babde546d26425ca5340dccf878d306b90eb0fbec2f83ab51"
         )
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(normalize=True)
+        # the two switches only depend on walk_dir and its direct callees; a whole-binary CFG of the 305 KB Rust
+        # .text (943 functions) takes most of this test's CI time to decompile one 0xD05-byte function
+        proj, cfg = load_project_with_scoped_cfg(bin_path, 0x40BCF0, include_plt=True, call_tree_depth=1, run_ccc=False)
         f = proj.kb.functions[0x40BCF0]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
@@ -4961,10 +5023,10 @@ class TestDecompiler(unittest.TestCase):
     def test_decompiling_msvcrt_IsExceptionObjectToBeDestroyed(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "decompiler", "vcruntime_test.exe")
 
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions()
+        # the for-loop/return structuring is function-local, but the repeatedly-called 0x140015F64's prototype
+        # (from CC analysis) can shape it; scoped CFG + CCC (default call-tree expansion) keep that while replacing
+        # the whole-binary CFG + CCC over every CRT function
+        proj, cfg = load_project_with_scoped_cfg(bin_path, 0x140015BC4)
 
         # IsExceptionObjectToBeDestroyed
         f = proj.kb.functions[0x140015BC4]
@@ -4978,10 +5040,9 @@ class TestDecompiler(unittest.TestCase):
     def test_decompiling_msvcrt_fclose_nolock_internal(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "decompiler", "vcruntime_test.exe")
 
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions()
+        # the constant-folded return value is intra-procedural; scoped CFG + CCC (default call-tree expansion)
+        # replace the whole-binary CFG + CCC over every CRT function
+        proj, cfg = load_project_with_scoped_cfg(bin_path, 0x14001D9A8)
 
         # fclose_nolock_internal
         f = proj.kb.functions[0x14001D9A8]
@@ -4995,10 +5056,9 @@ class TestDecompiler(unittest.TestCase):
     def test_decompiling_msvcrt_setsbuplow(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "decompiler", "vcruntime_test.exe")
 
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions()
+        # the do-while loop only depends on setSBUpLow's own body and its direct callees' prototypes; scoped CFG +
+        # CCC (default call-tree expansion) replace the whole-binary CFG + CCC over every CRT function
+        proj, cfg = load_project_with_scoped_cfg(bin_path, 0x14002EC04)
 
         # setSBUpLow
         f = proj.kb.functions[0x14002EC04]
@@ -5613,9 +5673,11 @@ class TestDecompiler(unittest.TestCase):
         bin_path = os.path.join(
             test_location, "i386", "windows", "48460c9633d06cad3e3b41c87de04177d129906610c5bbdebc7507a211100e98"
         )
-        proj = angr.Project(bin_path, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions()
+        # sub_401240 makes no direct calls into the main object (only indirect IAT calls), so its own body is all
+        # that matters; a whole-binary CFG + CCC of the 71 KB .text is not needed for this one leaf function
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path, 0x401240, expand_call_tree=False, run_ccc=False, project_kwargs={"auto_load_libs": False}
+        )
         func = proj.kb.functions[0x401240]
         dec = proj.analyses.Decompiler(func, cfg=cfg, options=decompiler_options)
         assert dec.codegen is not None and dec.codegen.text is not None
@@ -5635,9 +5697,9 @@ class TestDecompiler(unittest.TestCase):
         bin_path = os.path.join(
             test_location, "i386", "windows", "48460c9633d06cad3e3b41c87de04177d129906610c5bbdebc7507a211100e98_altered"
         )
-        proj = angr.Project(bin_path, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions()
+        # sub_4025F0 itself spans ~53 KB (75% of .text), so window=0xE000 is needed to avoid truncating it; CCC
+        # (default run_ccc=True) is scoped to its call tree instead of every function in the binary.
+        proj, cfg = load_project_with_scoped_cfg(bin_path, 0x4025F0, window=0xE000)
         func = proj.kb.functions[0x4025F0]
         decompiler_options = decompiler_options or []
         decompiler_options += [("prettify_thiscall", True)]
@@ -5748,12 +5810,9 @@ class TestDecompiler(unittest.TestCase):
 
     def test_decompiling_rust_fmt_main(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "decompiler", "fmt_rust")
-        # turning off cache for better speed
-        proj = angr.Project(
-            bin_path,
-            cache_limits={"functions": None, "cfg_nodes": None, "cfg_edges": None},
-        )
-        cfg = proj.analyses.CFG(normalize=True)
+        # the assertions only look at uumain and its direct callees (prettify_thiscall renders them using their
+        # on-demand-recovered prototypes); a whole-binary CFG of this 765 KB, 6299-function Rust binary takes ~48s
+        proj, cfg = load_project_with_scoped_cfg(bin_path, 0x469200, include_plt=True, call_tree_depth=1, run_ccc=False)
         func = proj.kb.functions[0x469200]
         decompiler_options = decompiler_options or []
         decompiler_options += [("prettify_thiscall", True)]
@@ -5875,9 +5934,10 @@ class TestDecompiler(unittest.TestCase):
 
     def test_decompiling_fauxware_wide_scrt_release_startup_lock(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "windows", "fauxware-wide.exe")
-        proj = angr.Project(bin_path, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions(analyze_callsites=True)
+        # the `lock xchg` intrinsic rendering is independent of CFG scope; Clinic re-runs its own scoped
+        # analyze_callsites=True CCC for the function anyway. A whole-binary CFG + CCC of 291 CRT functions is not
+        # needed for this 36-byte function's 2-function call tree.
+        proj, cfg = load_project_with_scoped_cfg(bin_path, 0x140001AC0, ccc_kwargs={"analyze_callsites": True})
 
         f = proj.kb.functions[0x140001AC0]
         dec = proj.analyses.Decompiler(f, cfg=cfg.model, options=decompiler_options)

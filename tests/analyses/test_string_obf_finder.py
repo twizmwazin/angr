@@ -6,6 +6,7 @@ from unittest import TestCase, main
 
 import angr
 from angr.sim_type import parse_signature
+from tests.common import WORKER, complete_calling_conventions_for
 
 binaries_base = os.path.join(
     os.path.dirname(os.path.realpath(str(__file__))),
@@ -22,7 +23,10 @@ class TestStringObfFinder(TestCase):
         bin_path = os.path.join(binaries_base, "x86_64", "netfilter_b64.sys")
 
         proj = angr.Project(bin_path, auto_load_libs=False)
-        _ = proj.analyses.CFG(force_smart_scan=False, normalize=True, show_progressbar=True)
+        # keep the whole-binary CFG: the finder needs the deobfuscator callers, the loaders, and the
+        # _security_check_cookie symbol below, none of which a call tree rooted at the decompiled functions is
+        # guaranteed to reach.
+        _ = proj.analyses.CFG(force_smart_scan=False, normalize=True, show_progressbar=not WORKER)
 
         # sadly we do not yet have function prototypes for Windows kernel
         # gotta manually specify prototypes for a few Windows kernel APIs
@@ -33,7 +37,11 @@ class TestStringObfFinder(TestCase):
         # ensure we correctly recognize security_check_cookie
         assert proj.kb.functions[0x1400070B0].name == "_security_check_cookie"
 
-        proj.analyses.CompleteCallingConventions(recover_variables=True)
+        # scope CompleteCallingConventions to the functions actually decompiled/analyzed below (plus their
+        # transitive callees) instead of every function of this ~150-function driver.
+        complete_calling_conventions_for(
+            proj, [0x140005174, 0x140003504, 0x140006208, 0x1400035A0, 0x140001A90, 0x140001A18]
+        )
 
         type1_deobfuscator = proj.kb.functions[0x140001A90]
         type2_deobfuscator = proj.kb.functions[0x140001A18]

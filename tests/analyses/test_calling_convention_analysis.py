@@ -28,7 +28,12 @@ from angr.calling_conventions import (
 from angr.errors import AngrRuntimeError
 from angr.sim_type import SimTypeBottom, SimTypeFloat, SimTypeFunction, SimTypeInt, SimTypeLongLong
 from angr.utils.ssa import get_reg_offset_base
-from tests.common import bin_location, requires_binaries_private
+from tests.common import (
+    bin_location,
+    complete_calling_conventions_for,
+    load_project_with_scoped_cfg,
+    requires_binaries_private,
+)
 
 test_location = os.path.join(bin_location, "tests")
 
@@ -144,9 +149,6 @@ class TestCallingConventionAnalysis(unittest.TestCase):
         proj = angr.Project(binary_path, auto_load_libs=False, load_debug_info=False)
 
         cfg = proj.analyses.CFG()  # fill in the default kb
-
-        proj.analyses.CompleteCallingConventions(mode=mode, recover_variables=True)
-
         funcs = cfg.kb.functions
 
         # check args
@@ -163,6 +165,14 @@ class TestCallingConventionAnalysis(unittest.TestCase):
             "main": ["r_rdi", "r_rsi"],
             "queue_directory": ["r_rdi", "r_rsi", "r_rdx"],
         }
+
+        # CCC only needs to cover these 11 functions and their transitive callees (~217 of ~510 kb functions); the
+        # remaining ~180 local functions (sort comparators, hash callbacks, crt glue) are unreachable from them, so
+        # their FactCollector/VariableRecoveryFast passes would be pure waste. main's own closure spans about half
+        # the binary, so the CFG itself stays whole-binary.
+        complete_calling_conventions_for(
+            proj, [funcs[name].addr for name in expected_args], mode=mode, recover_variables=True
+        )
 
         for func_name, args in expected_args.items():
             self.check_args(func_name, self._a(funcs, func_name), args)
@@ -577,8 +587,12 @@ class TestCallingConventionAnalysis(unittest.TestCase):
         binary_path = os.path.join(test_location, "x86_64", "copy.o")
         proj = angr.Project(binary_path, auto_load_libs=False)
 
+        # can_write_any_file's prototype comes from callsite analysis of its caller writable_destination, so the
+        # CFG (which the callsite analysis reads from kb.cfgs) stays whole-object; only CCC is scoped to the
+        # transitive closure of the two asserted functions (~5 of 48 functions), skipping copy_internal and co.
         cfg = proj.analyses.CFG(normalize=True)
-        proj.analyses.CompleteCallingConventions(mode=mode, recover_variables=True)
+        roots = [cfg.kb.functions[name].addr for name in ("punch_hole", "can_write_any_file")]
+        complete_calling_conventions_for(proj, roots, mode=mode, recover_variables=True)
 
         func0 = cfg.kb.functions["punch_hole"]
         assert isinstance(func0.calling_convention, SimCCSystemVAMD64)
@@ -616,7 +630,13 @@ class TestCallingConventionAnalysis(unittest.TestCase):
         proj = angr.Project(binary_path, auto_load_libs=False)
 
         cfg = proj.analyses.CFG(normalize=True)
-        proj.analyses.CompleteCallingConventions(mode=mode, recover_variables=True)
+        # the closure of the four asserted functions covers ~33 of 38 local functions anyway (get_field_list reaches
+        # nearly everything), so this only trims a handful of unrelated ones; kept for parity with the rest of the
+        # file rather than for a large saving.
+        roots = [
+            cfg.kb.functions[name].addr for name in ("alloc_table_row", "get_header", "get_field_list", "alloc_field")
+        ]
+        complete_calling_conventions_for(proj, roots, mode=mode, recover_variables=True)
 
         func0 = cfg.kb.functions["alloc_table_row"]
         assert isinstance(func0.calling_convention, SimCCSystemVAMD64)
@@ -643,10 +663,12 @@ class TestCallingConventionAnalysis(unittest.TestCase):
         binary_path = os.path.join(
             test_location, "i386", "windows", "48460c9633d06cad3e3b41c87de04177d129906610c5bbdebc7507a211100e98"
         )
-        proj = angr.Project(binary_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFG(normalize=True)
-        proj.analyses.CompleteCallingConventions(mode=mode, recover_variables=True)
+        # the assertions only look at 0x4106f0; a whole-binary CFG + CCC of this 71 KB .text (incl. an unreferenced
+        # 53 KB blob) takes well over a minute, while the function's own call tree is about 9 functions
+        proj, cfg = load_project_with_scoped_cfg(
+            binary_path, 0x4106F0, project_kwargs={"auto_load_libs": False}, run_ccc=False
+        )
+        complete_calling_conventions_for(proj, [0x4106F0], mode=mode, recover_variables=True)
 
         func_main = cfg.kb.functions[0x4106F0]
         assert isinstance(func_main.calling_convention, SimCCCdecl)
@@ -658,10 +680,12 @@ class TestCallingConventionAnalysis(unittest.TestCase):
         binary_path = os.path.join(
             test_location, "i386", "windows", "48460c9633d06cad3e3b41c87de04177d129906610c5bbdebc7507a211100e98"
         )
-        proj = angr.Project(binary_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFG(normalize=True)
-        proj.analyses.CompleteCallingConventions(mode=mode, recover_variables=True)
+        # the assertions only look at 0x401a90; a whole-binary CFG + CCC of this 71 KB .text (incl. an unreferenced
+        # 53 KB blob) takes well over a minute, while the function's own call tree is about 8 functions
+        proj, cfg = load_project_with_scoped_cfg(
+            binary_path, 0x401A90, project_kwargs={"auto_load_libs": False}, run_ccc=False
+        )
+        complete_calling_conventions_for(proj, [0x401A90], mode=mode, recover_variables=True)
 
         func_main = cfg.kb.functions[0x401A90]
         assert func_main.info["bp_as_gpr"] is False

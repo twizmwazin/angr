@@ -59,7 +59,7 @@ from angr.utils.ail_serialization import (
     parse_static_buffers,
     parse_static_vvars,
 )
-from tests.common import bin_location
+from tests.common import bin_location, load_project_with_scoped_cfg
 
 test_location = os.path.join(bin_location, "tests")
 
@@ -604,10 +604,17 @@ class TestClinicSerializationAboveFourGigabytes(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.proj = angr.Project(
-            os.path.join(test_location, "x86_64", "decompiler", "vcruntime_test.exe"), auto_load_libs=False
+        # 0x140014348 is the tail-jump target (see below); it must be seeded as a function so Clinic treats the jmp
+        # as a tail call. The assertions only concern 0x140001068's own short call chain, not the rest of this 232 KB
+        # CRT .text.
+        cls.proj, cls.cfg = load_project_with_scoped_cfg(
+            os.path.join(test_location, "x86_64", "decompiler", "vcruntime_test.exe"),
+            0x140001068,
+            extra_func_addrs=(0x140014348,),
+            call_tree_depth=2,
+            project_kwargs={"auto_load_libs": False},
+            run_ccc=False,
         )
-        cls.cfg = cls.proj.analyses.CFGFast(normalize=True)
         # a tail jump to a known function makes Clinic mint a new block address for this one
         cls.func = cls.proj.kb.functions[0x140001068]
         dec = cls.proj.analyses.Decompiler(cls.func, cfg=cls.cfg.model, generate_code=True)
