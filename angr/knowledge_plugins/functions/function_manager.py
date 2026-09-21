@@ -199,6 +199,13 @@ class SpillingFunctionDict(UserDict[K, Function], FunctionDictBase[K]):
     :ivar _eviction_enabled:    A flag indicating whether eviction is currently enabled or not.
     """
 
+    #: The meta-only function cache holds this many times more entries than the full-function cache. A meta-only
+    #: Function is about a quarter the size of a full one (~6 KB against ~28 KB), so the two caches get a similar
+    #: memory budget, and analyses that walk the metadata of every function repeatedly (FLIRT does it once per
+    #: signature, rustc version identification tries dozens of signatures) no longer reload each evicted function
+    #: from LMDB on every pass: on a 900 KB Rust binary that reloading was half of Rust symbol recovery.
+    META_CACHE_RATIO = 4
+
     def __init__(
         self,
         backref: FunctionManager[K] | None,
@@ -220,7 +227,7 @@ class SpillingFunctionDict(UserDict[K, Function], FunctionDictBase[K]):
         self.irange = self._list.irange
 
         self._meta_func_cache: LRUCache[K, Function] = SmartLRUCache(
-            maxsize=cache_limit, evict=self._meta_func_cache_evicted
+            maxsize=cache_limit * self.META_CACHE_RATIO, evict=self._meta_func_cache_evicted
         )
         self._funcsdb: str | None = None
         self._db_batch_size: int = db_batch_size
@@ -286,7 +293,9 @@ class SpillingFunctionDict(UserDict[K, Function], FunctionDictBase[K]):
         self._list = SortedList()
         self.irange = self._list.irange
 
-        self._meta_func_cache = SmartLRUCache(maxsize=self._cache_limit, evict=self._meta_func_cache_evicted)
+        self._meta_func_cache = SmartLRUCache(
+            maxsize=self._cache_limit * self.META_CACHE_RATIO, evict=self._meta_func_cache_evicted
+        )
         self._funcsdb = None
         self._eviction_enabled = True
         self._loading_from_lmdb = False
@@ -430,6 +439,10 @@ class SpillingFunctionDict(UserDict[K, Function], FunctionDictBase[K]):
         self._cache_limit = value
         if self.cached_count > value + self._db_batch_size:
             self._evict_lru()
+        new_meta_cache = SmartLRUCache(maxsize=value * self.META_CACHE_RATIO, evict=self._meta_func_cache_evicted)
+        for k, v in list(self._meta_func_cache.items()):
+            new_meta_cache[k] = v
+        self._meta_func_cache = new_meta_cache
 
     @property
     def cached_count(self) -> int:

@@ -352,9 +352,30 @@ class RustSimStruct(RustSimType, SimStruct):
     _args = ("fields", "name", "pack", "align")
     _fields = ("name", "fields")
 
+    # class-level default so instances created without __init__ (e.g., unpickled from older versions) still work
+    _alignment_memo: int | None = None
+
     def __init__(self, fields: dict[str, SimType] | OrderedDict, name=None, pack=False, align=None):
         SimStruct.__init__(self, fields, name, pack, align)
         self._size = None
+        self._alignment_memo = None
+
+    @property
+    def alignment(self):
+        if self._align is not None:
+            return self._align
+        if self._alignment_memo is not None:
+            return self._alignment_memo
+        # SimStruct.alignment recomputes the whole field tree on every access. Rust type databases nest structs and
+        # enums deeply, and every prototype fit queries the size (hence the alignment) of its argument types, so
+        # without memoization the cost of loading a type database is quadratic in the nesting depth. Only memoize a
+        # value computed outside of a recursive computation on this very struct, where SimStruct's cycle guard would
+        # have substituted 1 for the cycle.
+        top_level = self._size_memo is None
+        alignment = SimStruct.alignment.fget(self)  # type: ignore[union-attr]
+        if top_level and alignment is not NotImplemented:
+            self._alignment_memo = alignment
+        return alignment
 
     def _with_arch(self, arch, *, memo: dict[str, SimType]):
         if self.name in memo:
@@ -637,6 +658,9 @@ class RustSimTypeBottom(RustSimType, SimTypeBottom):
 
 
 class EnumVariant:
+    # class-level default so instances created without __init__ (e.g., unpickled from older versions) still work
+    _type_memo: RustSimStruct | None = None
+
     def __init__(self, name, fields, discriminant, discriminant_size):
         self.name = name
         self.fields: list[tuple[SimType, str | None]] = fields
@@ -644,6 +668,7 @@ class EnumVariant:
         self.discriminant_size = discriminant_size
 
         self._arch = None
+        self._type_memo = None
 
     @staticmethod
     def from_no_data(name, discriminant, discriminant_size):
@@ -684,12 +709,19 @@ class EnumVariant:
 
     @property
     def type(self):
+        # ``bits``, ``size`` and ``field_offsets`` all go through this struct, and an enum's size asks for it once per
+        # variant on every computation; building (and re-sizing) a fresh struct each time made loading a Rust type
+        # database spend most of its time here. The variant is immutable once constructed, so build the struct once.
+        result = self._type_memo
+        if result is not None:
+            return result
         fields = OrderedDict()
         for idx, (field_ty, name) in enumerate(self.fields):
             fields[name or f"field_{idx}"] = field_ty
         result = RustSimStruct(fields, pack=True)
         if self._arch:
-            return result.with_arch(self._arch)
+            result = result.with_arch(self._arch)
+        self._type_memo = result
         return result
 
     def as_struct_ty(self):

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator, Sequence
 
 import networkx
+import pyvex
 
 import angr
 from angr import ailment, claripy, sim_type
@@ -29,7 +30,7 @@ class HashLookupAPIDeobfuscator(Analysis):
         for idx, func_addr in enumerate(func_addrs):
             self._update_progress(0.0 + 20.0 * idx / len(func_addrs), "Finding l0 candidates")
             func = self.kb.functions.get_by_addr(func_addr)
-            if self._is_metadata_accessor_candidate(func):
+            if self._may_access_peb(func) and self._is_metadata_accessor_candidate(func):
                 candidates_l0.add(func_addr)
 
         # Consider predecessors to handle metadata loader wrappers
@@ -51,6 +52,27 @@ class HashLookupAPIDeobfuscator(Analysis):
 
         self._finish_progress()
         self.kb.obfuscations.type3_deobfuscated_apis.update(self.results)
+
+    def _may_access_peb(self, function: Function) -> bool:
+        """
+        Cheap pre-filter for :meth:`_is_metadata_accessor_candidate`, which otherwise decompiles every function of the
+        binary. A call to ``NtGetCurrentPeb`` only ever enters AIL through the x86 ccall rewriter, which turns an
+        ``fs:[0x30]`` read (a ``x86g_use_seg_selector`` ccall in VEX) into that call on Win32 targets. So on any other
+        target no function can qualify, and on x86 Win32 only functions whose VEX IR carries that ccall can.
+        """
+        if self.project.simos.name != "Win32" or self.project.arch.name != "X86":
+            return False
+        if function.is_simprocedure or function.is_plt or function.is_alignment:
+            return False
+        try:
+            for block in function.blocks:
+                for expr in block.vex.expressions:
+                    if isinstance(expr, pyvex.expr.CCall) and expr.cee.name == "x86g_use_seg_selector":
+                        return True
+        except Exception:  # pylint:disable=broad-exception-caught
+            # if the function cannot be lifted this way, leave the decision to the full lifter
+            return True
+        return False
 
     def _is_metadata_accessor_candidate(self, function: Function) -> bool:
         graph = self._lift(function)
