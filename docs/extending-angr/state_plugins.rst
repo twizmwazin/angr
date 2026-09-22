@@ -144,12 +144,8 @@ Common Ancestor
 The full prototype of the ``merge`` interface is ``def merge(self, others,
 merge_conditions, common_ancestor=None)``. ``others`` and ``merge_conditions``
 have been discussed in depth already. If you annotate ``others`` and
-``common_ancestor``, use your own plugin class (or ``typing.Self``): the
-interface is specified by the
-:py:class:`angr.state_plugins.plugin.SupportsMerge` protocol, which type
-checkers match against each plugin with ``Self`` bound to that plugin's class,
-since ``state.merge()`` only ever merges plugins of the same class with each
-other.
+``common_ancestor``, use your own plugin class or ``typing.Self``; the
+interface is the :py:class:`angr.state_plugins.plugin.SupportsMerge` protocol.
 
 The common ancestor is the instance of the plugin from the most recent common
 ancestor of the states being merged. It may not be available for all merges, in

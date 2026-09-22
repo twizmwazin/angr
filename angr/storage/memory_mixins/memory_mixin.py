@@ -10,18 +10,10 @@ from angr.state_plugins.plugin import SimStatePlugin
 
 class SupportsCompare(Protocol):
     """
-    The comparison half of the memory model contract: a memory that can be compared with another instance of its own
-    class. Like :class:`angr.state_plugins.plugin.SupportsMerge`, this is a Protocol so that ``Self`` is bound to the
-    implementing class when a memory model's ``compare`` is checked against it.
+    The compare contract of memory models. A Protocol so that ``Self`` binds to the implementing class.
     """
 
     def compare(self, other: Self) -> bool:  # pylint:disable=unused-argument
-        """
-        Compare this memory with another one of the same class.
-
-        :param other:   The memory to compare against.
-        :return:        True if no difference between the two was found, False otherwise.
-        """
         raise SimMemoryError(f"compare() is not implemented for {self.__class__.__name__}")
 
 
@@ -89,9 +81,6 @@ class MemoryMixin[InData, OutData, Addr](SimStatePlugin, SupportsCompare):
     def load(self, addr: Addr, size: InData | None = None, **kwargs) -> OutData: ...
 
     def store(self, addr: Addr, data: InData, size: InData | None = None, **kwargs) -> None: ...
-
-    # merge() and compare() are part of this interface too; they are specified by the SupportsMerge and
-    # SupportsCompare protocols that this class implements.
 
     def permissions(self, addr: Addr, permissions: int | claripy.ast.BV | None = None, **kwargs) -> claripy.ast.BV: ...
 

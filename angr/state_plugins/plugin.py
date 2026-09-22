@@ -27,15 +27,7 @@ class _CopyFunc[S_co](Protocol):
 
 class SupportsMerge(Protocol):
     """
-    The merging half of the state plugin contract: an object that can be merged with other instances of its own class.
-
-    This is a Protocol rather than a method on :class:`SimStatePlugin` because of how type checkers treat ``Self`` in
-    a parameter annotation. In a method of an ordinary class, ``Self`` is bound to that class when overrides are
-    checked, so a subclass whose ``merge`` names its own type for ``others`` (``others: list[MyPlugin]``, or even
-    ``others: list[Self]``) is rejected as an incompatible override. A Protocol member binds ``Self`` to the class that
-    implements it instead, so every plugin is checked against ``merge(self, others: list[<its own class>], ...)``,
-    which is exactly the contract :meth:`angr.sim_state.SimState.merge` upholds: it only ever merges plugins of one
-    class with each other.
+    The merge contract of state plugins. A Protocol so that ``Self`` binds to the implementing class.
     """
 
     def merge(  # pylint:disable=unused-argument
@@ -80,8 +72,7 @@ class SupportsMerge(Protocol):
         :returns: True if the state plugins are actually merged.
         :rtype: bool
         """
-        # Not a NotImplementedError: a Protocol method whose body only raises NotImplementedError is abstract to type
-        # checkers, which would make every plugin that does not implement merge() uninstantiable in their eyes.
+        # not NotImplementedError, which would make this method abstract to type checkers
         raise SimMergeError(f"merge() is not implemented for {self.__class__.__name__}")
 
 
@@ -90,8 +81,6 @@ class SimStatePlugin(SupportsMerge):
     This is a base class for SimState plugins. A SimState plugin will be copied along with the state when the state is
     branched. They are intended to be used for things such as tracking open files, tracking heap details, and providing
     storage and persistence for SimProcedures.
-
-    Merging is specified by :class:`SupportsMerge`; override :meth:`SupportsMerge.merge` to support it.
     """
 
     def __init__(self) -> None:
