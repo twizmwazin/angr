@@ -9,7 +9,7 @@ use clarirs_core::solver_mixins::{
 use clarirs_smtrs::SmtrsSolver;
 use clarirs_vsa::VSASolver;
 use num_bigint::BigInt;
-use pyo3::types::PyTuple;
+use pyo3::types::{PyDict, PyTuple};
 
 #[pyclass(name = "Solver", module = "angr.rustylib.claripy.solver", subclass)]
 #[derive(Debug)]
@@ -1127,7 +1127,20 @@ impl PyCompositeSolver {
     }
 }
 
+/// Wall time the smtrs backend has spent in this process, by category, as
+/// `{name: (nanoseconds, calls)}`; plain counts carry their value in the
+/// second slot. For profiling angr's use of the solver.
+#[pyfunction]
+fn smtrs_stats(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
+    let stats = PyDict::new(py);
+    for (name, ns, calls) in clarirs_smtrs::stats::snapshot() {
+        stats.set_item(name, (ns, calls))?;
+    }
+    Ok(stats)
+}
+
 pub(crate) fn import(_: Python, m: &Bound<PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(smtrs_stats, m)?)?;
     m.add_class::<PySolver>()?;
     m.add_class::<PyConcreteSolver>()?;
     m.add_class::<PySmtrsSolver>()?;

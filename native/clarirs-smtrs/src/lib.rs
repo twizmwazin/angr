@@ -14,5 +14,6 @@ mod backend;
 mod convert;
 mod deadline;
 mod solver;
+pub mod stats;
 
 pub use solver::SmtrsSolver;

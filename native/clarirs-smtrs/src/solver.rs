@@ -105,6 +105,7 @@ impl<'c> SmtrsSolver<'c> {
             config: self.config(),
             first: self.queries == 1,
         };
+        let _t = crate::stats::RUN.enter();
         with_backend(|b| b.run(&req, f))
     }
 
@@ -186,11 +187,7 @@ impl<'c> SmtrsSolver<'c> {
             if !engine.check(conv.pool, &[])? {
                 return Err(ClarirsError::Unsat);
             }
-            let found = if maximize {
-                engine.solver.maximize(conv.pool, target, &[])
-            } else {
-                engine.solver.minimize(conv.pool, target, &[])
-            };
+            let found = engine.extremum(conv.pool, target, maximize);
             let value = found.ok_or_else(|| {
                 ClarirsError::SolverUnknown("smtrs could not optimize this expression".to_string())
             })?;
@@ -382,7 +379,7 @@ impl<'c> Solver<'c> for SmtrsSolver<'c> {
             if !engine.check(conv.pool, &[])? {
                 return Err(ClarirsError::Unsat);
             }
-            let values = engine.solver.eval_n(conv.pool, term, n as usize, &[]);
+            let values = engine.enumerate(conv.pool, term, n as usize);
             if values.is_empty() {
                 return Err(ClarirsError::SolverUnknown(
                     "smtrs could not enumerate values for this expression".to_string(),

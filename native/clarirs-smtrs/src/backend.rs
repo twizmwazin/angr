@@ -31,7 +31,7 @@ use std::time::Duration;
 
 use clarirs_core::prelude::*;
 use rustc_hash::FxHashMap;
-use smtrs_core::{SymbolId, TermId, TermPool, Value};
+use smtrs_core::{BvConst, SymbolId, TermId, TermPool, Value};
 use smtrs_solver::Answer;
 
 use crate::convert::{Converter, Kind, eval_completed, string_value, value_to_ast};
@@ -64,6 +64,8 @@ pub(crate) struct Engine {
 
 impl Engine {
     fn new(config: Config) -> Self {
+        let _t = crate::stats::ENGINE_SETUP.enter();
+        crate::stats::ENGINE_BUILDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let mut solver = smtrs_solver::Solver::new();
         // Model validation re-evaluates every assertion under the model on
         // each sat answer: a debugging aid, not something to pay for on
@@ -89,6 +91,8 @@ impl Engine {
     }
 
     fn fork(&self) -> Self {
+        let _t = crate::stats::ENGINE_SETUP.enter();
+        crate::stats::ENGINE_FORKS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let mut engine = Engine {
             solver: self.solver.fork(),
             asserted: self.asserted.clone(),
@@ -160,13 +164,54 @@ impl Engine {
         pool: &mut TermPool,
         assumptions: &[TermId],
     ) -> Result<bool, ClarirsError> {
-        let answer = self.solver.check_sat(pool, assumptions);
+        let snap = crate::stats::SolverSnapshot::of(&self.solver);
+        let answer = {
+            let _t = crate::stats::CHECK.enter();
+            self.solver.check_sat(pool, assumptions)
+        };
+        snap.account(&self.solver);
         self.model_fresh = answer == Answer::Sat;
         match answer {
             Answer::Sat => Ok(true),
             Answer::Unsat => Ok(false),
             Answer::Unknown(reason) => Err(ClarirsError::SolverUnknown(reason)),
         }
+    }
+
+    /// `minimize` / `maximize` of `target` over the current constraints.
+    pub(crate) fn extremum(
+        &mut self,
+        pool: &mut TermPool,
+        target: TermId,
+        maximize: bool,
+    ) -> Option<BvConst> {
+        let snap = crate::stats::SolverSnapshot::of(&self.solver);
+        let found = {
+            let _t = crate::stats::EXTREMUM.enter();
+            if maximize {
+                self.solver.maximize(pool, target, &[])
+            } else {
+                self.solver.minimize(pool, target, &[])
+            }
+        };
+        snap.account(&self.solver);
+        found
+    }
+
+    /// Up to `n` distinct values of `term` over the current constraints.
+    pub(crate) fn enumerate(
+        &mut self,
+        pool: &mut TermPool,
+        term: TermId,
+        n: usize,
+    ) -> Vec<BvConst> {
+        let snap = crate::stats::SolverSnapshot::of(&self.solver);
+        let values = {
+            let _t = crate::stats::ENUMERATE.enter();
+            self.solver.eval_n(pool, term, n, &[])
+        };
+        snap.account(&self.solver);
+        values
     }
 
     /// Make sure the engine holds a model of the current constraints,
@@ -191,6 +236,7 @@ impl Engine {
         pool: &mut TermPool,
         terms: &[TermId],
     ) -> Result<Vec<Value>, ClarirsError> {
+        let _t = crate::stats::EVAL.enter();
         let lowered;
         let terms = if smtrs_fp::contains_fp(pool, terms) {
             lowered = smtrs_fp::lower(pool, terms).map_err(|e| {
@@ -218,6 +264,7 @@ impl Engine {
         conv: &mut Converter<'_>,
         expr: &AstRef<'c>,
     ) -> Result<AstRef<'c>, ClarirsError> {
+        let _t = crate::stats::EVAL.enter();
         let ctx = expr.context();
         let mut values: HashMap<u64, AstRef<'c>> = HashMap::new();
         let mut stack = vec![expr.clone()];
@@ -272,6 +319,7 @@ impl Engine {
         terms: &[TermId],
         kinds: &[Kind],
     ) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+        let _t = crate::stats::EVAL.enter();
         let ctx = exprs[0].context();
         let substitute: Vec<bool> = terms
             .iter()
@@ -394,6 +442,7 @@ impl Backend {
         {
             let engine = engines.get_mut(&pid).expect("checked above");
             let base = engine.asserted.len();
+            crate::stats::BORROWED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             engine.solver.push(1);
             // The level is popped whatever happens inside, a panic included:
             // an engine left with a foreign level would answer wrongly for

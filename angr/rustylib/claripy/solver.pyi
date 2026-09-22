@@ -9,6 +9,11 @@ from angr.rustylib.claripy.ast.bv import BV
 
 type _BoolLike = Bool | bool | int | BV
 
+def smtrs_stats() -> dict[str, tuple[int, int]]:
+    """Wall time the smtrs backend has spent in this process, by category, as
+    ``{name: (nanoseconds, calls)}``; plain counts carry their value in the
+    second slot."""
+
 class Solver:
     timeout: int | None
     def __init__(self, timeout: int | None = None, track: bool = False) -> None: ...
