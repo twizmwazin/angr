@@ -93,6 +93,24 @@ pub static PHASE_PROP_ABS: Counter = Counter::new(12);
 pub static ENGINE_SETUP: Counter = Counter::new(13);
 
 pub static ENGINE_BUILDS: AtomicU64 = AtomicU64::new(0);
+/// Why an engine was built from scratch rather than reused or forked.
+/// The solver had no engine and no usable ancestor engine (a fresh solver,
+/// or an ancestor that never queried).
+pub static BUILD_NO_ANCESTOR: AtomicU64 = AtomicU64::new(0);
+/// The ancestor's engine no longer stands for a prefix of the constraints
+/// (the ancestor was extended, simplified or cleared after the clone).
+pub static BUILD_ANCESTOR_DIVERGED: AtomicU64 = AtomicU64::new(0);
+/// The solver's own engine no longer stands for its constraints.
+pub static BUILD_OWN_STALE: AtomicU64 = AtomicU64::new(0);
+/// Engines dropped by `simplify` because simplification changed a constraint.
+pub static INVALIDATED_BY_SIMPLIFY: AtomicU64 = AtomicU64::new(0);
+/// `simplify` calls that changed nothing.
+pub static SIMPLIFY_NOOP: AtomicU64 = AtomicU64::new(0);
+pub static CLONES: AtomicU64 = AtomicU64::new(0);
+/// Engines kept for their owner's children after the owner let go of them.
+pub static ENGINES_RETIRED: AtomicU64 = AtomicU64::new(0);
+/// Queries (borrowed or forked) answered from a retired engine.
+pub static RETIRED_QUERIES: AtomicU64 = AtomicU64::new(0);
 pub static ENGINE_FORKS: AtomicU64 = AtomicU64::new(0);
 /// First queries of a clone answered under a push level on its ancestor.
 pub static BORROWED: AtomicU64 = AtomicU64::new(0);
@@ -181,9 +199,17 @@ pub fn snapshot() -> Vec<(&'static str, u64, u64)> {
         ("phase_prop_abs", &PHASE_PROP_ABS),
         ("engine_setup", &ENGINE_SETUP),
     ];
-    let counts: [(&str, &AtomicU64); 7] = [
+    let counts: [(&str, &AtomicU64); 15] = [
         ("engine_builds", &ENGINE_BUILDS),
         ("engine_forks", &ENGINE_FORKS),
+        ("build_no_ancestor", &BUILD_NO_ANCESTOR),
+        ("build_ancestor_diverged", &BUILD_ANCESTOR_DIVERGED),
+        ("build_own_stale", &BUILD_OWN_STALE),
+        ("invalidated_by_simplify", &INVALIDATED_BY_SIMPLIFY),
+        ("simplify_noop", &SIMPLIFY_NOOP),
+        ("clones", &CLONES),
+        ("engines_retired", &ENGINES_RETIRED),
+        ("retired_queries", &RETIRED_QUERIES),
         ("borrowed_queries", &BORROWED),
         ("rebuilds", &REBUILDS),
         ("sat_conflicts", &SAT_CONFLICTS),
