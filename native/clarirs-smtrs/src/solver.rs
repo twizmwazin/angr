@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use clarirs_core::prelude::*;
 use smtrs_core::{BvConst, Op};
 
-use crate::backend::{Config, Request, forget_engine, with_backend};
+use crate::backend::{Config, Request, release, with_backend};
 use crate::convert::{bitvec_of, is_literal, value_to_ast};
 
 static NEXT_SOLVER_ID: AtomicU64 = AtomicU64::new(1);
@@ -34,12 +34,17 @@ pub struct SmtrsSolver<'c> {
 
 impl<'c> Clone for SmtrsSolver<'c> {
     fn clone(&self) -> Self {
+        crate::stats::CLONES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let parent = with_backend(|b| {
-            if b.has_engine(self.id) {
+            let parent = if b.has_engine(self.id) {
                 Some(self.id)
             } else {
                 self.parent
+            };
+            if let Some(pid) = parent {
+                b.attach(pid);
             }
+            parent
         });
         SmtrsSolver {
             ctx: self.ctx,
@@ -55,7 +60,7 @@ impl<'c> Clone for SmtrsSolver<'c> {
 
 impl Drop for SmtrsSolver<'_> {
     fn drop(&mut self) {
-        forget_engine(self.id);
+        release(self.id, self.parent);
     }
 }
 
@@ -106,7 +111,15 @@ impl<'c> SmtrsSolver<'c> {
             first: self.queries == 1,
         };
         let _t = crate::stats::RUN.enter();
-        with_backend(|b| b.run(&req, f))
+        let (result, own_engine) = with_backend(|b| {
+            let result = b.run(&req, f);
+            (result, b.has_engine(req.id))
+        });
+        // With an engine of its own, this solver is done with its ancestor's.
+        if own_engine && let Some(parent) = self.parent.take() {
+            with_backend(|b| b.detach(Some(parent)));
+        }
+        result
     }
 
     fn invalidate(&self) {
@@ -235,7 +248,11 @@ impl<'c> Solver<'c> for SmtrsSolver<'c> {
             self.assertions = simplified;
             // The engine's asserted prefix no longer matches; `run` will
             // notice, but drop it now rather than keep it warm for nothing.
+            crate::stats::INVALIDATED_BY_SIMPLIFY
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             self.invalidate();
+        } else {
+            crate::stats::SIMPLIFY_NOOP.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
         Ok(())
     }
@@ -803,6 +820,46 @@ mod tests {
         assert_eq!(parent.min_unsigned(&x)?, bv(&ctx, 8, 8));
         drop(parent);
         assert!(!child.satisfiable()?);
+        Ok(())
+    }
+
+    /// angr drops a state once it has stepped it. The engine of a dropped
+    /// solver stays for the clones made from it: their first query borrows
+    /// it, a second forks it, and it goes once no clone depends on it.
+    #[test]
+    fn test_a_dropped_solver_leaves_its_engine_to_its_clones() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let x = ctx.bvs("x", 8)?;
+        let mut parent = SmtrsSolver::new(&ctx);
+        parent.add(&ctx.ugt(&x, bv(&ctx, 5, 8))?)?;
+        assert!(parent.satisfiable()?);
+        let pid = parent.id;
+        let mut child = parent.clone();
+        let cid = child.id;
+        child.add(&ctx.ult(&x, bv(&ctx, 7, 8))?)?;
+        let orphan = parent.clone();
+        drop(parent);
+        assert!(with_backend(
+            |b| !b.has_engine(pid) && b.has_retired_engine(pid)
+        ));
+
+        // Borrowed under a push level, then forked into an engine of its own.
+        assert_eq!(child.eval(&x)?, bv(&ctx, 6, 8));
+        assert!(with_backend(
+            |b| !b.has_engine(cid) && b.has_retired_engine(pid)
+        ));
+        assert_eq!(child.max_unsigned(&x)?, bv(&ctx, 6, 8));
+        assert!(with_backend(
+            |b| b.has_engine(cid) && b.has_retired_engine(pid)
+        ));
+
+        // The last dependant gone, the retired engine goes too.
+        drop(orphan);
+        assert!(with_backend(|b| !b.has_retired_engine(pid)));
+        child.add(&ctx.eq_(&x, bv(&ctx, 6, 8))?)?;
+        assert!(child.satisfiable()?);
+        drop(child);
+        assert!(with_backend(|b| !b.has_engine(cid)));
         Ok(())
     }
 

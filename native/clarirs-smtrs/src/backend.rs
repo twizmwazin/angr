@@ -22,6 +22,14 @@
 //! query a push/pop on a warm engine instead of a solver build. A clone that
 //! keeps being queried gets its own engine, forked from the ancestor's with
 //! its learned clauses when that is still possible.
+//!
+//! An engine outlives its solver while clones of that solver live: angr
+//! drops a state as soon as it has stepped it, and the successors would
+//! otherwise each encode the constraints they inherited from scratch. Such
+//! a *retired* engine is kept under its owner's id until the last clone
+//! recorded against it is dropped or has an engine of its own.
+//! `CLARIRS_SMTRS_NO_INHERIT` in the environment switches this off, for
+//! comparison.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -361,7 +369,15 @@ pub(crate) struct Backend {
     terms: FxHashMap<u64, TermId>,
     vars: FxHashMap<(InternedString, smtrs_core::Sort), SymbolId>,
     names: FxHashMap<String, SymbolId>,
+    /// Live solvers' own engines, by solver id.
     engines: HashMap<u64, Engine>,
+    /// Engines whose owner is gone, or has moved past them, kept under the
+    /// owner's id while any solver cloned from it still lives: angr drops
+    /// a state once it has stepped it, and its successors would otherwise
+    /// encode the shared constraints again from scratch.
+    retired: HashMap<u64, Engine>,
+    /// Live solvers whose `parent` is this id, so may still use its engine.
+    children: HashMap<u64, u32>,
 }
 
 thread_local! {
@@ -371,31 +387,105 @@ thread_local! {
         vars: FxHashMap::default(),
         names: FxHashMap::default(),
         engines: HashMap::new(),
+        retired: HashMap::new(),
+        children: HashMap::new(),
     });
+    /// Solver drops that arrived while the backend was borrowed.
+    static PENDING_RELEASES: RefCell<Vec<(u64, Option<u64>)>> = const { RefCell::new(Vec::new()) };
 }
 
 /// Run `f` against this thread's backend.
 pub(crate) fn with_backend<R>(f: impl FnOnce(&mut Backend) -> R) -> R {
-    BACKEND.with(|cell| f(&mut cell.borrow_mut()))
+    BACKEND.with(|cell| {
+        let mut backend = cell.borrow_mut();
+        backend.settle();
+        f(&mut backend)
+    })
 }
 
-/// Forget a solver's engine. Safe to call from `Drop`, including during
-/// thread teardown or while the backend is already borrowed.
-pub(crate) fn forget_engine(id: u64) {
-    let _ = BACKEND.try_with(|cell| {
-        if let Ok(mut backend) = cell.try_borrow_mut() {
-            backend.engines.remove(&id);
-        }
-    });
+/// A solver is gone: let go of its parent's engine, and release its own or
+/// keep it for its children. Safe to call from `Drop`, including during
+/// thread teardown or while the backend is already borrowed, in which case
+/// the release is applied on the backend's next use.
+pub(crate) fn release(id: u64, parent: Option<u64>) {
+    let applied = BACKEND
+        .try_with(|cell| match cell.try_borrow_mut() {
+            Ok(mut backend) => {
+                backend.released(id, parent);
+                true
+            }
+            Err(_) => false,
+        })
+        .unwrap_or(true); // thread teardown: nothing left to keep
+    if !applied {
+        let _ = PENDING_RELEASES.try_with(|pending| {
+            if let Ok(mut pending) = pending.try_borrow_mut() {
+                pending.push((id, parent));
+            }
+        });
+    }
 }
 
 impl Backend {
+    fn settle(&mut self) {
+        let pending = PENDING_RELEASES.with(|pending| {
+            pending
+                .try_borrow_mut()
+                .map(|mut p| std::mem::take(&mut *p))
+                .unwrap_or_default()
+        });
+        for (id, parent) in pending {
+            self.released(id, parent);
+        }
+    }
+
+    fn released(&mut self, id: u64, parent: Option<u64>) {
+        self.detach(parent);
+        if let Some(engine) = self.engines.remove(&id) {
+            self.retire(id, engine);
+        }
+    }
+
+    /// A solver cloned from `parent` while it had an engine.
+    pub(crate) fn attach(&mut self, parent: u64) {
+        *self.children.entry(parent).or_insert(0) += 1;
+    }
+
+    /// One solver cloned from `parent` no longer needs its engine.
+    pub(crate) fn detach(&mut self, parent: Option<u64>) {
+        let Some(pid) = parent else { return };
+        if let Some(n) = self.children.get_mut(&pid) {
+            *n -= 1;
+            if *n == 0 {
+                self.children.remove(&pid);
+                self.retired.remove(&pid);
+            }
+        }
+    }
+
+    /// Keep `engine` for `id`'s children, if it has any.
+    fn retire(&mut self, id: u64, engine: Engine) {
+        if self.children.contains_key(&id) && std::env::var_os("CLARIRS_SMTRS_NO_INHERIT").is_none()
+        {
+            crate::stats::ENGINES_RETIRED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.retired.insert(id, engine);
+        }
+    }
+
     pub(crate) fn has_engine(&self, id: u64) -> bool {
         self.engines.contains_key(&id)
     }
 
+    #[cfg(test)]
+    pub(crate) fn has_retired_engine(&self, id: u64) -> bool {
+        self.retired.contains_key(&id)
+    }
+
+    /// The solver's constraints changed behind its engine.
     pub(crate) fn drop_engine(&mut self, id: u64) {
-        self.engines.remove(&id);
+        if let Some(engine) = self.engines.remove(&id) {
+            self.retire(id, engine);
+        }
     }
 
     /// Run `f` against an engine holding exactly `req.constraints`,
@@ -405,12 +495,15 @@ impl Backend {
         req: &Request<'_, '_>,
         f: impl FnOnce(&mut Converter<'_>, &mut Engine) -> Result<R, ClarirsError>,
     ) -> Result<R, ClarirsError> {
+        use std::sync::atomic::Ordering::Relaxed;
         let Backend {
             pool,
             terms,
             vars,
             names,
             engines,
+            retired,
+            children: _,
         } = self;
         let mut conv = Converter::new(pool, terms, vars, names);
 
@@ -418,8 +511,8 @@ impl Backend {
         let own_ok = engines
             .get(&req.id)
             .is_some_and(|e| e.config == req.config && e.is_prefix_of(req.constraints));
-        if !own_ok {
-            engines.remove(&req.id);
+        if !own_ok && engines.remove(&req.id).is_some() {
+            crate::stats::BUILD_OWN_STALE.fetch_add(1, Relaxed);
         }
         if let Some(engine) = engines.get_mut(&req.id) {
             engine.sync(&mut conv, req.constraints)?;
@@ -427,47 +520,62 @@ impl Backend {
             return f(&mut conv, engine);
         }
 
-        // Our ancestor's engine, if it still stands for a prefix of ours.
-        let parent = req.parent.filter(|pid| {
-            engines
-                .get(pid)
-                .is_some_and(|e| e.config == req.config && e.is_prefix_of(req.constraints))
-        });
+        // Our ancestor's engine, live or retired, if it still stands for a
+        // prefix of ours.
+        let stands = |e: &Engine| e.config == req.config && e.is_prefix_of(req.constraints);
+        let ancestor = match req.parent {
+            Some(pid) if engines.get(&pid).is_some_and(stands) => engines.get_mut(&pid),
+            Some(pid) if retired.get(&pid).is_some_and(stands) => {
+                crate::stats::RETIRED_QUERIES.fetch_add(1, Relaxed);
+                retired.get_mut(&pid)
+            }
+            _ => None,
+        };
 
-        // First query: borrow the ancestor's engine under a push level. Not
-        // in unsat-core mode, where the core would name its tracked symbols.
-        if req.first
-            && !req.config.unsat_core
-            && let Some(pid) = parent
-        {
-            let engine = engines.get_mut(&pid).expect("checked above");
-            let base = engine.asserted.len();
-            crate::stats::BORROWED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            engine.solver.push(1);
-            // The level is popped whatever happens inside, a panic included:
-            // an engine left with a foreign level would answer wrongly for
-            // its owner from then on.
-            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                for c in &req.constraints[base..] {
-                    let t = conv.term(c)?;
-                    engine.solver.assert(t);
-                }
+        if let Some(engine) = ancestor {
+            // First query: borrow the ancestor's engine under a push level.
+            // Not in unsat-core mode, where the core would name its tracked
+            // symbols.
+            if req.first && !req.config.unsat_core {
+                let base = engine.asserted.len();
+                crate::stats::BORROWED.fetch_add(1, Relaxed);
+                engine.solver.push(1);
+                // The level is popped whatever happens inside, a panic
+                // included: an engine left with a foreign level would answer
+                // wrongly for its owner from then on.
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    for c in &req.constraints[base..] {
+                        let t = conv.term(c)?;
+                        engine.solver.assert(t);
+                    }
+                    engine.model_fresh = false;
+                    let _armed = engine.arm();
+                    f(&mut conv, engine)
+                }));
+                engine.solver.pop(1);
                 engine.model_fresh = false;
-                let _armed = engine.arm();
-                f(&mut conv, engine)
-            }));
-            engine.solver.pop(1);
-            engine.model_fresh = false;
-            return match result {
-                Ok(result) => result,
-                Err(payload) => std::panic::resume_unwind(payload),
-            };
+                return match result {
+                    Ok(result) => result,
+                    Err(payload) => std::panic::resume_unwind(payload),
+                };
+            }
+            let mut forked = engine.fork();
+            forked.sync(&mut conv, req.constraints)?;
+            let engine = engines.entry(req.id).or_insert(forked);
+            let _armed = engine.arm();
+            return f(&mut conv, engine);
         }
 
-        let mut engine = match parent {
-            Some(pid) => engines[&pid].fork(),
-            None => Engine::new(req.config),
+        let had_ancestor = req
+            .parent
+            .is_some_and(|pid| engines.contains_key(&pid) || retired.contains_key(&pid));
+        let reason = if had_ancestor {
+            &crate::stats::BUILD_ANCESTOR_DIVERGED
+        } else {
+            &crate::stats::BUILD_NO_ANCESTOR
         };
+        reason.fetch_add(1, Relaxed);
+        let mut engine = Engine::new(req.config);
         engine.sync(&mut conv, req.constraints)?;
         let engine = engines.entry(req.id).or_insert(engine);
         let _armed = engine.arm();
