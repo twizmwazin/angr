@@ -377,8 +377,9 @@ class JavaVmMemoryMixin(MemoryMixin):
         o.max_array_size = self.max_array_size
         return o
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor=None) -> bool:  # pylint: disable=unused-argument
         l.warning("Merging is not implemented for JavaVM memory!")
+        return False
 
     # pylint: disable=no-self-use,unused-argument
     def _find(self, addr, what, max_search=None, max_symbolic_bytes=None, default=None):

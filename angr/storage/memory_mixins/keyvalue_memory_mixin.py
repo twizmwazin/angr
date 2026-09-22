@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from typing import Self
 
 from angr.storage.memory_mixins.memory_mixin import MemoryMixin
+
+l = logging.getLogger(name=__name__)
 
 
 class TypedVariable:
@@ -39,6 +42,10 @@ class KeyValueMemoryMixin(MemoryMixin):
         o: KeyValueMemoryMixin = super().copy(memo)
         o._store = self._store.copy()
         return o
+
+    def merge(self, others, merge_conditions, common_ancestor=None) -> bool:  # pylint: disable=unused-argument
+        l.warning("Merging is not implemented for key-value memory!")
+        return False
 
     def __str__(self):
         return "\n".join([f"{k}: {v.value} ({v.type})" for k, v in self._store.items()])
