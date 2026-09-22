@@ -169,6 +169,7 @@ impl<'b> Converter<'b> {
         if let Some(&t) = self.terms.get(&ast.hash()) {
             return Ok(t);
         }
+        let _t = crate::stats::CONVERT.enter();
         // Explicit stack: angr builds ASTs thousands of nodes deep.
         let mut stack: Vec<(AstRef<'c>, usize)> = vec![(ast.clone(), 0)];
         while let Some((node, next_child)) = stack.last_mut() {
