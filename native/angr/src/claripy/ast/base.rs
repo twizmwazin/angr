@@ -3,6 +3,7 @@ use std::collections::{BTreeSet, HashMap};
 use clarirs_core::algorithms::{collect_vars::collect_vars, structurally_match};
 use clarirs_vsa::cardinality::Cardinality;
 use num_bigint::BigUint;
+use pyo3::exceptions::PyNotImplementedError;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyFrozenSet, PyTuple, PyType};
 
@@ -125,6 +126,13 @@ impl Base {
     #[getter]
     pub fn concrete(&self) -> bool {
         !self.inner.symbolic()
+    }
+
+    #[getter]
+    pub fn concrete_value(&self) -> PyResult<Py<PyAny>> {
+        Err(PyNotImplementedError::new_err(
+            "concrete_value is implemented by each sort-specific subclass",
+        ))
     }
 
     #[getter]

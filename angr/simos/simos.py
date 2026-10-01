@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import struct
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from archinfo import ArchMIPS32, ArchS390X
 
@@ -75,7 +75,7 @@ class SimOS:
                 _l.error("Resolver at %#x failed to resolve!", resolver_addr)
                 return None
 
-            return val.concrete_value if val is not None and val.concrete else None
+            return cast(int, val.concrete_value) if val is not None and val.concrete else None
 
         self.project.loader.perform_irelative_relocs(irelative_resolver)
 
