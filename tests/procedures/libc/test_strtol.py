@@ -19,6 +19,11 @@ class TestStrtol(unittest.TestCase):
         b = angr.Project(test_bin, auto_load_libs=True)
 
         initial_state = b.factory.entry_state(remove_options={angr.options.LAZY_SOLVES})
+        # strtol unrolls one case per character up to max_strtol_len, and every branch check after it pays for the
+        # unrolled constraints. The longest input any expected output needs is seven digits ("-0146715", -0xcdcd in
+        # octal), so seven is the smallest length that reaches all ten outputs; the default of 11 takes three times
+        # as long. test_strtol_long_string covers parsing at the default length.
+        initial_state.libc.max_strtol_len = 7
         pg = b.factory.simulation_manager(thing=initial_state, threads=threads)
 
         # find the end of main

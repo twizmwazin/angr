@@ -144,8 +144,10 @@ class TestCallable(unittest.TestCase):
             s.add(arg > claripy.FPV(1.0, claripy.FSORT_DOUBLE))  # type: ignore
         s.add(result == claripy.FPV(27.7, claripy.FSORT_DOUBLE))
 
-        args_conc = s.batch_eval(sym_args, 1)[0]
-        assert s.eval(result, 1)[0] == 27.7
+        # Read the arguments and the result out of one model: each separate eval is a fresh z3 query, and a second
+        # query for the result alone takes twice as long as the first.
+        *args_conc, result_conc = s.batch_eval([*sym_args, result], 1)[0]
+        assert result_conc == 27.7
         # not almost equal!! totally equal!!! z3 is magic, if kinda slow!!!!!
         for arg_conc in args_conc:
             assert arg_conc > 1.0
