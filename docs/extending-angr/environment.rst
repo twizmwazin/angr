@@ -168,8 +168,8 @@ address corresponds to a syscall is ``project.simos.is_syscall_addr(addr)`` and
 the syscall corresponding to the address can be retrieved with
 ``project.simos.syscall_from_addr(addr)``.
 
-Case 1, in-tree development
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Case 1, in-tree development (syscalls)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 SimSyscallLibraries are stored in the same place as the normal SimLibraries,
 ``angr/procedures/definitions``. These libraries don't have to specify any
@@ -191,8 +191,8 @@ calling ``register_simos()`` with the OS name as it appears in
 ``project.loader.main_object.os`` and the SimOS class. Your class should do
 everything described above.
 
-Case 2, out-of-tree development, tight integration
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Case 2, out-of-tree development, tight integration (syscalls)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 You can add syscalls to a SimSyscallLibrary the same way you can add functions
 to a normal SimLibrary, by tweaking the entries in ``angr.SIM_LIBRARIES``. If
@@ -203,8 +203,8 @@ You can register a SimOS with angr from out-of-tree as well - the same
 ``register_simos`` method is just sitting there waiting for you as
 ``angr.simos.register_simos(name, simos_cls)``.
 
-Case 3, out-of-tree development, loose integration
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Case 3, out-of-tree development, loose integration (syscalls)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The SimSyscallLibrary the SimOS uses is copied from the original during setup,
 so it is safe to mutate. You can directly fiddle with
