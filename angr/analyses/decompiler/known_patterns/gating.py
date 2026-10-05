@@ -212,11 +212,11 @@ def all_of(*gates: PatternGate) -> AllOf:
 
 # --- prebuilt target gates --------------------------------------------------
 
-#: The binary is a Linux kernel module (or the kernel image itself): it carries
+#: The binary is a Linux kernel module (or the kernel image itself); it carries
 #: the module metadata sections, or exports symbols through ``__ksymtab``.
 LINUX_KERNEL = TargetGate("linux-kernel-object", lambda ctx: ctx.is_linux_kernel_object)
 
-#: The binary is a Windows kernel-mode driver: it imports ntoskrnl/hal/a kernel
+#: The binary is a Windows kernel-mode driver; it imports ntoskrnl/hal/a kernel
 #: -mode port or miniport library rather than the user-mode Win32 DLLs.
 WINDOWS_KERNEL_DRIVER = TargetGate("windows-kernel-driver", lambda ctx: ctx.is_windows_kernel_driver)
 
