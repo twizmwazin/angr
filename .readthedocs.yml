@@ -16,3 +16,9 @@ build:
   tools:
     python: "3.12"
     rust: latest
+  jobs:
+    build:
+      html:
+        # Read the Docs' default HTML command plus ``-j auto``. The PDF build
+        # that follows reads the same doctrees directory.
+        - uv run --no-sync --no-dev sphinx-build -j auto -T -b html -d docs/_build/doctrees -D language=en docs $READTHEDOCS_OUTPUT/html
