@@ -4,6 +4,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 from __future__ import annotations
 
+import builtins
 import datetime
 import importlib
 import inspect
@@ -309,6 +310,48 @@ def limit_global_toctree(_app, pagename, _templatename, context, _doctree):
     context["toctree"] = bounded
 
 
+# -- Builtin types: link to the Python documentation -------------------------
+# The Python domain looks type annotations up with its "fuzzy" search, and a
+# name it cannot find as a class is retried as data and then as an attribute.
+# A builtin such as ``bytes`` or ``type`` is never an angr class, so the search
+# ends on whichever angr attributes happen to share the name: ``dict[int,
+# bytes]`` linked to ``angr.analyses.cfg.cfb.Unknown.bytes``, and Sphinx warned
+# that more than one target was found. Each of those lookups also scans every
+# object in the inventory several times.
+#
+# Resolving builtin names against the Python inventory first, ahead of Sphinx's
+# own resolver, gives the right link. Anything intersphinx cannot resolve is
+# left for the normal resolver.
+
+_BUILTIN_TYPES = frozenset(name for name, obj in vars(builtins).items() if isinstance(obj, type))
+
+
+def _make_builtin_type_resolver():
+    from sphinx import addnodes
+    from sphinx.ext.intersphinx import missing_reference
+    from sphinx.transforms.post_transforms import SphinxPostTransform
+
+    class ResolveBuiltinTypes(SphinxPostTransform):
+        # Sphinx's ReferencesResolver runs at 10.
+        default_priority = 9
+
+        def run(self, **kwargs):
+            for node in list(self.document.findall(addnodes.pending_xref)):
+                if (
+                    node.get("refdomain") != "py"
+                    or node.get("reftype") not in {"class", "obj"}
+                    or node.get("reftarget") not in _BUILTIN_TYPES
+                    or isinstance(node[0], addnodes.pending_xref_condition)
+                ):
+                    continue
+                newnode = missing_reference(self.app, self.env, node, node[0].deepcopy())
+                if newnode is not None:
+                    node.replace_self(newnode)
+
+    return ResolveBuiltinTypes
+
+
 def setup(app):
     app.connect("autodoc-skip-member", skip_inherited_undocumented)
     app.connect("html-page-context", limit_global_toctree, priority=400)
+    app.add_post_transform(_make_builtin_type_resolver())
