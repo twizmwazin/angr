@@ -1367,7 +1367,7 @@ class VFG(ForwardAnalysis[SimState, VFGNode, VFGJob, BlockID, SimState], Analysi
 
         :param src_block_id:         The block ID for source node.
         :param dst_block_id:         The block Id for destination node.
-        :param str jumpkind:         The jumpkind of the edge.
+        :param jumpkind:             The jumpkind of the edge (passed through ``kwargs``).
         :param exit_stmt_idx:        ID of the statement in the source IRSB where this edge is created from. 'default'
                                      refers to the default exit.
         :return: None

@@ -48,20 +48,19 @@ class ForwardAnalysis[AnalysisState, NodeType, JobType, JobKey, SuccessorType]:
 
     def __init__(
         self,
-        order_jobs=False,
-        allow_merging=False,
-        allow_widening=False,
+        order_jobs: bool = False,
+        allow_merging: bool = False,
+        allow_widening: bool = False,
         status_callback: Callable[[ForwardAnalysis], Any] | None = None,
         graph_visitor: GraphVisitor[NodeType] | None = None,
     ):
         """
         Constructor
 
-        :param bool order_jobs:     If all jobs should be ordered or not.
-        :param bool allow_merging:  If job merging is allowed.
-        :param bool allow_widening: If job widening is allowed.
+        :param order_jobs:     If all jobs should be ordered or not.
+        :param allow_merging:  If job merging is allowed.
+        :param allow_widening: If job widening is allowed.
         :param graph_visitor:       A graph visitor to provide successors.
-        :type graph_visitor:        GraphVisitor or None
         :return: None
         """
 
@@ -425,7 +424,7 @@ class ForwardAnalysis[AnalysisState, NodeType, JobType, JobKey, SuccessorType]:
         """
         Process a job, get all successors of this job, and call _handle_successor() to handle each successor.
 
-        :param JobInfo job_info: The JobInfo instance
+        :param job_info: The JobInfo instance
         :return: None
         """
 
@@ -510,7 +509,7 @@ class ForwardAnalysis[AnalysisState, NodeType, JobType, JobKey, SuccessorType]:
         Return the job currently at position `pos`, but still keep it in the job queue. An IndexError will be raised
         if that position does not currently exist in the job list.
 
-        :param int pos: Position of the job to get.
+        :param pos: Position of the job to get.
         :return:        The job
         """
 

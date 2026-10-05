@@ -1009,25 +1009,25 @@ class FunctionManager[K: (int, SootMethodDescriptor)](KnowledgeBasePlugin, colle
 
     def _add_call_to(
         self,
-        function_addr,
+        function_addr: K,
         from_node,
         to_addr,
         retn_node=None,
         syscall: bool = False,
-        stmt_idx=None,
-        ins_addr=None,
+        stmt_idx: int | None = None,
+        ins_addr: int | None = None,
         return_to_outside: bool = False,
     ):
         """
         Add a call to a function.
 
-        :param int function_addr:   Address of the current function where this call happens.
+        :param function_addr:   Address of the current function where this call happens.
         :param from_node:           The source node.
         :param to_addr:             Address of the target function, or None if unknown.
         :param retn_node:           The node where the target function will return to if it returns.
-        :param bool syscall:        If this is a call to a syscall or not.
-        :param int stmt_idx:        ID of the statement where this call happens.
-        :param int ins_addr:        Address of the instruction where this call happens.
+        :param syscall:        If this is a call to a syscall or not.
+        :param stmt_idx:        ID of the statement where this call happens.
+        :param ins_addr:        Address of the instruction where this call happens.
         :param return_to_outside:  True if the return of the call is considered going to outside of the current
                                         function.
         :return:                    None
@@ -1277,13 +1277,13 @@ class FunctionManager[K: (int, SootMethodDescriptor)](KnowledgeBasePlugin, colle
         # trigger function_name_changed to update function name caches
         self.function_name_changed(func.addr, None, func.name)
 
-    def contains_addr(self, addr):
+    def contains_addr(self, addr: K):
         """
         Decide if an address is handled by the function manager.
 
         Note: this function is non-conformant with python programming idioms, but its needed for performance reasons.
 
-        :param int addr: Address of the function.
+        :param addr: Address of the function.
         """
         return addr in self._function_map
 
@@ -1291,7 +1291,7 @@ class FunctionManager[K: (int, SootMethodDescriptor)](KnowledgeBasePlugin, colle
         """
         Return the function who has the least address that is greater than or equal to `addr`.
 
-        :param int addr: The address to query.
+        :param addr: The address to query.
         :return:         A Function instance, or None if there is no other function after `addr`.
         """
 
@@ -1300,11 +1300,11 @@ class FunctionManager[K: (int, SootMethodDescriptor)](KnowledgeBasePlugin, colle
         except KeyError:
             return None
 
-    def ceiling_func(self, addr) -> Function | None:
+    def ceiling_func(self, addr: K) -> Function | None:
         """
         Return the function who has the least address that is greater than or equal to `addr`.
 
-        :param int addr: The address to query.
+        :param addr: The address to query.
         :return:         A Function instance, or None if there is no other function after `addr`.
         """
 
@@ -1319,7 +1319,7 @@ class FunctionManager[K: (int, SootMethodDescriptor)](KnowledgeBasePlugin, colle
         """
         Return the function who has the greatest address that is less than or equal to `addr`.
 
-        :param int addr: The address to query.
+        :param addr: The address to query.
         :return:         An address, or None if there is no other function before `addr`.
         """
 
@@ -1328,13 +1328,12 @@ class FunctionManager[K: (int, SootMethodDescriptor)](KnowledgeBasePlugin, colle
         except KeyError:
             return None
 
-    def floor_func(self, addr):
+    def floor_func(self, addr: K) -> Function | None:
         """
         Return the function who has the greatest address that is less than or equal to `addr`.
 
-        :param int addr: The address to query.
+        :param addr: The address to query.
         :return:         A Function instance, or None if there is no other function before `addr`.
-        :rtype:          Function or None
         """
 
         try:
@@ -1396,7 +1395,6 @@ class FunctionManager[K: (int, SootMethodDescriptor)](KnowledgeBasePlugin, colle
         :param plt: True to find the PLT stub, False to find a non-PLT stub, None to disable this
                                  restriction.
         :return: The Function instance, or None if the function is not found and create is False.
-        :rtype: Function or None
         """
         if name is not None and name.startswith("sub_"):
             # first check if a function with the specified name exists

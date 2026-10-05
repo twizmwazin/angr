@@ -81,7 +81,7 @@ class SimStatePlugin:
         o.state = None  # type: ignore
         return o
 
-    def merge(self, others, merge_conditions, common_ancestor=None):  # pylint:disable=unused-argument
+    def merge(self, others, merge_conditions, common_ancestor=None) -> bool:  # pylint:disable=unused-argument
         """
         Should merge the state plugin with the provided others. This will be called by ``state.merge()`` after copying
         the target state, so this should mutate the current instance to merge with the others.
@@ -116,7 +116,6 @@ class SimStatePlugin:
         :param merge_conditions: a symbolic condition for each of the plugins
         :param common_ancestor: a common ancestor of this plugin and the others being merged
         :returns: True if the state plugins are actually merged.
-        :rtype: bool
         """
         raise NotImplementedError(f"merge() not implement for {self.__class__.__name__}")
 

@@ -720,11 +720,11 @@ class VariableManagerInternal(Serializable):
             if not self._atom_to_variable[key]:
                 del self._atom_to_variable[key]
 
-    def make_phi_node(self, block_addr, *variables):
+    def make_phi_node(self, block_addr: int, *variables):
         """
         Create a phi variable for variables at block `block_addr`.
 
-        :param int block_addr:  The address of the current block.
+        :param block_addr:      The address of the current block.
         :param variables:       Variables that the phi variable represents.
         :return:                The created phi variable.
         """
@@ -956,46 +956,43 @@ class VariableManagerInternal(Serializable):
 
         return variables
 
-    def get_global_variables(self, addr):
+    def get_global_variables(self, addr: int):
         """
         Get global variable by the address of the variable.
 
-        :param int addr:    Address of the variable.
+        :param addr:        Address of the variable.
         :return:            A set of variables or an empty set if no variable exists.
         """
         return self._global_region.get_variables_by_offset(addr)
 
-    def is_phi_variable(self, var):
+    def is_phi_variable(self, var: SimVariable) -> bool:
         """
         Test if `var` is a phi variable.
 
-        :param SimVariable var: The variable instance.
+        :param var:             The variable instance.
         :return:                True if `var` is a phi variable, False otherwise.
-        :rtype:                 bool
         """
 
         return var in self._phi_variables
 
-    def get_phi_subvariables(self, var):
+    def get_phi_subvariables(self, var: SimVariable) -> set[SimVariable]:
         """
         Get sub-variables that phi variable `var` represents.
 
-        :param SimVariable var: The variable instance.
+        :param var:             The variable instance.
         :return:                A set of sub-variables, or an empty set if `var` is not a phi variable.
-        :rtype:                 set
         """
 
         if not self.is_phi_variable(var):
             return set()
         return self._phi_variables[var]
 
-    def get_phi_variables(self, block_addr):
+    def get_phi_variables(self, block_addr: int) -> dict[SimVariable, set[SimVariable]]:
         """
         Get a dict of phi variables and their corresponding variables.
 
-        :param int block_addr:  Address of the block.
+        :param block_addr:      Address of the block.
         :return:                A dict of phi variables of an empty dict if there are no phi variables at the block.
-        :rtype:                 dict
         """
 
         if block_addr not in self._phi_variables_by_block:
@@ -1439,11 +1436,11 @@ class VariableManager(KnowledgeBasePlugin):
             return True
         return key in self.function_managers
 
-    def __getitem__(self, key) -> VariableManagerInternal:
+    def __getitem__(self, key: str | int) -> VariableManagerInternal:
         """
         Get the VariableManagerInternal object for a function or a region.
 
-        :param str or int key: Key of the region. "global" for the global region, or a function address for the
+        :param key:            Key of the region. "global" for the global region, or a function address for the
                                function.
         :return:               The VariableManagerInternal object.
         """
@@ -1454,11 +1451,11 @@ class VariableManager(KnowledgeBasePlugin):
         # key refers to a function address
         return self.get_function_manager(key)
 
-    def __delitem__(self, key) -> None:
+    def __delitem__(self, key: str | int) -> None:
         """
         Remove the existing VariableManagerInternal object for a function or a region.
 
-        :param Union[str,int] key:  Key of the region. "global" for the global region, or a function address for the
+        :param key:                 Key of the region. "global" for the global region, or a function address for the
                                     function.
         :return:                    None
         """

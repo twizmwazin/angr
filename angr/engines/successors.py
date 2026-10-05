@@ -31,16 +31,16 @@ class SimSuccessors:
     This class serves as a categorization of all the kinds of result states that can come from a
     SimEngine run.
 
-    :ivar int addr:         The address at which execution is taking place, as a python int
+    :ivar addr:         The address at which execution is taking place, as a python int
     :ivar initial_state:    The initial state for which execution produced these successors
     :ivar engine:           The engine that produced these successors
     :ivar sort:             A string identifying the type of engine that produced these successors
-    :ivar bool processed:   Whether or not the processing succeeded
-    :ivar str description:  A textual description of the execution step
+    :ivar processed:   Whether or not the processing succeeded
+    :ivar description:  A textual description of the execution step
 
     The successor states produced by this run are categorized into several lists:
 
-    :ivar dict artifacts:   Any analysis byproducts (for example, an IRSB) that were produced during execution
+    :ivar artifacts:   Any analysis byproducts (for example, an IRSB) that were produced during execution
     :ivar successors:       The "normal" successors. IP may be symbolic, but must have reasonable number of solutions
     :ivar unsat_successors: Any successor which is unsatisfiable after its guard condition is added.
     :ivar all_successors:   successors + unsat_successors
@@ -65,10 +65,10 @@ class SimSuccessors:
 
         # the engine that should process or did process this request
         self.engine = None
-        self.processed = False
-        self.description = "SimSuccessors"
+        self.processed: bool = False
+        self.description: str = "SimSuccessors"
         self.sort: str | None = None
-        self.artifacts = {}
+        self.artifacts: dict = {}
 
     def __repr__(self):
         if self.processed:
@@ -118,7 +118,15 @@ class SimSuccessors:
         return iter(self.flat_successors)
 
     def add_successor(
-        self, state, target, guard, jumpkind, add_guard=True, exit_stmt_idx=None, exit_ins_addr=None, source=None
+        self,
+        state: SimState,
+        target,
+        guard,
+        jumpkind: str,
+        add_guard: bool = True,
+        exit_stmt_idx: int | None = None,
+        exit_ins_addr: int | None = None,
+        source: int | None = None,
     ):
         """
         Add a successor state of the SimRun.
@@ -126,16 +134,16 @@ class SimSuccessors:
         and calls out to helper functions to prepare the state and categorize it into the appropriate
         successor lists.
 
-        :param SimState state:    The successor state.
+        :param state:    The successor state.
         :param target:            The target (of the jump/call/ret).
         :param guard:             The guard expression.
-        :param str jumpkind:      The jumpkind (call, ret, jump, or whatnot).
-        :param bool add_guard:    Whether to add the guard constraint (default: True).
-        :param int exit_stmt_idx: The ID of the exit statement, an integer by default. 'default'
+        :param jumpkind:      The jumpkind (call, ret, jump, or whatnot).
+        :param add_guard:    Whether to add the guard constraint (default: True).
+        :param exit_stmt_idx: The ID of the exit statement, an integer by default. 'default'
                                   stands for the default exit, and None means it's not from a
                                   statement (for example, from a SimProcedure).
-        :param int exit_ins_addr: The instruction pointer of this exit, which is an integer by default.
-        :param int source:        The source of the jump (i.e., the address of the basic block).
+        :param exit_ins_addr: The instruction pointer of this exit, which is an integer by default.
+        :param source:        The source of the jump (i.e., the address of the basic block).
         """
 
         # First, trigger the SimInspect breakpoint
@@ -365,12 +373,12 @@ class SimSuccessors:
         return syscall_num, possible
 
     @staticmethod
-    def _fix_syscall_ip(state):
+    def _fix_syscall_ip(state: SimState):
         """
         Resolve syscall information from the state, get the IP address of the syscall SimProcedure, and set the IP of
         the state accordingly. Don't do anything if the resolution fails.
 
-        :param SimState state: the program state.
+        :param state: the program state.
         :return: None
         """
 
@@ -395,7 +403,7 @@ class SimSuccessors:
             self.flat_successors[0].scratch.avoidable = False
 
     @staticmethod
-    def _eval_target_jumptable(state, ip, limit):
+    def _eval_target_jumptable(state, ip, limit) -> list | None:
         """
         A *very* fast method to evaluate symbolic jump targets if they are a) concrete targets, or b) targets coming
         from jump tables.
@@ -405,7 +413,6 @@ class SimSuccessors:
         :param limit:   The maximum number of concrete IPs.
         :return:        A list of conditions and the corresponding concrete IPs, or None which indicates fallback is
                         necessary.
-        :rtype:         list or None
         """
 
         if ip.symbolic is False:
@@ -484,7 +491,7 @@ class SimSuccessors:
         return cond_and_targets[:limit]
 
     @staticmethod
-    def _eval_target_brutal(state, ip, limit):
+    def _eval_target_brutal(state, ip, limit) -> list:
         """
         The traditional way of evaluating symbolic jump targets.
 
@@ -492,7 +499,6 @@ class SimSuccessors:
         :param ip:      The AST of the instruction pointer to evaluate.
         :param limit:   The maximum number of concrete IPs.
         :return:        A list of conditions and the corresponding concrete IPs.
-        :rtype:         list
         """
 
         addrs = state.solver.eval_upto(ip, limit)

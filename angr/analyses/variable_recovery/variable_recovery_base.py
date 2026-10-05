@@ -32,13 +32,12 @@ if TYPE_CHECKING:
 l = logging.getLogger(name=__name__)
 
 
-def parse_stack_pointer(sp):
+def parse_stack_pointer(sp) -> int:
     """
     Convert multiple supported forms of stack pointer representations into stack offsets.
 
     :param sp:  A stack pointer representation.
     :return:    A stack pointer offset.
-    :rtype:     int
     """
     if isinstance(sp, int):
         return sp
@@ -110,11 +109,11 @@ class VariableRecoveryBase(Analysis):
     # Public methods
     #
 
-    def get_variable_definitions(self, block_addr):
+    def get_variable_definitions(self, block_addr: int):
         """
         Get variables that are defined at the specified block.
 
-        :param int block_addr:  Address of the block.
+        :param block_addr:  Address of the block.
         :return:                A set of variables.
         """
 
@@ -395,11 +394,11 @@ class VariableRecoveryStateBase:
         for ro in self.register_region:
             yield from ro.internal_objects
 
-    def get_variable_definitions(self, block_addr):
+    def get_variable_definitions(self, block_addr: int):
         """
         Get variables that are defined at the specified block.
 
-        :param int block_addr:  Address of the block.
+        :param block_addr:  Address of the block.
         :return:                A set of variables.
         """
 

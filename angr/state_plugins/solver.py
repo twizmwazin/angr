@@ -4,7 +4,7 @@ import functools
 import logging
 import os
 import time
-from typing import Any, TypeVar, overload
+from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 from angr import claripy
 from angr import sim_options as o
@@ -16,6 +16,9 @@ from .inspect import BP_AFTER, BP_BEFORE
 from .plugin import SimStatePlugin
 from .sim_action import SimActionConstraint
 from .sim_action_object import SimActionObject, ast_stripping_decorator
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 l = logging.getLogger(name=__name__)
 
@@ -212,11 +215,11 @@ class SimSolver(SimStatePlugin):
         self.temporal_tracked_variables = {} if temporal_tracked_variables is None else temporal_tracked_variables
         self.eternal_tracked_variables = {} if eternal_tracked_variables is None else eternal_tracked_variables
 
-    def reload_solver(self, constraints=None):
+    def reload_solver(self, constraints: list | None = None):
         """
         Reloads the solver. Useful when changing solver options.
 
-        :param list constraints:    A new list of constraints to use in the reloaded solver instead of the current one
+        :param constraints:         A new list of constraints to use in the reloaded solver instead of the current one
         """
 
         if constraints is None:
@@ -501,7 +504,7 @@ class SimSolver(SimStatePlugin):
     @timed_function
     @ast_stripping_decorator
     @error_converter
-    def eval_to_ast(self, e, n, extra_constraints=(), exact=None):
+    def eval_to_ast(self, e, n, extra_constraints=(), exact=None) -> list[claripy.ast.Base]:
         """
         Evaluate an expression, using the solver if necessary. Returns AST objects.
 
@@ -509,8 +512,7 @@ class SimSolver(SimStatePlugin):
         :param n: the number of desired solutions
         :param extra_constraints: extra constraints to apply to the solver
         :param exact: if False, returns approximate solutions
-        :return: a tuple of the solutions, in the form of claripy AST nodes
-        :rtype: tuple
+        :return: a list of the solutions, in the form of claripy AST nodes
         """
         return self._solver.eval_to_ast(e, n, extra_constraints=extra_constraints, exact=exact)
 
@@ -518,7 +520,7 @@ class SimSolver(SimStatePlugin):
     @timed_function
     @ast_stripping_decorator
     @error_converter
-    def _eval(self, e, n, extra_constraints=(), exact=None):
+    def _eval(self, e, n, extra_constraints=(), exact=None) -> Sequence[Any]:
         """
         Evaluate an expression, using the solver if necessary. Returns primitives.
 
@@ -526,8 +528,7 @@ class SimSolver(SimStatePlugin):
         :param n: the number of desired solutions
         :param extra_constraints: extra constraints to apply to the solver
         :param exact: if False, returns approximate solutions
-        :return: a tuple of the solutions, in the form of Python primitives
-        :rtype: tuple
+        :return: a sequence of the solutions, in the form of Python primitives
         """
         return self._solver.eval(e, n, extra_constraints=extra_constraints, exact=exact)
 
@@ -822,7 +823,7 @@ class SimSolver(SimStatePlugin):
     @overload
     def eval_upto(self, e: _EvalArg, n: int, cast_to: type[CastType], **kwargs) -> list[CastType]: ...
 
-    def eval_upto(self, e, n, cast_to=None, **kwargs):
+    def eval_upto(self, e, n, cast_to=None, **kwargs) -> list[Any]:
         """
         Evaluate an expression, using the solver if necessary. Returns primitives as specified by the `cast_to`
         parameter. Only certain primitives are supported, check the implementation of `_cast_to` to see which ones.
@@ -832,8 +833,7 @@ class SimSolver(SimStatePlugin):
         :param extra_constraints: extra constraints to apply to the solver
         :param exact: if False, returns approximate solutions
         :param cast_to: desired type of resulting values
-        :return: a tuple of the solutions, in the form of Python primitives
-        :rtype: tuple
+        :return: a list of the solutions, in the form of Python primitives
         """
         concrete_val = _concrete_value(e)
         if concrete_val is not None:

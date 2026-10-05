@@ -656,7 +656,7 @@ class RegionIdentifier(Analysis):
         only one loop successor. This is used in the DREAM structuring algorithm.
 
         :param region:                  The cyclic region to refine.
-        :param networkx.DiGraph graph:  The current graph that is being structured.
+        :param graph:  The current graph that is being structured.
         :return:                        None
         """
         assert self.overlay_manager is not None

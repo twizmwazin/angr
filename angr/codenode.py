@@ -251,7 +251,7 @@ class HookNode[K: (int, SootMethodDescriptor)](CodeNode[K]):
 
     def __init__(self, addr, size, sim_procedure: SimProcedure | None, **kwargs):
         """
-        :param type sim_procedure: the the sim_procedure class
+        :param sim_procedure: the the sim_procedure class
         """
         super().__init__(addr, size, **kwargs)
         self.sim_procedure = sim_procedure

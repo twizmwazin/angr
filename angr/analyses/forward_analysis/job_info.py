@@ -44,12 +44,12 @@ class JobInfo[JobType, JobKey]:
             if job_type == "widened":
                 yield job
 
-    def add_job(self, job, merged=False, widened=False):
+    def add_job(self, job, merged: bool = False, widened: bool = False):
         """
         Appended a new job to this JobInfo node.
         :param job: The new job to append.
-        :param bool merged: Whether it is a merged job or not.
-        :param bool widened: Whether it is a widened job or not.
+        :param merged: Whether it is a merged job or not.
+        :param widened: Whether it is a widened job or not.
         """
 
         job_type = ""

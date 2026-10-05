@@ -272,14 +272,13 @@ class Analysis:
     This class represents an analysis on the program.
 
     :ivar project:  The project for this analysis.
-    :type project:  angr.Project
-    :ivar KnowledgeBase kb: The knowledgebase object.
+    :ivar kb: The knowledgebase object.
     :ivar _progress_callback: A callback function for receiving the progress of this analysis. It only takes
                                         one argument, which is a float number from 0.0 to 100.0 indicating the current
                                         progress.
-    :ivar bool _show_progressbar: If a progressbar should be shown during the analysis. It's independent from
+    :ivar _show_progressbar: If a progressbar should be shown during the analysis. It's independent from
                                     _progress_callback.
-    :ivar progress.Progress _progressbar: The progress bar object.
+    :ivar _progressbar: The progress bar object.
     """
 
     project: Project
@@ -292,8 +291,8 @@ class Analysis:
     _last_ramusage_update: float = 0.0
     _last_gil_release: float = 0.0
     _progress_callback: Callable | None = None
-    _show_progressbar = False
-    _progressbar = None
+    _show_progressbar: bool = False
+    _progressbar: progress.Progress | None = None
     _task = None
     log: list
 
@@ -337,12 +336,12 @@ class Analysis:
 
         self._progressbar.start()
 
-    def _update_progress(self, percentage, text=None, **kwargs):
+    def _update_progress(self, percentage: float, text=None, **kwargs):
         """
         Update the progress with a percentage, including updating the progressbar as well as calling the progress
         callback.
 
-        :param float percentage:    Percentage of the progressbar. from 0.0 to 100.0.
+        :param percentage:    Percentage of the progressbar. from 0.0 to 100.0.
         :param kwargs:              Other parameters that will be passed to the progress_callback handler.
         :return: None
         """
@@ -379,7 +378,7 @@ class Analysis:
         if self._progress_callback is not None:
             self._progress_callback(100.0)  # pylint:disable=not-callable
 
-    def _release_gil(self, ctr, freq, sleep_time=0.001):
+    def _release_gil(self, ctr: int, freq: int, sleep_time=0.001):
         """
         Periodically calls time.sleep() and releases the GIL so other threads (like, GUI threads) have a much better
         chance to be scheduled, and other critical components (like the GUI) can be kept responsiveness.
@@ -390,8 +389,8 @@ class Analysis:
         GIL_RELEASE_INTERVAL seconds. This keeps the GUI responsive while bounding the overhead on tight
         analysis loops.
 
-        :param int ctr:     A number provided by the caller.
-        :param int freq:    How frequently the wall clock should be checked. The check happens when ctr % freq == 0.
+        :param ctr:     A number provided by the caller.
+        :param freq:    How frequently the wall clock should be checked. The check happens when ctr % freq == 0.
         :param sleep_time:  Number (or fraction) of seconds to sleep.
         :return:            None
         """

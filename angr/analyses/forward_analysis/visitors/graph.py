@@ -47,7 +47,6 @@ class GraphVisitor[NodeType]:
 
         :param node: The node to work with.
         :return:     A list of successors.
-        :rtype:      list
         """
 
         raise NotImplementedError
@@ -66,7 +65,7 @@ class GraphVisitor[NodeType]:
         """
         Get a list of all nodes sorted in an optimal traversal order.
 
-        :param iterable nodes: A collection of nodes to sort. If none, all nodes in the graph will be used to sort.
+        :param nodes: A collection of nodes to sort. If none, all nodes in the graph will be used to sort.
         :return:               A list of sorted nodes.
         """
 
@@ -168,7 +167,6 @@ class GraphVisitor[NodeType]:
 
         :param node: A node in the graph.
         :return:     A set of nodes that are all successors to the given node.
-        :rtype:      set
         """
 
         successors = set()

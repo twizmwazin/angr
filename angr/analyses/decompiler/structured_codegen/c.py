@@ -1706,7 +1706,7 @@ class CFunctionCall(CExpression):
     """
     func(arg0, arg1)
 
-    :ivar Function callee_func:  The function getting called.
+    :ivar callee_func:  The function getting called.
     """
 
     __slots__ = (
@@ -3953,10 +3953,10 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
 
         return lines[0] if len(lines) == 1 else CStatements(lines, codegen=self, addr=node.addr)
 
-    def _handle_SwitchCase(self, node, **kwargs):
+    def _handle_SwitchCase(self, node: SwitchCaseNode, **kwargs):
         """
 
-        :param SwitchCaseNode node:
+        :param node:
         :return:
         """
 
@@ -3977,10 +3977,10 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
 
         return CContinue(tags=tags, codegen=self)
 
-    def _handle_AILBlock(self, node, **kwargs):
+    def _handle_AILBlock(self, node: Block, **kwargs):
         """
 
-        :param Block node:
+        :param node:
         :return:
         """
 

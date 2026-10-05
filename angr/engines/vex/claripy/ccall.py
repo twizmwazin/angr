@@ -2180,18 +2180,14 @@ def _get_flags(state) -> claripy.ast.bv.BV:
         return claripy.ite_cases([(case, func(state, *args[:i], value_, *args[i + 1 :])) for case, value_ in cases], 0)
 
 
-def _concat_flags(nbits, flags_vec):
+def _concat_flags(nbits: int, flags_vec: list) -> claripy.ast.BV:
     """
     Concatenate different flag BVs to a single BV. Currently used for ARM, X86
     and AMD64.
     :param nbits    : platform size in bits.
     :param flags_vec: vector of flag BVs and their offset in the resulting BV.
 
-    :type nbits     : int
-    :type flags_vec : list
-
     :return         : the resulting flag BV.
-    :rtype          : claripy.BVV
     """
 
     result = claripy.BVV(0, 0)

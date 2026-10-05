@@ -26,7 +26,7 @@ def shallow_reverse[T](g: networkx.DiGraph[T]) -> networkx.DiGraph[T]:
     cannot easily make a shallow reversed copy of a graph in NetworkX 2, since networkx.reverse(copy=False) now returns
     a GraphView, and GraphViews are always read-only.
 
-    :param networkx.DiGraph g:  The graph to reverse.
+    :param g:                   The graph to reverse.
     :return:                    A new networkx.DiGraph that has all nodes and all edges of the original graph, with
                                 edges reversed.
     """
@@ -146,12 +146,11 @@ def subgraph_between_nodes[T](
     """
     For a directed graph, return a subgraph that includes all nodes going from a source node to a target node.
 
-    :param networkx.DiGraph graph:  The directed graph.
+    :param graph:                   The directed graph.
     :param source:                  The source node.
-    :param list frontier:           A collection of target nodes.
-    :param bool include_frontier:   Should nodes in frontier be included in the subgraph.
+    :param frontier:                A collection of target nodes.
+    :param include_frontier:        Should nodes in frontier be included in the subgraph.
     :return:                        A subgraph.
-    :rtype:                         networkx.DiGraph
     """
 
     frontier = set(frontier)
@@ -404,7 +403,7 @@ class Dominators[T]:
 
         self._construct(graph, entry_node)
 
-    def _graph_successors(self, graph, node):
+    def _graph_successors(self, graph, node) -> Iterable:
         """
         Return the successors of a node in the graph.
         This method can be overridden in case there are special requirements with the graph and the successors. For
@@ -412,8 +411,7 @@ class Dominators[T]:
 
         :param graph: The graph.
         :param node:  The node of which we want to get the successors.
-        :return:      An iterator of successors.
-        :rtype:       iter
+        :return:      An iterable of successors.
         """
 
         if self._graph_successors_func is not None:
@@ -705,7 +703,7 @@ class GraphUtils:
     """
 
     @staticmethod
-    def find_merge_points(function_addr, function_endpoints, graph):  # pylint:disable=unused-argument
+    def find_merge_points(function_addr: int, function_endpoints: list, graph: networkx.DiGraph) -> list[int]:  # pylint:disable=unused-argument
         """
         Given a local transition graph of a function, find all merge points inside, and then perform a
         quasi-topological sort of those merge points.
@@ -714,11 +712,10 @@ class GraphUtils:
         - two or more paths come together, and ends at the same address.
         - end of the current function
 
-        :param int function_addr: Address of the function.
-        :param list function_endpoints: Endpoints of the function. They typically come from Function.endpoints.
-        :param networkx.DiGraph graph: A local transition graph of a function. Normally it comes from Function.graph.
+        :param function_addr: Address of the function.
+        :param function_endpoints: Endpoints of the function. They typically come from Function.endpoints.
+        :param graph: A local transition graph of a function. Normally it comes from Function.graph.
         :return: A list of ordered addresses of merge points.
-        :rtype: list
         """
 
         merge_points = set()
@@ -732,18 +729,17 @@ class GraphUtils:
         return [n.addr for n in ordered_merge_points]
 
     @staticmethod
-    def find_widening_points(function_addr, function_endpoints, graph):  # pylint: disable=unused-argument
+    def find_widening_points(function_addr: int, function_endpoints: list, graph: networkx.DiGraph) -> list[int]:  # pylint: disable=unused-argument
         """
         Given a local transition graph of a function, find all widening points inside.
 
         Correctly choosing widening points is very important in order to not lose too much information during static
         analysis. We mainly consider merge points that has at least one loop back edges coming in as widening points.
 
-        :param int function_addr: Address of the function.
-        :param list function_endpoints: Endpoints of the function, typically coming from Function.endpoints.
-        :param networkx.DiGraph graph: A local transition graph of a function, normally Function.graph.
+        :param function_addr: Address of the function.
+        :param function_endpoints: Endpoints of the function, typically coming from Function.endpoints.
+        :param graph: A local transition graph of a function, normally Function.graph.
         :return: A list of addresses of widening points.
-        :rtype: list
         """
 
         sccs = networkx.strongly_connected_components(graph)
@@ -804,14 +800,13 @@ class GraphUtils:
                 yield node
 
     @staticmethod
-    def reverse_post_order_sort_nodes(graph, nodes=None):
+    def reverse_post_order_sort_nodes(graph: networkx.DiGraph, nodes: Iterable | None = None) -> list | Iterator:
         """
         Sort a given set of nodes in reverse post ordering.
 
-        :param networkx.DiGraph graph: A local transition graph of a function.
-        :param iterable nodes: A collection of nodes to sort.
-        :return: A list of sorted nodes.
-        :rtype: list
+        :param graph: A local transition graph of a function.
+        :param nodes: A collection of nodes to sort.
+        :return: A list of sorted nodes, or a reverse iterator over all nodes if `nodes` is None.
         """
 
         # keying on the node instead of node.addr keeps address-tied nodes (duplicated blocks) apart

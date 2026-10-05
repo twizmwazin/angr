@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from angr.sim_procedure import SimProcedure
 
 
 class CodeLocation[BlockAddr: int | None, StmtIdx: int | None, Context]:
@@ -25,7 +28,7 @@ class CodeLocation[BlockAddr: int | None, StmtIdx: int | None, Context]:
         self,
         block_addr: BlockAddr,
         stmt_idx: StmtIdx,
-        sim_procedure=None,
+        sim_procedure: SimProcedure | None = None,
         ins_addr: int | None = None,
         context: Context = None,
         block_idx: int | None = None,
@@ -37,7 +40,7 @@ class CodeLocation[BlockAddr: int | None, StmtIdx: int | None, Context]:
         :param block_addr:          Address of the block
         :param stmt_idx:            Statement ID. None for SimProcedures or if the code location is meant to refer to
                                     the entire block.
-        :param class sim_procedure: The corresponding SimProcedure class.
+        :param sim_procedure:       The corresponding SimProcedure.
         :param ins_addr:            The instruction address.
         :param context:             A tuple that represents the context of this CodeLocation in contextual mode, or
                                     None in contextless mode.

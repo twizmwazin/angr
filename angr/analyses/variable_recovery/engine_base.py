@@ -305,12 +305,14 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
                 offset = None
             variable_manager.reference_at(var, offset, codeloc, atom=src)
 
-    def _assign_to_register(self, offset, richr, size, src=None, dst=None, create_variable: bool = True):  # pylint:disable=unused-argument
+    def _assign_to_register(  # pylint:disable=unused-argument
+        self, offset: int, richr: RichR, size: int, src=None, dst=None, create_variable: bool = True
+    ):
         """
 
-        :param int offset:
-        :param RichR data:
-        :param int size:
+        :param offset:
+        :param richr:
+        :param size:
         :return:
         """
 
@@ -539,12 +541,14 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
 
         return variable
 
-    def _store(self, richr_addr: RichR[claripy.ast.BV], data: RichR[claripy.ast.BV | claripy.ast.FP], size, atom=None):  # pylint:disable=unused-argument
+    def _store(  # pylint:disable=unused-argument
+        self, richr_addr: RichR[claripy.ast.BV], data: RichR[claripy.ast.BV | claripy.ast.FP], size: int, atom=None
+    ):
         """
 
-        :param RichR addr:
-        :param RichR data:
-        :param int size:
+        :param richr_addr:
+        :param data:
+        :param size:
         :return:
         """
 
@@ -784,7 +788,7 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
     def _load(self, richr_addr: RichR[claripy.ast.BV], size: int, expr=None):
         """
 
-        :param RichR richr_addr:
+        :param richr_addr:
         :param size:
         :return:
         """

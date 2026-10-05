@@ -46,6 +46,7 @@ from .state_plugins.sim_action_object import SimActionObject
 
 if TYPE_CHECKING:
     from angr.knowledge_plugins.functions import Function
+    from angr.sim_state import SimState
 
 
 l = logging.getLogger(name=__name__)
@@ -268,13 +269,13 @@ class SimFunctionArgument:
     """
     Represent a generic function argument.
 
-    :ivar int size:    The size of the argument, in number of bytes.
-    :ivar bool is_fp:  Whether loads from this location should return a floating point bitvector
+    :ivar size:    The size of the argument, in number of bytes.
+    :ivar is_fp:  Whether loads from this location should return a floating point bitvector
     """
 
     def __init__(self, size: int, is_fp: bool = False):
-        self.size = size
-        self.is_fp = is_fp
+        self.size: int = size
+        self.is_fp: bool = is_fp
 
     def __ne__(self, other):
         return not self == other
@@ -320,16 +321,16 @@ class SimRegArg(SimFunctionArgument):
     """
     Represents a function argument that has been passed in a register.
 
-    :ivar string reg_name:    The name of the represented register.
-    :ivar int size:           The size of the data to store, in number of bytes.
+    :ivar reg_name:    The name of the represented register.
+    :ivar size:           The size of the data to store, in number of bytes.
     :ivar reg_offset:         The offset into the register to start storing data.
     :ivar clear_entire_reg:   Whether a store to this register should zero the unused parts of the register.
-    :ivar bool is_fp:  Whether loads from this location should return a floating point bitvector
+    :ivar is_fp:  Whether loads from this location should return a floating point bitvector
     """
 
-    def __init__(self, reg_name: RegisterName, size: int, reg_offset=0, is_fp=False, clear_entire_reg=False):
+    def __init__(self, reg_name: RegisterName, size: int, reg_offset=0, is_fp: bool = False, clear_entire_reg=False):
         super().__init__(size, is_fp)
-        self.reg_name = reg_name
+        self.reg_name: RegisterName = reg_name
         self.reg_offset = reg_offset
         self.clear_entire_reg = clear_entire_reg
 
@@ -382,9 +383,9 @@ class SimStackArg(SimFunctionArgument):
     """
     Represents a function argument that has been passed on the stack.
 
-    :var int stack_offset:    The position of the argument relative to the stack pointer after the function prelude.
-    :ivar int size:           The size of the argument, in number of bytes.
-    :ivar bool is_fp:  Whether loads from this location should return a floating point bitvector
+    :var stack_offset:    The position of the argument relative to the stack pointer after the function prelude.
+    :ivar size:           The size of the argument, in number of bytes.
+    :ivar is_fp:  Whether loads from this location should return a floating point bitvector
     """
 
     def __init__(self, stack_offset: int, size: int, is_fp: bool = False):
@@ -1362,11 +1363,11 @@ class SimCC:
             return (cls.ARCH, *cls.EXTRA_ARCHES)
         return cls.EXTRA_ARCHES
 
-    def get_arg_info(self, state, prototype):
+    def get_arg_info(self, state: SimState, prototype):
         """
         This is just a simple wrapper that collects the information from various locations
         prototype is as passed to self.arg_locs and self.get_args
-        :param angr.SimState state: The state to evaluate and extract the values from
+        :param state: The state to evaluate and extract the values from
         :return:    A list of tuples, where the nth tuple is (type, name, location, value) of the nth argument
         """
 
