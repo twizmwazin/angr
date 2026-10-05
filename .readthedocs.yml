@@ -6,6 +6,9 @@ sphinx:
   configuration: docs/conf.py
 formats: [pdf]
 python:
+  # This entry is what makes Read the Docs set up a uv-managed environment and
+  # run Sphinx through ``uv run``. The install itself is replaced by
+  # build.jobs.install below.
   install:
     - method: uv
       command: sync
@@ -16,3 +19,17 @@ build:
   tools:
     python: "3.12"
     rust: latest
+  jobs:
+    install:
+      # The same sync as above, except:
+      # - ``--no-default-groups`` leaves out the dev and extras groups that
+      #   pyproject.toml makes uv install by default. The docs need neither
+      #   pytest, pylint or pyright, nor pysoot, which is built from git.
+      # - opt-level 0 for the Rust extension. Sphinx only imports it, and an
+      #   optimized build takes more than twice as long to compile.
+      - CARGO_PROFILE_RELEASE_OPT_LEVEL=0 uv sync --all-extras --group docs --no-default-groups
+    build:
+      html:
+        # Read the Docs' default HTML command plus ``-j auto``. The PDF build
+        # that follows reads the same doctrees directory.
+        - uv run --no-sync --no-dev sphinx-build -j auto -T -b html -d docs/_build/doctrees -D language=en docs $READTHEDOCS_OUTPUT/html

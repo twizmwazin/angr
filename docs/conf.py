@@ -4,9 +4,11 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 from __future__ import annotations
 
+import builtins
 import datetime
 import importlib
 import inspect
+import sys
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -82,7 +84,6 @@ todo_include_todos = True
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "furo"
-html_static_path = ["_static"]
 
 
 # -- Inherited / overridden member handling ----------------------------------
@@ -188,6 +189,108 @@ def _enclosing_class(obj: object, name: str) -> type | None:
         if inspect.isclass(candidate):
             return candidate
     return None
+
+
+# -- Imported module members: skip before autodoc loads them ----------------
+# For a module without ``__all__``, autodoc documents only the members whose
+# ``__module__`` is that module, so ``from sqlalchemy.orm import relationship``
+# never shows up on the page. Sphinx 9 applies that check late, though: each
+# imported member is loaded first, which runs every ``autodoc-process-docstring``
+# handler on it. sphinx-autodoc-typehints then evaluates the annotations and
+# parses the docstrings of third-party code (SQLAlchemy, fastmcp, ...), which
+# costs build time and logs warnings about code that is not angr's.
+#
+# Making the same decision at ``autodoc-skip-member`` time leaves the rendered
+# pages unchanged and avoids that work. Module attributes that carry their own
+# documentation (``#:`` comments) are exempt, as they are in autodoc.
+
+
+def skip_imported_module_members(app, what, name, obj, skip, options):
+    """Skip a module member that autodoc would drop for being imported."""
+    if skip or what != "module" or getattr(options, "imported_members", None):
+        return None
+
+    modname = app.env.current_document.autodoc_module
+    module = sys.modules.get(modname)
+    if module is None or getattr(module, "__all__", None) is not None:
+        return None
+
+    from sphinx.pycode import ModuleAnalyzer, PycodeError
+    from sphinx.util.inspect import safe_getattr, unpartial
+
+    # The same test autodoc applies to implicit module members.
+    obj_module = safe_getattr(unpartial(obj), "__module__", None)
+    if not obj_module or obj_module == modname:
+        return None
+
+    try:
+        attr_docs = ModuleAnalyzer.for_module(modname).find_attr_docs()
+    except PycodeError:
+        attr_docs = {}
+    if ("", name) in attr_docs:
+        return None
+    return True
+
+
+# -- Module data that happens to be callable --------------------------------
+# Module-level data never gets a signature, so Sphinx 9 starts it with an empty
+# signature list, yet it still stores whatever an ``autodoc-process-signature``
+# handler returns into the list's first slot. sphinx-autodoc-typehints returns
+# a signature for any callable object, including callable instances such as
+# the gates in ``angr.analyses.decompiler.known_patterns.gating``. The store
+# raises IndexError, and autodoc logs "error while formatting signature" and
+# leaves the object out of the page.
+#
+# Answering first with an empty result, which is not None but is falsy, ends
+# the event without anything being stored.
+
+
+def no_signature_for_data(_app, what, _name, _obj, _options, _signature, _return_annotation):
+    """Keep other handlers from giving module-level data a signature."""
+    if what == "data":
+        return ()
+    return None
+
+
+# -- Builtin types: link to the Python documentation -------------------------
+# The Python domain looks type annotations up with its "fuzzy" search, and a
+# name it cannot find as a class is retried as data and then as an attribute.
+# A builtin such as ``bytes`` or ``type`` is never an angr class, so the search
+# ends on whichever angr attributes happen to share the name: ``dict[int,
+# bytes]`` linked to ``angr.analyses.cfg.cfb.Unknown.bytes``, and Sphinx warned
+# that more than one target was found. Each of those lookups also scans every
+# object in the inventory several times.
+#
+# Resolving builtin names against the Python inventory first, ahead of Sphinx's
+# own resolver, gives the right link. Anything intersphinx cannot resolve is
+# left for the normal resolver.
+
+_BUILTIN_TYPES = frozenset(name for name, obj in vars(builtins).items() if isinstance(obj, type))
+
+
+def _make_builtin_type_resolver():
+    from sphinx import addnodes
+    from sphinx.ext.intersphinx import missing_reference
+    from sphinx.transforms.post_transforms import SphinxPostTransform
+
+    class ResolveBuiltinTypes(SphinxPostTransform):
+        # Sphinx's ReferencesResolver runs at 10.
+        default_priority = 9
+
+        def run(self, **kwargs):
+            for node in list(self.document.findall(addnodes.pending_xref)):
+                if (
+                    node.get("refdomain") != "py"
+                    or node.get("reftype") not in {"class", "obj"}
+                    or node.get("reftarget") not in _BUILTIN_TYPES
+                    or isinstance(node[0], addnodes.pending_xref_condition)
+                ):
+                    continue
+                newnode = missing_reference(self.app, self.env, node, node[0].deepcopy())
+                if newnode is not None:
+                    node.replace_self(newnode)
+
+    return ResolveBuiltinTypes
 
 
 # -- Re-exported objects: mark the duplicate copy as :no-index: -------------
@@ -310,5 +413,10 @@ def limit_global_toctree(_app, pagename, _templatename, context, _doctree):
 
 
 def setup(app):
+    # skip_inherited_undocumented answers for every member it sees, so this has
+    # to run first to get a say.
+    app.connect("autodoc-skip-member", skip_imported_module_members, priority=400)
     app.connect("autodoc-skip-member", skip_inherited_undocumented)
+    app.connect("autodoc-process-signature", no_signature_for_data, priority=400)
+    app.add_post_transform(_make_builtin_type_resolver())
     app.connect("html-page-context", limit_global_toctree, priority=400)
