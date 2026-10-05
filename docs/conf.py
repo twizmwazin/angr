@@ -7,6 +7,7 @@ from __future__ import annotations
 import datetime
 import importlib
 import inspect
+import sys
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -190,6 +191,47 @@ def _enclosing_class(obj: object, name: str) -> type | None:
     return None
 
 
+# -- Imported module members: skip before autodoc loads them ----------------
+# For a module without ``__all__``, autodoc documents only the members whose
+# ``__module__`` is that module, so ``from sqlalchemy.orm import relationship``
+# never shows up on the page. Sphinx 9 applies that check late, though: each
+# imported member is loaded first, which runs every ``autodoc-process-docstring``
+# handler on it. sphinx-autodoc-typehints then evaluates the annotations and
+# parses the docstrings of third-party code (SQLAlchemy, fastmcp, ...), which
+# costs build time and logs warnings about code that is not angr's.
+#
+# Making the same decision at ``autodoc-skip-member`` time leaves the rendered
+# pages unchanged and avoids that work. Module attributes that carry their own
+# documentation (``#:`` comments) are exempt, as they are in autodoc.
+
+
+def skip_imported_module_members(app, what, name, obj, skip, options):
+    """Skip a module member that autodoc would drop for being imported."""
+    if skip or what != "module" or getattr(options, "imported_members", None):
+        return None
+
+    modname = app.env.current_document.autodoc_module
+    module = sys.modules.get(modname)
+    if module is None or getattr(module, "__all__", None) is not None:
+        return None
+
+    from sphinx.pycode import ModuleAnalyzer, PycodeError
+    from sphinx.util.inspect import safe_getattr, unpartial
+
+    # The same test autodoc applies to implicit module members.
+    obj_module = safe_getattr(unpartial(obj), "__module__", None)
+    if not obj_module or obj_module == modname:
+        return None
+
+    try:
+        attr_docs = ModuleAnalyzer.for_module(modname).find_attr_docs()
+    except PycodeError:
+        attr_docs = {}
+    if ("", name) in attr_docs:
+        return None
+    return True
+
+
 # -- Re-exported objects: mark the duplicate copy as :no-index: -------------
 # `angr/__init__.py` re-exports many symbols (e.g. ``from .sim_state import
 # SimState``). Autodoc, with the package's ``__all__`` listing them, documents
@@ -310,5 +352,8 @@ def limit_global_toctree(_app, pagename, _templatename, context, _doctree):
 
 
 def setup(app):
+    # skip_inherited_undocumented answers for every member it sees, so this has
+    # to run first to get a say.
+    app.connect("autodoc-skip-member", skip_imported_module_members, priority=400)
     app.connect("autodoc-skip-member", skip_inherited_undocumented)
     app.connect("html-page-context", limit_global_toctree, priority=400)
