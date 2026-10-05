@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from angr.utils.graph import GraphUtils
 
 from .graph import GraphVisitor
 
+if TYPE_CHECKING:
+    import networkx
+
 
 class CallGraphVisitor(GraphVisitor):
     """
-    :param networkx.DiGraph callgraph:
+    :param callgraph:
     """
 
-    def __init__(self, callgraph):
+    def __init__(self, callgraph: networkx.DiGraph):
         super().__init__()
         self.callgraph = callgraph
 

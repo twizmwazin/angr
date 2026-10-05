@@ -424,7 +424,6 @@ class RegionedMemoryMixin(MemoryMixin):
 
         :param addr: Address to convert
         :return: A list of mapping between region IDs and offsets.
-        :rtype: dict
         """
 
         addr_e = claripy.BVV(addr, bits) if isinstance(addr, int) else _raw_ast(addr)

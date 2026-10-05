@@ -291,12 +291,11 @@ class LoopAnalysis(ForwardAnalysis, Analysis):
         # Is it bounded?
         self.bounded = self._is_bounded()
 
-    def _is_bounded(self):
+    def _is_bounded(self) -> bool | None:
         """
         Checks whether this loop is bounded. We basically does a bunch of pattern matching.
 
         :return: True if this loop is bounded, False is this loop is not bounded, None otherwise (undetermined).
-        :rtype: bool or None
         """
 
         b = self._is_bounded_iterator_based()

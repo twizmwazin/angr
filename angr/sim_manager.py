@@ -6,6 +6,7 @@ import sys
 import types
 from collections import defaultdict
 from types import TracebackType
+from typing import TYPE_CHECKING
 
 import mulpyplexer
 
@@ -20,6 +21,9 @@ from .sim_options import LAZY_SOLVES
 from .sim_state import SimState
 from .state_hierarchy import StateHierarchy
 from .state_plugins.sim_event import resource_event
+
+if TYPE_CHECKING:
+    from .project import Project
 
 l = logging.getLogger(name=__name__)
 
@@ -42,7 +46,6 @@ class SimulationManager:
     The most important methods you should look at are ``step``, ``explore``, and ``use_technique``.
 
     :param project:         A Project instance.
-    :type project:          angr.project.Project
     :param stashes:         A dictionary to use as the stash store.
     :param active_states:   Active states to seed the "active" stash with.
     :param hierarchy:       A StateHierarchy object to use to track the relationships between states.
@@ -72,7 +75,7 @@ class SimulationManager:
 
     def __init__(
         self,
-        project,
+        project: Project,
         active_states=None,
         stashes=None,
         hierarchy=None,
@@ -232,7 +235,7 @@ class SimulationManager:
     #   ...
     #
 
-    def use_technique(self, tech):
+    def use_technique(self, tech: ExplorationTechnique):
         """
         Use an exploration technique with this SimulationManager.
 
@@ -240,7 +243,6 @@ class SimulationManager:
 
         :param tech:    An ExplorationTechnique object that contains code to modify
                         this SimulationManager's behavior.
-        :type tech:     ExplorationTechnique
         :return:        The technique that was added, for convenience
         """
         if not isinstance(tech, ExplorationTechnique):
@@ -254,12 +256,11 @@ class SimulationManager:
         self._techniques.append(tech)
         return tech
 
-    def remove_technique(self, tech):
+    def remove_technique(self, tech: ExplorationTechnique):
         """
         Remove an exploration technique from a list of active techniques.
 
         :param tech:    An ExplorationTechnique object.
-        :type tech:     ExplorationTechnique
         """
         if not isinstance(tech, ExplorationTechnique):
             raise SimulationManagerError
@@ -346,7 +347,7 @@ class SimulationManager:
 
         return self
 
-    def run(self, stash="active", n=None, until=None, **kwargs):
+    def run(self, stash="active", n=None, until=None, **kwargs) -> SimulationManager:
         """
         Run until the SimulationManager has reached a completed state, according to
         the current exploration techniques. If no exploration techniques that define a completion
@@ -358,7 +359,6 @@ class SimulationManager:
                             returns True or False. Stepping will terminate when it is True.
 
         :return:            The simulation manager, for chaining.
-        :rtype:             SimulationManager
         """
         for _ in itertools.count() if n is None else range(n):
             if not self.complete() and self._stashes[stash]:
@@ -390,7 +390,7 @@ class SimulationManager:
         until=None,
         filter_func=None,
         **run_args,
-    ):
+    ) -> SimulationManager:
         """
         Step a stash of states forward and categorize the successors appropriately.
 
@@ -430,7 +430,6 @@ class SimulationManager:
         :param traceflags:      traceflags to be passed to VEX. Default: 0
 
         :returns:           The simulation manager, for chaining.
-        :rtype:             SimulationManager
         """
         l.debug("Stepping %s of %s", stash, self)
         # 8<----------------- Compatibility layer -----------------
@@ -568,7 +567,7 @@ class SimulationManager:
     #   ...
     #
 
-    def prune(self, filter_func=None, from_stash="active", to_stash="pruned"):
+    def prune(self, filter_func=None, from_stash="active", to_stash="pruned") -> SimulationManager:
         """
         Prune unsatisfiable states from a stash.
 
@@ -579,7 +578,6 @@ class SimulationManager:
         :param to_stash:    Put pruned states in this stash. (default: 'pruned')
 
         :returns:           The simulation manager, for chaining.
-        :rtype:             SimulationManager
         """
 
         def _prune_filter(state):
@@ -613,7 +611,7 @@ class SimulationManager:
             self._store_states(stash, simgr.stashes[stash])
         self._errored.extend(simgr._errored)
 
-    def move(self, from_stash, to_stash, filter_func=None):
+    def move(self, from_stash, to_stash, filter_func=None) -> SimulationManager:
         """
         Move states from one stash to another.
 
@@ -623,7 +621,6 @@ class SimulationManager:
                             a state and returns True or False. (default: stash all states)
 
         :returns:           The simulation manager, for chaining.
-        :rtype:             SimulationManager
         """
         filter_func = filter_func or (lambda s: True)
 
@@ -632,7 +629,7 @@ class SimulationManager:
 
         return self.split(stash_splitter, from_stash=from_stash, to_stash=to_stash)
 
-    def stash(self, filter_func=None, from_stash="active", to_stash="stashed"):
+    def stash(self, filter_func=None, from_stash="active", to_stash="stashed") -> SimulationManager:
         """
         Stash some states. This is an alias for move(), with defaults for the stashes.
 
@@ -642,11 +639,10 @@ class SimulationManager:
         :param to_stash:    Put matching states into this stash. (default: 'stashed')
 
         :returns:           The simulation manager, for chaining.
-        :rtype:             SimulationManager
         """
         return self.move(from_stash, to_stash, filter_func=filter_func)
 
-    def unstash(self, filter_func=None, to_stash="active", from_stash="stashed"):
+    def unstash(self, filter_func=None, to_stash="active", from_stash="stashed") -> SimulationManager:
         """
         Unstash some states. This is an alias for move(), with defaults for the stashes.
 
@@ -656,11 +652,10 @@ class SimulationManager:
         :param to_stash:    put matching states into this stash. (default: 'active')
 
         :returns:           The simulation manager, for chaining.
-        :rtype:             SimulationManager
         """
         return self.move(from_stash, to_stash, filter_func=filter_func)
 
-    def drop(self, filter_func=None, stash="active"):
+    def drop(self, filter_func=None, stash="active") -> SimulationManager:
         """
         Drops states from a stash. This is an alias for move(), with defaults for the stashes.
 
@@ -669,11 +664,10 @@ class SimulationManager:
         :param stash:       Drop matching states from this stash. (default: 'active')
 
         :returns:           The simulation manager, for chaining.
-        :rtype:             SimulationManager
         """
         return self.move(stash, self.DROP, filter_func=filter_func)
 
-    def apply(self, state_func=None, stash_func=None, stash="active", to_stash=None):
+    def apply(self, state_func=None, stash_func=None, stash="active", to_stash=None) -> SimulationManager:
         """
         Applies a given function to a given stash.
 
@@ -689,7 +683,6 @@ class SimulationManager:
         :param to_stash:    If specified, this stash will be used to store the resulting states instead.
 
         :returns:           The simulation manager, for chaining.
-        :rtype:             SimulationManager
         """
         to_stash = to_stash or stash
 
@@ -720,7 +713,7 @@ class SimulationManager:
         limit=8,
         from_stash="active",
         to_stash="stashed",
-    ):
+    ) -> SimulationManager:
         """
         Split a stash of states into two stashes depending on the specified options.
 
@@ -744,7 +737,6 @@ class SimulationManager:
         :param to_stash:        The stash to write to (default: 'stashed')
 
         :returns:               The simulation manager, for chaining.
-        :rtype:                 SimulationManager
         """
         states = self._fetch_states(stash=from_stash)
 
@@ -774,7 +766,7 @@ class SimulationManager:
             set(state.posix.fd) if state.has_plugin("posix") else None,
         )
 
-    def merge(self, merge_func=None, merge_key=None, stash="active", prune=True):
+    def merge(self, merge_func=None, merge_key=None, stash="active", prune=True) -> SimulationManager:
         """
         Merge the states in a given stash.
 
@@ -787,7 +779,6 @@ class SimulationManager:
         :param prune:       Whether to prune the stash prior to merging it
 
         :returns:           The simulation manager, for chaining.
-        :rtype:             SimulationManager
         """
         if prune:
             self.prune(from_stash=stash)
@@ -851,12 +842,12 @@ class SimulationManager:
             (match if filter_func(state) else nomatch).append(state)
         return match, nomatch
 
-    def _merge_states(self, states):
+    def _merge_states(self, states) -> SimState:
         """
         Merges a list of states.
 
         :param states:      the states to merge
-        :returns SimState:  the resulting state
+        :returns:           the resulting state
         """
 
         if self._hierarchy:

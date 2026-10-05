@@ -51,29 +51,29 @@ class GotoSimplifier(SequenceWalker):
 
         self.walk(node)
 
-    def _handle_sequencenode(self, node, successor=None, **kwargs):
+    def _handle_sequencenode(self, node: SequenceNode, successor=None, **kwargs):
         """
 
-        :param SequenceNode node:
+        :param node:
         :return:
         """
 
         for n0, n1 in zip(node.nodes, [*node.nodes[1:], successor]):
             self._handle(n0, successor=n1)
 
-    def _handle_codenode(self, node, successor=None, **kwargs):
+    def _handle_codenode(self, node: CodeNode, successor=None, **kwargs):
         """
 
-        :param CodeNode node:
+        :param node:
         :return:
         """
 
         self._handle(node.node, successor=successor)
 
-    def _handle_conditionnode(self, node, successor=None, **kwargs):
+    def _handle_conditionnode(self, node: ConditionNode, successor=None, **kwargs):
         """
 
-        :param ConditionNode node:
+        :param node:
         :param successor:
         :return:
         """
@@ -89,10 +89,10 @@ class GotoSimplifier(SequenceWalker):
         if node.else_node is not None:
             self._handle(node.else_node, successor=successor)
 
-    def _handle_loopnode(self, node, successor=None, **kwargs):
+    def _handle_loopnode(self, node: LoopNode, successor=None, **kwargs):
         """
 
-        :param LoopNode node:
+        :param node:
         :param successor:
         :return:
         """
@@ -102,21 +102,21 @@ class GotoSimplifier(SequenceWalker):
             successor=node,  # the end of a loop always jumps to the beginning of its body
         )
 
-    def _handle_multinode(self, node, successor=None, **kwargs):
+    def _handle_multinode(self, node: MultiNode, successor=None, **kwargs):
         """
 
-        :param MultiNode node:
+        :param node:
         :return:
         """
 
         for n0, n1 in zip(node.nodes, [*node.nodes[1:], successor]):
             self._handle(n0, successor=n1)
 
-    def _handle_block(self, block, successor=None, **kwargs):  # pylint:disable=no-self-use
+    def _handle_block(self, block: ailment.Block, successor=None, **kwargs):  # pylint:disable=no-self-use
         """
         This will also record irreducible gotos into the kb if found.
 
-        :param ailment.Block block:
+        :param block:
         :return:
         """
         if not block.statements:

@@ -3,10 +3,14 @@ from __future__ import annotations
 import logging
 import math
 from collections import defaultdict
+from typing import TYPE_CHECKING
 
 from angr.engines.successors import SimSuccessors
 
 from .base import ExplorationTechnique
+
+if TYPE_CHECKING:
+    from angr.sim_state import SimState
 
 _l = logging.getLogger(__name__)
 
@@ -49,10 +53,10 @@ class Bucketizer(ExplorationTechnique):
         return successors
 
     @staticmethod
-    def _get_transition_dict(state):
+    def _get_transition_dict(state: SimState):
         """
 
-        :param SimState state:
+        :param state:
         :return:
         """
 
@@ -64,11 +68,11 @@ class Bucketizer(ExplorationTechnique):
         return t
 
     @staticmethod
-    def _record_transition(state, transition):
+    def _record_transition(state: SimState, transition: int):
         """
 
-        :param SimState state:
-        :param tuple transition:
+        :param state:
+        :param transition:
         :return:
         """
 
@@ -78,11 +82,11 @@ class Bucketizer(ExplorationTechnique):
         state.globals["transition"] = t
 
     @staticmethod
-    def _accept_transition(state, transition):
+    def _accept_transition(state: SimState, transition: int):
         """
 
-        :param SimState state:
-        :param tuple transition:
+        :param state:
+        :param transition:
         :return:
         """
 

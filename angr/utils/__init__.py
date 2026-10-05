@@ -9,7 +9,7 @@ def looks_like_sql(s: str) -> bool:
     """
     Determine if string `s` looks like an SQL query.
 
-    :param str s:   The string to detect.
+    :param s:       The string to detect.
     :return:        True if the string looks like an SQL, False otherwise.
     """
 

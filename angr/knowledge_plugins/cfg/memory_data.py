@@ -111,12 +111,11 @@ class MemoryData(Serializable):
     def __repr__(self):
         return f"\\{self.address:#x}, {self.size if self.size is not None else 'size unknown'} bytes, {self.sort}/"
 
-    def copy(self):
+    def copy(self) -> MemoryData:
         """
         Make a copy of the MemoryData.
 
         :return: A copy of the MemoryData instance.
-        :rtype: MemoryData
         """
         s = MemoryData(self.address, self.size, self.sort, pointer_addr=self.pointer_addr, max_size=self.max_size)
         s.content = self.content

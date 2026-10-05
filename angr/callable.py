@@ -13,6 +13,7 @@ from .errors import AngrCallableError, AngrCallableMultistateError
 from .sim_manager import SimulationManager
 
 if TYPE_CHECKING:
+    from angr import claripy
     from angr.project import Project
 
 
@@ -126,13 +127,12 @@ class Callable:
         elif len(caller.active) == 1:
             self.result_state = caller.active[0]
 
-    def call_c(self, c_args):
+    def call_c(self, c_args: str) -> claripy.ast.Base | None:
         """
         Call this Callable with a string of C-style arguments.
 
-        :param str c_args:  C-style arguments.
+        :param c_args:      C-style arguments.
         :return:            The return value from the call.
-        :rtype:             claripy.Ast
         """
 
         c_args = c_args.strip()

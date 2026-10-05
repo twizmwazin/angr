@@ -20,15 +20,14 @@ l = logging.getLogger(name=__name__)
 
 
 class SimRegNameView(SimStatePlugin):
-    def __getattr__(self, k) -> claripy.ast.base.Base:
+    def __getattr__(self, k: str) -> claripy.ast.base.Base:
         """
         Get the value of a register.
 
-        :param str k: Name of the register. Prefix it with "_" prevents SimInspect being triggered and SimActions being
+        :param k: Name of the register. Prefix it with "_" prevents SimInspect being triggered and SimActions being
                       created.
         :param v:     Value to set to the register.
         :return:      Value of the register.
-        :rtype:       claripy.ast.Base
         """
 
         state: SimState = super().__getattribute__("state")
@@ -48,11 +47,11 @@ class SimRegNameView(SimStatePlugin):
         except KeyError:
             return super().__getattribute__(k)
 
-    def __setattr__(self, k, v):
+    def __setattr__(self, k: str, v):
         """
         Set value to a register.
 
-        :param str k: Name of the register. Prefix it with "_" prevents SimInspect being triggered and SimActions being
+        :param k: Name of the register. Prefix it with "_" prevents SimInspect being triggered and SimActions being
                       created.
         :param v:     Value to set to the register.
         :return:      None

@@ -29,9 +29,9 @@ class SimHeapLibc(SimHeapBase):
         """
         A somewhat faithful implementation of libc `calloc`.
 
-        :param     sim_nmemb: the number of elements to allocated
-        :param     sim_size: the size of each element (in bytes)
-        :returns:  the address of the allocation, or a NULL pointer if the allocation failed
+        :param sim_nmemb: the number of elements to allocated
+        :param sim_size:  the size of each element (in bytes)
+        :returns:         the address of the allocation, or a NULL pointer if the allocation failed
         """
         raise NotImplementedError(f"{self.calloc.__func__.__name__} not implemented for {self.__class__.__name__}")
 

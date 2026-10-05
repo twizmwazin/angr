@@ -25,6 +25,9 @@ from .cfg.cfg_fast import CFGFast
 from .ddg import DDG
 
 if TYPE_CHECKING:
+    from angr.knowledge_plugins.cfg import CFGModel
+    from angr.knowledge_plugins.functions import Function
+
     from .cfg import CFGNode
 
 l = logging.getLogger(name=__name__)
@@ -297,12 +300,12 @@ class SymbolManager:
     SymbolManager manages all symbols in the binary.
     """
 
-    def __init__(self, binary, cfg):
+    def __init__(self, binary: Reassembler, cfg: CFGFast):
         """
         Constructor.
 
-        :param Reassembler binary: The Binary analysis instance.
-        :param angr.analyses.CFG cfg: The CFG analysis instance.
+        :param binary: The Binary analysis instance.
+        :param cfg: The CFG analysis instance.
         :return: None
         """
 
@@ -404,12 +407,12 @@ class SymbolManager:
 
         return label
 
-    def label_got(self, addr, label):
+    def label_got(self, addr: int, label: Label):
         """
         Mark a certain label as assigned (to an instruction or a block of data).
 
-        :param int addr: The address of the label.
-        :param angr.analyses.reassembler.Label label:
+        :param addr: The address of the label.
+        :param label:
                          The label that is just assigned.
         :return: None
         """
@@ -420,18 +423,26 @@ class SymbolManager:
 
 class Operand:
     def __init__(
-        self, binary, insn_addr, insn_size, capstone_operand, operand_str, mnemonic, operand_offset, syntax=None
+        self,
+        binary: Reassembler,
+        insn_addr: int,
+        insn_size,
+        capstone_operand,
+        operand_str: str,
+        mnemonic: str,
+        operand_offset: int,
+        syntax: str | None = None,
     ):
         """
         Constructor.
 
-        :param Reassembler binary: The Binary analysis.
-        :param int insn_addr: Address of the instruction.
+        :param binary: The Binary analysis.
+        :param insn_addr: Address of the instruction.
         :param capstone_operand:
-        :param str operand_str: the string representation of this operand
-        :param str mnemonic: Mnemonic of the instruction that this operand belongs to.
-        :param int operand_offset: offset of the operand into the instruction.
-        :param str syntax: Provide a way to override the default syntax coming from `binary`.
+        :param operand_str: the string representation of this operand
+        :param mnemonic: Mnemonic of the instruction that this operand belongs to.
+        :param operand_offset: offset of the operand into the instruction.
+        :param syntax: Provide a way to override the default syntax coming from `binary`.
         :return: None
         """
 
@@ -635,15 +646,14 @@ class Operand:
 
                 self.binary.register_instruction_reference(self.insn_addr, self.disp, "absolute", self.operand_offset)
 
-    def _imm_to_ptr(self, imm, operand_type, mnemonic):  # pylint:disable=no-self-use,unused-argument
+    def _imm_to_ptr(self, imm: int, operand_type: int, mnemonic: str) -> tuple[bool, bool, int | None]:  # pylint:disable=no-self-use,unused-argument
         """
         Try to classify an immediate as a pointer.
 
-        :param int imm: The immediate to test.
-        :param int operand_type: Operand type of this operand, can either be IMM or MEM.
-        :param str mnemonic: Mnemonic of the instruction that this operand belongs to.
+        :param imm: The immediate to test.
+        :param operand_type: Operand type of this operand, can either be IMM or MEM.
+        :param mnemonic: Mnemonic of the instruction that this operand belongs to.
         :return: A tuple of (is code reference, is data reference, base address, offset)
-        :rtype: tuple
         """
 
         is_coderef, is_dataref = False, False
@@ -686,13 +696,13 @@ class Instruction:
     High-level representation of an instruction in the binary
     """
 
-    def __init__(self, binary, addr, size, insn_bytes, capstone_instr):
+    def __init__(self, binary: Reassembler, addr: int, size: int, insn_bytes: bytes | None, capstone_instr):
         """
 
-        :param Reassembler binary: The Binary analysis
-        :param int addr: Address of the instruction
-        :param int size: Size of the instruction
-        :param str insn_bytes: Instruction bytes
+        :param binary: The Binary analysis
+        :param addr: Address of the instruction
+        :param size: Size of the instruction
+        :param insn_bytes: Instruction bytes
         :param capstone_instr: Capstone Instr object.
         :return: None
         """
@@ -866,13 +876,13 @@ class BasicBlock:
     BasicBlock represents a basic block in the binary.
     """
 
-    def __init__(self, binary, addr, size, x86_getpc_retsite: bool = False):
+    def __init__(self, binary: Reassembler, addr: int, size: int | None, x86_getpc_retsite: bool = False):
         """
         Constructor.
 
-        :param Reassembler binary: The Binary analysis.
-        :param int addr: Address of the block
-        :param int size: Size of the block
+        :param binary: The Binary analysis.
+        :param addr: Address of the block
+        :param size: Size of the block
         :return: None
         """
 
@@ -963,15 +973,24 @@ class Procedure:
     Procedure in the binary.
     """
 
-    def __init__(self, binary, function=None, addr=None, size=None, name=None, section=".text", asm_code=None):
+    def __init__(
+        self,
+        binary: Reassembler,
+        function: Function | None = None,
+        addr: int | None = None,
+        size: int | None = None,
+        name=None,
+        section: str = ".text",
+        asm_code=None,
+    ):
         """
         Constructor.
 
-        :param Reassembler binary: The Binary analysis.
-        :param angr.knowledge.Function function: The function it represents
-        :param int addr: Address of the function. Not required if `function` is provided.
-        :param int size: Size of the function. Not required if `function` is provided.
-        :param str section: Which section this function comes from.
+        :param binary: The Binary analysis.
+        :param function: The function it represents
+        :param addr: Address of the function. Not required if `function` is provided.
+        :param size: Size of the function. Not required if `function` is provided.
+        :param section: Which section this function comes from.
         :return: None
         """
 
@@ -1004,11 +1023,10 @@ class Procedure:
     #
 
     @property
-    def name(self):
+    def name(self) -> str | None:
         """
         Get function name from the labels of the very first block.
         :return: Function name if there is any, None otherwise
-        :rtype: string
         """
 
         if self._name is not None:
@@ -1031,11 +1049,10 @@ class Procedure:
         return None
 
     @property
-    def is_plt(self):
+    def is_plt(self) -> bool:
         """
         If this function is a PLT entry or not.
         :return: True if this function is a PLT entry, False otherwise
-        :rtype: bool
         """
 
         if self.section == ".plt":
@@ -1080,14 +1097,13 @@ class Procedure:
         for block in self.blocks:
             block.assign_labels()
 
-    def assembly(self, comments=False, symbolized=True):
+    def assembly(self, comments=False, symbolized=True) -> list:
         """
         Get the assembly manifest of the procedure.
 
         :param comments:
         :param symbolized:
         :return: A list of tuples (address, basic block assembly), ordered by basic block addresses
-        :rtype: list
         """
 
         assembly = []
@@ -1116,12 +1132,11 @@ class Procedure:
 
         return assembly
 
-    def instruction_addresses(self):
+    def instruction_addresses(self) -> list:
         """
         Get all instruction addresses in the binary.
 
         :return: A list of sorted instruction addresses.
-        :rtype: list
         """
 
         addrs = []
@@ -1171,13 +1186,12 @@ class Procedure:
             self.blocks = sorted(self.blocks, key=lambda x: x.addr)
 
     @property
-    def _output_function_label(self):
+    def _output_function_label(self) -> bool:
         """
         Determines if we want to output the function label in assembly. We output the function label only when the
         original instruction does not output the function label.
 
         :return: True if we should output the function label, False otherwise.
-        :rtype: bool
         """
 
         if self.asm_code:
@@ -1259,11 +1273,11 @@ class Data:
     def content(self, v):
         self._content = v
 
-    def shrink(self, new_size):
+    def shrink(self, new_size: int):
         """
         Reduce the size of this block
 
-        :param int new_size: The new size
+        :param new_size: The new size
         :return: None
         """
         self.size = new_size
@@ -1756,12 +1770,11 @@ class Reassembler(Analysis):
     # Properties
     #
     @property
-    def instructions(self):
+    def instructions(self) -> tuple:
         """
         Get a list of all instructions in the binary
 
         :return: A list of (address, instruction)
-        :rtype: tuple
         """
 
         raise NotImplementedError
@@ -1845,7 +1858,7 @@ class Reassembler(Analysis):
     # Public methods
     #
 
-    def disassemble_block(self, block):
+    def disassemble_block(self, block) -> CapstoneBlock:
         """
         Disassemble a block using the assembly syntax configured for this Reassembler.
 
@@ -1854,7 +1867,6 @@ class Reassembler(Analysis):
 
         :param block: The angr Block to disassemble.
         :return: A CapstoneBlock instance.
-        :rtype: CapstoneBlock
         """
 
         arch = self.project.arch
@@ -1868,13 +1880,12 @@ class Reassembler(Analysis):
             return CapstoneBlock(block.addr, insns, block.thumb, arch)
         return block.capstone
 
-    def section_alignment(self, section_name):
+    def section_alignment(self, section_name: str) -> int:
         """
         Get the alignment for the specific section. If the section is not found, 16 is used as default.
 
-        :param str section_name: The section.
+        :param section_name: The section.
         :return: The alignment in bytes.
-        :rtype: int
         """
 
         return self._section_alignments.get(section_name, 16)
@@ -1887,14 +1898,13 @@ class Reassembler(Analysis):
         """
         return any(start <= addr < end for start, end in self.main_executable_regions)
 
-    def main_executable_region_limbos_contain(self, addr):
+    def main_executable_region_limbos_contain(self, addr: int) -> tuple[bool, int | None]:
         """
         Sometimes there exists a pointer that points to a few bytes before the beginning of a section, or a few bytes
         after the beginning of the section. We take care of that here.
 
-        :param int addr: The address to check.
+        :param addr: The address to check.
         :return: A 2-tuple of (bool, the closest base address)
-        :rtype: tuple
         """
 
         TOLERANCE = 64
@@ -1914,23 +1924,23 @@ class Reassembler(Analysis):
             return closest_region
         return (False, None)
 
-    def main_nonexecutable_regions_contain(self, addr):
+    def main_nonexecutable_regions_contain(self, addr: int) -> bool:
         """
 
-        :param int addr: The address to check.
+        :param addr: The address to check.
         :return: True if the address is inside a non-executable region, False otherwise.
-        :rtype: bool
         """
         return any(start <= addr < end for start, end in self.main_nonexecutable_regions)
 
-    def main_nonexecutable_region_limbos_contain(self, addr, tolerance_before=64, tolerance_after=64):
+    def main_nonexecutable_region_limbos_contain(
+        self, addr: int, tolerance_before=64, tolerance_after=64
+    ) -> tuple[bool, int | None]:
         """
         Sometimes there exists a pointer that points to a few bytes before the beginning of a section, or a few bytes
         after the beginning of the section. We take care of that here.
 
-        :param int addr: The address to check.
+        :param addr: The address to check.
         :return: A 2-tuple of (bool, the closest base address)
-        :rtype: tuple
         """
 
         closest_region = None
@@ -1965,12 +1975,12 @@ class Reassembler(Analysis):
 
         self._relocations.append(r)
 
-    def add_label(self, name, addr):
+    def add_label(self, name: str, addr: int):
         """
         Add a new label to the symbol manager.
 
-        :param str name: Name of the label.
-        :param int addr: Address of the label.
+        :param name: Name of the label.
+        :param addr: Address of the label.
         :return: None
         """
 
@@ -1979,12 +1989,12 @@ class Reassembler(Analysis):
 
         self.symbol_manager.new_label(addr, name=name, force=True)
 
-    def insert_asm(self, addr, asm_code, before_label=False):
+    def insert_asm(self, addr: int, asm_code: str, before_label=False):
         """
         Insert some assembly code at the specific address. There must be an instruction starting at that address.
 
-        :param int addr: Address of insertion
-        :param str asm_code: The assembly code to insert
+        :param addr: Address of insertion
+        :param asm_code: The assembly code to insert
         :return: None
         """
 
@@ -1993,27 +2003,29 @@ class Reassembler(Analysis):
         else:
             self._inserted_asm_after_label[addr].append(asm_code)
 
-    def append_procedure(self, name, asm_code):
+    def append_procedure(self, name: str, asm_code: str):
         """
         Add a new procedure with specific name and assembly code.
 
-        :param str name: The name of the new procedure.
-        :param str asm_code: The assembly code of the procedure
+        :param name: The name of the new procedure.
+        :param asm_code: The assembly code of the procedure
         :return: None
         """
 
         proc = Procedure(self, name=name, asm_code=asm_code)
         self.procedures.append(proc)
 
-    def append_data(self, name, initial_content, size, readonly=False, sort="unknown"):  # pylint:disable=unused-argument
+    def append_data(  # pylint:disable=unused-argument
+        self, name: str, initial_content: bytes | None, size: int, readonly: bool = False, sort: str = "unknown"
+    ):
         """
         Append a new data entry into the binary with specific name, content, and size.
 
-        :param str name: Name of the data entry. Will be used as the label.
-        :param bytes initial_content: The initial content of the data entry.
-        :param int size: Size of the data entry.
-        :param bool readonly: If the data entry belongs to the readonly region.
-        :param str sort: Type of the data.
+        :param name: Name of the data entry. Will be used as the label.
+        :param initial_content: The initial content of the data entry.
+        :param size: Size of the data entry.
+        :param readonly: If the data entry belongs to the readonly region.
+        :param sort: Type of the data.
         :return: None
         """
 
@@ -2155,12 +2167,11 @@ class Reassembler(Analysis):
 
         return s
 
-    def remove_cgc_attachments(self):
+    def remove_cgc_attachments(self) -> bool:
         """
         Remove CGC attachments.
 
         :return: True if CGC attachments are found and removed, False otherwise
-        :rtype: bool
         """
 
         cgc_package_list = None
@@ -2664,18 +2675,25 @@ class Reassembler(Analysis):
             or (self._extra_memory_regions and next((a < ptr < b for a, b in self._extra_memory_regions), None))
         )
 
-    def _sequence_handler(self, cfg, irsb, irsb_addr, stmt_idx, data_addr, max_size):  # pylint:disable=unused-argument
+    def _sequence_handler(  # pylint:disable=unused-argument
+        self,
+        cfg: CFGModel,
+        irsb: pyvex.IRSB | None,
+        irsb_addr: int | None,
+        stmt_idx: int | None,
+        data_addr: int,
+        max_size: int,
+    ) -> tuple[str | None, int | None]:
         """
         Find sequences in binary data.
 
-        :param angr.analyses.CFG cfg: The control flow graph.
-        :param pyvex.IRSB irsb: The IRSB object.
-        :param int irsb_addr: Address of the block.
-        :param int stmt_idx: Statement ID.
-        :param int data_addr: Address of the data in memory.
-        :param int max_size: Maximum size possible.
+        :param cfg: The control flow graph.
+        :param irsb: The IRSB object.
+        :param irsb_addr: Address of the block.
+        :param stmt_idx: Statement ID.
+        :param data_addr: Address of the data in memory.
+        :param max_size: Maximum size possible.
         :return: A 2-tuple of data type and size.
-        :rtype: tuple
         """
 
         if not self._is_sequence(cfg, data_addr, 5):
@@ -2690,14 +2708,13 @@ class Reassembler(Analysis):
 
         return "sequence", sequence_max_size
 
-    def _cgc_package_list_identifier(self, data_addr, data_size):
+    def _cgc_package_list_identifier(self, data_addr: int, data_size: int) -> tuple[str | None, int | None]:
         """
         Identifies the CGC package list associated with the CGC binary.
 
-        :param int data_addr: Address of the data in memory.
-        :param int data_size: Maximum size possible.
+        :param data_addr: Address of the data in memory.
+        :param data_size: Maximum size possible.
         :return: A 2-tuple of data type and size.
-        :rtype: tuple
         """
 
         if data_size < 100:
@@ -2716,18 +2733,25 @@ class Reassembler(Analysis):
 
         return "cgc-package-list", data_size
 
-    def _cgc_extended_application_handler(self, cfg, irsb, irsb_addr, stmt_idx, data_addr, max_size):  # pylint:disable=unused-argument
+    def _cgc_extended_application_handler(  # pylint:disable=unused-argument
+        self,
+        cfg: CFGModel,
+        irsb: pyvex.IRSB | None,
+        irsb_addr: int | None,
+        stmt_idx: int | None,
+        data_addr: int,
+        max_size: int,
+    ) -> tuple[str | None, int | None]:
         """
         Identifies the extended application (a PDF file) associated with the CGC binary.
 
-        :param angr.analyses.CFG cfg: The control flow graph.
-        :param pyvex.IRSB irsb: The IRSB object.
-        :param int irsb_addr: Address of the block.
-        :param int stmt_idx: Statement ID.
-        :param int data_addr: Address of the data in memory.
-        :param int max_size: Maximum size possible.
+        :param cfg: The control flow graph.
+        :param irsb: The IRSB object.
+        :param irsb_addr: Address of the block.
+        :param stmt_idx: Statement ID.
+        :param data_addr: Address of the data in memory.
+        :param max_size: Maximum size possible.
         :return: A 2-tuple of data type and size.
-        :rtype: tuple
         """
 
         if max_size < 100:
@@ -2758,18 +2782,25 @@ class Reassembler(Analysis):
 
         return "cgc-extended-application", max_size
 
-    def _unknown_data_size_handler(self, cfg, irsb, irsb_addr, stmt_idx, data_addr, max_size):  # pylint:disable=unused-argument
+    def _unknown_data_size_handler(  # pylint:disable=unused-argument
+        self,
+        cfg: CFGModel,
+        irsb: pyvex.IRSB | None,
+        irsb_addr: int | None,
+        stmt_idx: int | None,
+        data_addr: int,
+        max_size: int,
+    ) -> tuple[str | None, int | None]:
         """
         Return the maximum number of bytes until a potential pointer or a potential sequence is found.
 
-        :param angr.analyses.CFG cfg: The control flow graph.
-        :param pyvex.IRSB irsb: The IRSB object.
-        :param int irsb_addr: Address of the block.
-        :param int stmt_idx: Statement ID.
-        :param int data_addr: Address of the data in memory.
-        :param int max_size: Maximum size possible.
+        :param cfg: The control flow graph.
+        :param irsb: The IRSB object.
+        :param irsb_addr: Address of the block.
+        :param stmt_idx: Statement ID.
+        :param data_addr: Address of the data in memory.
+        :param max_size: Maximum size possible.
         :return: A 2-tuple of data type and size.
-        :rtype: tuple
         """
 
         sequence_offset = None
@@ -2802,12 +2833,11 @@ class Reassembler(Analysis):
             return "unknown", sequence_offset
         return None, None
 
-    def _has_integer_used_as_pointers(self):
+    def _has_integer_used_as_pointers(self) -> bool:
         """
         Test if there is any (suspicious) pointer decryption in the code.
 
         :return: True if there is any pointer decryption, False otherwise.
-        :rtype: bool
         """
 
         # check all integer accesses and see if there is any integer being used as a pointer later, but it wasn't
@@ -2883,16 +2913,17 @@ class Reassembler(Analysis):
 
         return False
 
-    def fast_memory_load(self, addr, size, data_type, endness="Iend_LE"):
+    def fast_memory_load(
+        self, addr: int, size: int, data_type: type, endness: str = "Iend_LE"
+    ) -> int | bytes | str | None:
         """
         Load memory bytes from loader's memory backend.
 
-        :param int addr:    The address to begin memory loading.
-        :param int size:    Size in bytes.
+        :param addr:    The address to begin memory loading.
+        :param size:    Size in bytes.
         :param data_type:   Type of the data.
-        :param str endness: Endianness of this memory load.
+        :param endness: Endianness of this memory load.
         :return:            Data read out of the memory.
-        :rtype:             int or bytes or str or None
         """
 
         if data_type is int:

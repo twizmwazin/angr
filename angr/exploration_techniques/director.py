@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from typing import TYPE_CHECKING, Any
 
 import networkx
 
@@ -12,6 +13,12 @@ from angr.knowledge_base import KnowledgeBase
 from angr.sim_type import SimType, SimTypeChar, SimTypePointer, SimTypeReg, SimTypeString
 
 from .base import ExplorationTechnique
+
+if TYPE_CHECKING:
+    from angr.analyses.cfg.cfg_emulated import CFGEmulated
+    from angr.knowledge_plugins.cfg import CFGNode
+    from angr.sim_manager import SimulationManager
+    from angr.sim_state import SimState
 
 l = logging.getLogger(name=__name__)
 
@@ -29,26 +36,24 @@ class BaseGoal:
     # Public methods
     #
 
-    def check(self, cfg, state, peek_blocks):
+    def check(self, cfg: CFGEmulated, state: SimState, peek_blocks: int) -> bool:
         """
 
-        :param angr.analyses.CFGEmulated cfg:   An instance of CFGEmulated.
-        :param angr.SimState state:             The state to check.
-        :param int peek_blocks:                 Number of blocks to peek ahead from the current point.
+        :param cfg:                             An instance of CFGEmulated.
+        :param state:                           The state to check.
+        :param peek_blocks:                     Number of blocks to peek ahead from the current point.
         :return: True if we can determine that this condition is definitely satisfiable if the path is taken, False
                 otherwise.
-        :rtype: bool
         """
 
         raise NotImplementedError
 
-    def check_state(self, state):
+    def check_state(self, state: SimState) -> bool:
         """
         Check if the current state satisfies the goal.
 
-        :param angr.SimState state:                  The state to check.
+        :param state:                                The state to check.
         :return: True if it satisfies the goal, False otherwise.
-        :rtype: bool
         """
 
         raise NotImplementedError
@@ -58,14 +63,13 @@ class BaseGoal:
     #
 
     @staticmethod
-    def _get_cfg_node(cfg, state):
+    def _get_cfg_node(cfg: CFGEmulated, state: SimState) -> CFGNode | None:
         """
         Get the CFGNode object on the control flow graph given an angr state.
 
-        :param angr.analyses.CFGEmulated cfg:   An instance of CFGEmulated.
-        :param angr.SimState state:             The current state.
+        :param cfg:                             An instance of CFGEmulated.
+        :param state:                           The current state.
         :return: A CFGNode instance if the node exists, or None if the node cannot be found.
-        :rtype: CFGNode or None
         """
 
         call_stack_suffix = state.callstack.stack_suffix(cfg.context_sensitivity_level)
@@ -76,13 +80,13 @@ class BaseGoal:
         return cfg.model.get_node(block_id)
 
     @staticmethod
-    def _dfs_edges(graph, source, max_steps=None):
+    def _dfs_edges(graph: networkx.DiGraph, source: Any, max_steps: int | None = None):
         """
         Perform a depth-first search on the given DiGraph, with a limit on maximum steps.
 
-        :param networkx.DiGraph graph:  The graph to traverse.
-        :param Any source:              The source to begin traversal.
-        :param int max_steps:           Maximum steps of the traversal, or None if not limiting steps.
+        :param graph:                   The graph to traverse.
+        :param source:                  The source to begin traversal.
+        :param max_steps:               Maximum steps of the traversal, or None if not limiting steps.
         :return: An iterator of edges.
         """
 
@@ -125,15 +129,14 @@ class ExecuteAddressGoal(BaseGoal):
     def __repr__(self):
         return f"<ExecuteAddressCondition targeting {self.addr:#x}>"
 
-    def check(self, cfg, state, peek_blocks):
+    def check(self, cfg, state, peek_blocks: int) -> bool:
         """
         Check if the specified address will be executed
 
         :param cfg:
         :param state:
-        :param int peek_blocks:
+        :param peek_blocks:
         :return:
-        :rtype: bool
         """
 
         # Get the current CFGNode from the CFG
@@ -153,13 +156,12 @@ class ExecuteAddressGoal(BaseGoal):
         l.debug("SimState %s will not reach %#x.", state, self.addr)
         return False
 
-    def check_state(self, state):
+    def check_state(self, state: SimState) -> bool:
         """
         Check if the current address is the target address.
 
-        :param angr.SimState state: The state to check.
+        :param state:               The state to check.
         :return: True if the current address is the target address, False otherwise.
-        :rtype: bool
         """
 
         return state.addr == self.addr
@@ -246,13 +248,12 @@ class CallFunctionGoal(BaseGoal):
         l.debug("SimState %s will not reach function %s.", state, self.function)
         return False
 
-    def check_state(self, state):
+    def check_state(self, state: SimState) -> bool:
         """
         Check if the specific function is reached with certain arguments
 
-        :param angr.SimState state: The state to check
+        :param state:               The state to check
         :return: True if the function is reached with certain arguments, False otherwise.
-        :rtype: bool
         """
 
         if state.addr == self.function.addr:
@@ -285,15 +286,16 @@ class CallFunctionGoal(BaseGoal):
         return True
 
     @staticmethod
-    def _compare_arguments(state, arg_type, expected_value, real_value):
+    def _compare_arguments(
+        state: SimState, arg_type: SimType, expected_value: claripy.ast.Base | str, real_value: claripy.ast.Base
+    ) -> bool:
         """
 
-        :param SimState state:
-        :param simvuex.s_type.SimType arg_type:
-        :param claripy.ast.Base expected_value:
-        :param claripy.ast.Base real_value:
+        :param state:
+        :param arg_type:
+        :param expected_value:
+        :param real_value:
         :return:
-        :rtype: bool
         """
 
         if real_value.symbolic:
@@ -420,11 +422,11 @@ class Director(ExplorationTechnique):
 
         return simgr
 
-    def add_goal(self, goal):
+    def add_goal(self, goal: BaseGoal):
         """
         Add a goal.
 
-        :param BaseGoal goal: The goal to add.
+        :param goal:          The goal to add.
         :return: None
         """
 
@@ -456,12 +458,12 @@ class Director(ExplorationTechnique):
 
             self._cfg.resume(starts=starts, max_steps=self._peek_blocks)
 
-    def _load_fallback_states(self, pg):
+    def _load_fallback_states(self, pg: SimulationManager):
         """
         Load the last N deprioritized states will be extracted from the "deprioritized" stash and put to "active" stash.
         N is controlled by 'num_fallback_states'.
 
-        :param SimulationManager pg: The simulation manager.
+        :param pg:                   The simulation manager.
         :return: None
         """
 
@@ -471,15 +473,14 @@ class Director(ExplorationTechnique):
             pg.active.extend(pg.deprioritized[-self._num_fallback_states :])
             pg.stashes["deprioritized"] = pg.deprioritized[: -self._num_fallback_states]
 
-    def _categorize_states(self, simgr):
+    def _categorize_states(self, simgr: SimulationManager) -> SimulationManager:
         """
         Categorize all states into two different groups: reaching the destination within the peek depth, and not
         reaching the destination within the peek depth.
 
-        :param SimulationManager simgr:    The simulation manager that contains states. All active states (state
+        :param simgr:                      The simulation manager that contains states. All active states (state
                                            belonging to "active" stash) are subjected to categorization.
         :return:                The categorized simulation manager.
-        :rtype:                 angr.SimulationManager
         """
 
         past_active_states = len(simgr.active)
@@ -509,14 +510,13 @@ class Director(ExplorationTechnique):
 
         return simgr
 
-    def _check_goals(self, goal, state):  # pylint:disable=no-self-use
+    def _check_goals(self, goal: BaseGoal, state: SimState) -> bool:  # pylint:disable=no-self-use
         """
         Check if the state is satisfying the goal.
 
-        :param BaseGoal goal: The goal to check against.
-        :param angr.SimState state: The state to check.
+        :param goal:          The goal to check against.
+        :param state:         The state to check.
         :return: True if the state satisfies the goal currently, False otherwise.
-        :rtype: bool
         """
 
         return goal.check_state(state)

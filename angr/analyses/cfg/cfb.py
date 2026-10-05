@@ -399,12 +399,11 @@ class CFBlanket(Analysis):
         for block in func.blocks:
             self.add_obj(block.addr, block)
 
-    def dbg_repr(self):
+    def dbg_repr(self) -> str:
         """
         The debugging representation of this CFBlanket.
 
         :return:    The debugging representation of this CFBlanket.
-        :rtype:     str
         """
 
         output = []

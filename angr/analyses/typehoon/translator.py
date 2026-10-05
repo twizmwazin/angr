@@ -317,11 +317,11 @@ class TypeTranslator:
     # Backpatching
     #
 
-    def backpatch(self, st, translated):
+    def backpatch(self, st: SimType, translated: dict):
         """
 
-        :param sim_type.SimType st:
-        :param dict translated:
+        :param st:
+        :param translated:
         :return:
         """
 

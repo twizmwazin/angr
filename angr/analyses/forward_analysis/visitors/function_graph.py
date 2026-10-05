@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 import networkx
 
@@ -8,15 +9,18 @@ from angr.utils.graph import GraphUtils, dfs_back_edges
 
 from .graph import GraphVisitor, NodeType
 
+if TYPE_CHECKING:
+    from angr.knowledge_plugins.functions import Function
+
 _l = logging.getLogger(__name__)
 
 
 class FunctionGraphVisitor(GraphVisitor):
     """
-    :param knowledge.Function func:
+    :param func:
     """
 
-    def __init__(self, func, graph=None):
+    def __init__(self, func: Function, graph=None):
         super().__init__()
         self.function = func
 

@@ -78,11 +78,11 @@ class DisassemblyPiece:
 
 
 class FunctionStart(DisassemblyPiece):
-    def __init__(self, func):
+    def __init__(self, func: Function):
         """
         Constructor.
 
-        :param angr.knowledge.Function func: The function instance.
+        :param func: The function instance.
         """
 
         self.addr = func.addr

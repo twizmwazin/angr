@@ -181,13 +181,12 @@ class AngrDB:
 
         return d
 
-    def db_compatible(self, version):
+    def db_compatible(self, version: int) -> bool:
         """
         Checks if the given database version is compatible with the current AngrDB class.
 
-        :param int version: The version of the database.
+        :param version:     The version of the database.
         :return:            True if compatible, False otherwise.
-        :rtype:             bool
         """
 
         return version in self.COMPATIBLE_VERSIONS

@@ -505,7 +505,7 @@ class CompleteCallingConventionsAnalysis(Analysis):
     #
 
     @staticmethod
-    def function_needs_variable_recovery(func):
+    def function_needs_variable_recovery(func) -> bool:
         """
         Check if running variable recovery on the function is the only way to determine the calling convention of the
         this function.
@@ -518,7 +518,6 @@ class CompleteCallingConventionsAnalysis(Analysis):
         :param func:    The function object.
         :return:        True if we must run VariableRecovery before we can determine what the calling convention of this
                         function is. False otherwise.
-        :rtype:         bool
         """
 
         # TODO: Check SimLibraries

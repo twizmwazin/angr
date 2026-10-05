@@ -103,12 +103,11 @@ class StructurerBase(Analysis):
     # Util methods
     #
 
-    def _has_cycle(self):
+    def _has_cycle(self) -> bool:
         """
         Test if the region contains a cycle.
 
         :return: True if the region contains a cycle, False otherwise.
-        :rtype: bool
         """
 
         return not networkx.is_directed_acyclic_graph(self._region.graph)
@@ -118,11 +117,11 @@ class StructurerBase(Analysis):
         block.statements = [stmt for stmt in block.statements if not isinstance(stmt, ailment.Stmt.ConditionalJump)]
 
     @staticmethod
-    def _remove_conditional_jumps(seq, follow_seq=True):
+    def _remove_conditional_jumps(seq: SequenceNode, follow_seq=True):
         """
         Remove all conditional jumps.
 
-        :param SequenceNode seq:    The SequenceNode instance to handle.
+        :param seq:                 The SequenceNode instance to handle.
         :return:                    A processed SequenceNode.
         """
 
@@ -257,11 +256,11 @@ class StructurerBase(Analysis):
             walker.walk(default)
 
     @staticmethod
-    def _remove_all_jumps(seq):
+    def _remove_all_jumps(seq: SequenceNode):
         """
         Remove all constant jumps.
 
-        :param SequenceNode seq:    The SequenceNode instance to handle.
+        :param seq:                 The SequenceNode instance to handle.
         :return:                    A processed SequenceNode.
         """
 
@@ -286,12 +285,12 @@ class StructurerBase(Analysis):
         return seq
 
     @staticmethod
-    def remove_redundant_jumps(seq, ail_manager: Manager):
+    def remove_redundant_jumps(seq: SequenceNode, ail_manager: Manager):
         """
         Remove all redundant jumps.
 
-        :param SequenceNode seq:    The SequenceNode instance to handle.
-        :param Manager ail_manager: The AIL manager to create new atoms if needed.
+        :param seq:                 The SequenceNode instance to handle.
+        :param ail_manager:         The AIL manager to create new atoms if needed.
         :return:                    A processed SequenceNode.
         """
 

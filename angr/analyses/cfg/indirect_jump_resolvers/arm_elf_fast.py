@@ -110,18 +110,17 @@ class ArmElfFastResolver(IndirectJumpResolver):
         return True, [target_addr]
 
     def resolve(  # pylint:disable=unused-argument
-        self, cfg, addr, func_addr, block, jumpkind, func_graph_complete: bool = True, **kwargs
-    ):
+        self, cfg, addr: int, func_addr: int, block, jumpkind: str, func_graph_complete: bool = True, **kwargs
+    ) -> tuple[bool, list[int]]:
         """
         The main resolving function.
 
         :param cfg:             A CFG instance.
-        :param int addr:        Address of the IRSB.
-        :param int func_addr:   Address of the function.
+        :param addr:            Address of the IRSB.
+        :param func_addr:       Address of the function.
         :param block:           The IRSB.
-        :param str jumpkind:    The jumpkind.
+        :param jumpkind:        The jumpkind.
         :return:
-        :rtype:                 tuple
         """
 
         # Note that this function assumes the IRSB is optimized (opt_level > 0)

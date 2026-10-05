@@ -16,13 +16,13 @@ class Server:
     Server implements the analysis server with a series of control interfaces exposed.
 
     :ivar project:          An instance of angr.Project.
-    :ivar str spill_yard:   A directory to store spilled states.
-    :ivar str db:           Path of the database that stores information about spilled states.
-    :ivar int max_workers:  Maximum number of workers. Each worker starts a new process.
-    :ivar int max_states:   Maximum number of active states for each worker.
-    :ivar int staging_max:  Maximum number of inactive states that are kept into memory before spilled onto the disk
+    :ivar spill_yard:       A directory to store spilled states.
+    :ivar db_str:           Path of the database that stores information about spilled states.
+    :ivar max_workers:      Maximum number of workers. Each worker starts a new process.
+    :ivar max_states:       Maximum number of active states for each worker.
+    :ivar staging_max:      Maximum number of inactive states that are kept into memory before spilled onto the disk
                             and potentially be picked up by another worker.
-    :ivar bool bucketizer:  Use the Bucketizer exploration strategy.
+    :ivar bucketizer:       Use the Bucketizer exploration strategy.
     :ivar _worker_exit_callback:    A method that will be called upon the exit of each worker.
     """
 
@@ -43,17 +43,17 @@ class Server:
     ):
         self.project = project
 
-        self.spill_yard = spill_yard or tempfile.mkdtemp(suffix="angr_spill_yard")
+        self.spill_yard: str = spill_yard or tempfile.mkdtemp(suffix="angr_spill_yard")
         if not spill_yard:
             _l.info("Temporary spill yard: %s", self.spill_yard)
-        self.db_str = db or "sqlite:///" + os.path.join(tempfile.mkdtemp(suffix="angr_server_db"), "db.sqlite3")
+        self.db_str: str = db or "sqlite:///" + os.path.join(tempfile.mkdtemp(suffix="angr_server_db"), "db.sqlite3")
         if not db:
             _l.info("Database: %s", self.db_str)
 
-        self.max_workers = max_workers if max_workers is not None else multiprocessing.cpu_count()
-        self.max_states = max_states
-        self.staging_max = staging_max
-        self.bucketizer = bucketizer
+        self.max_workers: int = max_workers if max_workers is not None else multiprocessing.cpu_count()
+        self.max_states: int = max_states
+        self.staging_max: int = staging_max
+        self.bucketizer: bool = bucketizer
         self.techniques = techniques
         self.add_options = add_options
         self.remove_options = remove_options

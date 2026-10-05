@@ -266,7 +266,7 @@ class SimLibrary:
         """
         Set the prototype of a function in the form of a C-style function declaration.
 
-        :param str c_decl: The C-style declaration of the function.
+        :param c_decl:     The C-style declaration of the function.
         :return:           A tuple of (function name, function prototype)
         """
 
@@ -423,7 +423,7 @@ class SimLibrary:
         """
         return name in self.procedures
 
-    def has_prototype(self, func_name):
+    def has_prototype(self, func_name: str) -> bool:
         """
         Check if a function has a prototype associated with it.
 
@@ -431,9 +431,8 @@ class SimLibrary:
         not count: this keeps ``has_prototype()`` consistent with ``get_prototype()``, which returns ``None`` for such
         entries.
 
-        :param str func_name: The name of the function.
+        :param func_name:     The name of the function.
         :return:              A bool indicating if a prototype of the function is available.
-        :rtype:               bool
         """
 
         return self.prototypes.get(func_name) is not None or func_name in self.prototypes_json
@@ -478,12 +477,12 @@ class SimCppLibrary(SimLibrary):
         _, func_proto = next(iter(parsed.items()))
         return func_proto
 
-    def get(self, name, arch):
+    def get(self, name: str, arch):
         """
         Get an implementation of the given function specialized for the given arch, or a stub procedure if none exists.
         Demangle the function name if it is a mangled C++ name.
 
-        :param str name:    The name of the function as a string
+        :param name:        The name of the function as a string
         :param arch:    The architecure to use, as either a string or an archinfo.Arch instance
         :return:        A SimProcedure instance representing the function as found in the library
         """
@@ -492,13 +491,13 @@ class SimCppLibrary(SimLibrary):
             return self.get_stub(name, arch)  # get_stub() might use the mangled name to derive the function prototype
         return super().get(demangled_name, arch)
 
-    def get_stub(self, name, arch):
+    def get_stub(self, name: str, arch):
         """
         Get a stub procedure for the given function, regardless of if a real implementation is available. This will
         apply any metadata, such as a default calling convention or a function prototype. Demangle the function name
         if it is a mangled C++ name.
 
-        :param str name:    The name of the function as a string
+        :param name:        The name of the function as a string
         :param arch:        The architecture to use, as either a string or an archinfo.Arch instance
         :return:            A SimProcedure instance representing a plausable stub as could be found in the library.
         """
@@ -539,21 +538,21 @@ class SimCppLibrary(SimLibrary):
         name = self._try_demangle(name)
         return super().has_metadata(name)
 
-    def has_implementation(self, name):
+    def has_implementation(self, name: str):
         """
         Check if a function has an implementation associated with it. Demangle the function name if it is a mangled C++
         name.
 
-        :param str name:    A mangled function name.
+        :param name:        A mangled function name.
         :return:            bool
         """
         return super().has_implementation(self._try_demangle(name))
 
-    def has_prototype(self, func_name):
+    def has_prototype(self, func_name: str):
         """
         Check if a function has a prototype associated with it. Demangle the function name if it is a mangled C++ name.
 
-        :param str name:    A mangled function name.
+        :param func_name:   A mangled function name.
         :return:            bool
         """
         return super().has_prototype(self._try_demangle(func_name))

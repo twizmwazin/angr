@@ -484,11 +484,11 @@ class SimPackets(SimFileBase):
             for i, size, x in zip(lengths, sizes, self.content)
         ]
 
-    def read(self, pos, size, **kwargs):
+    def read(self, pos: int | None, size, **kwargs):
         """
         Read a packet from the stream.
 
-        :param int pos:     The packet number to read from the sequence of the stream. May be None to append to the
+        :param pos:         The packet number to read from the sequence of the stream. May be None to append to the
                             stream.
         :param size:        The size to read. May be symbolic.
         :param short_reads: Whether to replace the size with a symbolic value constrained to less than or equal to the
@@ -568,11 +568,11 @@ class SimPackets(SimFileBase):
         self.content.append(packet)
         return (*packet, pos + 1)
 
-    def write(self, pos, data, size=None, events=True, **kwargs):
+    def write(self, pos: int | None, data, size=None, events=True, **kwargs):
         """
         Write a packet to the stream.
 
-        :param int pos:     The packet number to write in the sequence of the stream. May be None to append to the
+        :param pos:         The packet number to write in the sequence of the stream. May be None to append to the
                             stream.
         :param data:        The data to write, as a string or bitvector.
         :param size:        The optional size to write. May be symbolic; must be constrained to at most the size of

@@ -23,21 +23,21 @@ class PickledStatesBase:
 
         raise NotImplementedError
 
-    def add(self, prio, sid):
+    def add(self, prio: int, sid: str):
         """
         Add a newly pickled state.
 
-        :param int prio:    Priority of the state.
-        :param str sid:     Persistent ID of the state.
+        :param prio:        Priority of the state.
+        :param sid:         Persistent ID of the state.
         :return:            None
         """
         raise NotImplementedError
 
-    def pop_n(self, n):
+    def pop_n(self, n: int):
         """
         Pop the top N states.
 
-        :param int n:   Number of states to take.
+        :param n:       Number of states to take.
         :return:        A list of states.
         """
         raise NotImplementedError

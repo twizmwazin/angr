@@ -80,10 +80,16 @@ from .pe_msvc_eh_structs import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from angr.block import Block
     from angr.engines.pcode.lifter import IRSB as PcodeIRSB
     from angr.knowledge_plugins.cfg.spilling_cfg import SpillingCFG
     from angr.knowledge_plugins.cfg.types import CFGNODE_K
+    from angr.knowledge_plugins.functions import Function
+    from angr.sim_state import SimState
+
+    from .indirect_jump_resolvers.resolver import IndirectJumpResolver
 
 
 VEX_IRSB_MAX_SIZE = 400
@@ -169,7 +175,7 @@ class FunctionReturn:
         """
         Comparison
 
-        :param FunctionReturn other: The other object
+        :param other: The other object
         :return: True if equal, False otherwise
         """
         return (
@@ -234,16 +240,15 @@ class PendingJobs:
         for jobs in self._jobs.values():
             yield from jobs
 
-    def pop_job(self, returning=True):
+    def pop_job(self, returning: bool = True) -> CFGJob | None:
         """
         Pop a job from the pending jobs list.
 
         When returning == True, we prioritize the jobs whose functions are known to be returning (function.returning is
         True). As an optimization, we are sorting the pending jobs list according to job.function.returning.
 
-        :param bool returning: Only pop a pending job if the corresponding function returns.
+        :param returning: Only pop a pending job if the corresponding function returns.
         :return: A pending job if we can find one, or None if we cannot find any that satisfies the requirement.
-        :rtype: angr.analyses.cfg.cfg_fast.CFGJob
         """
 
         if not self:
@@ -311,22 +316,22 @@ class PendingJobs:
 
         self.clear_updated_functions()
 
-    def add_returning_function(self, func_addr):
+    def add_returning_function(self, func_addr: int):
         """
         Mark a function as returning.
 
-        :param int func_addr: Address of the function that returns.
+        :param func_addr: Address of the function that returns.
         :return:              None
         """
 
         self._returning_functions.add(func_addr)
         self._updated_functions.add(func_addr)
 
-    def add_nonreturning_function(self, func_addr):
+    def add_nonreturning_function(self, func_addr: int):
         """
         Mark a function as not returning.
 
-        :param int func_addr:   Address of the function that does not return.
+        :param func_addr:   Address of the function that does not return.
         :return:                None
         """
 
@@ -685,35 +690,35 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
         self,
         binary=None,
         objects=None,
-        regions=None,
-        pickle_intermediate_results=False,
-        symbols=True,
+        regions: Iterable[tuple[int, int]] | None = None,
+        pickle_intermediate_results: bool = False,
+        symbols: bool = True,
         function_prologues: bool | None = None,
-        resolve_indirect_jumps=True,
-        force_segment=False,
+        resolve_indirect_jumps: bool = True,
+        force_segment: bool = False,
         force_smart_scan: bool | None = None,
-        force_complete_scan=False,
+        force_complete_scan: bool = False,
         indirect_jump_target_limit=100000,
-        data_references=True,
-        cross_references=False,
-        normalize=False,
-        start_at_entry=True,
-        function_starts=None,
-        extra_memory_regions=None,
+        data_references: bool = True,
+        cross_references: bool = False,
+        normalize: bool = False,
+        start_at_entry: bool = True,
+        function_starts: list[int] | None = None,
+        extra_memory_regions: list[tuple[int, int]] | None = None,
         data_type_guessing_handlers=None,
-        arch_options=None,
-        indirect_jump_resolvers=None,
+        arch_options: CFGArchOptions | None = None,
+        indirect_jump_resolvers: list[IndirectJumpResolver] | None = None,
         base_state=None,
         exclude_sparse_regions=True,
         skip_specific_regions=True,
         heuristic_plt_resolving=None,
-        detect_tail_calls=False,
+        detect_tail_calls: bool = False,
         low_priority=False,
         cfb=None,
         model=None,
         resume_state: CFGResumeState | None = None,
-        eh_frame=True,
-        eh_frame_boundaries=True,
+        eh_frame: bool = True,
+        eh_frame_boundaries: bool = True,
         exceptions=True,
         skip_unmapped_addrs=True,
         nodecode_window_size=2048,
@@ -726,8 +731,8 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
         retedges: bool = False,
         drop_bad_funcs: bool = True,
         treat_functions_as_complete: bool = True,
-        start=None,  # deprecated
-        end=None,  # deprecated
+        start: int | None = None,  # deprecated
+        end: int | None = None,  # deprecated
         collect_data_references=None,  # deprecated
         extra_cross_references=None,  # deprecated
         elf_eh_frame=None,  # deprecated
@@ -737,42 +742,42 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
         :param binary:                  The binary to recover CFG on. By default the main binary is used.
         :param objects:                 A list of objects to recover the CFG on. By default it will recover the CFG of
                                         all loaded objects.
-        :param iterable regions:        A list of tuples in the form of (start address, end address) describing memory
+        :param regions:                 A list of tuples in the form of (start address, end address) describing memory
                                         regions that the CFG should cover.
-        :param bool pickle_intermediate_results: If we want to store the intermediate results or not.
-        :param bool symbols:            Get function beginnings from symbols in the binary.
-        :param bool function_prologues: Scan the binary for function prologues, and use those positions as function
+        :param pickle_intermediate_results: If we want to store the intermediate results or not.
+        :param symbols:                 Get function beginnings from symbols in the binary.
+        :param function_prologues:      Scan the binary for function prologues, and use those positions as function
                                         beginnings
-        :param bool resolve_indirect_jumps: Try to resolve indirect jumps. This is necessary to resolve jump targets
+        :param resolve_indirect_jumps: Try to resolve indirect jumps. This is necessary to resolve jump targets
                                             from jump tables, etc.
-        :param bool force_segment:      Force CFGFast to rely on binary segments instead of sections.
-        :param bool force_complete_scan:    Perform a complete scan on the binary and maximize the number of identified
+        :param force_segment:           Force CFGFast to rely on binary segments instead of sections.
+        :param force_complete_scan:    Perform a complete scan on the binary and maximize the number of identified
                                             code blocks.
-        :param bool data_references:    Enables the collection of references to data used by individual instructions.
+        :param data_references:         Enables the collection of references to data used by individual instructions.
                                         This does not collect 'cross-references', particularly those that involve
                                         multiple instructions.  For that, see `cross_references`
-        :param bool cross_references:   Whether CFGFast should collect "cross-references" from the entire program or
+        :param cross_references:        Whether CFGFast should collect "cross-references" from the entire program or
                                         not. This will populate the knowledge base with references to and from each
                                         recognizable address constant found in the code. Note that, because this
                                         performs constant propagation on the entire program, it may be much slower and
                                         consume more memory.
                                         This option implies `data_references=True`.
-        :param bool normalize:          Normalize the CFG as well as all function graphs after CFG recovery.
-        :param bool start_at_entry:     Begin CFG recovery at the entry point of this project. Setting it to False
+        :param normalize:               Normalize the CFG as well as all function graphs after CFG recovery.
+        :param start_at_entry:          Begin CFG recovery at the entry point of this project. Setting it to False
                                         prevents CFGFast from viewing the entry point as one of the starting points of
                                         code scanning.
-        :param list function_starts:    A list of extra function starting points. CFGFast will try to resume scanning
+        :param function_starts:         A list of extra function starting points. CFGFast will try to resume scanning
                                         from each address in the list.
-        :param list extra_memory_regions: A list of 2-tuple (start-address, end-address) that shows extra memory
+        :param extra_memory_regions: A list of 2-tuple (start-address, end-address) that shows extra memory
                                           regions. Integers falling inside will be considered as pointers.
-        :param list indirect_jump_resolvers: A custom list of indirect jump resolvers. If this list is None or empty,
+        :param indirect_jump_resolvers: A custom list of indirect jump resolvers. If this list is None or empty,
                                              default indirect jump resolvers specific to this architecture and binary
                                              types will be loaded.
         :param base_state:              A state to use as a backer for all memory loads
-        :param bool detect_tail_calls:  Enable aggressive tail-call optimization detection.
-        :param bool eh_frame:           Retrieve function starts (and maybe sizes later) from the .eh_frame of ELF
+        :param detect_tail_calls:       Enable aggressive tail-call optimization detection.
+        :param eh_frame:                Retrieve function starts (and maybe sizes later) from the .eh_frame of ELF
                                         binaries or exception records of PE binaries.
-        :param bool eh_frame_boundaries: Treat function starts recorded in the .eh_frame of ELF binaries as hard
+        :param eh_frame_boundaries: Treat function starts recorded in the .eh_frame of ELF binaries as hard
                                         function boundaries while tracing, the same way symbol addresses are treated.
                                         Without it, a tail-called function that is reached through a jump before it
                                         is reached through a call is absorbed into the caller. Only used if eh_frame
@@ -800,9 +805,9 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
                                         occurs in obfuscated binaries where many functions never return. This parameter
                                         acts as a threshold to disable this check when the number of jobs in the queue
                                         exceeds this threshold.
-        :param int start:               (Deprecated) The beginning address of CFG recovery.
-        :param int end:                 (Deprecated) The end address of CFG recovery.
-        :param CFGArchOptions arch_options: Architecture-specific options.
+        :param start:                   (Deprecated) The beginning address of CFG recovery.
+        :param end:                     (Deprecated) The end address of CFG recovery.
+        :param arch_options:            Architecture-specific options.
         :param extra_arch_options:      Any key-value pair in kwargs will be seen as an arch-specific option and will
                                         be used to set the option value in self._arch_options.
         :param retedges:                Whether to add return edges (from function endpoints to their return sites) in
@@ -828,7 +833,7 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
                                         the core recovery loop stops at the next job boundary, post-analysis still runs
                                         and finalizes the partially recovered model, and cfg.should_abort remains True
                                         so callers can tell the model is partial.
-        :param bool show_progressbar:   (Inherited from angr.Analysis.) Show a progressbar during CFG recovery.
+        :param show_progressbar:        (Inherited from angr.Analysis.) Show a progressbar during CFG recovery.
 
         Aborting and resuming CFG recovery:
 
@@ -2101,7 +2106,7 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
         """
         Some pre job-processing tasks, like update progress bar.
 
-        :param CFGJob job: The CFGJob instance.
+        :param job: The CFGJob instance.
         :return: None
         """
 
@@ -3170,11 +3175,11 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
 
         self._finish_progress()
 
-    def do_full_xrefs(self, overlay_state=None):
+    def do_full_xrefs(self, overlay_state: SimState | None = None):
         """
         Perform xref recovery on all functions.
 
-        :param SimState overlay:    An overlay state for loading constant data.
+        :param overlay_state:       An overlay state for loading constant data.
         :return:                    None
         """
 
@@ -3434,9 +3439,8 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
         """
         Scan a basic block starting at a specific address
 
-        :param CFGJob cfg_job: The CFGJob instance.
+        :param cfg_job: The CFGJob instance.
         :return: a list of successors
-        :rtype: list
         """
 
         addr = cfg_job.addr
@@ -3457,17 +3461,16 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
 
         return entries
 
-    def _scan_procedure(self, cfg_job, current_func_addr) -> list[CFGJob]:
+    def _scan_procedure(self, cfg_job: CFGJob, current_func_addr: int) -> list[CFGJob]:
         """
         Checks the hooking procedure for this address searching for new static
         exit points to add to successors (generating entries for them)
         if this address has not been traced before. Updates previous CFG nodes
         with edges.
 
-        :param CFGJob cfg_job:      The CFGJob instance.
-        :param int current_func_addr: Address of the current function.
+        :param cfg_job:      The CFGJob instance.
+        :param current_func_addr: Address of the current function.
         :return: List of successors
-        :rtype: list
         """
 
         addr = cfg_job.addr
@@ -3600,15 +3603,14 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
 
         return entries
 
-    def _scan_irsb(self, cfg_job, current_func_addr) -> list[CFGJob]:
+    def _scan_irsb(self, cfg_job: CFGJob, current_func_addr: int) -> list[CFGJob]:
         """
         Generate a list of successors (generating them each as entries) to IRSB.
         Updates previous CFG nodes with edges.
 
-        :param CFGJob cfg_job: The CFGJob instance.
-        :param int current_func_addr: Address of the current function
+        :param cfg_job: The CFGJob instance.
+        :param current_func_addr: Address of the current function
         :return: a list of successors
-        :rtype: list
         """
         addr, function_addr, cfg_node, irsb = self._generate_cfgnode(cfg_job, current_func_addr)
 
@@ -4325,13 +4327,13 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
 
     # Data reference processing
 
-    def _collect_data_references(self, irsb, irsb_addr):
+    def _collect_data_references(self, irsb: pyvex.IRSB, irsb_addr: int):
         """
         Unoptimizes IRSB and _add_data_reference's for individual statements or
         for parts of statements (e.g. Store)
 
-        :param pyvex.IRSB irsb: Block to scan for data references
-        :param int irsb_addr: Address of block
+        :param irsb: Block to scan for data references
+        :param irsb_addr: Address of block
         :return: None
         """
 
@@ -4451,19 +4453,19 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
 
     def _collect_data_references_by_scanning_stmts(self, irsb, irsb_addr):
         # helper methods
-        def _process(stmt_idx_, data_, insn_addr, next_insn_addr, data_size=None, data_type=None):
+        def _process(
+            stmt_idx_: int, data_, insn_addr: int, next_insn_addr: int, data_size=None, data_type: str | None = None
+        ):
             """
             Helper method used for calling _add_data_reference after checking
             for manipulation of constants
 
-            :param pyvex.IRSB irsb_: Edited block (as might be de-optimised)
-            :param pyvex.IRStmt.* stmt_: Statement
-            :param int stmt_idx_: Statement ID
+            :param stmt_idx_: Statement ID
             :param data_: data manipulated by statement
-            :param int insn_addr: instruction address
-            :param int next_insn_addr: next instruction address
+            :param insn_addr: instruction address
+            :param next_insn_addr: next instruction address
             :param data_size: Size of the data being manipulated
-            :param str data_type: Type of the data being manipulated
+            :param data_type: Type of the data being manipulated
             :return: None
             """
             if type(data_) is pyvex.expr.Const:  # pylint: disable=unidiomatic-typecheck
@@ -4684,17 +4686,16 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
 
     # Indirect jumps processing
 
-    def _resolve_plt(self, addr, irsb, indir_jump: IndirectJump):
+    def _resolve_plt(self, addr: int, irsb, indir_jump: IndirectJump) -> bool:
         """
         Determine if the IRSB at the given address is a PLT stub. If it is, concretely execute the basic block to
         resolve the jump target.
 
-        :param int addr:                Address of the block.
+        :param addr:                    Address of the block.
         :param irsb:                    The basic block.
         :param indir_jump:              The IndirectJump instance.
         :return:                        True if the IRSB represents a PLT stub and we successfully resolved the target.
                                         False otherwise.
-        :rtype:                         bool
         """
 
         # is the address identified by CLE as a PLT stub?
@@ -4726,13 +4727,15 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
 
         return False
 
-    def _indirect_jump_resolved(self, jump: IndirectJump, jump_addr, resolved_by, targets: list[int]):
+    def _indirect_jump_resolved(
+        self, jump: IndirectJump, jump_addr, resolved_by: IndirectJumpResolver, targets: list[int]
+    ):
         """
         Called when an indirect jump is successfully resolved.
 
         :param jump:                                The resolved indirect jump.
-        :param IndirectJumpResolver resolved_by:    The resolver used to resolve this indirect jump.
-        :param list targets:                        List of indirect jump targets.
+        :param resolved_by:                         The resolver used to resolve this indirect jump.
+        :param targets:                             List of indirect jump targets.
 
         :return:                                    None
         """
@@ -4812,11 +4815,11 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
 
         CFGBase._indirect_jump_resolved(self, jump, jump.addr, resolved_by, targets)
 
-    def _indirect_jump_unresolved(self, jump):
+    def _indirect_jump_unresolved(self, jump: IndirectJump):
         """
         Called when we cannot resolve an indirect jump.
 
-        :param IndirectJump jump: The unresolved indirect jump.
+        :param jump: The unresolved indirect jump.
 
         :return:    None
         """
@@ -5139,11 +5142,11 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
 
             a_key = b_key  # update a
 
-    def _remove_node(self, node):
+    def _remove_node(self, node: CFGNode):
         """
         Remove a CFGNode from self.graph as well as from the function manager (if it is the beginning of a function)
 
-        :param CFGNode node: The CFGNode to remove from the graph.
+        :param node: The CFGNode to remove from the graph.
         :return: None
         """
 
@@ -5157,13 +5160,13 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
         if node.addr in self.kb.functions.callgraph:
             self.kb.functions.callgraph.remove_node(node.addr)
 
-    def _shrink_node(self, node, new_size, remove_function=True):
+    def _shrink_node(self, node: CFGNode, new_size: int, remove_function: bool = True):
         """
         Shrink the size of a node in CFG.
 
-        :param CFGNode node: The CFGNode to shrink
-        :param int new_size: The new size of the basic block
-        :param bool remove_function: If there is a function starting at `node`, should we remove that function or not.
+        :param node: The CFGNode to shrink
+        :param new_size: The new size of the basic block
+        :param remove_function: If there is a function starting at `node`, should we remove that function or not.
         :return: None
         """
 
@@ -5552,13 +5555,13 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
     # Function utils
     #
 
-    def _function_add_node(self, cfg_node, function_addr):
+    def _function_add_node(self, cfg_node: CFGNode, function_addr: int):
         """
         Adds node to function manager, converting address to CodeNode if
         possible
 
-        :param CFGNode cfg_node:    A CFGNode instance.
-        :param int function_addr:   Address of the current function.
+        :param cfg_node:    A CFGNode instance.
+        :param function_addr:   Address of the current function.
         :return: None
         """
         snippet = self._to_snippet(cfg_node=cfg_node)
@@ -5566,24 +5569,23 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
 
     def _function_add_transition_edge(
         self,
-        dst_addr,
-        src_node,
-        src_func_addr,
+        dst_addr: int,
+        src_node: CFGNode | None,
+        src_func_addr: int,
         to_outside=False,
         dst_func_addr=None,
         stmt_idx=None,
         ins_addr=None,
         is_exception=False,
-    ):
+    ) -> bool:
         """
         Add a transition edge to the function transition map.
 
-        :param int dst_addr: Address that the control flow transits to.
-        :param CFGNode src_node: The source node that the control flow transits from.
-        :param int src_func_addr: Function address.
+        :param dst_addr: Address that the control flow transits to.
+        :param src_node: The source node that the control flow transits from.
+        :param src_func_addr: Function address.
         :return: True if the edge is correctly added. False if any exception occurred (for example, the target address
                  does not exist)
-        :rtype: bool
         """
 
         try:
@@ -5621,19 +5623,25 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
         except (SimMemoryError, SimEngineError):
             return False
 
-    def _function_add_call_edge(self, addr, src_node, function_addr, syscall=False, stmt_idx=None, ins_addr=None):
+    def _function_add_call_edge(
+        self,
+        addr: int,
+        src_node: CFGNode | None,
+        function_addr: int,
+        syscall: bool = False,
+        stmt_idx: int | str | None = None,
+        ins_addr: int | None = None,
+    ) -> bool:
         """
         Add a call edge to the function transition map.
 
-        :param int addr: Address that is being called (callee).
-        :param CFGNode src_node: The source CFG node (caller).
-        :param int ret_addr: Address that returns to (in case the function returns).
-        :param int function_addr: Function address..
-        :param bool syscall: If this is a call to a syscall or not.
-        :param int or str stmt_idx: Statement ID of this call.
-        :param int or None ins_addr: Instruction address of this call.
+        :param addr: Address that is being called (callee).
+        :param src_node: The source CFG node (caller).
+        :param function_addr: Function address..
+        :param syscall: If this is a call to a syscall or not.
+        :param stmt_idx: Statement ID of this call.
+        :param ins_addr: Instruction address of this call.
         :return: True if the edge is added. False if any exception occurred.
-        :rtype: bool
         """
         try:
             if src_node is None:
@@ -5659,14 +5667,14 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
         except (SimMemoryError, SimEngineError):
             return False
 
-    def _function_add_fakeret_edge(self, addr, src_node, src_func_addr, confirmed=None):
+    def _function_add_fakeret_edge(self, addr: int, src_node: CFGNode | None, src_func_addr: int, confirmed=None):
         """
         Generate CodeNodes for target and source, if no source node add node
         for function, otherwise creates fake return to in function manager
 
-        :param int addr: target address
-        :param angr.analyses.CFGNode src_node: source node
-        :param int src_func_addr: address of function
+        :param addr: target address
+        :param src_node: source node
+        :param src_func_addr: address of function
         :param confirmed: used as attribute on eventual digraph
         :return: None
         """
@@ -5683,27 +5691,27 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
             src_snippet = self._to_snippet(cfg_node=src_node)
             self.kb.functions._add_fakeret_to(src_func_addr, src_snippet, target_snippet, confirmed=confirmed)
 
-    def _function_add_return_site(self, addr, function_addr):
+    def _function_add_return_site(self, addr: int, function_addr: int):
         """
         Generate CodeNodes for target address, registers node for function to
         function manager as return site
 
-        :param int addr: target address
-        :param int function_addr: address of function
+        :param addr: target address
+        :param function_addr: address of function
         :return: None
         """
         node = next(self.model.nodes_by_addr(addr), None)
         target = self._to_snippet(node) if node is not None else addr
         self.kb.functions._add_return_from(function_addr, target)
 
-    def _function_add_return_edge(self, return_from_addr, return_to_addr, function_addr):
+    def _function_add_return_edge(self, return_from_addr: int, return_to_addr: int, function_addr: int):
         """
         Generate CodeNodes for return_to_addr, add this node for function to
         function manager generating new edge
 
-        :param int return_from_addr: target address
-        :param int return_to_addr: target address
-        :param int function_addr: address of function
+        :param return_from_addr: target address
+        :param return_to_addr: target address
+        :param function_addr: address of function
         :return: None
         """
 
@@ -5723,7 +5731,7 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
     # Architecture-specific methods
     #
 
-    def _arm_track_lr_on_stack(self, addr, irsb, function):
+    def _arm_track_lr_on_stack(self, addr: int, irsb: pyvex.IRSB, function: Function):
         """
         At the beginning of the basic block, we check if the first instruction stores the LR register onto the stack.
         If it does, we calculate the offset of that store, and record the offset in function.info.
@@ -5752,9 +5760,9 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
         This method can be enabled by setting "ret_jumpkind_heuristics", which is an architecture-specific option on
         ARM, to True.
 
-        :param int addr: Address of the basic block.
-        :param pyvex.IRSB irsb: The basic block object.
-        :param Function function: The function instance.
+        :param addr: Address of the basic block.
+        :param irsb: The basic block object.
+        :param function: The function instance.
         :return: None
         """
 
@@ -5810,14 +5818,14 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
         if "lr_saved_on_stack" not in function.info:
             function.info["lr_saved_on_stack"] = False
 
-    def _arm_track_read_lr_from_stack(self, irsb, function):  # pylint:disable=unused-argument
+    def _arm_track_read_lr_from_stack(self, irsb: pyvex.IRSB, function: Function):  # pylint:disable=unused-argument
         """
         At the end of a basic block, simulate the very last instruction to see if the return address is read from the
         stack and written in PC. If so, the jumpkind of this IRSB will be set to Ijk_Ret. For detailed explanations,
         please see the documentation of _arm_track_lr_on_stack().
 
-        :param pyvex.IRSB irsb: The basic block object.
-        :param Function function: The function instance.
+        :param irsb: The basic block object.
+        :param function: The function instance.
         :return: None
         """
 
@@ -6007,7 +6015,7 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
     # Other methods
     #
 
-    def _generate_cfgnode(self, cfg_job, current_function_addr):
+    def _generate_cfgnode(self, cfg_job: CFGJob, current_function_addr: int) -> tuple:
         """
         Generate a CFGNode that starts at `cfg_job.addr`.
 
@@ -6018,10 +6026,9 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
         the other mode. If the basic block is successfully decoded in the other mode (different from the initial one),
          `addr` and `current_function_addr` are updated.
 
-        :param CFGJob cfg_job: The CFGJob instance.
-        :param int current_function_addr: Address of the current function.
+        :param cfg_job: The CFGJob instance.
+        :param current_function_addr: Address of the current function.
         :return: A 4-tuple of (new address, new function address, CFGNode instance, IRSB object)
-        :rtype: tuple
         """
 
         addr = cfg_job.addr

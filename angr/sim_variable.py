@@ -40,7 +40,7 @@ class SimVariable(Serializable):
     ):
         """
         :param ident: A unique identifier provided by user or the program. Usually a string.
-        :param str name: Name of this variable.
+        :param name: Name of this variable.
         """
         self.ident = ident
         self.name = name

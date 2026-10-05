@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import itertools
+from typing import TYPE_CHECKING
 
 import networkx
 import pyvex
@@ -9,6 +10,10 @@ from .errors import AngrBladeError, SimTranslationError
 from .knowledge_plugins.cfg import CFGNode
 from .slicer import SimSlicer
 from .utils.constants import DEFAULT_STATEMENT
+
+if TYPE_CHECKING:
+    from .analyses.cfg.cfg_base import CFGBase
+    from .project import Project
 
 
 class BadJumpkindNotification(Exception):
@@ -29,8 +34,8 @@ class Blade:
         dst_run: int,
         dst_stmt_idx: int,
         direction: str = "backward",
-        project=None,
-        cfg=None,
+        project: Project | None = None,
+        cfg: CFGBase | None = None,
         ignore_sp: bool = False,
         ignore_bp: bool = False,
         ignored_regs=None,
@@ -48,8 +53,8 @@ class Blade:
         :param dst_run:                 An address specifying the target SimRun.
         :param dst_stmt_idx:            The target statement index. -1 means executing until the last statement.
         :param direction:               'backward' or 'forward' slicing. Forward slicing is not yet supported.
-        :param angr.Project project:    The project instance.
-        :param angr.analyses.CFGBase cfg: the CFG instance. It will be made mandatory later.
+        :param project:                 The project instance.
+        :param cfg:                     the CFG instance. It will be made mandatory later.
         :param ignore_sp:               Whether the stack pointer should be ignored in dependency tracking. Any
                                         dependency from/to stack pointers will be ignored if this options is True.
         :param ignore_bp:               Whether the base pointer should be ignored or not.
@@ -167,12 +172,11 @@ class Blade:
     # Private methods
     #
 
-    def _get_irsb(self, v):
+    def _get_irsb(self, v) -> pyvex.IRSB:
         """
         Get the IRSB object from an address, a SimRun, or a CFGNode.
         :param v: Can be one of the following: an address, or a CFGNode.
         :return: The IRSB instance.
-        :rtype: pyvex.IRSB
         """
 
         if isinstance(v, CFGNode):
@@ -196,24 +200,22 @@ class Blade:
 
         raise AngrBladeError(f"Unsupported SimRun argument type {type(v)}")
 
-    def _get_cfgnode(self, thing):
+    def _get_cfgnode(self, thing) -> CFGNode | None:
         """
         Get the CFGNode corresponding to the specific address.
 
         :param thing: Can be anything that self._normalize() accepts. Usually it's the address of the node
         :return: the CFGNode instance
-        :rtype: CFGNode
         """
 
         return self._cfg.get_any_node(self._get_addr(thing))
 
     @staticmethod
-    def _get_addr(v):
+    def _get_addr(v) -> int:
         """
         Get address of the basic block or CFG node specified by v.
         :param v: Can be one of the following: a CFGNode, or an address.
         :return: The address.
-        :rtype: int
         """
 
         if isinstance(v, CFGNode):

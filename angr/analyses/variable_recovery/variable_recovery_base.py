@@ -24,6 +24,7 @@ from angr.storage.memory_mixins import MultiValuedMemory
 from angr.utils.cowdict import DefaultChainMapCOW
 
 if TYPE_CHECKING:
+    from angr.knowledge_plugins.variables.variable_manager import VariableManager
     from angr.project import Project
     from angr.storage import SimMemoryObject
 
@@ -384,7 +385,7 @@ class VariableRecoveryStateBase:
         return self._analysis._dominance_frontiers
 
     @property
-    def variable_manager(self):
+    def variable_manager(self) -> VariableManager:
         return self._analysis.variable_manager
 
     @property

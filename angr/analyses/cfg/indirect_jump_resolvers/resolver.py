@@ -14,49 +14,48 @@ class IndirectJumpResolver:
         self.timeless = timeless
         self.base_state = base_state
 
-    def filter(self, cfg, addr, func_addr, block, jumpkind):
+    def filter(self, cfg, addr: int, func_addr: int, block, jumpkind: str) -> bool:
         """
         Check if this resolution method may be able to resolve the indirect jump or not.
 
-        :param int addr:        Basic block address of this indirect jump.
-        :param int func_addr:   Address of the function that this indirect jump belongs to.
+        :param addr:            Basic block address of this indirect jump.
+        :param func_addr:       Address of the function that this indirect jump belongs to.
         :param block:           The basic block. The type is determined by the backend being used. It's pyvex.IRSB if
                                 pyvex is used as the backend.
-        :param str jumpkind:    The jumpkind.
+        :param jumpkind:        The jumpkind.
         :return: True if it is possible for this resolution method to resolve the specific indirect jump, False
                  otherwise.
-        :rtype:  bool
         """
 
         raise NotImplementedError
 
-    def resolve(self, cfg, addr, func_addr, block, jumpkind, func_graph_complete: bool = True, **kwargs):
+    def resolve(
+        self, cfg, addr: int, func_addr: int, block, jumpkind: str, func_graph_complete: bool = True, **kwargs
+    ) -> tuple[bool, list[int]]:
         """
         Resolve an indirect jump.
 
         :param cfg:             The CFG analysis object.
-        :param int addr:        Basic block address of this indirect jump.
-        :param int func_addr:   Address of the function that this indirect jump belongs to.
+        :param addr:            Basic block address of this indirect jump.
+        :param func_addr:       Address of the function that this indirect jump belongs to.
         :param block:           The basic block. The type is determined by the backend being used. It's pyvex.IRSB if
                                 pyvex is used as the backend.
-        :param str jumpkind:    The jumpkind.
+        :param jumpkind:        The jumpkind.
         :param func_graph_complete: True if the function graph is complete at this point (except for nodes that this
                                 indirect jump node dominates).
         :return:                A tuple of a boolean indicating whether the resolution is successful or not, and a list
                                 of resolved targets (ints).
-        :rtype:                 tuple
         """
 
         raise NotImplementedError
 
-    def _is_target_valid(self, cfg, target):  # pylint:disable=no-self-use
+    def _is_target_valid(self, cfg, target: int) -> bool:  # pylint:disable=no-self-use
         """
         Check if the resolved target is valid.
 
         :param cfg:         The CFG analysis object.
-        :param int target:  The target to check.
+        :param target:      The target to check.
         :return:            True if the target is valid. False otherwise.
-        :rtype:             bool
         """
 
         if self.base_state is not None:

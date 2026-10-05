@@ -50,7 +50,7 @@ class AnnotatedCFG:
     # Public methods
     #
 
-    def from_digraph(self, digraph):
+    def from_digraph(self, digraph: networkx.DiGraph):
         """
         Initialize this AnnotatedCFG object with a networkx.DiGraph consisting of the following
         form of nodes:
@@ -59,7 +59,7 @@ class AnnotatedCFG:
 
         Those nodes are connected by edges indicating the execution flow.
 
-        :param networkx.DiGraph digraph: A networkx.DiGraph object
+        :param digraph: A networkx.DiGraph object
         """
 
         for n1 in digraph.nodes():
@@ -154,15 +154,14 @@ class AnnotatedCFG:
 
         return []
 
-    def get_last_statement_index(self, addr):
+    def get_last_statement_index(self, addr: int) -> int | None:
         """
         Get the statement index of the last statement to execute in the basic block specified by `addr`.
 
-        :param int addr:    Address of the basic block.
+        :param addr:    Address of the basic block.
         :return:            The statement index of the last statement to be executed in the block. Usually if the
                             default exit is taken, it will be the last statement to execute. If the block is not in the
                             slice or we should never take any exit going to this block, None is returned.
-        :rtype:             int or None
         """
 
         if addr in self._exit_taken:

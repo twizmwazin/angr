@@ -12,15 +12,14 @@ class memset(angr.SimProcedure):
     # pylint:disable=arguments-differ, missing-class-docstring
 
     @staticmethod
-    def _repeat_bytes(byt, rep):
+    def _repeat_bytes(byt: int, rep: int) -> int:
         """
         Get a long number for a byte being repeated for many times. This is part of the effort of optimizing
         performance of angr's memory operations.
 
-        :param int byt: the byte to repeat
-        :param int rep: times to repeat the byte
+        :param byt: the byte to repeat
+        :param rep: times to repeat the byte
         :return: a long integer representing the repeating bytes
-        ;rtype: int
         """
 
         if rep == 1:

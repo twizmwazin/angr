@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from functools import reduce
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .transitions import merge_transitions
+
+if TYPE_CHECKING:
+    from angr.knowledge_plugins.functions.function import Function
 
 
 class CFGSliceToSink:
@@ -11,11 +14,11 @@ class CFGSliceToSink:
     The representation of a slice of a CFG.
     """
 
-    def __init__(self, target, transitions=None):
+    def __init__(self, target: Function, transitions: dict[int, list[int]] | None = None):
         """
-        :param angr.knowledge_plugins.functions.function.Function target:
+        :param target:
             The targeted sink, to which every path in the slice leads.
-        :param Dict[int,List[int]] transitions:
+        :param transitions:
             A mapping representing transitions in the graph.
             Indexes are source addresses and values a list of destination addresses, for which there exists a transition
             in the slice from source to destination.
@@ -24,16 +27,16 @@ class CFGSliceToSink:
         self._transitions = transitions or {}
 
     @property
-    def transitions(self):
+    def transitions(self) -> dict[int, list[int]]:
         """
-        :return Dict[int,List[int]]: The transitions in the slice.
+        :return: The transitions in the slice.
         """
         return self._transitions
 
     @property
-    def transitions_as_tuples(self):
+    def transitions_as_tuples(self) -> list[tuple[int, int]]:
         """
-        :return List[Tuple[int,int]]: The list of transitions as pairs of (source, destination).
+        :return: The list of transitions as pairs of (source, destination).
         """
         return reduce(
             lambda acc, source: acc + [(source, destination) for destination in self._transitions[source]],
@@ -42,9 +45,9 @@ class CFGSliceToSink:
         )
 
     @property
-    def target(self):
+    def target(self) -> Function:
         """
-        :return angr.knowledge_plugins.functions.function.Function:
+        :return:
             The targeted sink function, from which the slice is constructed.
         """
         return self._target
@@ -65,31 +68,31 @@ class CFGSliceToSink:
         return list(self._origins | self._destinations)
 
     @property
-    def entrypoints(self):
+    def entrypoints(self) -> list[int]:
         """
         Entrypoints are all source addresses that are not the destination address of any transition.
 
-        :return List[int]: The list of entrypoints addresses.
+        :return: The list of entrypoints addresses.
         """
         return sorted(self._origins - self._destinations)
 
-    def add_transitions(self, transitions):
+    def add_transitions(self, transitions: dict[int, list[int]]) -> dict[int, list[int]]:
         """
         Add the given transitions to the current slice.
 
-        :param Dict[int,List[int]] transitions:
+        :param transitions:
             The list of transitions to be added to `self.transitions`.
 
-        :return Dict[int,List[int]]: Return the updated list of transitions.
+        :return: Return the updated list of transitions.
         """
         self._transitions = merge_transitions(transitions, self._transitions)
         return self._transitions
 
-    def is_empty(self):
+    def is_empty(self) -> bool:
         """
         Test if a given slice does not contain any transition.
 
-        :return bool: True if the <CFGSliceToSink> instance does not contain any transitions. False otherwise.
+        :return: True if the <CFGSliceToSink> instance does not contain any transitions. False otherwise.
         """
         return not bool(self._transitions)
 

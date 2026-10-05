@@ -81,11 +81,11 @@ class Labels(KnowledgeBasePlugin):
         o._labels = dict(self._labels.items())
         o._reverse_labels = dict(self._reverse_labels.items())
 
-    def get_unique_label(self, label):
+    def get_unique_label(self, label: str):
         """
         Get a unique label name from the given label name.
 
-        :param str label:   The desired label name.
+        :param label:       The desired label name.
         :return:            A unique label name.
         """
 

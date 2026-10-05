@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 import angr
 from angr import claripy
@@ -8,6 +9,9 @@ from angr.errors import SimEngineError
 
 from .base import SimSootValue
 from .constants import SimSootValue_IntConstant
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 l = logging.getLogger("angr.engines.soot.values.arrayref")
 
@@ -33,11 +37,11 @@ class SimSootValue_ArrayBaseRef(SimSootValue):
             return self._default_value_generator(state)
         return state.project.simos.get_default_value_by_type(self.element_type, state=state)
 
-    def add_default_value_generator(self, generator):
+    def add_default_value_generator(self, generator: Callable):
         """
         Add a generator for overwriting the default value for array elements.
 
-        :param function generator: Function that given the state, returns a
+        :param generator: Function that given the state, returns a
                                    default value for array elements, e.g.
                                    `generator = lambda state: claripy.BVV(0, 32)`
         """

@@ -14,6 +14,9 @@ from angr.procedures import SIM_PROCEDURES
 from angr.sim_variable import SimConstantVariable, SimMemoryVariable, SimRegisterVariable, SimStackVariable
 
 if TYPE_CHECKING:
+    import networkx
+
+    from angr.analyses.ddg import ProgramVariable
     from angr.knowledge_plugins import Function
 
 l = logging.getLogger(name=__name__)
@@ -44,26 +47,26 @@ class RedundantStackVariable:
 class RegisterReallocation:
     def __init__(
         self,
-        stack_variable,
-        register_variable,
-        stack_variable_sources,
-        stack_variable_consumers,
-        prologue_addr,
-        prologue_size,
-        epilogue_addr,
-        epilogue_size,
+        stack_variable: SimStackVariable,
+        register_variable: SimRegisterVariable,
+        stack_variable_sources: list,
+        stack_variable_consumers: list,
+        prologue_addr: int,
+        prologue_size: int,
+        epilogue_addr: int,
+        epilogue_size: int,
     ):
         """
         Constructor.
 
-        :param SimStackVariable stack_variable:
-        :param SimRegisterVariable register_variable:
-        :param list stack_variable_sources:
-        :param list stack_variable_consumers:
-        :param int prologue_addr:
-        :param int prologue_size:
-        :param int epilogue_addr:
-        :param int epilogue_size:
+        :param stack_variable:
+        :param register_variable:
+        :param stack_variable_sources:
+        :param stack_variable_consumers:
+        :param prologue_addr:
+        :param prologue_size:
+        :param epilogue_addr:
+        :param epilogue_size:
         """
 
         self.stack_variable = stack_variable
@@ -83,11 +86,11 @@ class RegisterReallocation:
 
 
 class DeadAssignment:
-    def __init__(self, pv):
+    def __init__(self, pv: ProgramVariable):
         """
         Constructor.
 
-        :param angr.analyses.ddg.ProgramVariable pv: The assignment to remove.
+        :param pv: The assignment to remove.
         """
 
         self.pv = pv
@@ -146,10 +149,10 @@ class BinaryOptimizer(Analysis):
 
             self._optimize_function(f)
 
-    def _optimize_function(self, function):
+    def _optimize_function(self, function: Function):
         """
 
-        :param Function function:
+        :param function:
         :return:
         """
 
@@ -193,11 +196,11 @@ class BinaryOptimizer(Analysis):
         if "dead_assignment_elimination" in self._techniques:
             self._dead_assignment_elimination(function, ddg.simplified_data_graph)
 
-    def _constant_propagation(self, function, data_graph):  # pylint:disable=unused-argument
+    def _constant_propagation(self, function, data_graph: networkx.MultiDiGraph):  # pylint:disable=unused-argument
         """
 
         :param function:
-        :param networkx.MultiDiGraph data_graph:
+        :param data_graph:
         :return:
         """
 
@@ -233,7 +236,7 @@ class BinaryOptimizer(Analysis):
 
             # print n0, n1, n2
 
-    def _redundant_stack_variable_removal(self, function, data_graph):
+    def _redundant_stack_variable_removal(self, function, data_graph: networkx.MultiDiGraph):
         """
         If an argument passed from the stack (i.e. dword ptr [ebp+4h]) is saved to a local variable on the stack at the
         beginning of the function, and this local variable was never modified anywhere in this function, and no pointer
@@ -241,7 +244,7 @@ class BinaryOptimizer(Analysis):
         that argument instead.
 
         :param function:
-        :param networkx.MultiDiGraph data_graph:
+        :param data_graph:
         :return:
         """
 
@@ -348,7 +351,7 @@ class BinaryOptimizer(Analysis):
 
         self.redundant_stack_variables.extend(redundant_stack_variables)
 
-    def _register_reallocation(self, function, data_graph):
+    def _register_reallocation(self, function: Function, data_graph: networkx.MultiDiGraph):
         """
         Find unused registers throughout the function, and use those registers to replace stack variables.
 
@@ -358,8 +361,8 @@ class BinaryOptimizer(Analysis):
         - Prologue and epilogue of the function is identifiable.
         - At least one register is not used in the entire function.
 
-        :param Function function:
-        :param networkx.MultiDiGraph data_graph:
+        :param function:
+        :param data_graph:
         :return: None
         """
 
@@ -628,14 +631,14 @@ class BinaryOptimizer(Analysis):
                 repr(function),
             )
 
-    def _dead_assignment_elimination(self, function, data_graph):  # pylint:disable=unused-argument
+    def _dead_assignment_elimination(self, function: Function, data_graph: networkx.MultiDiGraph):  # pylint:disable=unused-argument
         """
         Remove assignments to registers that has no consumers, but immediately killed.
 
         BROKEN - DO NOT USE IT
 
-        :param Function function:
-        :param networkx.MultiDiGraph data_graph:
+        :param function:
+        :param data_graph:
         :return: None
         """
 

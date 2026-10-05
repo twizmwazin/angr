@@ -127,6 +127,7 @@ from .stackarg_offset_manager import StackArgOffsetManager
 from .variable_map import VariableMap
 
 if TYPE_CHECKING:
+    from angr.codenode import CodeNode
     from angr.knowledge_plugins.cfg import CFGModel
 
     from .decompilation_cache import DecompilationCache
@@ -602,12 +603,12 @@ class Clinic(Analysis, Serializable):
     # Public methods
     #
 
-    def block(self, addr, size):
+    def block(self, addr: int, size: int):
         """
         Get the converted block at the given specific address with the given size.
 
-        :param int addr:
-        :param int size:
+        :param addr:
+        :param size:
         :return:
         """
 
@@ -1824,13 +1825,12 @@ class Clinic(Analysis, Serializable):
 
                 self._blocks_by_addr_and_size[(block_node.addr, block_node.size)] = ail_block
 
-    def _convert(self, block_node):
+    def _convert(self, block_node) -> Block | CodeNode:
         """
         Convert a BlockNode to an AIL block.
 
         :param block_node:  A BlockNode instance.
         :return:            A converted AIL block.
-        :rtype:             ailment.Block
         """
 
         if type(block_node) is not BlockNode:
@@ -2349,7 +2349,7 @@ class Clinic(Analysis, Serializable):
 
     def _simplify_block(
         self,
-        ail_block,
+        ail_block: Block,
         stack_pointer_tracker=None,
         cache=None,
         preserve_vvar_ids: set[int] | None = None,
@@ -2358,7 +2358,7 @@ class Clinic(Analysis, Serializable):
         """
         Simplify a single AIL block.
 
-        :param ailment.Block ail_block: The AIL block to simplify.
+        :param ail_block:               The AIL block to simplify.
         :param stack_pointer_tracker:   The RegisterDeltaTracker analysis instance.
         :return:                        A simplified AIL block.
         """
@@ -3086,11 +3086,11 @@ class Clinic(Analysis, Serializable):
     def _set_reference_values(self, expr, reference_values) -> None:
         self.variable_map.set_reference_values(expr, reference_values)
 
-    def _link_variables_on_block(self, block, kb):
+    def _link_variables_on_block(self, block: Block, kb):
         """
         Link atoms (AIL expressions) in the given block to corresponding variables identified previously.
 
-        :param ailment.Block block: The AIL block to work on.
+        :param block:               The AIL block to work on.
         :return:                    None
         """
 
@@ -3177,14 +3177,14 @@ class Clinic(Analysis, Serializable):
                 self._link_variables_on_expr(variable_manager, global_variables, block, stmt_idx, stmt, arg)
 
     def _link_variables_on_expr(
-        self, variable_manager: VariableManagerInternal, global_variables, block, stmt_idx, stmt, expr
+        self, variable_manager: VariableManagerInternal, global_variables, block: Block, stmt_idx: int, stmt, expr
     ):
         """
         Link atoms (AIL expressions) in the given expression to corresponding variables identified previously.
 
         :param variable_manager:    Variable manager of the function.
-        :param ailment.Block block: AIL block.
-        :param int stmt_idx:        ID of the statement.
+        :param block:               AIL block.
+        :param stmt_idx:            ID of the statement.
         :param stmt:                The AIL statement that `expr` belongs to.
         :param expr:                The AIl expression to work on.
         :return:                    None

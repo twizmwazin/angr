@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from typing import TYPE_CHECKING
 
 import networkx
 import pyvex
@@ -17,6 +18,12 @@ from angr.sim_variable import (
     SimStackVariable,
     SimTemporaryVariable,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import ItemsView, Iterable, KeysView
+
+    from angr.sim_variable import SimVariable
+    from angr.state_plugins.sim_action import SimAction
 
 l = logging.getLogger(name=__name__)
 
@@ -51,13 +58,13 @@ class ProgramVariable:
     """
     Describes a variable in the program at a specific location.
 
-    :ivar SimVariable variable: The variable.
-    :ivar CodeLocation location: Location of the variable.
+    :ivar variable: The variable.
+    :ivar location: Location of the variable.
     """
 
     def __init__(self, variable, location, initial=False, arch=None):
-        self.variable = variable
-        self.location = location
+        self.variable: SimVariable = variable
+        self.location: CodeLocation = location
         self.initial = initial
         self._arch = arch  # for pretty printing
 
@@ -126,12 +133,11 @@ class LiveDefinitions:
     # Public methods
     #
 
-    def branch(self):
+    def branch(self) -> LiveDefinitions:
         """
         Create a branch of the current live definition collection.
 
         :return: A new LiveDefinition instance.
-        :rtype: angr.analyses.ddg.LiveDefinitions
         """
 
         ld = LiveDefinitions()
@@ -141,12 +147,11 @@ class LiveDefinitions:
 
         return ld
 
-    def copy(self):
+    def copy(self) -> LiveDefinitions:
         """
         Make a hard copy of `self`.
 
         :return: A new LiveDefinition instance.
-        :rtype: angr.analyses.ddg.LiveDefinitions
         """
 
         ld = LiveDefinitions()
@@ -156,15 +161,14 @@ class LiveDefinitions:
 
         return ld
 
-    def add_def(self, variable, location, size_threshold=32):
+    def add_def(self, variable: SimVariable, location: CodeLocation, size_threshold: int = 32) -> bool:
         """
         Add a new definition of variable.
 
-        :param SimVariable variable: The variable being defined.
-        :param CodeLocation location: Location of the variable being defined.
-        :param int size_threshold: The maximum bytes to consider for the variable.
+        :param variable: The variable being defined.
+        :param location: Location of the variable being defined.
+        :param size_threshold: The maximum bytes to consider for the variable.
         :return: True if the definition was new, False otherwise
-        :rtype: bool
         """
 
         new_defs_added = False
@@ -200,15 +204,14 @@ class LiveDefinitions:
 
         return new_defs_added
 
-    def add_defs(self, variable, locations, size_threshold=32):
+    def add_defs(self, variable: SimVariable, locations: Iterable[CodeLocation], size_threshold: int = 32) -> bool:
         """
         Add a collection of new definitions of a variable.
 
-        :param SimVariable variable: The variable being defined.
-        :param iterable locations: A collection of locations where the variable was defined.
-        :param int size_threshold: The maximum bytes to consider for the variable.
+        :param variable: The variable being defined.
+        :param locations: A collection of locations where the variable was defined.
+        :param size_threshold: The maximum bytes to consider for the variable.
         :return: True if any of the definition was new, False otherwise
-        :rtype: bool
         """
 
         new_defs_added = False
@@ -218,13 +221,13 @@ class LiveDefinitions:
 
         return new_defs_added
 
-    def kill_def(self, variable, location, size_threshold=32):
+    def kill_def(self, variable: SimVariable, location: CodeLocation, size_threshold: int = 32):
         """
         Add a new definition for variable and kill all previous definitions.
 
-        :param SimVariable variable: The variable to kill.
-        :param CodeLocation location: The location where this variable is defined.
-        :param int size_threshold: The maximum bytes to consider for the variable.
+        :param variable: The variable to kill.
+        :param location: The location where this variable is defined.
+        :param size_threshold: The maximum bytes to consider for the variable.
         :return: None
         """
 
@@ -253,15 +256,14 @@ class LiveDefinitions:
         else:
             l.error('Unsupported variable type "%s".', type(variable))
 
-    def lookup_defs(self, variable, size_threshold=32):
+    def lookup_defs(self, variable: SimVariable, size_threshold: int = 32) -> set[CodeLocation]:
         """
         Find all definitions of the variable.
 
-        :param SimVariable variable: The variable to lookup for.
-        :param int size_threshold: The maximum bytes to consider for the variable. For example, if the variable is 100
-                                   byte long, only the first `size_threshold` bytes are considered.
+        :param variable: The variable to lookup for.
+        :param size_threshold: The maximum bytes to consider for the variable. For example, if the variable is 100
+                               byte long, only the first `size_threshold` bytes are considered.
         :return: A set of code locations where the variable is defined.
-        :rtype: set
         """
 
         live_def_locs = set()
@@ -292,22 +294,20 @@ class LiveDefinitions:
 
         return live_def_locs
 
-    def items(self):
+    def items(self) -> ItemsView[SimVariable, set[CodeLocation]]:
         """
         An iterator that returns all live definitions.
 
         :return: The iterator.
-        :rtype: iter
         """
 
         return self._defs.items()
 
-    def itervariables(self):
+    def itervariables(self) -> KeysView[SimVariable]:
         """
         An iterator that returns all live variables.
 
         :return: The iterator.
-        :rtype: iter
         """
 
         return self._defs.keys()
@@ -360,13 +360,12 @@ class DDGViewItem:
             )
         )
 
-    def _to_viewitem(self, prog_var):
+    def _to_viewitem(self, prog_var: ProgramVariable) -> DDGViewItem:
         """
         Convert a ProgramVariable instance to a DDGViewItem object.
 
-        :param ProgramVariable prog_var: The ProgramVariable object to convert.
-        :return:                         The converted DDGViewItem object.
-        :rtype:                          DDGViewItem
+        :param prog_var: The ProgramVariable object to convert.
+        :return:         The converted DDGViewItem object.
         """
 
         return DDGViewItem(self._ddg, prog_var, simplified=self._simplified)
@@ -481,7 +480,7 @@ class DDG(Analysis):
     analysis) will directly benefit the DDG.
     """
 
-    def __init__(self, cfg, start=None, call_depth=None, block_addrs=None):
+    def __init__(self, cfg, start=None, call_depth=None, block_addrs: Iterable | None = None):
         """
         :param cfg:         Control flow graph. Please make sure each node has an associated `state` with it, e.g. by
                             passing the keep_state=True and state_add_options=angr.options.refs arguments to
@@ -489,8 +488,7 @@ class DDG(Analysis):
         :param start:       An address, Specifies where we start the generation of this data dependence graph.
         :param call_depth:  None or integers. A non-negative integer specifies how deep we would like to track in the
                             call tree. None disables call_depth limit.
-        :param iterable or None block_addrs: A collection of block addresses that the DDG analysis should be performed
-                                             on.
+        :param block_addrs: A collection of block addresses that the DDG analysis should be performed on.
         """
 
         # Sanity check
@@ -535,21 +533,19 @@ class DDG(Analysis):
     #
 
     @property
-    def graph(self):
+    def graph(self) -> networkx.DiGraph:
         """
         :returns: A networkx DiGraph instance representing the dependence relations between statements.
-        :rtype: networkx.DiGraph
         """
 
         return self._stmt_graph
 
     @property
-    def data_graph(self):
+    def data_graph(self) -> networkx.DiGraph:
         """
         Get the data dependence graph.
 
         :return: A networkx DiGraph instance representing data dependence.
-        :rtype: networkx.DiGraph
         """
 
         return self._data_graph
@@ -626,16 +622,21 @@ class DDG(Analysis):
         # Not found
         return None
 
-    def data_sub_graph(self, pv, simplified=True, killing_edges=False, excluding_types=None):
+    def data_sub_graph(
+        self,
+        pv: ProgramVariable,
+        simplified: bool = True,
+        killing_edges: bool = False,
+        excluding_types: Iterable | None = None,
+    ) -> networkx.MultiDiGraph:
         """
         Get a subgraph from the data graph or the simplified data graph that starts from node pv.
 
-        :param ProgramVariable pv: The starting point of the subgraph.
-        :param bool simplified: When True, the simplified data graph is used, otherwise the data graph is used.
-        :param bool killing_edges: Are killing edges included or not.
-        :param iterable excluding_types: Excluding edges whose types are among those excluded types.
+        :param pv: The starting point of the subgraph.
+        :param simplified: When True, the simplified data graph is used, otherwise the data graph is used.
+        :param killing_edges: Are killing edges included or not.
+        :param excluding_types: Excluding edges whose types are among those excluded types.
         :return: A subgraph.
-        :rtype: networkx.MultiDiGraph
         """
 
         result = networkx.MultiDiGraph()
@@ -818,16 +819,15 @@ class DDG(Analysis):
                         nw = DDGJob(successor, new_call_depth)
                         self._worklist_append(nw, worklist, worklist_set)
 
-    def _track(self, state, live_defs, statements):
+    def _track(self, state, live_defs, statements: list | None) -> LiveDefinitions:
         """
         Given all live definitions prior to this program point, track the changes, and return a new list of live
         definitions. We scan through the action list of the new state to track the changes.
 
         :param state:           The input state at that program point.
         :param live_defs:       All live definitions prior to reaching this program point.
-        :param list statements: A list of VEX statements.
+        :param statements:      A list of VEX statements.
         :returns:               A list of new live definitions.
-        :rtype:                 angr.analyses.ddg.LiveDefinitions
         """
 
         # Make a copy of live_defs
@@ -884,14 +884,12 @@ class DDG(Analysis):
 
         return self._live_defs
 
-    def _def_lookup(self, variable):  # pylint:disable=no-self-use
+    def _def_lookup(self, variable: SimVariable):  # pylint:disable=no-self-use
         """
         This is a backward lookup in the previous defs. Note that, as we are using VSA, it is possible that `variable`
         is affected by several definitions.
 
-        :param angr.analyses.ddg.LiveDefinitions live_defs:
-                            The collection of live definitions.
-        :param SimVariable: The variable to lookup for definitions.
+        :param variable:    The variable to lookup for definitions.
         :returns:           A dict {stmt:labels} where label is the number of individual addresses of `addr_list` (or
                             the actual set of addresses depending on the keep_addrs flag) that are definted by stmt.
         """
@@ -929,13 +927,12 @@ class DDG(Analysis):
 
         self._live_defs.kill_def(variable, code_loc)
 
-    def _get_register_size(self, reg_offset):
+    def _get_register_size(self, reg_offset: int) -> int:
         """
         Get the size of a register.
 
-        :param int reg_offset: Offset of the register.
+        :param reg_offset: Offset of the register.
         :return: Size in bytes.
-        :rtype: int
         """
 
         # TODO: support registers that are not aligned
@@ -955,13 +952,12 @@ class DDG(Analysis):
     #
 
     @staticmethod
-    def _get_actual_addrs(action, state):
+    def _get_actual_addrs(action: SimAction, state) -> set[int]:
         """
         For memory actions, get a list of addresses it operates on.
 
-        :param SimAction action: The action object to work with.
-        :return:                 A list of addresses that are accessed with that action.
-        :rtype:                  list
+        :param action: The action object to work with.
+        :return:       A set of addresses that are accessed with that action.
         """
 
         if action.actual_addrs is None:
@@ -978,13 +974,13 @@ class DDG(Analysis):
 
         return addr_list
 
-    def _create_memory_variable(self, action, addr, addrs):
+    def _create_memory_variable(self, action: SimAction, addr: int, addrs: set[int]):
         """
         Create a SimStackVariable or SimMemoryVariable based on action objects and its address.
 
-        :param SimAction action: The action to work with.
-        :param int addr:         The address of the memory variable in creation.
-        :param list addrs:       A list of all addresses that the action was effective on.
+        :param action: The action to work with.
+        :param addr:   The address of the memory variable in creation.
+        :param addrs:  A set of all addresses that the action was effective on.
         :return:
         """
 
@@ -1004,11 +1000,11 @@ class DDG(Analysis):
 
         return variable
 
-    def _make_edges(self, action, prog_var):
+    def _make_edges(self, action: SimAction, prog_var: ProgramVariable):
         """
 
-        :param SimAction action:
-        :param ProgramVariable prog_var:
+        :param action:
+        :param prog_var:
         :return:
         """
 
@@ -1321,11 +1317,11 @@ class DDG(Analysis):
     # Graph operations
     #
 
-    def _data_graph_add_node(self, node):
+    def _data_graph_add_node(self, node: ProgramVariable):
         """
         Add a node in the data dependence graph.
 
-        :param ProgramVariable node: The node to add.
+        :param node: The node to add.
         :return: None
         """
 
@@ -1333,12 +1329,12 @@ class DDG(Analysis):
 
         self._simplified_data_graph = None
 
-    def _data_graph_add_edge(self, src, dst, **edge_labels):
+    def _data_graph_add_edge(self, src: ProgramVariable, dst: ProgramVariable, **edge_labels):
         """
         Add an edge in the data dependence graph.
 
-        :param ProgramVariable src: Source node.
-        :param ProgramVariable dst: Destination node.
+        :param src: Source node.
+        :param dst: Destination node.
         :param edge_labels: All labels associated with the edge.
         :return: None
         """
@@ -1350,12 +1346,12 @@ class DDG(Analysis):
 
         self._simplified_data_graph = None
 
-    def _stmt_graph_add_edge(self, src, dst, **edge_labels):
+    def _stmt_graph_add_edge(self, src: CodeLocation, dst: CodeLocation, **edge_labels):
         """
         Add an edge in the statement dependence graph from a program location `src` to another program location `dst`.
 
-        :param CodeLocation src: Source node.
-        :param CodeLocation dst: Destination node.
+        :param src: Source node.
+        :param dst: Destination node.
         :param edge_labels: All labels associated with the edge.
         :returns: None
         """
@@ -1367,11 +1363,11 @@ class DDG(Analysis):
 
         self._stmt_graph.add_edge(src, dst, **edge_labels)
 
-    def _stmt_graph_annotate_edges(self, edges_to_annotate, **new_labels):
+    def _stmt_graph_annotate_edges(self, edges_to_annotate: list, **new_labels):
         """
         Add new annotations to edges in the statement dependence graph.
 
-        :param list edges_to_annotate:      A list of edges to annotate.
+        :param edges_to_annotate:      A list of edges to annotate.
         :param new_labels:  New labels to be added to those edges.
         :returns: None
         """
@@ -1394,13 +1390,12 @@ class DDG(Analysis):
                     # Construct a tuple
                     data[k] = (v,)
 
-    def _simplify_data_graph(self, data_graph):  # pylint:disable=no-self-use
+    def _simplify_data_graph(self, data_graph: networkx.DiGraph) -> networkx.MultiDiGraph:  # pylint:disable=no-self-use
         """
         Simplify a data graph by removing all temp variable nodes on the graph.
 
-        :param networkx.DiGraph data_graph: The data dependence graph to simplify.
+        :param data_graph: The data dependence graph to simplify.
         :return: The simplified graph.
-        :rtype: networkx.MultiDiGraph
         """
 
         graph = networkx.MultiDiGraph(data_graph)
@@ -1547,16 +1542,17 @@ class DDG(Analysis):
 
         return filtered_defs
 
-    def find_definitions(self, variable, location=None, simplified_graph=True):
+    def find_definitions(
+        self, variable: SimVariable, location=None, simplified_graph: bool = True
+    ) -> list[ProgramVariable]:
         """
         Find all definitions of the given variable.
 
-        :param SimVariable variable:
-        :param bool simplified_graph: True if you just want to search in the simplified graph instead of the normal
-                                      graph. Usually the simplified graph suffices for finding definitions of register
-                                      or memory variables.
+        :param variable:
+        :param simplified_graph: True if you just want to search in the simplified graph instead of the normal
+                                 graph. Usually the simplified graph suffices for finding definitions of register
+                                 or memory variables.
         :return: A collection of all variable definitions to the specific variable.
-        :rtype: list
         """
 
         graph = self.simplified_data_graph if simplified_graph else self.data_graph
@@ -1575,14 +1571,13 @@ class DDG(Analysis):
 
         return defs
 
-    def find_consumers(self, var_def, simplified_graph=True):
+    def find_consumers(self, var_def: ProgramVariable, simplified_graph: bool = True) -> list[ProgramVariable]:
         """
         Find all consumers to the specified variable definition.
 
-        :param ProgramVariable var_def: The variable definition.
-        :param bool simplified_graph: True if we want to search in the simplified graph, False otherwise.
+        :param var_def: The variable definition.
+        :param simplified_graph: True if we want to search in the simplified graph, False otherwise.
         :return: A collection of all consumers to the specified variable definition.
-        :rtype: list
         """
 
         graph = self.simplified_data_graph if simplified_graph else self.data_graph
@@ -1611,14 +1606,13 @@ class DDG(Analysis):
 
         return consumers
 
-    def find_killers(self, var_def, simplified_graph=True):
+    def find_killers(self, var_def: ProgramVariable, simplified_graph: bool = True) -> list[ProgramVariable]:
         """
         Find all killers to the specified variable definition.
 
-        :param ProgramVariable var_def: The variable definition.
-        :param bool simplified_graph: True if we want to search in the simplified graph, False otherwise.
+        :param var_def: The variable definition.
+        :param simplified_graph: True if we want to search in the simplified graph, False otherwise.
         :return: A collection of all killers to the specified variable definition.
-        :rtype: list
         """
 
         graph = self.simplified_data_graph if simplified_graph else self.data_graph
@@ -1634,14 +1628,13 @@ class DDG(Analysis):
 
         return killers
 
-    def find_sources(self, var_def, simplified_graph=True):
+    def find_sources(self, var_def: ProgramVariable, simplified_graph: bool = True) -> list[ProgramVariable]:
         """
         Find all sources to the specified variable definition.
 
-        :param ProgramVariable var_def: The variable definition.
-        :param bool simplified_graph: True if we want to search in the simplified graph, False otherwise.
+        :param var_def: The variable definition.
+        :param simplified_graph: True if we want to search in the simplified graph, False otherwise.
         :return: A collection of all sources to the specified variable definition.
-        :rtype: list
         """
 
         graph = self.simplified_data_graph if simplified_graph else self.data_graph

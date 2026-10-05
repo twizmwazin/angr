@@ -97,17 +97,14 @@ class IRSB:
     single-entry, multiple-exit code block.
 
     :ivar arch:             The architecture this block is lifted under
-    :vartype arch:          :class:`archinfo.Arch`
     :ivar statements:       The statements in this block
-    :vartype statements:    list of :class:`IRStmt`
     :ivar next:             The expression for the default exit target of this block
-    :vartype next:          :class:`IRExpr`
-    :ivar int offsIP:       The offset of the instruction pointer in the VEX guest state
-    :ivar int stmts_used:   The number of statements in this IRSB
-    :ivar str jumpkind:     The type of this block's default jump (call, boring, syscall, etc) as a VEX enum string
-    :ivar bool direct_next: Whether this block ends with a direct (not indirect) jump or branch
-    :ivar int size:         The size of this block in bytes
-    :ivar int addr:         The address of this basic block, i.e. the address in the first IMark
+    :ivar offsIP:           The offset of the instruction pointer in the VEX guest state
+    :ivar stmts_used:       The number of statements in this IRSB
+    :ivar jumpkind:         The type of this block's default jump (call, boring, syscall, etc) as a VEX enum string
+    :ivar direct_next:      Whether this block ends with a direct (not indirect) jump or branch
+    :ivar size:             The size of this block in bytes
+    :ivar addr:             The address of this basic block, i.e. the address in the first IMark
     """
 
     __slots__ = (
@@ -167,7 +164,7 @@ class IRSB:
         """
         :param data:                The bytes to lift. Can be either a string of bytes or a cffi buffer object.
                                     You may also pass None to initialize an empty IRSB.
-        :param int mem_addr:        The address to lift the data at.
+        :param mem_addr:            The address to lift the data at.
         :param arch:                The architecture to lift the data as.
         :param max_inst:            The maximum number of instructions to lift. (See note below)
         :param max_bytes:           The maximum number of bytes to use.

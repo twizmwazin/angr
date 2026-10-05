@@ -167,7 +167,7 @@ class SootFunction(Function):
         return self._local_blocks
 
     @property
-    def cyclomatic_complexity(self):
+    def cyclomatic_complexity(self) -> int:
         """
         The cyclomatic complexity of the function.
 
@@ -182,7 +182,6 @@ class SootFunction(Function):
         Initially this value is None until it is computed for the first time
 
         :return: The cyclomatic complexity of the function.
-        :rtype: int
         """
         if self._cyclomatic_complexity is None:
             self._cyclomatic_complexity = (
@@ -201,12 +200,11 @@ class SootFunction(Function):
         return self._local_blocks.keys()
 
     @property
-    def block_addrs_set(self):
+    def block_addrs_set(self) -> set:
         """
         Return a set of block addresses for a better performance of inclusion tests.
 
         :return: A set of block addresses.
-        :rtype: set
         """
 
         return self._local_block_addrs
@@ -215,8 +213,8 @@ class SootFunction(Function):
         """
         Getting a block out of the current function.
 
-        :param int addr:    The address of the block.
-        :param int size:    The size of the block. This is optional. If not provided, angr will load
+        :param addr:        The address of the block.
+        :param size:        The size of the block. This is optional. If not provided, angr will load
         :param byte_string:
         :return:
         """
@@ -357,7 +355,7 @@ class SootFunction(Function):
         self,
         from_node: CodeNode,
         to_node,
-        outside=False,
+        outside: bool = False,
         ins_addr=None,
         stmt_idx=None,
         is_exception=False,
@@ -368,7 +366,7 @@ class SootFunction(Function):
 
         :param from_node            The address of the basic block that begins this transition.
         :param to_node              The address of the basic block that ends this transition.
-        :param bool outside:        If this is a transition to another function.
+        :param outside:             If this is a transition to another function.
         :return: None
         """
 
@@ -584,7 +582,6 @@ class SootFunction(Function):
         The generated graph is cached in self._local_transition_graph.
 
         :return:    A local transition graph.
-        :rtype:     networkx.DiGraph
         """
 
         if self._local_transition_graph is not None:
@@ -606,12 +603,12 @@ class SootFunction(Function):
 
         return g
 
-    def subgraph(self, ins_addrs):
+    def subgraph(self, ins_addrs: Iterable) -> networkx.DiGraph:
         """
         Generate a sub control flow graph of instruction addresses based on self.graph
 
-        :param iterable ins_addrs: A collection of instruction addresses that should be included in the subgraph.
-        :return networkx.DiGraph: A subgraph.
+        :param ins_addrs: A collection of instruction addresses that should be included in the subgraph.
+        :return: A subgraph.
         """
 
         # find all basic blocks that include those instructions

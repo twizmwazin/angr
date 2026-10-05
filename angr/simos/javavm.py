@@ -284,13 +284,13 @@ class SimJavaVM(SimOS):
     #
 
     @staticmethod
-    def get_default_value_by_type(type_, state):
+    def get_default_value_by_type(type_: str, state: SimState):
         """
         Java specify defaults values for primitive and reference types. This
         method returns the default value for a given type.
 
-        :param str type_:       Name of type.
-        :param SimState state:  Current SimState.
+        :param type_:           Name of type.
+        :param state:           Current SimState.
         :return:                Default value for this type.
         """
         if options.ZERO_FILL_UNCONSTRAINED_MEMORY not in state.options:

@@ -396,12 +396,12 @@ class OptimizationPass(BaseOptimizationPass):
             self._scratch["peephole_bundle"] = bundle
         return bundle
 
-    def _simplify_block(self, ail_block, cache=None):
+    def _simplify_block(self, ail_block: ailment.Block, cache=None):
         """
         Simplify a single AIL block.
 
-        :param ailment.Block ail_block: The AIL block to simplify.
-        :return:                        A simplified AIL block.
+        :param ail_block: The AIL block to simplify.
+        :return:          A simplified AIL block.
         """
 
         cached_prop = None

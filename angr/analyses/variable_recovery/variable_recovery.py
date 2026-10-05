@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from typing import TYPE_CHECKING
 
 import archinfo
 
@@ -20,6 +21,9 @@ from angr.storage.memory_mixins.paged_memory.pages.multi_values import MultiValu
 from .annotations import StackLocationAnnotation
 from .variable_recovery_base import VariableRecoveryBase, VariableRecoveryStateBase
 
+if TYPE_CHECKING:
+    from angr.codenode import CodeNode
+
 l = logging.getLogger(name=__name__)
 
 
@@ -27,7 +31,7 @@ class VariableRecoveryState(VariableRecoveryStateBase):
     """
     The abstract state of variable recovery analysis.
 
-    :ivar angr.knowledge.variable_manager.VariableManager variable_manager: The variable manager.
+    :ivar variable_manager: The variable manager.
     """
 
     def __init__(
@@ -122,8 +126,7 @@ class VariableRecoveryState(VariableRecoveryStateBase):
         Merge two abstract states.
 
         :param others:  Other abstract states to merge.
-        :return:        The merged abstract state.
-        :rtype:         VariableRecoveryState, and a boolean that indicates if any merge has happened.
+        :return:        The merged abstract state, and a boolean that indicates if any merge has happened.
         """
 
         self.phi_variables = {}
@@ -157,12 +160,11 @@ class VariableRecoveryState(VariableRecoveryStateBase):
             merge_occurred,
         )
 
-    def _merge_concrete_states(self, other):
+    def _merge_concrete_states(self, other: VariableRecoveryState) -> list:
         """
 
-        :param VariableRecoveryState other:
+        :param other:
         :return:
-        :rtype:                             list
         """
 
         merged = []
@@ -392,11 +394,11 @@ class VariableRecoveryState(VariableRecoveryStateBase):
 
         return n
 
-    def _addr_to_stack_offset(self, addr):
+    def _addr_to_stack_offset(self, addr: claripy.ast.Base):
         """
         Convert an address to a stack offset.
 
-        :param claripy.ast.Base addr:  The address to convert from.
+        :param addr:  The address to convert from.
         :return:                       A stack offset if the addr comes from the stack pointer, or None if the address
                                        does not come from the stack pointer.
         """
@@ -471,10 +473,10 @@ class VariableRecovery(ForwardAnalysis, VariableRecoveryBase):  # pylint:disable
     analysis to resolve the conflicts between overlapping variables.
     """
 
-    def __init__(self, func, max_iterations=20, store_live_variables=False):
+    def __init__(self, func: Function, max_iterations=20, store_live_variables=False):
         """
 
-        :param knowledge.Function func:  The function to analyze.
+        :param func:  The function to analyze.
         """
 
         function_graph_visitor = visitors.FunctionGraphVisitor(func)
@@ -528,14 +530,13 @@ class VariableRecovery(ForwardAnalysis, VariableRecoveryBase):  # pylint:disable
         merged_state, merge_occurred = states[0].merge(states[1:], successor=node.addr)
         return merged_state, not merge_occurred
 
-    def _run_on_node(self, node, state):
+    def _run_on_node(self, node: CodeNode, state: VariableRecoveryState) -> tuple:
         """
         Take an input abstract state, execute the node, and derive an output state.
 
-        :param angr.Block node:             The node to work on.
-        :param VariableRecoveryState state: The input state.
+        :param node:                        The node to work on.
+        :param state:                       The input state.
         :return:                            A tuple of (changed, new output state).
-        :rtype:                             tuple
         """
 
         l.debug("Analyzing block %#x, iteration %d.", node.addr, self._node_iterations[node])

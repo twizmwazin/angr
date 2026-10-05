@@ -8,7 +8,7 @@ import types
 from collections import defaultdict
 from io import BytesIO, IOBase
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import archinfo
 import cle
@@ -24,6 +24,9 @@ from .llm_client import LLMClient
 from .procedures import SIM_LIBRARIES, SIM_PROCEDURES
 from .sim_procedure import SimProcedure
 from .simos import SimOS, os_mapping
+
+if TYPE_CHECKING:
+    from .misc.plugins import PluginPreset
 
 l = logging.getLogger(name=__name__)
 
@@ -91,31 +94,29 @@ class Project:
     :param arch:                        The target architecture (auto-detected otherwise).
     :param simos:                       a SimOS class to use for this project.
     :param engine:                      The SimEngine class to use for this project.
-    :param bool translation_cache:      If True, cache translated basic blocks rather than re-translating them.
+    :param translation_cache:           If True, cache translated basic blocks rather than re-translating them.
     :param selfmodifying_code:          Whether we aggressively support self-modifying code. When enabled, emulation
                                         will try to read code from the current state instead of the original memory,
                                         regardless of the current memory protections.
     :param store_function:              A function that defines how the Project should be stored. Default to pickling.
     :param load_function:               A function that defines how the Project should be loaded. Default to unpickling.
     :param analyses_preset:             The plugin preset for the analyses provider (i.e. Analyses instance).
-    :type analyses_preset:              angr.misc.PluginPreset
 
     Any additional keyword arguments passed will be passed onto ``cle.Loader``.
 
     :ivar analyses:     The available analyses.
-    :type analyses:     angr.analysis.Analyses
     :ivar entry:        The program entrypoint.
     :ivar factory:      Provides access to important analysis elements such as path groups and symbolic execution
                         results.
-    :type factory:      AngrObjectFactory
     :ivar filename:     The filename of the executable.
     :ivar loader:       The program loader.
-    :type loader:       cle.Loader
     :ivar storage:      Dictionary of things that should be loaded/stored with the Project.
-    :type storage:      defaultdict(list)
     """
 
     arch: archinfo.Arch
+    factory: AngrObjectFactory
+    loader: cle.Loader
+    storage: defaultdict[Any, list]
     # class-level default so that projects unpickled from before this attribute existed still work
     _language_confidence: str | None = None
 
@@ -131,12 +132,12 @@ class Project:
         simos=None,
         engine=None,
         load_options: dict[str, Any] | None = None,
-        translation_cache=True,
+        translation_cache: bool = True,
         selfmodifying_code: bool = False,
         support_selfmodifying_code: bool | None = None,  # deprecated. use selfmodifying_code instead
         store_function=None,
         load_function=None,
-        analyses_preset=None,
+        analyses_preset: str | PluginPreset | None = None,
         eager_ifunc_resolution=None,
         cache_limits: dict[str, int | None] | None = None,
         rustc_version=None,
@@ -627,7 +628,7 @@ class Project:
 
         del self._sim_procedures[addr]
 
-    def hook_symbol(self, symbol_name, simproc, kwargs=None, replace: bool | None = None):
+    def hook_symbol(self, symbol_name, simproc, kwargs=None, replace: bool | None = None) -> int | None:
         """
         Resolve a dependency in a binary. Looks up the address of the given symbol, and then hooks that
         address. If the symbol was not available in the loaded libraries, this address may be provided
@@ -647,7 +648,6 @@ class Project:
                             true, silently replace the hook. If false, warn and do not replace the
                             hook. If none (default), warn and replace the hook.
         :returns:           The address of the new symbol.
-        :rtype:             int
         """
         if type(symbol_name) is not int:
             sym = self.loader.find_symbol(symbol_name)
@@ -678,11 +678,11 @@ class Project:
         self.hook(hook_addr, simproc, kwargs=kwargs, replace=replace)
         return hook_addr
 
-    def symbol_hooked_by(self, symbol_name) -> SimProcedure | None:
+    def symbol_hooked_by(self, symbol_name: str) -> SimProcedure | None:
         """
         Return the SimProcedure, if it exists, for the given symbol name.
 
-        :param str symbol_name: Name of the symbol.
+        :param symbol_name: Name of the symbol.
 
         :returns:    None if the address is not hooked.
         """
@@ -695,13 +695,12 @@ class Project:
             return None
         return self.hooked_by(hook_addr)
 
-    def is_symbol_hooked(self, symbol_name):
+    def is_symbol_hooked(self, symbol_name: str) -> bool:
         """
         Check if a symbol is already hooked.
 
-        :param str symbol_name: Name of the symbol.
+        :param symbol_name: Name of the symbol.
         :return: True if the symbol can be resolved and is hooked, False otherwise.
-        :rtype: bool
         """
         sym = self.loader.find_symbol(symbol_name)
         if sym is None:

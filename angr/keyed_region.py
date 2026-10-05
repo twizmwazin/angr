@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import logging
 import weakref
+from typing import TYPE_CHECKING
 
 from sortedcontainers import SortedDict
 
 from .knowledge_plugins.key_definitions.unknown_size import UnknownSize
+
+if TYPE_CHECKING:
+    from .sim_variable import SimVariable
 
 l = logging.getLogger(name=__name__)
 
@@ -181,11 +185,11 @@ class KeyedRegion:
         kr._object_mapping = self._object_mapping.copy()
         return kr
 
-    def merge(self, other, replacements=None):
+    def merge(self, other: KeyedRegion, replacements=None):
         """
         Merge another KeyedRegion into this KeyedRegion.
 
-        :param KeyedRegion other: The other instance to merge with.
+        :param other:             The other instance to merge with.
         :return: None
         """
 
@@ -226,11 +230,11 @@ class KeyedRegion:
 
         return self
 
-    def replace(self, replacements):
+    def replace(self, replacements: dict):
         """
         Replace variables with other variables.
 
-        :param dict replacements:   A dict of variable replacements.
+        :param replacements:        A dict of variable replacements.
         :return:                    self
         """
 
@@ -261,12 +265,12 @@ class KeyedRegion:
             s.append(f"Offset {offset:#x}: {variables}")
         return "\n".join(s)
 
-    def add_variable(self, start, variable):
+    def add_variable(self, start: int, variable: SimVariable):
         """
         Add a variable to this region at the given offset.
 
-        :param int start:
-        :param SimVariable variable:
+        :param start:
+        :param variable:
         :return: None
         """
 
@@ -274,25 +278,25 @@ class KeyedRegion:
 
         self.add_object(start, variable, size)
 
-    def add_object(self, start, obj, object_size):
+    def add_object(self, start, obj, object_size: int):
         """
         Add/Store an object to this region at the given offset.
 
         :param start:
         :param obj:
-        :param int object_size: Size of the object
+        :param object_size: Size of the object
         :return:
         """
 
         self._store(start, obj, object_size, overwrite=False)
 
-    def set_variable(self, start, variable):
+    def set_variable(self, start: int, variable: SimVariable):
         """
         Add a variable to this region at the given offset, and remove all other variables that are fully covered by
         this variable.
 
-        :param int start:
-        :param SimVariable variable:
+        :param start:
+        :param variable:
         :return: None
         """
 
@@ -334,13 +338,12 @@ class KeyedRegion:
                 del self._storage[key]
         self._object_mapping.pop(id(obj), None)
 
-    def get_base_addr(self, addr):
+    def get_base_addr(self, addr: int) -> int | None:
         """
         Get the base offset (the key we are using to index objects covering the given offset) of a specific offset.
 
-        :param int addr:
+        :param addr:
         :return:
-        :rtype:  int or None
         """
 
         base_addr, container = self._get_container(addr)
@@ -348,13 +351,12 @@ class KeyedRegion:
             return None
         return base_addr
 
-    def get_variables_by_offset(self, start):
+    def get_variables_by_offset(self, start: int) -> set:
         """
         Find variables covering the given region offset.
 
-        :param int start:
+        :param start:
         :return: A set of variables.
-        :rtype:  set
         """
 
         _, container = self._get_container(start)
@@ -396,14 +398,14 @@ class KeyedRegion:
             return self._canonical_size
         return size
 
-    def _store(self, start, obj, size, overwrite=False):
+    def _store(self, start: int, obj, size: int | UnknownSize, overwrite: bool = False):
         """
         Store a variable into the storage.
 
-        :param int start: The beginning address of the variable.
+        :param start: The beginning address of the variable.
         :param obj: The object to store.
-        :param int size: Size of the object to store.
-        :param bool overwrite: Whether existing objects should be overwritten or not.
+        :param size: Size of the object to store.
+        :param overwrite: Whether existing objects should be overwritten or not.
         :return: None
         """
 
@@ -411,12 +413,12 @@ class KeyedRegion:
         self._object_mapping[stored_object.obj_id] = stored_object
         self.__store(stored_object, overwrite=overwrite)
 
-    def __store(self, stored_object, overwrite=False, merge_to_top=False, top=None):
+    def __store(self, stored_object: StoredObject, overwrite: bool = False, merge_to_top=False, top=None):
         """
         Store a variable into the storage.
 
-        :param StoredObject stored_object: The descriptor describing start address and the variable.
-        :param bool overwrite:  Whether existing objects should be overwritten or not. True to make a strong update,
+        :param stored_object: The descriptor describing start address and the variable.
+        :param overwrite:       Whether existing objects should be overwritten or not. True to make a strong update,
                                 False to make a weak update.
         :return: None
         """

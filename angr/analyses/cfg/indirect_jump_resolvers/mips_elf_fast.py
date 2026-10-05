@@ -59,19 +59,25 @@ class MipsElfFastResolver(IndirectJumpResolver):
         return isinstance(self.project.arch, (archinfo.ArchMIPS32, archinfo.ArchMIPS64))
 
     def resolve(  # pylint:disable=unused-argument
-        self, cfg, addr, func_addr, block, jumpkind, func_graph_complete: bool = True, **kwargs
-    ):
+        self,
+        cfg,
+        addr: int,
+        func_addr: int,
+        block: pyvex.IRSB,
+        jumpkind: str,
+        func_graph_complete: bool = True,
+        **kwargs,
+    ) -> tuple:
         """
         Wrapper for _resolve that slowly increments the max_depth used by Blade for finding sources
         until we can resolve the addr or we reach the default max_depth
 
         :param cfg: A CFG instance.
-        :param int addr: IRSB address.
-        :param int func_addr: The function address.
-        :param pyvex.IRSB block: The IRSB.
-        :param str jumpkind: The jumpkind.
+        :param addr: IRSB address.
+        :param func_addr: The function address.
+        :param block: The IRSB.
+        :param jumpkind: The jumpkind.
         :return: If it was resolved and targets alongside it
-        :rtype: tuple
         """
         global MISSES
 
@@ -83,18 +89,19 @@ class MipsElfFastResolver(IndirectJumpResolver):
             MISSES += 1
         return False, []
 
-    def _resolve(self, cfg, addr, func_addr, block, jumpkind, max_level):  # pylint:disable=unused-argument
+    def _resolve(  # pylint:disable=unused-argument
+        self, cfg, addr: int, func_addr: int, block: pyvex.IRSB, jumpkind: str, max_level: int
+    ) -> tuple:
         """
         Resolves the indirect jump in MIPS ELF binaries where all external function calls are indexed using gp.
 
         :param cfg: A CFG instance.
-        :param int addr: IRSB address.
-        :param int func_addr: The function address.
-        :param pyvex.IRSB block: The IRSB.
-        :param str jumpkind: The jumpkind.
-        :param int max_level: maximum level for Blade to resolve when looking for sources
+        :param addr: IRSB address.
+        :param func_addr: The function address.
+        :param block: The IRSB.
+        :param jumpkind: The jumpkind.
+        :param max_level: maximum level for Blade to resolve when looking for sources
         :return: If it was resolved and targets alongside it
-        :rtype: tuple
         """
 
         global HITS_CASE_1, HITS_CASE_2

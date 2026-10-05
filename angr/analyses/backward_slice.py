@@ -590,12 +590,12 @@ class BackwardSlice(Analysis):
             exit_statements_per_run = new_exit_statements_per_run
             new_exit_statements_per_run = defaultdict(list)
 
-    def _pick_statement(self, block_address, stmt_idx):
+    def _pick_statement(self, block_address: int, stmt_idx: int):
         """
         Include a statement in the final slice.
 
-        :param int block_address:   Address of the basic block.
-        :param int stmt_idx:        Statement ID.
+        :param block_address:   Address of the basic block.
+        :param stmt_idx:        Statement ID.
         """
 
         # TODO: Support context-sensitivity

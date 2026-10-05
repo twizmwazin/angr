@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from archinfo import Arch
+
 
 class CFGArchOptions:
     """
@@ -9,14 +14,14 @@ class CFGArchOptions:
     Suppose `ao` is the CFGArchOptions object, and there is an option called `ret_jumpkind_heuristics`, you can access
     it by `ao.ret_jumpkind_heuristics` and set its value via `ao.ret_jumpkind_heuristics = True`
 
-    :ivar dict OPTIONS: A dict of all default options for different architectures.
-    :ivar archinfo.Arch arch: The architecture object.
-    :ivar dict _options: Values of all CFG options that are specific to the current architecture.
+    :ivar OPTIONS: A dict of all default options for different architectures.
+    :ivar arch: The architecture object.
+    :ivar _options: Values of all CFG options that are specific to the current architecture.
     """
 
     # option name: (option value type, default option value)
 
-    OPTIONS = {
+    OPTIONS: dict = {
         "ARMEL": {
             # Whether to perform some simple heuristics to detect returns that are incorrectly labeled as boring
             # branches by VEX
@@ -42,15 +47,15 @@ class CFGArchOptions:
         },
     }
 
-    arch = None
-    _options = {}
+    arch: Arch | None = None
+    _options: dict = {}
 
-    def __init__(self, arch, **options):
+    def __init__(self, arch: Arch, **options):
         """
         Constructor.
 
-        :param archinfo.Arch arch: The architecture instance.
-        :param dict options: Architecture-specific options, which will be used to initialize this object.
+        :param arch: The architecture instance.
+        :param options: Architecture-specific options, which will be used to initialize this object.
         """
 
         self.arch = arch

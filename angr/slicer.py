@@ -79,7 +79,7 @@ class SimSlicer:
         self._alias_analysis()
         self._slice()
 
-    def _alias_analysis(self, mock_sp=True, mock_bp=True):
+    def _alias_analysis(self, mock_sp: bool = True, mock_bp: bool = True):
         """
         Perform a forward execution and perform alias analysis. Note that this analysis is fast, light-weight, and by no
         means complete. For instance, most arithmetic operations are not supported.
@@ -87,8 +87,8 @@ class SimSlicer:
         - Depending on user settings, stack pointer and stack base pointer will be mocked and propagated to individual
           tmps.
 
-        :param bool mock_sp: propagate stack pointer or not
-        :param bool mock_bp: propagate stack base pointer or not
+        :param mock_sp: propagate stack pointer or not
+        :param mock_bp: propagate stack base pointer or not
         :return: None
         """
 
@@ -112,11 +112,11 @@ class SimSlicer:
     # Forward execution IRStmt handlers
     #
 
-    def _forward_handler_stmt(self, stmt, state):
+    def _forward_handler_stmt(self, stmt, state: SimLightState):
         """
 
         :param stmt:
-        :param SimLightState state:
+        :param state:
         :return:
         """
 
@@ -138,11 +138,11 @@ class SimSlicer:
     # Forward execution IRExpr handlers
     #
 
-    def _forward_handler_expr(self, expr, state):
+    def _forward_handler_expr(self, expr, state: SimLightState):
         """
 
         :param stmt:
-        :param SimLightState state:
+        :param state:
         :return:
         """
 

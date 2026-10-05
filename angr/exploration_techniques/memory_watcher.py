@@ -9,16 +9,16 @@ class MemoryWatcher(ExplorationTechnique):
     """Memory Watcher
 
     Args:
-        min_memory (int,optional): Minimum amount of free memory in MB before
+        min_memory: Minimum amount of free memory in MB before
                     stopping execution (default: 95% memory use)
-        memory_stash (str, optional): What to call the low memory stash
+        memory_stash: What to call the low memory stash
                     (default: 'lowmem')
 
     At each step, keep an eye on how much memory is left on the system. Stash
     off states to effectively stop execution if we're below a given threshold.
     """
 
-    def __init__(self, min_memory=512, memory_stash="lowmem"):
+    def __init__(self, min_memory: int | None = 512, memory_stash: str = "lowmem"):
         super().__init__()
 
         if min_memory is not None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from archinfo.arch_soot import SootAddressTerminator, SootArgument
 
@@ -10,6 +11,10 @@ from angr.engines.soot.method_dispatcher import resolve_method
 from .base import SimSootValue
 from .instancefieldref import SimSootValue_InstanceFieldRef
 from .local import SimSootValue_Local
+
+if TYPE_CHECKING:
+    from angr import claripy
+    from angr.sim_state import SimState
 
 l = logging.getLogger("angr.engines.soot.values.thisref")
 
@@ -36,14 +41,16 @@ class SimSootValue_ThisRef(SimSootValue):
     def id(self):
         return f"{self.heap_alloc_id}.{self.type}.this"
 
-    def set_field(self, state, field_name, field_type, field_value):
+    def set_field(
+        self, state: SimState, field_name: str, field_type: str, field_value: SimSootValue | claripy.ast.Base
+    ):
         """
         Sets an instance field.
 
-        :param SimState state: angr state where we want to allocate the object attribute
-        :param str field_name: name of the attribute
-        :param str field_type: type of the attribute
-        :param SimSootValue field_value: attribute's value
+        :param state: angr state where we want to allocate the object attribute
+        :param field_name: name of the attribute
+        :param field_type: type of the attribute
+        :param field_value: attribute's value
         """
         field_ref = SimSootValue_InstanceFieldRef.get_ref(
             state=state,
@@ -59,13 +66,13 @@ class SimSootValue_ThisRef(SimSootValue):
         # store value in java memory
         state.memory.store(field_ref, field_value)
 
-    def get_field(self, state, field_name, field_type):
+    def get_field(self, state: SimState, field_name: str, field_type: str):
         """
         Gets the value of an instance field.
 
-        :param SimState state: angr state where we want to allocate the object attribute
-        :param str field_name: name of the attribute
-        :param str field_type: type of the attribute
+        :param state: angr state where we want to allocate the object attribute
+        :param field_name: name of the attribute
+        :param field_type: type of the attribute
         """
         # get field reference
         field_ref = SimSootValue_InstanceFieldRef.get_ref(
@@ -82,13 +89,13 @@ class SimSootValue_ThisRef(SimSootValue):
         # load value from java memory
         return state.memory.load(field_ref, none_if_missing=True)
 
-    def store_field(self, state, field_name, field_type, value):
+    def store_field(self, state: SimState, field_name: str, field_type, value: SimSootValue | claripy.ast.Base):
         """
         Store a field of a given object, WITHOUT RESOLVING HIERARCHY
 
-        :param SimState state: angr state where we want to allocate the object attribute
-        :param str field_name: name of the attribute
-        :param SimSootValue field_value: attribute's value
+        :param state: angr state where we want to allocate the object attribute
+        :param field_name: name of the attribute
+        :param value: attribute's value
         """
         field_ref = SimSootValue_InstanceFieldRef(self.heap_alloc_id, self.type, field_name, field_type)
 
@@ -97,13 +104,13 @@ class SimSootValue_ThisRef(SimSootValue):
 
         state.memory.store(field_ref, value)
 
-    def load_field(self, state, field_name, field_type):
+    def load_field(self, state: SimState, field_name: str, field_type: str):
         """
         Load a field of a given object, without resolving HIERARCHY
 
-        :param SimState tastate: angr state where we want to load the object attribute
-        :param str field_name: name of the attribute
-        :param str field_type: type of the attribute
+        :param state: angr state where we want to load the object attribute
+        :param field_name: name of the attribute
+        :param field_type: type of the attribute
         """
         field_ref = SimSootValue_InstanceFieldRef(self.heap_alloc_id, self.type, field_name, field_type)
 

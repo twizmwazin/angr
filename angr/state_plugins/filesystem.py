@@ -348,10 +348,10 @@ class SimConcreteFilesystem(SimMount):
     """
     Abstract SimMount allowing the user to import files from some external source into the guest
 
-    :param str pathsep:         The host path separator character, default os.path.sep
+    :param pathsep:             The host path separator character, default os.path.sep
     """
 
-    def __init__(self, pathsep=os.path.sep):
+    def __init__(self, pathsep: str = os.path.sep):
         super().__init__()
         self.pathsep = pathsep
         self.cache = {}
@@ -446,11 +446,11 @@ class SimHostFilesystem(SimConcreteFilesystem):
     """
     Simulated mount that makes some piece from the host filesystem available to the guest.
 
-    :param str host_path:       The path on the host to mount
-    :param str pathsep:         The host path separator character, default os.path.sep
+    :param host_path:           The path on the host to mount
+    :param pathsep:             The host path separator character, default os.path.sep
     """
 
-    def __init__(self, host_path=None, **kwargs):
+    def __init__(self, host_path: str | None = None, **kwargs):
         super().__init__(**kwargs)
         self.host_path = host_path if host_path is not None else self.pathsep
 

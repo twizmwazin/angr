@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from .errors import SimStateOptionsError
 
 _NO_DEFAULT_VALUE = "_NO_DEFAULT_VALUE"  # please god don't use this value as the default value of your state option
@@ -98,13 +100,12 @@ class SimStateOptions:
         else:
             raise SimStateOptionsError(f"Unsupported constructor argument type '{type(thing)}'.")
 
-    def _get_option_desc(self, key):
+    def _get_option_desc(self, key: str) -> StateOption:
         """
         Get the option descriptor from self.OPTIONS.
 
-        :param str key: Name of the state option.
+        :param key:     Name of the state option.
         :return:        The option descriptor.
-        :rtype:         StateOption
         """
 
         try:
@@ -115,7 +116,7 @@ class SimStateOptions:
     def __repr__(self):
         return "<SimStateOptions>"
 
-    def __contains__(self, key):
+    def __contains__(self, key: str) -> bool:
         """
         [COMPATIBILITY]
         In order to be compatible with the old interface, __contains__() only supports testing the value of a Boolean
@@ -135,9 +136,8 @@ class SimStateOptions:
         >>> "symbolic_ip_max_targets" in state.options
         SimStateOptionsError('"symbolic_ip_max_targets" is not a Boolean switch.')
 
-        :param str key: Name of the Boolean switch.
+        :param key:     Name of the Boolean switch.
         :return:        True if the switch is on (the option is switched on), False otherwise.
-        :rtype:         bool
         """
 
         # o = self._get_option_desc(key)
@@ -147,12 +147,12 @@ class SimStateOptions:
 
         return key in self._options and self._options[key] is True
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: str, value: Any):
         """
         Set the value of a state option.
 
-        :param str key:     Name of the state option.
-        :param str value:   The value of the state option. Must be of the same type as registered.
+        :param key:         Name of the state option.
+        :param value:       The value of the state option. Must be of the same type as registered.
         :return:            None
         """
 
@@ -166,11 +166,11 @@ class SimStateOptions:
 
         self._options[o.name] = value
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str):
         """
         Get the value of a state option.
 
-        :param str key: Name of the state option.
+        :param key:     Name of the state option.
         :return:        Value of the state option.
         """
 
@@ -187,7 +187,7 @@ class SimStateOptions:
 
         return self._options[o.name]
 
-    def __ior__(self, boolean_switches):
+    def __ior__(self, boolean_switches: set):
         """
         [COMPATIBILITY]
         In order to be compatible with the old interface, you can enable a collection of Boolean switches at the same
@@ -195,7 +195,7 @@ class SimStateOptions:
 
         >>> state.options |= {sim_options.SYMBOLIC, sim_options.ABSTRACT_MEMORY}
 
-        :param set boolean_switches:    A collection of Boolean switches to enable.
+        :param boolean_switches:        A collection of Boolean switches to enable.
         :return:                        self
         """
 
@@ -203,7 +203,7 @@ class SimStateOptions:
             self[name] = True
         return self
 
-    def __isub__(self, boolean_switches):
+    def __isub__(self, boolean_switches: set):
         """
         [COMPATIBILITY]
         In order to be compatible with the old interface, you can disable a collection of Boolean switches at the same
@@ -211,7 +211,7 @@ class SimStateOptions:
 
         >>> state.options -= {sim_options.SYMBOLIC, sim_options.ABSTRACT_MEMORY}
 
-        :param set boolean_switches:    A collection of Boolean switches to disable.
+        :param boolean_switches:        A collection of Boolean switches to disable.
         :return:                        self
         """
 
@@ -219,16 +219,15 @@ class SimStateOptions:
             self[name] = False
         return self
 
-    def __sub__(self, boolean_switches):
+    def __sub__(self, boolean_switches: set) -> SimStateOptions:
         """
         [COMPATIBILITY]
         You may disable a collection of Boolean switches by doing:
 
         >>> state.options = state.options - {sim_options.SYMBOLIC}
 
-        :param set boolean_switches:    A collection of Boolean switches to disable.
+        :param boolean_switches:        A collection of Boolean switches to disable.
         :return:                        A new SimStateOptions instance.
-        :rtype:                         SimStateOptions
         """
 
         ops = SimStateOptions(self)
@@ -257,18 +256,18 @@ class SimStateOptions:
     def __setstate__(self, state):
         self._options = state["_options"]
 
-    def add(self, boolean_switch):
+    def add(self, boolean_switch: str):
         """
         [COMPATIBILITY]
         Enable a Boolean switch.
 
-        :param str boolean_switch:  Name of the Boolean switch.
+        :param boolean_switch:      Name of the Boolean switch.
         :return:                    None
         """
 
         self[boolean_switch] = True
 
-    def update(self, boolean_switches):
+    def update(self, boolean_switches: set):
         """
         [COMPATIBILITY]
         In order to be compatible with the old interface, you can enable a collection of Boolean switches at the same
@@ -280,46 +279,46 @@ class SimStateOptions:
 
         >>> state.options.update(sim_options.unicorn)
 
-        :param set boolean_switches:    A collection of Boolean switches to enable.
+        :param boolean_switches:        A collection of Boolean switches to enable.
         :return:                        None
         """
 
         for name in boolean_switches:
             self[name] = True
 
-    def remove(self, name):
+    def remove(self, name: str):
         """
         Drop a state option if it exists, or raise a KeyError if the state option is not set.
 
         [COMPATIBILITY]
         Remove a Boolean switch.
 
-        :param str name:    Name of the state option.
+        :param name:        Name of the state option.
         :return:            NNone
         """
 
         del self._options[name]
 
-    def discard(self, name):
+    def discard(self, name: str):
         """
         Drop a state option if it exists, or silently return if the state option is not set.
 
         [COMPATIBILITY]
         Disable a Boolean switch.
 
-        :param str name:  Name of the Boolean switch.
+        :param name:      Name of the Boolean switch.
         :return:          None
         """
 
         if name in self._options:
             del self._options[name]
 
-    def difference(self, boolean_switches):
+    def difference(self, boolean_switches: set):
         """
         [COMPATIBILITY]
         Make a copy of the current instance, and then discard all options that are in boolean_switches.
 
-        :param set boolean_switches:    A collection of Boolean switches to disable.
+        :param boolean_switches:        A collection of Boolean switches to disable.
         :return:                        A new SimStateOptions instance.
         """
 
@@ -328,24 +327,22 @@ class SimStateOptions:
             ops.discard(key)
         return ops
 
-    def copy(self):
+    def copy(self) -> SimStateOptions:
         """
         Get a copy of the current SimStateOptions instance.
 
         :return:    A new SimStateOptions instance.
-        :rtype:     SimStateOptions
         """
 
         return SimStateOptions(self)
 
-    def tally(self, exclude_false=True, description=False):
+    def tally(self, exclude_false: bool = True, description: bool = False) -> str:
         """
         Return a string representation of all state options.
 
-        :param bool exclude_false:  Whether to exclude Boolean switches that are disabled.
-        :param bool description:    Whether to display the description of each option.
+        :param exclude_false:       Whether to exclude Boolean switches that are disabled.
+        :param description:         Whether to display the description of each option.
         :return:                    A string representation.
-        :rtype:                     str
         """
 
         total = []
@@ -369,14 +366,14 @@ class SimStateOptions:
         return "\n".join(total)
 
     @classmethod
-    def register_option(cls, name, types, default=None, description=None):
+    def register_option(cls, name: str, types, default=None, description: str | None = None):
         """
         Register a state option.
 
-        :param str name:        Name of the state option.
+        :param name:            Name of the state option.
         :param types:           A collection of allowed types of this state option.
         :param default:         The default value of this state option.
-        :param str description: The description of this state option.
+        :param description:     The description of this state option.
         :return:                None
         """
 
@@ -390,13 +387,13 @@ class SimStateOptions:
         cls.OPTIONS[name] = o
 
     @classmethod
-    def register_bool_option(cls, name, description=None):
+    def register_bool_option(cls, name: str, description: str | None = None):
         """
         Register a Boolean switch as state option.
         This is equivalent to cls.register_option(name, set([bool]), description=description)
 
-        :param str name:        Name of the state option.
-        :param str description: The description of this state option.
+        :param name:            Name of the state option.
+        :param description:     The description of this state option.
         :return:                None
         """
 

@@ -569,11 +569,11 @@ class FormatParser(SimProcedure):
 
         return components
 
-    def _get_fmt(self, fmt):
+    def _get_fmt(self, fmt: list):
         """
         Extract the actual formats from the format string `fmt`.
 
-        :param list fmt: A list of format chars.
+        :param fmt: A list of format chars.
         :returns: a FormatString object
         """
         components = self.extract_components(fmt)

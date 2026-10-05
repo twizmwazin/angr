@@ -81,7 +81,7 @@ class ReachingDefinitionsAnalysis(
         :param max_iterations:                  The maximum number of iterations before the analysis is terminated.
         :param track_tmps:                      Whether or not temporary variables should be taken into consideration
                                                 during the analysis.
-        :param iterable observation_points:     A collection of tuples of ("node"|"insn", ins_addr, OP_TYPE) defining
+        :param observation_points:              A collection of tuples of ("node"|"insn", ins_addr, OP_TYPE) defining
                                                 where reaching definitions should be copied and stored. OP_TYPE can be
                                                 OP_BEFORE or OP_AFTER.
         :param init_state:                      An optional initialization state. The analysis creates and works on a

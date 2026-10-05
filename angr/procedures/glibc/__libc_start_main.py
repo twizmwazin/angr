@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from cle import AT
 
 import angr
 from angr import claripy
+
+if TYPE_CHECKING:
+    from angr.sim_state import SimState
 
 l = logging.getLogger(name=__name__)
 
@@ -268,18 +272,17 @@ class __libc_start_main(angr.SimProcedure):
         return result
 
     @staticmethod
-    def _extract_args(state, main, argc, argv, init, fini):
+    def _extract_args(state: SimState, main, argc, argv, init, fini) -> tuple:
         """
         Extract arguments and set them to
 
-        :param angr.sim_state.SimState state: The program state.
+        :param state: The program state.
         :param main: An argument to __libc_start_main.
         :param argc: An argument to __libc_start_main.
         :param argv: An argument to __libc_start_main.
         :param init: An argument to __libc_start_main.
         :param fini: An argument to __libc_start_main.
         :return: A tuple of five elements: (main, argc, argv, init, fini)
-        :rtype: tuple
         """
 
         main_ = main

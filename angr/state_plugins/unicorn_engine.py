@@ -1228,14 +1228,13 @@ class Unicorn(SimStatePlugin):
         _UC_NATIVE.clear_page_cache()
 
     @property
-    def _is_mips32(self):
+    def _is_mips32(self) -> bool:
         """
         There seems to be weird issues with unicorn-engine support on MIPS32 code (see commit 01126bf7). As a result,
         we test if the current architecture is MIPS32 in several places, and if so, we perform some extra steps, like
         re-creating the thread-local UC object.
 
         :return:    True if the current architecture is MIPS32, False otherwise.
-        :rtype:     bool
         """
         return self.state.arch.name == "MIPS32"
 

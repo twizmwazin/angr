@@ -512,13 +512,12 @@ class TreeIter:
                 return item
         raise IndexError(k)
 
-    def count(self, v):
+    def count(self, v: object) -> int:
         """
         Count occurrences of value v in the entire history. Note that the subclass must implement the __reversed__
         method, otherwise an exception will be thrown.
-        :param object v: The value to look for
+        :param v: The value to look for
         :return: The number of occurrences
-        :rtype: int
         """
         ctr = 0
         for item in reversed(self):

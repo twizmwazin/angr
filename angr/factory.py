@@ -110,7 +110,7 @@ class AngrObjectFactory:
         assert self.default_engine is not None
         return self.default_engine.process(*args, **kwargs)
 
-    def blank_state(self, **kwargs):
+    def blank_state(self, **kwargs) -> SimState:
         """
         Returns a mostly-uninitialized state object. All parameters are optional.
 
@@ -123,7 +123,6 @@ class AngrObjectFactory:
                                 when concrete_fs is set to True.
         :param kwargs:          Any additional keyword args will be passed to the SimState constructor.
         :return:                The blank state.
-        :rtype:                 SimState
         """
         return self.project.simos.state_blank(**kwargs)
 
@@ -144,7 +143,6 @@ class AngrObjectFactory:
         :param env:             a dictionary to use as the environment for the program. Both keys and values may be
                                 mixed strings and bitvectors.
         :return:                The entry state.
-        :rtype:                 SimState
         """
 
         return self.project.simos.state_entry(**kwargs)
@@ -159,7 +157,7 @@ class AngrObjectFactory:
         """
         return self.project.simos.state_full_init(**kwargs)
 
-    def call_state(self, addr, *args, **kwargs):
+    def call_state(self, addr, *args, **kwargs) -> SimState:
         """
         Returns a state object initialized to the start of a given function, as if it were called with given parameters.
 
@@ -180,7 +178,6 @@ class AngrObjectFactory:
                                 when concrete_fs is set to True.
         :param kwargs:          Any additional keyword args will be passed to the SimState constructor.
         :return:                The state at the beginning of the function.
-        :rtype:                 SimState
 
         The idea here is that you can provide almost any kind of python type in `args` and it'll be translated to a
         binary format to be placed into simulated memory. Lists (representing arrays) must be entirely elements of the
@@ -208,7 +205,6 @@ class AngrObjectFactory:
                                 SimStates).
         :param kwargs:          Any additional keyword arguments will be passed to the SimulationManager constructor
         :returns:               The new SimulationManager
-        :rtype:                 angr.sim_manager.SimulationManager
 
         Many different types can be passed to this method:
 
@@ -249,7 +245,7 @@ class AngrObjectFactory:
         remove_options=None,
         techniques: list[ExplorationTechnique] | None = None,
         step_limit: int | None = None,
-    ):
+    ) -> Callable:
         """
         A Callable is a representation of a function in the binary that can be interacted with like a native python
         function.
@@ -265,7 +261,6 @@ class AngrObjectFactory:
         :param step_limit:      The maximum number of blocks that Callable will execute before pruning the path.
         :returns:               A Callable object that can be used as a interface for executing guest code like a
                                 python function.
-        :rtype:                 angr.callable.Callable
         """
         if isinstance(addr, Function):
             addr = addr.addr

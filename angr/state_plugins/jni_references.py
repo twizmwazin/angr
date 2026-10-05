@@ -37,12 +37,12 @@ class SimStateJNIReferences(SimStatePlugin):
             f"Global references: {self.global_refs}"
         )
 
-    def create_new_reference(self, obj, global_ref=False):
+    def create_new_reference(self, obj, global_ref: bool = False):
         """
         Create a new reference thats maps to the given object.
 
         :param obj:              Object which gets referenced.
-        :param bool global_ref:  Whether a local or global reference is created.
+        :param global_ref:       Whether a local or global reference is created.
         """
         # get an unique address
         opaque_ref = self.state.project.loader.extern_object.allocate()
@@ -60,12 +60,12 @@ class SimStateJNIReferences(SimStatePlugin):
         """
         self.local_refs = {}
 
-    def delete_reference(self, opaque_ref, global_ref=False):
+    def delete_reference(self, opaque_ref, global_ref: bool = False):
         """
         Delete the stored mapping of a reference.
 
         :param opaque_ref:       Reference which should be removed.
-        :param bool global_ref:  Whether opaque_ref is a local or global
+        :param global_ref:       Whether opaque_ref is a local or global
                                  reference.
         """
         opaque_ref_value = self._get_reference_value(opaque_ref)

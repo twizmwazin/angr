@@ -1,8 +1,14 @@
 # pylint:disable=unused-import
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from angr.angrdb.models import DbComment
 from angr.knowledge_plugins.comments import CommentKind, Comments
+
+if TYPE_CHECKING:
+    from angr.angrdb.models import DbKnowledgeBase
+    from angr.knowledge_base import KnowledgeBase
 
 
 class CommentsSerializer:
@@ -11,12 +17,12 @@ class CommentsSerializer:
     """
 
     @staticmethod
-    def dump(session, db_kb, comments):
+    def dump(session, db_kb: DbKnowledgeBase, comments: Comments):
         """
 
         :param session:
-        :param DbKnowledgeBase db_kb:
-        :param Comments comments:
+        :param db_kb:
+        :param comments:
         :return:                        None
         """
 
@@ -46,12 +52,12 @@ class CommentsSerializer:
             session.delete(db_comment)
 
     @staticmethod
-    def load(session, db_kb, kb):  # pylint:disable=unused-argument
+    def load(session, db_kb: DbKnowledgeBase, kb: KnowledgeBase):  # pylint:disable=unused-argument
         """
 
         :param session:
-        :param DbKnowledgeBase db_kb:
-        :param KnowledgeBase kb:
+        :param db_kb:
+        :param kb:
         :return:
         """
 

@@ -13,7 +13,7 @@ from angr.sim_type import SimType, SimTypeFunction
 from angr.utils.types import make_type_reference, type_collections_for_lib
 
 if TYPE_CHECKING:
-    from .function import PrototypeSource
+    from .function import Function, PrototypeSource
 
 l = logging.getLogger(name=__name__)
 
@@ -143,11 +143,11 @@ class FunctionParser:
         return AngrDbV1.local_block_addrs(cmsg)
 
     @staticmethod
-    def parse_from_cmsg(cmsg, function_manager=None, project=None, meta_only: bool = False):
+    def parse_from_cmsg(cmsg, function_manager=None, project=None, meta_only: bool = False) -> Function:
         """
         :param cmsg: The data to instantiate the <Function> from.
 
-        :return Function:
+        :return:
         """
         proto = SimType.from_json(json.loads(cmsg.prototype.decode("utf-8"))) if cmsg.prototype else None
         if proto is not None:

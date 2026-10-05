@@ -18,13 +18,11 @@ def resolve_method(
     include_superclasses=True,
     init_class=True,
     raise_exception_if_not_found=False,
-):
+) -> SootMethodDescriptor:
     """
     Resolves the method based on the given characteristics (name, class and
     params) The method may be defined in one of the superclasses of the given
     class (TODO: support interfaces).
-
-    :rtype: archinfo.arch_soot.SootMethodDescriptor
     """
     base_class = state.javavm_classloader.get_class(class_name)
     class_hierarchy = state.javavm_classloader.get_class_hierarchy(base_class) if include_superclasses else [base_class]

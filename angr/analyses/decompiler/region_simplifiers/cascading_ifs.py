@@ -45,10 +45,10 @@ class CascadingIfsRemover(SequenceWalker):
         self.manager = manager
         self.walk(node)
 
-    def _handle_Condition(self, node, parent=None, index=None, **kwargs):
+    def _handle_Condition(self, node: ConditionNode, parent=None, index=None, **kwargs):
         """
 
-        :param ConditionNode node:
+        :param node:
         :param successor:
         :return:
         """

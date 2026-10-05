@@ -51,24 +51,22 @@ class PatchManager(KnowledgeBasePlugin):
     def patch_addrs(self):
         return self._patches.keys()
 
-    def get_patch(self, addr):
+    def get_patch(self, addr: int) -> Patch | None:
         """
         Get patch at the given address.
 
-        :param int addr:    The address of the patch.
+        :param addr:    The address of the patch.
         :return:            The patch if there is one starting at the address, or None if there isn't any.
-        :rtype:             Patch or None
         """
         return self._patches.get(addr, None)
 
-    def get_all_patches(self, addr, size):
+    def get_all_patches(self, addr: int, size: int) -> list[Patch]:
         """
         Retrieve all patches that cover a region specified by [addr, addr+size).
 
-        :param int addr:    The address of the beginning of the region.
-        :param int size:    Size of the region.
+        :param addr:    The address of the beginning of the region.
+        :param size:    Size of the region.
         :return:            A list of patches.
-        :rtype:             list
         """
         patches = []
         for patch_addr in self._patches.irange(maximum=addr + size - 1, reverse=True):

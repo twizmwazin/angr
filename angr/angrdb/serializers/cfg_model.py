@@ -1,8 +1,13 @@
 # pylint:disable=unused-import
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from angr.angrdb.models import DbCFGModel
 from angr.knowledge_plugins.cfg.cfg_model import CFGModel
+
+if TYPE_CHECKING:
+    from angr.angrdb.models import DbKnowledgeBase
 
 
 class CFGModelSerializer:
@@ -11,13 +16,13 @@ class CFGModelSerializer:
     """
 
     @staticmethod
-    def dump(session, db_kb, ident, cfg_model):
+    def dump(session, db_kb: DbKnowledgeBase, ident: str, cfg_model: CFGModel):
         """
 
         :param session:
-        :param DbKnowledgeBase db_kb:   The database object for KnowledgeBase.
-        :param str ident:               Identifier of the CFG model.
-        :param CFGModel cfg_model:      The CFG model to dump.
+        :param db_kb:                   The database object for KnowledgeBase.
+        :param ident:                   Identifier of the CFG model.
+        :param cfg_model:               The CFG model to dump.
         :return:                        None
         """
 

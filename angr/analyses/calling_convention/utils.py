@@ -23,7 +23,6 @@ def is_sane_register_variable(
     :param reg_offset:  The register offset.
     :param reg_size:    The register size.
     :return:            True if it is an acceptable function argument, False otherwise.
-    :rtype:             bool
     """
 
     if def_cc is not None and def_cc.ARG_REG_SANITY_FILTER:

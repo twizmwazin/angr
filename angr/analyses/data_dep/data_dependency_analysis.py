@@ -60,7 +60,7 @@ class DataDependencyGraphAnalysis(Analysis):
         :param end_state: Simulation state used to extract all SimActionData
         :param start_from: An address or None, Specifies where to start generation of DDG
         :param end_at: An address or None, Specifies where to end generation of DDG
-        :param iterable or None block_addrs: List of block addresses that the DDG analysis should be run on
+        :param block_addrs: List of block addresses that the DDG analysis should be run on
         """
         self._graph: DiGraph | None = None
         self._simplified_graph: DiGraph | None = None

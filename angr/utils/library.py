@@ -17,13 +17,12 @@ if TYPE_CHECKING:
     from angr.sim_type import SimTypeFunction
 
 
-def get_function_name(s):
+def get_function_name(s: str) -> str:
     """
     Get the function name from a C-style function declaration string.
 
-    :param str s: A C-style function declaration string.
+    :param s: A C-style function declaration string.
     :return:      The function name.
-    :rtype:       str
     """
 
     s = s.strip()
@@ -72,11 +71,11 @@ def register_kernel_types():
     )
 
 
-def convert_cproto_to_py(c_decl) -> tuple[str, SimTypeFunction, str]:
+def convert_cproto_to_py(c_decl: str) -> tuple[str, SimTypeFunction, str]:
     """
     Convert a C-style function declaration string to its corresponding SimTypes-based Python representation.
 
-    :param str c_decl:              The C-style function declaration string.
+    :param c_decl:              The C-style function declaration string.
     :return:                        A tuple of the function name, the prototype, and a string representing the
                                     SimType-based Python representation.
     """

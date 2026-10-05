@@ -54,8 +54,12 @@ from .cfg_base import CFGBase
 from .cfg_job_base import CFGJobBase
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
+
+    from angr.engines.successors import SimSuccessors
     from angr.knowledge_plugins.cfg import CFGNode
     from angr.knowledge_plugins.cfg.spilling_cfg import SpillingCFG
+    from angr.knowledge_plugins.functions import Function
 
 
 l = logging.getLogger(name=__name__)
@@ -180,21 +184,21 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
         call_depth=None,
         call_tracing_filter=None,
         initial_state=None,
-        starts=None,
+        starts: list | set | tuple | None = None,
         keep_state=False,
         indirect_jump_target_limit=100000,
         resolve_indirect_jumps=True,
         enable_advanced_backward_slicing=False,
         enable_symbolic_back_traversal=False,
-        indirect_jump_resolvers=None,
+        indirect_jump_resolvers: list | None = None,
         additional_edges=None,
-        no_construct=False,
-        normalize=False,
-        max_iterations=1,
-        address_whitelist=None,
-        base_graph=None,
-        iropt_level=None,
-        max_steps=None,
+        no_construct: bool = False,
+        normalize: bool = False,
+        max_iterations: int = 1,
+        address_whitelist: Iterable | None = None,
+        base_graph: networkx.DiGraph | None = None,
+        iropt_level: int | None = None,
+        max_steps: int | None = None,
         state_add_options=None,
         state_remove_options=None,
         model=None,
@@ -211,7 +215,7 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
         :param call_tracing_filter:                 Filter to apply on a given path and jumpkind to determine if it
                                                     should be skipped when call_depth is reached.
         :param initial_state:                       An initial state to use to begin analysis.
-        :param iterable starts:                     A collection of starting points to begin analysis. It can contain
+        :param starts:                              A collection of starting points to begin analysis. It can contain
                                                     the following three different types of entries: an address specified
                                                     as an integer, a 2-tuple that includes an integer address and a
                                                     jumpkind, or a SimState instance. Unsupported entries in starts will
@@ -223,30 +227,30 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
                                                     jumps
         :param enable_symbolic_back_traversal:      Whether to enable an intensive technique for resolving indirect
                                                     jumps
-        :param list indirect_jump_resolvers:        A custom list of indirect jump resolvers. If this list is None or
+        :param indirect_jump_resolvers:             A custom list of indirect jump resolvers. If this list is None or
                                                     empty,
                                                     default indirect jump resolvers specific to this architecture and
                                                     binary types will be loaded.
         :param additional_edges:                    A dict mapping addresses of basic blocks to addresses of
                                                     successors to manually include and analyze forward from.
-        :param bool no_construct:                   Skip the construction procedure. Only used in unit-testing.
-        :param bool normalize:                      If the CFG as well as all Function graphs should be normalized or
+        :param no_construct:                        Skip the construction procedure. Only used in unit-testing.
+        :param normalize:                           If the CFG as well as all Function graphs should be normalized or
                                                     not.
-        :param int max_iterations:                  The maximum number of iterations that each basic block should be
+        :param max_iterations:                      The maximum number of iterations that each basic block should be
                                                     "executed". 1 by default. Larger numbers of iterations are usually
                                                     required for complex analyses like loop analysis.
-        :param iterable address_whitelist:          A list of allowed addresses. Any basic blocks outside of this
+        :param address_whitelist:                   A list of allowed addresses. Any basic blocks outside of this
                                                     collection of addresses will be ignored.
-        :param networkx.DiGraph base_graph:         A basic control flow graph to follow. Each node inside this graph
+        :param base_graph:                          A basic control flow graph to follow. Each node inside this graph
                                                     must have the following properties: `addr` and `size`. CFG recovery
                                                     will strictly follow nodes and edges shown in the graph, and discard
                                                     any control flow that does not follow an existing edge in the base
                                                     graph. For example, you can pass in a Function local transition
                                                     graph as the base graph, and CFGEmulated will traverse nodes and
                                                     edges and extract useful information.
-        :param int iropt_level:                     The optimization level of VEX IR (0, 1, 2). The default level will
+        :param iropt_level:                          The optimization level of VEX IR (0, 1, 2). The default level will
                                                     be used if `iropt_level` is None.
-        :param int max_steps:                       The maximum number of basic blocks to recover forthe longest path
+        :param max_steps:                           The maximum number of basic blocks to recover forthe longest path
                                                     from each start before pausing the recovery procedure.
         :param state_add_options:                   State options that will be added to the initial state.
         :param state_remove_options:                State options that will be removed from the initial state.
@@ -392,14 +396,14 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
 
         return new_cfg
 
-    def resume(self, starts=None, max_steps=None):
+    def resume(self, starts: Iterable | None = None, max_steps: int | None = None):
         """
         Resume a paused or terminated control flow graph recovery.
 
-        :param iterable starts: A collection of new starts to resume from. If `starts` is None, we will resume CFG
-                                recovery from where it was paused before.
-        :param int max_steps:   The maximum number of blocks on the longest path starting from each start before pausing
-                                the recovery.
+        :param starts:      A collection of new starts to resume from. If `starts` is None, we will resume CFG
+                            recovery from where it was paused before.
+        :param max_steps:   The maximum number of blocks on the longest path starting from each start before pausing
+                            the recovery.
         :return: None
         """
 
@@ -449,11 +453,11 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
         for cfg_node in self._nodes.values():
             cfg_node.downsize()
 
-    def unroll_loops(self, max_loop_unrolling_times):
+    def unroll_loops(self, max_loop_unrolling_times: int):
         """
         Unroll loops for each function. The resulting CFG may still contain loops due to recursion, function calls, etc.
 
-        :param int max_loop_unrolling_times: The maximum iterations of unrolling.
+        :param max_loop_unrolling_times: The maximum iterations of unrolling.
         :return: None
         """
 
@@ -507,11 +511,11 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
 
         self._detect_loops(loop_callback=_unroll)
 
-    def force_unroll_loops(self, max_loop_unrolling_times):
+    def force_unroll_loops(self, max_loop_unrolling_times: int):
         """
         Unroll loops globally. The resulting CFG does not contain any loop, but this method is slow on large graphs.
 
-        :param int max_loop_unrolling_times: The maximum iterations of unrolling.
+        :param max_loop_unrolling_times: The maximum iterations of unrolling.
         :return: None
         """
 
@@ -628,27 +632,25 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
 
         self.model.graph.from_networkx(graph_copy)
 
-    def immediate_dominators(self, start, target_graph=None):
+    def immediate_dominators(self, start: CFGNode, target_graph: networkx.DiGraph | None = None) -> dict:
         """
         Get all immediate dominators of sub graph from given node upwards.
 
-        :param str start: id of the node to navigate forwards from.
-        :param networkx.classes.digraph.DiGraph target_graph: graph to analyse, default is self.graph.
+        :param start: id of the node to navigate forwards from.
+        :param target_graph: graph to analyse, default is self.graph.
 
         :return: each node of graph as index values, with element as respective node's immediate dominator.
-        :rtype: dict
         """
         return self._immediate_dominators(start, target_graph=target_graph, reverse_graph=False)
 
-    def immediate_postdominators(self, end, target_graph=None):
+    def immediate_postdominators(self, end: CFGNode, target_graph: networkx.DiGraph | None = None) -> dict:
         """
         Get all immediate postdominators of sub graph from given node upwards.
 
-        :param str start: id of the node to navigate forwards from.
-        :param networkx.classes.digraph.DiGraph target_graph: graph to analyse, default is self.graph.
+        :param end: id of the node to navigate forwards from.
+        :param target_graph: graph to analyse, default is self.graph.
 
         :return: each node of graph as index values, with element as respective node's immediate dominator.
-        :rtype: dict
         """
         return self._immediate_dominators(end, target_graph=target_graph, reverse_graph=True)
 
@@ -676,16 +678,15 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
 
         return self._quasi_topological_order.get(cfg_node, None)
 
-    def get_subgraph(self, starting_node, block_addresses):
+    def get_subgraph(self, starting_node: CFGNode, block_addresses: Iterable[int]) -> CFGEmulated:
         """
         Get a sub-graph out of a bunch of basic block addresses.
 
-        :param CFGNode starting_node: The beginning of the subgraph
-        :param iterable block_addresses: A collection of block addresses that should be included in the subgraph if
-                                        there is a path between `starting_node` and a CFGNode with the specified
-                                        address, and all nodes on the path should also be included in the subgraph.
+        :param starting_node: The beginning of the subgraph
+        :param block_addresses: A collection of block addresses that should be included in the subgraph if
+                                there is a path between `starting_node` and a CFGNode with the specified
+                                address, and all nodes on the path should also be included in the subgraph.
         :return: A new CFG that only contain the specific subgraph.
-        :rtype: CFGEmulated
         """
 
         graph = networkx.DiGraph()
@@ -810,22 +811,20 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
         return self._model.graph
 
     @property
-    def unresolvables(self):
+    def unresolvables(self) -> set:
         """
         Get those SimRuns that have non-resolvable exits.
 
         :return:    A set of SimRuns
-        :rtype:     set
         """
         return self._unresolvable_runs
 
     @property
-    def deadends(self):
+    def deadends(self) -> list[CFGNode]:
         """
         Get all CFGNodes that has an out-degree of 0
 
         :return: A list of CFGNode instances
-        :rtype:  list
         """
         if self.graph is None:
             raise AngrCFGError("CFG hasn't been generated yet.")
@@ -904,24 +903,22 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
     # CFG construction
     # The main loop and sub-methods
 
-    def _job_key(self, job):
+    def _job_key(self, job: CFGJob) -> BlockID:
         """
         Get the key for a specific CFG job. The key is a context-sensitive block ID.
 
-        :param CFGJob job: The CFGJob instance.
-        :return:             The block ID of the specific CFG job.
-        :rtype:              BlockID
+        :param job: The CFGJob instance.
+        :return:    The block ID of the specific CFG job.
         """
 
         return job.block_id
 
-    def _job_sorting_key(self, job):
+    def _job_sorting_key(self, job: CFGJob) -> int:
         """
         Get the sorting key of a CFGJob instance.
 
-        :param CFGJob job: the CFGJob object.
+        :param job: the CFGJob object.
         :return: An integer that determines the order of this job in the queue.
-        :rtype: int
         """
 
         if self._base_graph is None:
@@ -997,17 +994,16 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
             self._register_analysis_job(pending_job.func_addr, pending_job)
             break
 
-    def _create_initial_state(self, ip, jumpkind):
+    def _create_initial_state(self, ip: int, jumpkind: str | None) -> SimState:
         """
         Obtain a SimState object for a specific address
 
         Fastpath means the CFG generation will work in an IDA-like way, in which it will not try to execute every
         single statement in the emulator, but will just do the decoding job. This is much faster than the old way.
 
-        :param int ip: The instruction pointer
-        :param str jumpkind: The jumpkind upon executing the block
+        :param ip: The instruction pointer
+        :param jumpkind: The jumpkind upon executing the block
         :return: The newly-generated state
-        :rtype: SimState
         """
 
         jumpkind = "Ijk_Boring" if jumpkind is None else jumpkind
@@ -1148,16 +1144,14 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
 
     # Job handling
 
-    def _pre_job_handling(self, job):  # pylint:disable=arguments-differ
+    def _pre_job_handling(self, job: CFGJob):  # pylint:disable=arguments-differ
         """
         Before processing a CFGJob.
         Right now each block is traced at most once. If it is traced more than once, we will mark it as "should_skip"
         before tracing it.
         An AngrForwardAnalysisSkipJob exception is raised in order to skip analyzing the job.
 
-        :param CFGJob job: The CFG job object.
-        :param dict _locals: A bunch of local variables that will be kept around when handling this job and its
-                        corresponding successors.
+        :param job: The CFG job object.
         :return: None
         """
 
@@ -1332,13 +1326,12 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
         # For debugging purposes!
         job.successor_status = {}
 
-    def _get_successors(self, job):
+    def _get_successors(self, job: CFGJob) -> list[SimState]:
         """
         Get a collection of successors out of the current job.
 
-        :param CFGJob job:  The CFGJob instance.
-        :return:            A collection of successors.
-        :rtype:             list
+        :param job:  The CFGJob instance.
+        :return:     A collection of successors.
         """
 
         addr = job.addr
@@ -1507,7 +1500,7 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
     def _post_job_handling(self, job: CFGJob, _new_jobs, successors: list[SimState]):  # type: ignore[override]
         """
 
-        :param CFGJob job:
+        :param job:
         :param successors:
         :return:
         """
@@ -1524,15 +1517,16 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
         # SimInspect breakpoints support
         job.state._inspect("cfg_handle_job", BP_AFTER)
 
-    def _post_process_successors(self, input_state, sim_successors, successors):
+    def _post_process_successors(
+        self, input_state: SimState, sim_successors: SimSuccessors, successors: list[SimState]
+    ) -> tuple[list[SimState], dict]:
         """
         Filter the list of successors
 
-        :param SimState      input_state:            Input state.
-        :param SimSuccessors sim_successors:         The SimSuccessors instance.
-        :param list successors:                      A list of successors generated after processing the current block.
-        :return:                                     A list of successors.
-        :rtype:                                      list
+        :param input_state:            Input state.
+        :param sim_successors:         The SimSuccessors instance.
+        :param successors:             A list of successors generated after processing the current block.
+        :return:                       A list of successors, and a dict of extra information.
         """
 
         if sim_successors.sort == "IRSB" and input_state.thumb:
@@ -1570,8 +1564,8 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
         """
         Post job handling: print debugging information regarding the current job.
 
-        :param CFGJob job:      The current CFGJob instance.
-        :param list successors: All successors of the analysis job.
+        :param job:        The current CFGJob instance.
+        :param successors: All successors of the analysis job.
         :return: None
         """
 
@@ -1651,7 +1645,7 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
             else:
                 break
 
-    def _clean_pending_exits(self):
+    def _clean_pending_exits(self) -> bool:
         """
         Remove those pending exits if:
         a) they are the return exits of non-returning SimProcedures
@@ -1659,7 +1653,6 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
         c) they are the return exits of non-returning functions
 
         :return: True if any pending exits are removed, False otherwise
-        :rtype: bool
         """
 
         pending_exits_to_remove = []
@@ -1728,12 +1721,12 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
         if jumpkind == "Ijk_Call":
             extra_info["last_call_exit_target"] = target_addr
 
-    def _handle_successor(self, job, successor: SimState, successors):
+    def _handle_successor(self, job: CFGJob, successor: SimState, successors):
         """
         Returns a new CFGJob instance for further analysis, or None if there is no immediate state to perform the
         analysis on.
 
-        :param CFGJob job: The current job.
+        :param job: The current job.
         """
 
         state: SimState = successor
@@ -1918,12 +1911,12 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
 
         return [pw]
 
-    def _handle_job_without_successors(self, job, irsb, insn_addrs):
+    def _handle_job_without_successors(self, job: CFGJob, irsb: pyvex.IRSB, insn_addrs):
         """
         A block without successors should still be handled so it can be added to the function graph correctly.
 
-        :param CFGJob job:  The current job that do not have any successor.
-        :param IRSB irsb:   The related IRSB.
+        :param job:         The current job that do not have any successor.
+        :param irsb:        The related IRSB.
         :param insn_addrs:  A list of instruction addresses of this IRSB.
         :return: None
         """
@@ -1958,16 +1951,23 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
 
     # SimAction handling
 
-    def _handle_actions(self, state, current_run, func, sp_addr, accessed_registers):
+    def _handle_actions(
+        self,
+        state: SimState,
+        current_run: SimSuccessors,
+        func: Function | None,
+        sp_addr: int | None,
+        accessed_registers: set,
+    ):
         """
         For a given state and current location of of execution, will update a function by adding the offsets of
         appropriate actions to the stack variable or argument registers for the fnc.
 
-        :param SimState state: upcoming state.
-        :param SimSuccessors current_run: possible result states.
-        :param knowledge.Function func: current function.
-        :param int sp_addr: stack pointer address.
-        :param set accessed_registers: set of before accessed registers.
+        :param state: upcoming state.
+        :param current_run: possible result states.
+        :param func: current function.
+        :param sp_addr: stack pointer address.
+        :param accessed_registers: set of before accessed registers.
         """
         se = state.solver
 
@@ -2068,18 +2068,23 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
             self.graph.add_edge(src_node, dst_node, **kwargs)
 
     def _update_function_transition_graph(
-        self, src_node_key, dst_node_key, jumpkind="Ijk_Boring", ins_addr=None, stmt_idx=None, confirmed=None
+        self,
+        src_node_key,
+        dst_node_key,
+        jumpkind: str = "Ijk_Boring",
+        ins_addr: int | None = None,
+        stmt_idx: int | None = None,
+        confirmed: bool | None = None,
     ):
         """
         Update transition graphs of functions in function manager based on information passed in.
 
         :param src_node_key:    Node key of the source CFGNode. Might be None.
         :param dst_node:        Node key of the destination CFGNode. Might be None.
-        :param str jumpkind:    Jump kind of this transition.
-        :param int ret_addr:    The theoretical return address for calls.
-        :param int or None ins_addr:    Address of the instruction where this transition is made.
-        :param int or None stmt_idx:    ID of the statement where this transition is made.
-        :param bool or None confirmed:  Whether this call transition has been confirmed or not.
+        :param jumpkind:        Jump kind of this transition.
+        :param ins_addr:        Address of the instruction where this transition is made.
+        :param stmt_idx:        ID of the statement where this transition is made.
+        :param confirmed:       Whether this call transition has been confirmed or not.
         :return: None
         """
 
@@ -2188,7 +2193,7 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
         Update the callsites of functions (remove return targets) that are calling functions that are just deemed not
         returning.
 
-        :param iterable noreturns:  A collection of functions for newly-recovered non-returning functions.
+        :param noreturns:           A collection of functions for newly-recovered non-returning functions.
         :return:                    None
         """
 
@@ -2232,7 +2237,7 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
 
         return successors
 
-    def _filter_insane_successors(self, successors):
+    def _filter_insane_successors(self, successors: list[SimState]) -> list[SimState]:
         """
         Throw away all successors whose target doesn't make sense
 
@@ -2240,9 +2245,8 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
         the indirect jump resolvers, but through either pure concrete execution or backward slicing) to filter out the
         obviously incorrect successors.
 
-        :param list successors: A collection of successors.
-        :return:                A filtered list of successors
-        :rtype:                 list
+        :param successors: A collection of successors.
+        :return:           A filtered list of successors
         """
 
         old_successors = successors[::]
@@ -2308,7 +2312,7 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
     # Private methods - resolving indirect jumps
 
     @staticmethod
-    def _convert_indirect_jump_targets_to_states(job, indirect_jump_targets):
+    def _convert_indirect_jump_targets_to_states(job, indirect_jump_targets) -> list[SimState]:
         """
         Convert each concrete indirect jump target into a SimState. If there are non-zero successors and the original
         jumpkind is a call, we also generate a fake-ret successor.
@@ -2316,7 +2320,6 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
         :param job:                     The CFGJob instance.
         :param indirect_jump_targets:   A collection of concrete jump targets resolved from a indirect jump.
         :return:                        A list of SimStates.
-        :rtype:                         list
         """
 
         first_successor = job.sim_successors.all_successors[0]
@@ -2334,18 +2337,25 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
             successors.append(a)
         return successors
 
-    def _try_resolving_indirect_jumps(self, sim_successors, cfg_node, func_addr, successors, exception_info, artifacts):
+    def _try_resolving_indirect_jumps(
+        self,
+        sim_successors: SimSuccessors,
+        cfg_node: CFGNode,
+        func_addr: int,
+        successors: list[SimState],
+        exception_info: tuple | None,
+        artifacts,
+    ) -> list[SimState]:
         """
         Resolve indirect jumps specified by sim_successors.addr.
 
-        :param SimSuccessors sim_successors: The SimSuccessors instance.
-        :param CFGNode cfg_node:                     The CFGNode instance.
-        :param int func_addr:                        Current function address.
-        :param list successors:                      A list of successors.
-        :param tuple exception_info:                 The sys.exc_info() of the exception or None if none occurred.
-        :param artifacts:                            A container of collected information.
-        :return:                                     Resolved successors
-        :rtype:                                      list
+        :param sim_successors:  The SimSuccessors instance.
+        :param cfg_node:        The CFGNode instance.
+        :param func_addr:       Current function address.
+        :param successors:      A list of successors.
+        :param exception_info:  The sys.exc_info() of the exception or None if none occurred.
+        :param artifacts:       A container of collected information.
+        :return:                Resolved successors
         """
 
         # Try to resolve indirect jumps with advanced backward slicing (if enabled)
@@ -2623,16 +2633,17 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
 
         return list(successing_addresses)
 
-    def _symbolically_back_traverse(self, current_block, block_artifacts, cfg_node):
+    def _symbolically_back_traverse(
+        self, current_block: SimSuccessors, block_artifacts: dict, cfg_node: CFGNode
+    ) -> list[SimState]:
         """
         Symbolically executes from ancestor nodes (2-5 times removed) finding paths of execution through the given
         CFGNode.
 
-        :param SimSuccessors current_block: SimSuccessor with address to attempt to navigate to.
-        :param dict block_artifacts:  Container of IRSB data - specifically used for known persistent register values.
-        :param CFGNode cfg_node:      Current node interested around.
-        :returns:                     Double-checked concrete successors.
-        :rtype: List
+        :param current_block:   SimSuccessor with address to attempt to navigate to.
+        :param block_artifacts: Container of IRSB data - specifically used for known persistent register values.
+        :param cfg_node:        Current node interested around.
+        :returns:               Double-checked concrete successors.
         """
 
         class RegisterProtector:
@@ -2640,21 +2651,21 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
             A class that prevent specific registers from being overwritten.
             """
 
-            def __init__(self, reg_offset, info_collection):
+            def __init__(self, reg_offset: str, info_collection: dict):
                 """
                 Class to overwrite registers.
 
-                :param int reg_offset:       Register offset to overwrite from.
-                :param dict info_collection: New register offsets to use (in container).
+                :param reg_offset:       Register offset to overwrite from.
+                :param info_collection:  New register offsets to use (in container).
                 """
                 self._reg_offset = reg_offset
                 self._info_collection = info_collection
 
-            def write_persistent_register(self, state_):
+            def write_persistent_register(self, state_: SimState):
                 """
                 Writes over given registers from self._info_collection (taken from block_artifacts)
 
-                :param SimSuccessors state_: state to update registers for
+                :param state_: state to update registers for
                 """
                 if state_.inspect.attrs.address is None:
                     l.error("state.inspect.attrs.address is None. It will be fixed by Yan later.")
@@ -2823,13 +2834,12 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
 
     # Private methods - function hints
 
-    def _search_for_function_hints(self, successor_state):
+    def _search_for_function_hints(self, successor_state: SimState) -> list[int]:
         """
         Scan for constants that might be used as exit targets later, and add them into pending_exits.
 
-        :param SimState successor_state: A successing state.
-        :return:                                 A list of discovered code addresses.
-        :rtype:                                  list
+        :param successor_state: A successing state.
+        :return:                A list of discovered code addresses.
         """
 
         function_hints = []
@@ -2875,15 +2885,17 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
 
     # Private methods - creation of stuff (SimSuccessors, CFGNode, call-stack, etc.)
 
-    def _get_simsuccessors(self, addr, job, current_function_addr=None):
+    def _get_simsuccessors(
+        self, addr: int, job: CFGJob, current_function_addr: int | None = None
+    ) -> tuple[SimSuccessors | None, tuple | None, SimState]:
         """
         Create the SimSuccessors instance for a block.
 
-        :param int addr:                  Address of the block.
-        :param CFGJob job:                The CFG job instance with an input state inside.
-        :param int current_function_addr: Address of the current function.
-        :return:                          A SimSuccessors instance
-        :rtype:                           SimSuccessors
+        :param addr:                  Address of the block.
+        :param job:                   The CFG job instance with an input state inside.
+        :param current_function_addr: Address of the current function.
+        :return:                      A SimSuccessors instance (or None), the sys.exc_info() of the exception that
+                                      occurred (or None), and the saved input state.
         """
 
         exception_info = None
@@ -3034,17 +3046,18 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
 
         return sim_successors, exception_info, saved_state
 
-    def _create_new_call_stack(self, addr, all_jobs, job, exit_target, jumpkind):
+    def _create_new_call_stack(
+        self, addr: int, all_jobs: list[SimState], job: CFGJob, exit_target: int, jumpkind: str
+    ) -> CallStack:
         """
         Creates a new call stack, and according to the jumpkind performs appropriate actions.
 
-        :param int addr:                          Address to create at.
-        :param Simsuccessors all_jobs:            Jobs to get stack pointer from or return address.
-        :param CFGJob job:                        CFGJob to copy current call stack from.
-        :param int exit_target:                   Address of exit target.
-        :param str jumpkind:                      The type of jump performed.
-        :returns:                                 New call stack for target block.
-        :rtype:                                   CallStack
+        :param addr:        Address to create at.
+        :param all_jobs:    Jobs to get stack pointer from or return address.
+        :param job:         CFGJob to copy current call stack from.
+        :param exit_target: Address of exit target.
+        :param jumpkind:    The type of jump performed.
+        :returns:           New call stack for target block.
         """
 
         if self._is_call_jumpkind(jumpkind):
@@ -3132,17 +3145,24 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
 
         return new_call_stack
 
-    def _create_cfgnode(self, sim_successors, call_stack, func_addr, block_id=None, depth=None, exception_info=None):
+    def _create_cfgnode(
+        self,
+        sim_successors: SimSuccessors,
+        call_stack: CallStack,
+        func_addr: int,
+        block_id: BlockID | None = None,
+        depth: int | None = None,
+        exception_info=None,
+    ) -> CFGENode:
         """
         Create a context-sensitive CFGNode instance for a specific block.
 
-        :param SimSuccessors sim_successors:         The SimSuccessors object.
-        :param CallStack call_stack_suffix:          The call stack.
-        :param int func_addr:                        Address of the current function.
-        :param BlockID block_id:                     The block ID of this CFGNode.
-        :param int or None depth:                    Depth of this CFGNode.
-        :return:                                     A CFGNode instance.
-        :rtype:                                      CFGNode
+        :param sim_successors:  The SimSuccessors object.
+        :param call_stack:      The call stack.
+        :param func_addr:       Address of the current function.
+        :param block_id:        The block ID of this CFGNode.
+        :param depth:           Depth of this CFGNode.
+        :return:                A CFGNode instance.
         """
 
         sa = sim_successors.artifacts  # shorthand
@@ -3204,11 +3224,11 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
 
     # Private methods - loops and graph normalization
 
-    def _detect_loops(self, loop_callback=None):
+    def _detect_loops(self, loop_callback: Callable[[networkx.DiGraph, Loop], None] | None = None):
         """
         Loop detection.
 
-        :param func loop_callback: A callback function for each detected loop backedge.
+        :param loop_callback: A callback function for each detected loop backedge.
         :return: None
         """
 
@@ -3228,16 +3248,17 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
 
     # Private methods - dominators and post-dominators
 
-    def _immediate_dominators(self, node, target_graph=None, reverse_graph=False):
+    def _immediate_dominators(
+        self, node: CFGNode, target_graph: networkx.DiGraph | None = None, reverse_graph: bool = False
+    ) -> dict:
         """
         Get all immediate dominators of sub graph from given node upwards.
 
-        :param str node: id of the node to navigate forwards from.
-        :param networkx.classes.digraph.DiGraph target_graph: graph to analyse, default is self.graph.
-        :param bool reverse_graph: Whether the target graph should be reversed before analysation.
+        :param node: id of the node to navigate forwards from.
+        :param target_graph: graph to analyse, default is self.graph.
+        :param reverse_graph: Whether the target graph should be reversed before analysation.
 
         :return: each node of graph as index values, with element as respective node's immediate dominator.
-        :rtype: dict
         """
         if target_graph is None:
             target_graph = self.graph
@@ -3260,14 +3281,13 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
         order.pop()
         order.reverse()
 
-        def intersect(u_, v_):
+        def intersect(u_: CFGNode, v_: CFGNode) -> CFGNode:
             """
             Finds the highest (in postorder valuing) point of intersection above two node arguments.
 
-            :param str u_: nx node id.
-            :param str v_: nx node id.
+            :param u_: nx node id.
+            :param v_: nx node id.
             :return: intersection of paths.
-            :rtype: str
             """
             while u_ != v_:
                 while dfn[u_] < dfn[v_]:
@@ -3325,13 +3345,12 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
         return block_id.addr
 
     @staticmethod
-    def _block_id_current_func_addr(block_id):
+    def _block_id_current_func_addr(block_id: BlockID) -> int | None:
         """
         If we don't have any information about the caller, we have no way to get the address of the current function.
 
-        :param BlockID block_id: The block ID.
-        :return:                 The function address if there is one, or None if it's not possible to get.
-        :rtype:                  int or None
+        :param block_id: The block ID.
+        :return:         The function address if there is one, or None if it's not possible to get.
         """
 
         if block_id.callsite_tuples:
@@ -3346,19 +3365,19 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
     def _is_call_jumpkind(jumpkind):
         return bool(jumpkind == "Ijk_Call" or jumpkind.startswith("Ijk_Sys_"))
 
-    def _push_unresolvable_run(self, block_address):
+    def _push_unresolvable_run(self, block_address: int):
         """
         Adds this block to the list of unresolvable runs.
 
-        :param dict block_address: container of IRSB data from run.
+        :param block_address: container of IRSB data from run.
         """
         self._unresolvable_runs.add(block_address)
 
-    def _is_address_executable(self, address):
+    def _is_address_executable(self, address: int):
         """
         Check if the specific address is in one of the executable ranges.
 
-        :param int address: The address
+        :param address: The address
         :return: True if it's in an executable range, False otherwise
         """
 
@@ -3436,12 +3455,12 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
                     self._quasi_topological_order[n] = ctr
                     ctr -= 1
 
-    def _reset_state_mode(self, state, mode):
+    def _reset_state_mode(self, state, mode: str):
         """
         Reset the state mode to the given mode, and apply the custom state options specified with this analysis.
 
         :param state:    The state to work with.
-        :param str mode: The state mode.
+        :param mode:     The state mode.
         :return:         None
         """
 

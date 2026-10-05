@@ -116,12 +116,11 @@ class CallStack(SimStatePlugin):
             k -= 1
         raise IndexError(orig_k)
 
-    def __len__(self):
+    def __len__(self) -> int:
         """
         Get how many frames there are in the current call stack.
 
         :return: Number of frames
-        :rtype: int
         """
 
         o = 0
@@ -129,12 +128,11 @@ class CallStack(SimStatePlugin):
             o += 1
         return o
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """
         Get a string representation.
 
         :return: A printable representation of the CallStack object
-        :rtype: str
         """
         return f"<CallStack (depth {len(self)})>"
 
@@ -163,45 +161,42 @@ class CallStack(SimStatePlugin):
     #
 
     @property
-    def current_function_address(self):
+    def current_function_address(self) -> int:
         """
         Address of the current function.
 
         :return: the address of the function
-        :rtype: int
         """
 
         return self.func_addr
 
     @current_function_address.setter
-    def current_function_address(self, func_addr):
+    def current_function_address(self, func_addr: int):
         """
         Set the address of the current function. Note that we must make a copy of the CallStackFrame as CallStackFrame
         is considered to be immutable.
 
-        :param int func_addr: The function address.
+        :param func_addr: The function address.
         :return: None
         """
 
         self.func_addr = func_addr
 
     @property
-    def current_stack_pointer(self):
+    def current_stack_pointer(self) -> int | None:
         """
         Get the value of the stack pointer.
 
         :return: Value of the stack pointer
-        :rtype: int
         """
         return self.stack_ptr
 
     @property
-    def current_return_target(self):
+    def current_return_target(self) -> int | None:
         """
         Get the return target.
 
         :return: The address of return target.
-        :rtype: int
         """
 
         return self.ret_addr
@@ -211,12 +206,11 @@ class CallStack(SimStatePlugin):
     #
 
     @staticmethod
-    def stack_suffix_to_string(stack_suffix):
+    def stack_suffix_to_string(stack_suffix: tuple) -> str:
         """
         Convert a stack suffix to a human-readable string representation.
-        :param tuple stack_suffix: The stack suffix.
+        :param stack_suffix: The stack suffix.
         :return: A string representation
-        :rtype: str
         """
         return "[" + ",".join([(f"0x{i:x}") if i is not None else "Unspecified" for i in stack_suffix]) + "]"
 
@@ -262,26 +256,26 @@ class CallStack(SimStatePlugin):
 
         return new_list
 
-    def call(self, callsite_addr, addr, retn_target=None, stack_pointer=None):
+    def call(self, callsite_addr: int, addr: int, retn_target: int | None = None, stack_pointer: int | None = None):
         """
         Push a stack frame into the call stack. This method is called when calling a function in CFG recovery.
 
-        :param int callsite_addr: Address of the call site
-        :param int addr: Address of the call target
-        :param int or None retn_target: Address of the return target
-        :param int stack_pointer: Value of the stack pointer
+        :param callsite_addr: Address of the call site
+        :param addr: Address of the call target
+        :param retn_target: Address of the return target
+        :param stack_pointer: Value of the stack pointer
         :return: None
         """
 
         frame = type(self)(call_site_addr=callsite_addr, func_addr=addr, ret_addr=retn_target, stack_ptr=stack_pointer)
         return self.push(frame)
 
-    def ret(self, retn_target=None):
+    def ret(self, retn_target: int | None = None):
         """
         Pop one or many call frames from the stack. This method is called when returning from a function in CFG
         recovery.
 
-        :param int retn_target: The target to return to.
+        :param retn_target: The target to return to.
         :return: None
         """
 
@@ -307,12 +301,11 @@ class CallStack(SimStatePlugin):
         # There are cases especially in ARM where return is used as a jump
         # So we don't pop anything out
 
-    def dbg_repr(self):
+    def dbg_repr(self) -> str:
         """
         Debugging representation of this CallStack object.
 
         :return: Details of this CalLStack
-        :rtype: str
         """
 
         stack = []
@@ -324,13 +317,12 @@ class CallStack(SimStatePlugin):
 
         return "\n".join(stack)
 
-    def stack_suffix(self, context_sensitivity_level) -> tuple[int | None, ...]:
+    def stack_suffix(self, context_sensitivity_level: int) -> tuple[int | None, ...]:
         """
         Generate the stack suffix. A stack suffix can be used as the key to a SimRun in CFG recovery.
 
-        :param int context_sensitivity_level: Level of context sensitivity.
+        :param context_sensitivity_level: Level of context sensitivity.
         :return: A tuple of stack suffix.
-        :rtype: tuple
         """
 
         ret = ()
@@ -349,14 +341,13 @@ class CallStack(SimStatePlugin):
     # Private methods
     #
 
-    def _find_return_target(self, target):
+    def _find_return_target(self, target: int) -> int | None:
         """
         Check if the return target exists in the stack, and return the index if exists. We always search from the most
         recent call stack frame since the most recent frame has a higher chance to be hit in normal CFG recovery.
 
-        :param int target: Target of the return.
+        :param target: Target of the return.
         :return: The index of the object
-        :rtype: int
         """
 
         for i, frame in enumerate(self):

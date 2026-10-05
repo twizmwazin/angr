@@ -1,16 +1,23 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 
-def slice_callgraph(callgraph, cfg_slice_to_sink):
+if TYPE_CHECKING:
+    import networkx
+
+    from .cfg_slice_to_sink import CFGSliceToSink
+
+
+def slice_callgraph(callgraph: networkx.MultiDiGraph, cfg_slice_to_sink: CFGSliceToSink):
     """
     Slice a callgraph, keeping only the nodes present in the <CFGSliceToSink> representation, and th transitions for
     which a path exists.
 
     *Note* that this function mutates the graph passed as an argument.
 
-    :param networkx.MultiDiGraph callgraph:
+    :param callgraph:
         The callgraph to update.
-    :param CFGSliceToSink cfg_slice_to_sink:
+    :param cfg_slice_to_sink:
         The representation of the slice, containing the data to update the callgraph from.
     """
 
@@ -24,17 +31,17 @@ def slice_callgraph(callgraph, cfg_slice_to_sink):
     return callgraph
 
 
-def slice_cfg_graph(graph, cfg_slice_to_sink):
+def slice_cfg_graph(graph: networkx.DiGraph, cfg_slice_to_sink: CFGSliceToSink) -> networkx.DiGraph:
     """
     Slice a CFG graph, keeping only the transitions and nodes present in the <CFGSliceToSink> representation.
 
     *Note* that this function mutates the graph passed as an argument.
 
-    :param networkx.DiGraph graph: The graph to slice.
-    :param CFGSliceToSink cfg_slice_to_sink:
+    :param graph: The graph to slice.
+    :param cfg_slice_to_sink:
         The representation of the slice, containing the data to update the CFG from.
 
-    :return networkx.DiGraph: The sliced graph.
+    :return: The sliced graph.
     """
 
     def _edge_in_slice_transitions(transitions, edge):
@@ -54,7 +61,7 @@ def slice_cfg_graph(graph, cfg_slice_to_sink):
     return graph
 
 
-def slice_function_graph(function_graph, cfg_slice_to_sink):
+def slice_function_graph(function_graph: networkx.DiGraph, cfg_slice_to_sink: CFGSliceToSink) -> networkx.DiGraph:
     """
     Slice a function graph, keeping only the nodes present in the <CFGSliceToSink> representation.
 
@@ -73,11 +80,11 @@ def slice_function_graph(function_graph, cfg_slice_to_sink):
 
     *Note* that this function mutates the graph passed as an argument.
 
-    :param networkx.DiGraph graph: The graph to slice.
-    :param CFGSliceToSink cfg_slice_to_sink:
+    :param function_graph: The graph to slice.
+    :param cfg_slice_to_sink:
         The representation of the slice, containing the data to update the CFG from.
 
-    :return networkx.DiGraph: The sliced graph.
+    :return: The sliced graph.
     """
 
     nodes_to_remove = list(filter(lambda node: node.addr not in cfg_slice_to_sink.nodes, function_graph.nodes()))

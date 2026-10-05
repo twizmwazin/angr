@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from .base import SimSootValue
+
+if TYPE_CHECKING:
+    from angr.claripy.ast import String
+    from angr.sim_state import SimState
 
 
 class SimSootValue_StringRef(SimSootValue):
@@ -21,16 +27,14 @@ class SimSootValue_StringRef(SimSootValue):
         raise NotImplementedError
 
     @staticmethod
-    def new_string(state, value):
+    def new_string(state: SimState, value: String):
         """
         Allocate and initialize a new string in the context of the state passed.
 
         The method returns the reference to the newly allocated string
 
         :param state: angr state where we want to allocate the string
-        :type state: SimState
         :param value: value of the string to initialize
-        :type value: claripy.String
         :return: SimSootValue_StringRef
         """
         str_ref = SimSootValue_StringRef(state.memory.get_new_uuid())

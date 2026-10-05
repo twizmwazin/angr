@@ -86,7 +86,6 @@ class BasePointerSaveSimplifier(OptimizationPass):
         Find the AIL statement that saves the base pointer to a stack slot.
 
         :return:    A tuple of (block_addr, statement_idx, save_dst) or None if not found.
-        :rtype:     tuple|None
         """
 
         # scan the first N blocks of the function until we find the first baseptr save statement
@@ -119,13 +118,12 @@ class BasePointerSaveSimplifier(OptimizationPass):
         # Not found
         return None
 
-    def _find_baseptr_restore_stmt(self):
+    def _find_baseptr_restore_stmt(self) -> list[tuple[ailment.Block, int, ailment.Expr.StackBaseOffset]] | None:
         """
         Find the AIL statement that restores the base pointer from a stack slot.
 
         :return:    A list of tuples, where each tuple is like (block_addr, statement_idx, load_src), or None if not
                     found.
-        :rtype:     list|None
         """
 
         endpoints = self._func.endpoints

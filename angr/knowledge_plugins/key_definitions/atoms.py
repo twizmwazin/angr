@@ -238,11 +238,14 @@ class Register(Atom):
     space.
     Thus a register is defined by its offset from the base of this memory and its size.
 
-    :ivar int reg_offset:    The offset from the base to define its place in the memory bloc.
-    :ivar int size:          The size, in number of bytes.
+    :ivar reg_offset:    The offset from the base to define its place in the memory bloc.
+    :ivar size:          The size, in number of bytes.
     """
 
     __slots__ = ("reg_offset",)
+
+    reg_offset: RegisterOffset
+    size: int
 
     def __init__(self, reg_offset: RegisterOffset | int, size: int):
         super().__init__(size)
@@ -336,8 +339,8 @@ class MemoryLocation(Atom):
 
     def __init__(self, addr: SpOffset | HeapAddress | int, size: int, endness: Endness | None = None):
         """
-        :param int addr: The address of the beginning memory location slice.
-        :param int size: The size of the represented memory location, in bytes.
+        :param addr: The address of the beginning memory location slice.
+        :param size: The size of the represented memory location, in bytes.
         """
         super().__init__(size)
 

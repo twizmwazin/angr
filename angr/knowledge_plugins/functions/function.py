@@ -227,13 +227,13 @@ class Function(Serializable):
         self,
         function_manager: FunctionManager | None,
         addr: int,
-        name=None,
-        syscall=None,
+        name: str | None = None,
+        syscall: bool | None = None,
         is_simprocedure: bool | None = None,
-        binary_name=None,
+        binary_name: str | None = None,
         is_plt: bool | None = None,
-        returning=None,
-        alignment=False,
+        returning: bool | None = None,
+        alignment: bool = False,
         calling_convention: SimCC | None = None,
         prototype: SimTypeFunction | None = None,
         prototype_libname: str | None = None,
@@ -246,13 +246,13 @@ class Function(Serializable):
         the creation of a Function object.
 
         :param addr:            The address of the function.
-        :param str name:        The name of the function.
-        :param bool syscall:    Whether this function is a syscall or not.
-        :param bool is_simprocedure:    Whether this function is a SimProcedure or not.
-        :param str binary_name: Name of the binary where this function is.
-        :param bool is_plt:     If this function is a PLT entry.
-        :param bool returning:  If this function returns.
-        :param bool alignment:  If this function acts as an alignment filler. Such functions usually only contain nops.
+        :param name:            The name of the function.
+        :param syscall:         Whether this function is a syscall or not.
+        :param is_simprocedure: Whether this function is a SimProcedure or not.
+        :param binary_name:     Name of the binary where this function is.
+        :param is_plt:          If this function is a PLT entry.
+        :param returning:       If this function returns.
+        :param alignment:       If this function acts as an alignment filler. Such functions usually only contain nops.
         """
         if prototype_source is None:
             prototype_source = (
@@ -841,7 +841,7 @@ class Function(Serializable):
         return {addr: self._node_obj(idx) for addr, idx in self._graph.local_items()}
 
     @property
-    def cyclomatic_complexity(self):
+    def cyclomatic_complexity(self) -> int:
         """
         The cyclomatic complexity of the function.
 
@@ -856,7 +856,6 @@ class Function(Serializable):
         Initially this value is None until it is computed for the first time
 
         :return: The cyclomatic complexity of the function.
-        :rtype: int
         """
         if self._cyclomatic_complexity is None:
             self._cyclomatic_complexity = self._graph.number_of_edges() - self._graph.number_of_nodes() + 2
@@ -886,12 +885,11 @@ class Function(Serializable):
         return self._graph.local_addrs()
 
     @property
-    def block_addrs_set(self):
+    def block_addrs_set(self) -> set[int]:
         """
         Return a set of block addresses for a better performance of inclusion tests.
 
         :return: A set of block addresses.
-        :rtype: set
         """
 
         if self._block_addrs_cache is None:
@@ -902,8 +900,8 @@ class Function(Serializable):
         """
         Getting a block out of the current function.
 
-        :param int addr:    The address of the block.
-        :param int size:    The size of the block. This is optional. If not provided, angr will load
+        :param addr:        The address of the block.
+        :param size:        The size of the block. This is optional. If not provided, angr will load
         :param byte_string:
         :return:
         """
@@ -979,11 +977,11 @@ class Function(Serializable):
         return FunctionParser.serialize(self)
 
     @classmethod
-    def parse_from_cmessage(cls, cmsg, **kwargs):
+    def parse_from_cmessage(cls, cmsg, **kwargs) -> Function:
         """
         :param cmsg:
 
-        :return Function: The function instantiated out of the cmsg data.
+        :return: The function instantiated out of the cmsg data.
         """
         return FunctionParser.parse_from_cmsg(cmsg, **kwargs)
 
@@ -1326,12 +1324,11 @@ class Function(Serializable):
         self._graph.add_site(idx, SiteKind.RETOUT)
         self._graph.add_endpoint(idx, EndpointKind.RETURN)
 
-    def _get_initial_name(self):
+    def _get_initial_name(self) -> str:
         """
         Determine the most suitable name of the function.
 
         :return:    The initial function name.
-        :rtype:     string
         """
 
         name = None
@@ -1388,12 +1385,11 @@ class Function(Serializable):
 
         return binary_name
 
-    def _get_initial_returning(self):
+    def _get_initial_returning(self) -> bool | None:
         """
         Determine if this function returns or not *if it is hooked by a SimProcedure or a user hook*.
 
         :return:    True if the hooker returns, False otherwise.
-        :rtype:     bool
         """
 
         hooker = None
@@ -1465,7 +1461,7 @@ class Function(Serializable):
         self,
         from_node: CodeNode,
         to_node,
-        outside=False,
+        outside: bool = False,
         ins_addr=None,
         stmt_idx=None,
         is_exception=False,
@@ -1479,7 +1475,7 @@ class Function(Serializable):
                                     flow leaves during this transition.
         :param to_node              The address of the basic block that control
                                     flow enters during this transition.
-        :param bool outside:        If this is a transition to another function, e.g. tail call optimization
+        :param outside:             If this is a transition to another function, e.g. tail call optimization
         :return: None
         """
 
@@ -1512,11 +1508,11 @@ class Function(Serializable):
     @dirty_func
     def call_to(
         self,
-        from_node,
+        from_node: CodeNode,
         to_func: FuncNode | HookNode,
-        ret_node,
-        stmt_idx=None,
-        ins_addr=None,
+        ret_node: CodeNode | None,
+        stmt_idx: int | str | None = None,
+        ins_addr: int | None = None,
         return_to_outside=False,
         syscall: bool = False,
         update_func_block_count: bool = True,
@@ -1524,16 +1520,12 @@ class Function(Serializable):
         """
         Registers an edge between the caller basic block and callee function.
 
-        :param from_addr:   The basic block that control flow leaves during the transition.
-        :type  from_addr:   angr.knowledge.CodeNode
+        :param from_node:   The basic block that control flow leaves during the transition.
         :param to_func:     The function that we are calling, represented as a FuncNode.
-        :param ret_node     The basic block that control flow should return to after the
+        :param ret_node:    The basic block that control flow should return to after the
                             function call.
-        :type  to_func:     angr.knowledge.CodeNode or None
         :param stmt_idx:    Statement ID of this call.
-        :type  stmt_idx:    int, str or None
         :param ins_addr:    Instruction address of this call.
-        :type  ins_addr:    int or None
         """
 
         src = self.register(True, from_node, update_func_block_count=update_func_block_count)
@@ -1825,7 +1817,7 @@ class Function(Serializable):
 
         return g
 
-    def graph_ex(self, exception_edges=True) -> networkx.DiGraph[CodeNode]:
+    def graph_ex(self, exception_edges: bool = True) -> networkx.DiGraph[CodeNode]:
         """
         Get a local transition graph with a custom configuration. A local transition graph is a transition graph that
         only contains nodes that belong to the current function. This method allows user to include certain types of
@@ -1833,7 +1825,7 @@ class Function(Serializable):
 
         The generated graph is not cached. It is a mutable copy.
 
-        :param bool exception_edges:    Should exception edges and the nodes that are only reachable through exception
+        :param exception_edges:         Should exception edges and the nodes that are only reachable through exception
                                         edges be kept.
         :return:                        A local transition graph with a special configuration.
         """
@@ -1866,17 +1858,16 @@ class Function(Serializable):
 
         return g
 
-    def transition_graph_ex(self, exception_edges=True):
+    def transition_graph_ex(self, exception_edges: bool = True) -> networkx.DiGraph:
         """
         Get a transition graph with a custom configuration. This method allows user to exclude certain types of edges
         together with the nodes that are only reachable through such edges, such as exception edges.
 
         The generated graph is not cached.
 
-        :param bool exception_edges:    Should exception edges and the nodes that are only reachable through exception
+        :param exception_edges:         Should exception edges and the nodes that are only reachable through exception
                                         edges be kept.
         :return:                        A local transition graph with a special configuration.
-        :rtype:                         networkx.DiGraph
         """
 
         graph = self.transition_graph
@@ -1908,12 +1899,12 @@ class Function(Serializable):
 
         return g
 
-    def subgraph(self, ins_addrs):
+    def subgraph(self, ins_addrs: Iterable) -> networkx.DiGraph:
         """
         Generate a sub control flow graph of instruction addresses based on self.graph
 
-        :param iterable ins_addrs: A collection of instruction addresses that should be included in the subgraph.
-        :return networkx.DiGraph: A subgraph.
+        :param ins_addrs: A collection of instruction addresses that should be included in the subgraph.
+        :return: A subgraph.
         """
 
         # find all basic blocks that include those instructions
@@ -1951,12 +1942,12 @@ class Function(Serializable):
 
         return g
 
-    def instruction_size(self, insn_addr):
+    def instruction_size(self, insn_addr: int) -> int | None:
         """
         Get the size of the instruction specified by `insn_addr`.
 
-        :param int insn_addr: Address of the instruction
-        :return int: Size of the instruction in bytes, or None if the instruction is not found.
+        :param insn_addr: Address of the instruction
+        :return: Size of the instruction in bytes, or None if the instruction is not found.
         """
 
         for block in self.blocks:
@@ -1971,14 +1962,13 @@ class Function(Serializable):
 
         return None
 
-    def addr_to_instruction_addr(self, addr):
+    def addr_to_instruction_addr(self, addr: int) -> int | None:
         """
         Obtain the address of the instruction that covers @addr.
 
-        :param int addr:    An address.
+        :param addr:        An address.
         :return:            Address of the instruction that covers @addr, or None if this addr is not covered by any
                             instruction of this function.
-        :rtype:             int or None
         """
 
         # TODO: Replace the linear search with binary search

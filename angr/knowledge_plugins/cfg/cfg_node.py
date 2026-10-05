@@ -16,7 +16,10 @@ from angr.utils.ins_addr_list import InsAddrList
 from .block_id import BlockID
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from angr.block import Block, SootBlock
+    from angr.knowledge_plugins.xrefs.xref import XRef
 
     from .cfg_model import CFGModel
 
@@ -237,13 +240,12 @@ class CFGNode(Serializable):
     def predecessors_and_jumpkinds(self, excluding_fakeret=True):
         return self._cfg_model.get_predecessors_and_jumpkinds(self, excluding_fakeret=excluding_fakeret)
 
-    def get_data_references(self, kb=None):
+    def get_data_references(self, kb=None) -> Iterator[XRef]:
         """
         Get the known data references for this CFGNode via the knowledge base.
 
         :param kb:  Which knowledge base to use; uses the global KB by default if none is provided
         :return:    Generator yielding xrefs to this CFGNode's block.
-        :rtype:     iter
         """
         if not self._cfg_model.ident.startswith("CFGFast"):
             raise ValueError("Memory data is currently only supported in CFGFast.")
@@ -257,12 +259,11 @@ class CFGNode(Serializable):
             yield from refs
 
     @property
-    def accessed_data_references(self):
+    def accessed_data_references(self) -> Iterator[XRef]:
         """
         Property providing a view of all the known data references for this CFGNode via the global knowledge base
 
         :return:    Generator yielding xrefs to this CFGNode's block.
-        :rtype:     iter
         """
         return self.get_data_references()
 

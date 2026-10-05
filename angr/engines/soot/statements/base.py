@@ -39,13 +39,12 @@ class SimSootStmt:
     def _translate_value(self, value):
         return translate_value(value, self.state)
 
-    def _get_bb_addr_from_instr(self, instr):
+    def _get_bb_addr_from_instr(self, instr) -> SootAddressDescriptor:
         """
         Returns the address of the methods basic block that contains the given
         instruction.
 
         :param instr: The index of the instruction (within the current method).
-        :rtype: SootAddressDescriptor
         """
         current_method = self.state.addr.method
         try:

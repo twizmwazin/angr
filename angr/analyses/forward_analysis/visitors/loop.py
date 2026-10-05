@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from angr.utils.graph import GraphUtils
 
 from .graph import GraphVisitor
 
+if TYPE_CHECKING:
+    from angr.analyses.loopfinder import Loop
+
 
 class LoopVisitor(GraphVisitor):
     """
-    :param angr.analyses.loopfinder.Loop loop: The loop to visit.
+    :param loop: The loop to visit.
     """
 
-    def __init__(self, loop):
+    def __init__(self, loop: Loop):
         super().__init__()
         self.loop = loop
 

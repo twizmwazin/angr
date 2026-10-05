@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Self
+
+if TYPE_CHECKING:
+    from google.protobuf.message import Message
+
 
 class Serializable:
     """
@@ -18,46 +23,42 @@ class Serializable:
 
         raise NotImplementedError
 
-    def serialize_to_cmessage(self):
+    def serialize_to_cmessage(self) -> Message:
         """
         Serialize the class object and returns a protobuf cmessage object.
 
         :return:    A protobuf cmessage object.
-        :rtype:     protobuf.cmessage
         """
 
         raise NotImplementedError
 
-    def serialize(self):
+    def serialize(self) -> bytes:
         """
         Serialize the class object and returns a bytes object.
 
         :return:    A bytes object.
-        :rtype:     bytes
         """
 
         return self.serialize_to_cmessage().SerializeToString()
 
     @classmethod
-    def parse_from_cmessage(cls, cmsg, **kwargs):
+    def parse_from_cmessage(cls, cmsg, **kwargs) -> Self:
         """
         Parse a protobuf cmessage and create a class object.
 
         :param cmsg:    The probobuf cmessage object.
         :return:        A unserialized class object.
-        :rtype:         cls
         """
 
         raise NotImplementedError
 
     @classmethod
-    def parse(cls, s, **kwargs):
+    def parse(cls, s: bytes, **kwargs) -> Self:
         """
         Parse a bytes object and create a class object.
 
-        :param bytes s: A bytes object.
+        :param s:       A bytes object.
         :return:        A class object.
-        :rtype:         cls
         """
 
         pb2_obj = cls._get_cmsg()

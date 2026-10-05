@@ -362,14 +362,13 @@ class SimProcedure:
         """
         raise SimProcedureError(f"{self.__class__.__name__} does not implement a run() method")
 
-    def static_exits(self, blocks, **kwargs):  # pylint: disable=unused-argument
+    def static_exits(self, blocks: list, **kwargs) -> list[dict]:  # pylint: disable=unused-argument
         """
         Get new exits by performing static analysis and heuristics. This is a fast and best-effort approach to get new
         exits for scenarios where states are not available (e.g. when building a fast CFG).
 
-        :param list blocks: Blocks that are executed before reaching this SimProcedure.
+        :param blocks: Blocks that are executed before reaching this SimProcedure.
         :return: A list of dicts. Each dict should contain the following entries: 'address', 'jumpkind', and 'namehint'.
-        :rtype: list
         """
 
         if self.ADDS_EXITS:

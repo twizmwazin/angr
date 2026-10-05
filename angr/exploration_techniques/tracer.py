@@ -436,7 +436,7 @@ class Tracer(ExplorationTechnique):
             succs_dict[None][0] = state
         return succs_dict
 
-    def _force_resync(self, simgr, state, deviating_trace_idx, deviating_addr, kwargs):
+    def _force_resync(self, simgr, state, deviating_trace_idx, deviating_addr, kwargs) -> dict:
         """
         When a deviation happens, force the tracer to take the branch specified in the trace by manually setting the
         PC to the one in the trace. This method is only used in Permissive tracing mode.
@@ -448,7 +448,6 @@ class Tracer(ExplorationTechnique):
                                     one in the trace.
         :param kwargs:              Other keyword arguments that will be passed to step_state().
         :return:                    A new successor dict.
-        :rtype:                     dict
         """
 
         # if unicorn engine is enabled, disable it. forced execution requires single-stepping in angr.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from archinfo.arch_soot import SootAddressDescriptor, SootAddressTerminator, SootClassDescriptor
 
@@ -9,6 +10,9 @@ from angr.engines.soot.method_dispatcher import resolve_method
 from angr.sim_state import SimState
 
 from .plugin import SimStatePlugin
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 l = logging.getLogger("angr.state_plugins.javavm_classloader")
 
@@ -23,14 +27,14 @@ class SimJavaVmClassloader(SimStatePlugin):
         super().__init__()
         self._initialized_classes = set() if initialized_classes is None else initialized_classes
 
-    def get_class(self, class_name, init_class=False, step_func=None):
+    def get_class(self, class_name: str, init_class: bool = False, step_func: Callable | None = None):
         """
         Get a class descriptor for the class.
 
-        :param str class_name:  Name of class.
-        :param bool init_class: Whether the class initializer <clinit> should be
+        :param class_name:      Name of class.
+        :param init_class:      Whether the class initializer <clinit> should be
                                 executed.
-        :param func step_func: Callback function executed at every step of the simulation manager during
+        :param step_func:      Callback function executed at every step of the simulation manager during
                              the execution of the main <clinit> method
         """
         # try to get the soot class object from CLE

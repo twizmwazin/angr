@@ -29,6 +29,8 @@ if TYPE_CHECKING:
     from angr.knowledge_plugins.xrefs import XRef, XRefManager
     from angr.rustylib import SegmentList
 
+    from .block_id import BlockID
+    from .spilling_cfg import _NodeView
     from .types import CFG_ADDR_TYPES
 
 l = logging.getLogger(name=__name__)
@@ -434,11 +436,11 @@ class CFGModel(Serializable):
     def has_node_id(self, node_id) -> bool:
         return node_id in self._blockid_to_blockkey
 
-    def get_node(self, block_id) -> CFGNode | None:
+    def get_node(self, block_id: BlockID | int | SootAddressDescriptor) -> CFGNode | None:
         """
         Get a single node from Block ID.
 
-        :param BlockID block_id: Block ID of the node.
+        :param block_id:         Block ID of the node.
         :return:                 The CFGNode, or None if the node does not exist.
         """
         if block_id in self._blockid_to_blockkey:
@@ -574,12 +576,11 @@ class CFGModel(Serializable):
             return None
         return self._node_addrs[pos]
 
-    def nodes(self):
+    def nodes(self) -> _NodeView:
         """
         An iterator of all nodes in the graph.
 
         :return: The iterator.
-        :rtype: iterator
         """
 
         return self.graph.nodes()
@@ -626,13 +627,12 @@ class CFGModel(Serializable):
         """
         Get successors of a node in the control flow graph.
 
-        :param CFGNode node:                The node.
-        :param bool excluding_fakeret:      True if you want to exclude all successors that is connected to the node
+        :param node:                        The node.
+        :param excluding_fakeret:           True if you want to exclude all successors that is connected to the node
                                             with a fakeret edge.
-        :param str or None jumpkind:        Only return successors with the specified jumpkind. This argument will be
+        :param jumpkind:                    Only return successors with the specified jumpkind. This argument will be
                                             ignored if set to None.
         :return:                            A list of successors
-        :rtype:                             list
         """
 
         if jumpkind is not None and excluding_fakeret and jumpkind == "Ijk_FakeRet":
@@ -657,15 +657,14 @@ class CFGModel(Serializable):
                 successors.append(suc)
         return successors
 
-    def get_successors_and_jumpkinds(self, node, excluding_fakeret=True) -> list[tuple[CFGNode, str]]:
+    def get_successors_and_jumpkinds(self, node: CFGNode, excluding_fakeret: bool = True) -> list[tuple[CFGNode, str]]:
         """
         Get a list of tuples where the first element is the successor of the CFG node and the second element is the
         jumpkind of the successor.
 
-        :param CFGNode node:            The node.
-        :param bool excluding_fakeret:  True if you want to exclude all successors that are fall-through successors.
+        :param node:                    The node.
+        :param excluding_fakeret:       True if you want to exclude all successors that are fall-through successors.
         :return:                        A list of successors and their corresponding jumpkinds.
-        :rtype:                         list
         """
 
         successors = []
@@ -696,14 +695,13 @@ class CFGModel(Serializable):
 
     get_predecessors_and_jumpkind = get_predecessors_and_jumpkinds
 
-    def get_all_predecessors(self, cfgnode, depth_limit=None):
+    def get_all_predecessors(self, cfgnode: CFGNode, depth_limit: int | None = None) -> list[CFGNode]:
         """
         Get all predecessors of a specific node on the control flow graph.
 
-        :param CFGNode cfgnode: The CFGNode object
-        :param int depth_limit: Optional depth limit for the depth-first search
+        :param cfgnode: The CFGNode object
+        :param depth_limit: Optional depth limit for the depth-first search
         :return: A list of predecessors in the CFG
-        :rtype: list
         """
         # use the reverse graph and query for successors (networkx.dfs_predecessors is misleading)
         # dfs_successors returns a dict of (node, [predecessors]). We ignore the keyset and use the values
@@ -712,14 +710,13 @@ class CFGModel(Serializable):
         )
         return list(predecessors)
 
-    def get_all_successors(self, cfgnode, depth_limit=None):
+    def get_all_successors(self, cfgnode: CFGNode, depth_limit: int | None = None) -> list[CFGNode]:
         """
         Get all successors of a specific node on the control flow graph.
 
-        :param CFGNode cfgnode: The CFGNode object
-        :param int depth_limit: Optional depth limit for the depth-first search
+        :param cfgnode: The CFGNode object
+        :param depth_limit: Optional depth limit for the depth-first search
         :return: A list of successors in the CFG
-        :rtype: list
         """
         # dfs_successors returns a dict of (node, [predecessors]). We ignore the keyset and use the values
         successors = set().union(*networkx.dfs_successors(self.graph.to_networkx(), cfgnode, depth_limit).values())
@@ -1031,24 +1028,23 @@ class CFGModel(Serializable):
 
     def _guess_data_type(
         self,
-        data_addr,
-        max_size,
+        data_addr: int,
+        max_size: int,
         content_holder=None,
         xrefs: XRefManager | None = None,
         seg_list: SegmentList | None = None,
         data_type_guessing_handlers: list[Callable] | None = None,
         extra_memory_regions: list[tuple[int, int]] | None = None,
-    ):
+    ) -> tuple[str | None, int | None]:
         """
         Make a guess to the data type.
 
         Users can provide their own data type guessing code when initializing CFGFast instance, and each guessing
         handler will be called if this method fails to determine what the data is.
 
-        :param int data_addr: Address of the data.
-        :param int max_size: The maximum size this data entry can be.
+        :param data_addr: Address of the data.
+        :param max_size: The maximum size this data entry can be.
         :return: a tuple of (data type, size). (None, None) if we fail to determine the type or the size.
-        :rtype: tuple
         """
 
         assert self.project is not None and self.project.loader is not None
@@ -1214,14 +1210,13 @@ class CFGModel(Serializable):
 
         return None
 
-    def _guess_data_type_elfheader(self, data_addr, max_size):
+    def _guess_data_type_elfheader(self, data_addr: int, max_size: int) -> tuple[str | None, int | None]:
         """
         Is the specified data chunk an ELF header?
 
-        :param int data_addr:   Address of the data chunk
-        :param int max_size:    Size of the data chunk.
+        :param data_addr:       Address of the data chunk
+        :param max_size:        Size of the data chunk.
         :return:                A tuple of ('elf-header', size) if it is, or (None, None) if it is not.
-        :rtype:                 tuple
         """
 
         assert self.project is not None and self.project.loader is not None

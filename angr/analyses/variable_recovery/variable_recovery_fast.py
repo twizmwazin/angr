@@ -52,6 +52,7 @@ from .variable_recovery_base import VariableRecoveryBase, VariableRecoveryStateB
 
 if TYPE_CHECKING:
     from angr.analyses.typehoon.typevars import TypeConstraint
+    from angr.codenode import CodeNode
 
 l = logging.getLogger(name=__name__)
 
@@ -68,8 +69,8 @@ class VariableRecoveryFastState(VariableRecoveryStateBase):
     """
     The abstract state of variable recovery analysis.
 
-    :ivar KeyedRegion stack_region: The stack store.
-    :ivar KeyedRegion register_region:  The register store.
+    :ivar stack_region: The stack store.
+    :ivar register_region:  The register store.
     """
 
     def __init__(
@@ -517,12 +518,12 @@ class VariableRecoveryFast(ForwardAnalysis, VariableRecoveryBase):  # pylint:dis
         merged_state, merge_occurred = states[0].merge(states[1:], successor=node.addr)
         return merged_state, not merge_occurred
 
-    def _run_on_node(self, node, state):
+    def _run_on_node(self, node: ailment.Block | CodeNode, state: VariableRecoveryFastState):
         """
 
 
-        :param angr.Block node:
-        :param VariableRecoveryState state:
+        :param node:
+        :param state:
         :return:
         """
 
@@ -668,14 +669,14 @@ class VariableRecoveryFast(ForwardAnalysis, VariableRecoveryBase):  # pylint:dis
             i = next_i
         return block
 
-    def _process_block(self, state, block):  # pylint:disable=no-self-use
+    def _process_block(self, state, block: Block | ailment.Block):  # pylint:disable=no-self-use
         """
         Scan through all statements and perform the following tasks:
         - Find stack pointers and the VEX temporary variable storing stack pointers
         - Selectively calculate VEX statements
         - Track memory loading and mark stack and global variables accordingly
 
-        :param angr.Block block:
+        :param block:
         :return:
         """
 

@@ -25,7 +25,7 @@ class KnowledgeBaseSerializer:
         """
 
         :param session:             The database session object.
-        :param KnowledgeBase kb:    The KnowledgeBase instance to serialize.
+        :param kb:                  The KnowledgeBase instance to serialize.
         :return:                    None
         """
 

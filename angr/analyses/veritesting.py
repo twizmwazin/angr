@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from functools import cmp_to_key
+from typing import TYPE_CHECKING
 
 import networkx
 
@@ -16,6 +17,11 @@ from angr.procedures import SIM_PROCEDURES
 from angr.sim_manager import SimulationManager
 from angr.sim_options import BYPASS_VERITESTING_EXCEPTIONS
 from angr.utils.graph import shallow_reverse
+
+if TYPE_CHECKING:
+    from angr.engines.successors import SimSuccessors
+    from angr.knowledge_plugins.cfg import CFGENode
+    from angr.sim_state import SimState
 
 l = logging.getLogger(name=__name__)
 
@@ -269,7 +275,7 @@ class Veritesting(Analysis):
 
         return True, new_manager
 
-    def _execute_and_merge(self, state):
+    def _execute_and_merge(self, state: SimState):
         """
         Symbolically execute the program in a static manner. The basic idea is that we look ahead by creating a CFG,
         then perform a _controlled symbolic exploration_ based on the CFG, one path at a time. The controlled symbolic
@@ -279,7 +285,7 @@ class Veritesting(Analysis):
         A basic block will not be executed for more than *loop_unrolling_limit* times. If that is the case, a new state
         will be returned.
 
-        :param SimState state: The initial state to start the execution.
+        :param state: The initial state to start the execution.
         :returns:         A list of new states.
         """
 
@@ -438,12 +444,12 @@ class Veritesting(Analysis):
     # Path management
     #
 
-    def is_not_in_cfg(self, s):
+    def is_not_in_cfg(self, s: SimState) -> bool:
         """
         Returns if s.addr is not a proper node in our CFG.
 
-        :param SimState s: The SimState instance to test.
-        :returns bool: False if our CFG contains p.addr, True otherwise.
+        :param s: The SimState instance to test.
+        :returns: False if our CFG contains p.addr, True otherwise.
         """
 
         n = self._cfg.model.get_any_node(s.addr, is_syscall=s.history.jumpkind.startswith("Ijk_Sys"))
@@ -452,23 +458,23 @@ class Veritesting(Analysis):
 
         return n.simprocedure_name == "PathTerminator"
 
-    def _get_successors(self, state):
+    def _get_successors(self, state: SimState) -> SimSuccessors:
         """
         Gets the successors to the current state by step, saves copy of state and finally stashes new unconstrained
         states to manager.
 
-        :param SimState state:          Current state to step on from
-        :returns SimSuccessors:         The SimSuccessors object
+        :param state:                   Current state to step on from
+        :returns:                       The SimSuccessors object
         """
         size_of_next_irsb = self._cfg.model.get_any_node(state.addr).size
         return self.project.factory.successors(state, size=size_of_next_irsb)
 
-    def is_overbound(self, state):
+    def is_overbound(self, state: SimState) -> bool:
         """
         Filter out all states that run out of boundaries or loop too many times.
 
-        param SimState state: SimState instance to check
-        returns bool:    True if outside of mem/loop_ctr boundary
+        :param state: SimState instance to check
+        :returns:     True if outside of mem/loop_ctr boundary
         """
 
         ip = state.addr
@@ -500,12 +506,12 @@ class Veritesting(Analysis):
         return False
 
     @staticmethod
-    def _unfuck(s):
+    def _unfuck(s: SimState) -> SimState:
         """
         Deletes the loop counter from state's information dictionary
 
-        :param SimState s: SimState instance to update
-        :returns SimState: same SimState with deleted loop counter
+        :param s: SimState instance to update
+        :returns: same SimState with deleted loop counter
         """
         del s.globals["loop_ctrs"]
         return s
@@ -566,14 +572,14 @@ class Veritesting(Analysis):
         return cfg, cfg_graph_with_loops
 
     @staticmethod
-    def _post_dominate(reversed_graph, n1, n2):
+    def _post_dominate(reversed_graph: networkx.DiGraph, n1: CFGENode, n2: CFGENode) -> bool:
         """
         Checks whether `n1` post-dominates `n2` in the *original* (not reversed) graph.
 
-        :param networkx.DiGraph reversed_graph:  The reversed networkx.DiGraph instance.
-        :param networkx.Node n1:                 Node 1.
-        :param networkx.Node n2:                 Node 2.
-        :returns bool:                           True/False.
+        :param reversed_graph:  The reversed networkx.DiGraph instance.
+        :param n1:              Node 1.
+        :param n2:              Node 2.
+        :returns:               True/False.
         """
 
         ds = networkx.immediate_dominators(reversed_graph, n1)

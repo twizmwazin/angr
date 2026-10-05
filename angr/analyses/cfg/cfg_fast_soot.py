@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from copy import copy
+from typing import TYPE_CHECKING
 
 from archinfo.arch_soot import SootAddressDescriptor, SootMethodDescriptor
 from sortedcontainers import SortedDict
@@ -14,6 +15,9 @@ from angr.knowledge_plugins.cfg import CFGNode
 from angr.utils.constants import DEFAULT_STATEMENT
 
 from .cfg_fast import CFGFast, CFGJob, FunctionTransitionEdge, PendingJobs
+
+if TYPE_CHECKING:
+    from pysoot.sootir.soot_block import SootBlock
 
 l = logging.getLogger(name=__name__)
 
@@ -382,13 +386,12 @@ class CFGFastSoot(CFGFast):
 
         return stmts_count
 
-    def _scan_block(self, cfg_job) -> list[CFGJob]:
+    def _scan_block(self, cfg_job: CFGJob) -> list[CFGJob]:
         """
         Scan a basic block starting at a specific address
 
-        :param CFGJob cfg_job: The CFGJob instance.
+        :param cfg_job: The CFGJob instance.
         :return: a list of successors
-        :rtype: list
         """
 
         addr = cfg_job.addr
@@ -402,15 +405,14 @@ class CFGFastSoot(CFGFast):
 
         return entries
 
-    def _scan_soot_block(self, cfg_job, current_func_addr):
+    def _scan_soot_block(self, cfg_job: CFGJob, current_func_addr: SootMethodDescriptor) -> list[CFGJob]:
         """
         Generate a list of successors (generating them each as entries) to IRSB.
         Updates previous CFG nodes with edges.
 
-        :param CFGJob cfg_job: The CFGJob instance.
-        :param int current_func_addr: Address of the current function
+        :param cfg_job: The CFGJob instance.
+        :param current_func_addr: Address of the current function
         :return: a list of successors
-        :rtype: list
         """
 
         addr, function_addr, cfg_node, soot_block = self._generate_cfgnode(cfg_job, current_func_addr)
@@ -452,21 +454,30 @@ class CFGFastSoot(CFGFast):
 
         return entries
 
-    def _create_jobs(self, target, jumpkind, current_function_addr, soot_block, addr, cfg_node, stmt_addr, stmt_idx):  # pylint:disable=arguments-differ
+    def _create_jobs(  # pylint:disable=arguments-differ
+        self,
+        target: SootAddressDescriptor | None,
+        jumpkind: str,
+        current_function_addr: SootMethodDescriptor,
+        soot_block: SootBlock,
+        addr: SootAddressDescriptor,
+        cfg_node: CFGNode,
+        stmt_addr: SootAddressDescriptor,
+        stmt_idx: int,
+    ) -> list[CFGJob]:
         """
         Given a node and details of a successor, makes a list of CFGJobs
         and if it is a call or exit marks it appropriately so in the CFG
 
-        :param int target:          Destination of the resultant job
-        :param str jumpkind:        The jumpkind of the edge going to this node
-        :param int current_function_addr: Address of the current function
-        :param pyvex.IRSB irsb:     IRSB of the predecessor node
-        :param int addr:            The predecessor address
-        :param CFGNode cfg_node:    The CFGNode of the predecessor node
-        :param int ins_addr:        Address of the source instruction.
-        :param int stmt_addr:       ID of the source statement.
-        :return:                    a list of CFGJobs
-        :rtype:                     list
+        :param target:          Destination of the resultant job
+        :param jumpkind:        The jumpkind of the edge going to this node
+        :param current_function_addr: Address of the current function
+        :param soot_block:      Soot block of the predecessor node
+        :param addr:            The predecessor address
+        :param cfg_node:        The CFGNode of the predecessor node
+        :param stmt_addr:       Address of the source statement.
+        :param stmt_idx:        ID of the source statement.
+        :return:                a list of CFGJobs
         """
 
         target_addr = target

@@ -302,12 +302,11 @@ class SimSystemPosix(SimStatePlugin):
                 return fd
         raise SimPosixError("exhausted file descriptors")
 
-    def open(self, name, flags, preferred_fd=None):
+    def open(self, name: str | bytes, flags, preferred_fd=None):
         """
         Open a symbolic file. Basically open(2).
 
         :param name:            Path of the symbolic file, as a string or bytes.
-        :type name:             string or bytes
         :param flags:           File operation flags, a bitfield of constants from open(2), as an AST
         :param preferred_fd:    Assign this fd if it's not already claimed.
         :return:                The file descriptor number allocated (maps through posix.get_fd to a SimFileDescriptor)
@@ -671,7 +670,7 @@ class SimSystemPosix(SimStatePlugin):
             return None
         return file.concretize(**kwargs)
 
-    def dumps(self, fd, **kwargs):
+    def dumps(self, fd, **kwargs) -> bytes | list[bytes] | tuple:
         """
         Returns the concrete content for a file descriptor.
 
@@ -680,7 +679,6 @@ class SimSystemPosix(SimStatePlugin):
 
         :param fd:  A file descriptor.
         :return:    The concrete content.
-        :rtype:     str
         """
         if 0 <= fd <= 2:
             data = [self.stdin, self.stdout, self.stderr][fd].concretize(**kwargs)

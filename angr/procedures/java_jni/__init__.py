@@ -143,11 +143,11 @@ class JNISimProcedure(SimProcedure):
 
         return "".join(chars)
 
-    def _store_string_in_native_memory(self, string, addr=None):
+    def _store_string_in_native_memory(self, string: claripy.ast.String, addr=None):
         """
         Store given string UTF-8 encoded and zero terminated in native memory.
 
-        :param str string:  String
+        :param string:      String
         :param addr:        Native store address.
                             If not set, native memory is allocated.
         :return:            Native address of the string.

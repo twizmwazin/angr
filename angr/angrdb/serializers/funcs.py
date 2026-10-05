@@ -30,8 +30,8 @@ class FunctionManagerSerializer:
         """
 
         :param session:
-        :param DbKnowledgeBase db_kb:
-        :param FunctionManager func_manager:
+        :param db_kb:
+        :param func_manager:
         :return:
         """
 
@@ -68,8 +68,8 @@ class FunctionManagerSerializer:
         """
 
         :param session:
-        :param DbKnowledgeBase db_kb:
-        :param KnowledgeBase kb:
+        :param db_kb:
+        :param kb:
         :param callgraph:               A deserialized callgraph (if the database stores one). When provided, it is
                                         used directly and the (much slower) callgraph rebuilding logic is skipped.
         :param cfg_model:               An optional CFG model. When provided, the function_address member of all CFG

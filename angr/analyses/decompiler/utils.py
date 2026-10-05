@@ -147,13 +147,12 @@ def replace_last_statement(node, old_stmt, new_stmt):
     raise NotImplementedError(type(node))
 
 
-def extract_jump_targets(stmt):
+def extract_jump_targets(stmt) -> list:
     """
     Extract concrete goto targets from a Jump or a ConditionalJump statement.
 
     :param stmt:    The statement to analyze.
     :return:        A list of known concrete jump targets.
-    :rtype:         list
     """
 
     targets = []

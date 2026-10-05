@@ -6,14 +6,16 @@ Some utilitary functions to manage our representation of transitions:
 from __future__ import annotations
 
 
-def merge_transitions(transitions, existing_transitions):
+def merge_transitions(
+    transitions: dict[int, list[int]], existing_transitions: dict[int, list[int]]
+) -> dict[int, list[int]]:
     """
     Merge two dictionaries of transitions together.
 
-    :param Dict[int,List[int]] transitions:          Some transitions.
-    :param Dict[int,List[int]] existing_transitions: Other transitions.
+    :param transitions:          Some transitions.
+    :param existing_transitions: Other transitions.
 
-    :return Dict[int,List[int]]: The merge of the two parameters.
+    :return: The merge of the two parameters.
     """
 
     def _add_to_existing(address, values):

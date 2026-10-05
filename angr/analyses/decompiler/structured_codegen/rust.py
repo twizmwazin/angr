@@ -1412,7 +1412,7 @@ class RustFunctionCall(RustStatement, RustExpression):
     """
     func(arg0, arg1)
 
-    :ivar Function callee_func:  The function getting called.
+    :ivar callee_func:  The function getting called.
     :ivar is_expr:  True if the return value of the function is written to ret_expr; Essentially, ret_expr = call().
     """
 
@@ -3716,10 +3716,10 @@ class RustStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis):
 
         return RustStatements(lines, codegen=self) if len(lines) > 1 else lines[0]
 
-    def _handle_SwitchCase(self, node, **kwargs):
+    def _handle_SwitchCase(self, node: SwitchCaseNode, **kwargs):
         """
 
-        :param SwitchCaseNode node:
+        :param node:
         :return:
         """
 
@@ -3779,10 +3779,10 @@ class RustStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis):
 
         return RustContinue(tags=tags, codegen=self)
 
-    def _handle_AILBlock(self, node, **kwargs):
+    def _handle_AILBlock(self, node: Block, **kwargs):
         """
 
-        :param Block node:
+        :param node:
         :return:
         """
 

@@ -1,8 +1,14 @@
 # pylint:disable=unused-import
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from angr.angrdb.models import DbLabel
 from angr.knowledge_plugins.labels import Labels
+
+if TYPE_CHECKING:
+    from angr.angrdb.models import DbKnowledgeBase
+    from angr.knowledge_base import KnowledgeBase
 
 
 class LabelsSerializer:
@@ -11,13 +17,13 @@ class LabelsSerializer:
     """
 
     @staticmethod
-    def dump(session, db_kb, labels):
+    def dump(session, db_kb: DbKnowledgeBase, labels: Labels):
         """
 
         :param session:
-        :param DbKnowledgeBase db_kb:
-        :param Labels labels:
-        :return:                        None
+        :param db_kb:
+        :param labels:
+        :return:        None
         """
 
         for addr, name in labels.items():
@@ -42,12 +48,12 @@ class LabelsSerializer:
                 session.add(db_label)
 
     @staticmethod
-    def load(session, db_kb, kb):  # pylint:disable=unused-argument
+    def load(session, db_kb: DbKnowledgeBase, kb: KnowledgeBase):  # pylint:disable=unused-argument
         """
 
         :param session:
-        :param DbKnowledgeBase db_kb:
-        :param KnowledgeBase kb:
+        :param db_kb:
+        :param kb:
         :return:
         """
 

@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from angr.angrdb.models import DbBookmark
 from angr.knowledge_plugins.bookmarks import Bookmark, Bookmarks
+
+if TYPE_CHECKING:
+    from angr.angrdb.models import DbKnowledgeBase
+    from angr.knowledge_base import KnowledgeBase
 
 
 class BookmarksSerializer:
@@ -10,12 +16,12 @@ class BookmarksSerializer:
     """
 
     @staticmethod
-    def dump(session, db_kb, bookmarks):
+    def dump(session, db_kb: DbKnowledgeBase, bookmarks: Bookmarks):
         """
 
         :param session:
-        :param DbKnowledgeBase db_kb:
-        :param Bookmarks bookmarks:
+        :param db_kb:
+        :param bookmarks:
         :return:                        None
         """
 
@@ -33,12 +39,12 @@ class BookmarksSerializer:
             )
 
     @staticmethod
-    def load(session, db_kb, kb):  # pylint:disable=unused-argument
+    def load(session, db_kb: DbKnowledgeBase, kb: KnowledgeBase):  # pylint:disable=unused-argument
         """
 
         :param session:
-        :param DbKnowledgeBase db_kb:
-        :param KnowledgeBase kb:
+        :param db_kb:
+        :param kb:
         :return:
         """
 

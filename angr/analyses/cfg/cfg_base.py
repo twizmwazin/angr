@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import TYPE_CHECKING, Any, Literal, overload
 
 import archinfo
@@ -54,9 +54,15 @@ from angr.utils.vex import block_branch_ins_addr, block_is_single_instruction
 from .indirect_jump_resolvers.default_resolvers import default_indirect_jump_resolvers
 
 if TYPE_CHECKING:
+    from cle.backends import Backend
+
+    from angr.codenode import CodeNode
     from angr.knowledge_plugins.cfg.spilling_cfg import SpillingCFG
     from angr.knowledge_plugins.cfg.types import K
+    from angr.knowledge_plugins.functions import Function
     from angr.sim_state import SimState
+
+    from .indirect_jump_resolvers.resolver import IndirectJumpResolver
 
     AddressType = int | SootAddressDescriptor
     MethodType = int | SootMethodDescriptor
@@ -82,53 +88,53 @@ class CFGBase(Analysis):
 
     def __init__(
         self,
-        sort,
-        context_sensitivity_level,
-        normalize=False,
-        binary=None,
+        sort: str,
+        context_sensitivity_level: int,
+        normalize: bool = False,
+        binary: Backend | None = None,
         objects=None,
-        regions=None,
+        regions: Iterable[tuple[int, int]] | None = None,
         exclude_sparse_regions=True,
         skip_specific_regions=True,
-        force_segment=False,
-        base_state=None,
-        resolve_indirect_jumps=True,
-        indirect_jump_resolvers=None,
-        indirect_jump_target_limit=100000,
-        detect_tail_calls=False,
+        force_segment: bool = False,
+        base_state: SimState | None = None,
+        resolve_indirect_jumps: bool = True,
+        indirect_jump_resolvers: list[IndirectJumpResolver] | None = None,
+        indirect_jump_target_limit: int = 100000,
+        detect_tail_calls: bool = False,
         low_priority=False,
         skip_unmapped_addrs=True,
-        sp_tracking_track_memory=True,
-        model=None,
+        sp_tracking_track_memory: bool = True,
+        model: CFGModel | None = None,
     ):
         """
-        :param str sort:                            'fast' or 'emulated'.
-        :param int context_sensitivity_level:       The level of context-sensitivity of this CFG (see documentation for
+        :param sort:                                'fast' or 'emulated'.
+        :param context_sensitivity_level:           The level of context-sensitivity of this CFG (see documentation for
                                                     further details). It ranges from 0 to infinity.
-        :param bool normalize:                      Whether the CFG as well as all Function graphs should be normalized.
-        :param cle.backends.Backend binary:         The binary to recover CFG on. By default, the main binary is used.
+        :param normalize:                           Whether the CFG as well as all Function graphs should be normalized.
+        :param binary:                              The binary to recover CFG on. By default, the main binary is used.
         :param objects:                             A list of objects to recover the CFG on. By default, it will recover
                                                     the CFG of all loaded objects.
-        :param iterable regions:                    A list of tuples in the form of (start address, end address)
+        :param regions:                             A list of tuples in the form of (start address, end address)
                                                     describing memory regions that the CFG should cover.
-        :param bool force_segment:                  Force CFGFast to rely on binary segments instead of sections.
-        :param angr.SimState base_state:            A state to use as a backer for all memory loads.
-        :param bool resolve_indirect_jumps:         Whether to try to resolve indirect jumps.
+        :param force_segment:                       Force CFGFast to rely on binary segments instead of sections.
+        :param base_state:                          A state to use as a backer for all memory loads.
+        :param resolve_indirect_jumps:              Whether to try to resolve indirect jumps.
                                                     This is necessary to resolve jump targets from jump tables, etc.
-        :param list indirect_jump_resolvers:        A custom list of indirect jump resolvers.
+        :param indirect_jump_resolvers:             A custom list of indirect jump resolvers.
                                                     If this list is None or empty, default indirect jump resolvers
                                                     specific to this architecture and binary types will be loaded.
-        :param int indirect_jump_target_limit:      Maximum indirect jump targets to be recovered.
+        :param indirect_jump_target_limit:          Maximum indirect jump targets to be recovered.
         :param skip_unmapped_addrs:                 Ignore all branches into unmapped regions. True by default. You may
                                                     want to set it to False if you are analyzing manually patched
                                                     binaries or malware samples.
-        :param bool detect_tail_calls:              Aggressive tail-call optimization detection. This option is only
+        :param detect_tail_calls:                   Aggressive tail-call optimization detection. This option is only
                                                     respected in make_functions().
-        :param bool sp_tracking_track_memory:       Whether or not to track memory writes if tracking the stack pointer.
+        :param sp_tracking_track_memory:            Whether or not to track memory writes if tracking the stack pointer.
                                                     This increases the accuracy of stack pointer tracking,
                                                     especially for architectures without a base pointer.
                                                     Only used if detect_tail_calls is enabled.
-        :param None or CFGModel model:              The CFGModel instance to write to. A new CFGModel instance will be
+        :param model:                               The CFGModel instance to write to. A new CFGModel instance will be
                                                     created and registered with the knowledge base if `model` is None.
 
         :return: None
@@ -340,12 +346,11 @@ class CFGBase(Analysis):
         return self._context_sensitivity_level
 
     @property
-    def functions(self):
+    def functions(self) -> FunctionManager:
         """
         A reference to the FunctionManager in the current knowledge base.
 
         :return: FunctionManager with all functions
-        :rtype: angr.knowledge_plugins.FunctionManager
         """
         return self.kb.functions
 
@@ -387,11 +392,11 @@ class CFGBase(Analysis):
         # drop all propagation results that start with "cfg_intermediate"
         self.kb.propagations.discard_by_prefix("cfg_intermediate")
 
-    def make_copy(self, copy_to):
+    def make_copy(self, copy_to: CFGBase):
         """
         Copy self attributes to the new object.
 
-        :param CFGBase copy_to: The target to copy to.
+        :param copy_to: The target to copy to.
         :return: None
         """
 
@@ -438,12 +443,12 @@ class CFGBase(Analysis):
 
         self.graph.remove_edge(block_from, block_to)
 
-    def _merge_cfgnodes(self, cfgnode_0, cfgnode_1):
+    def _merge_cfgnodes(self, cfgnode_0: CFGNode, cfgnode_1: CFGNode):
         """
         Merge two adjacent CFGNodes into one.
 
-        :param CFGNode cfgnode_0:   The first CFGNode.
-        :param CFGNode cfgnode_1:   The second CFGNode.
+        :param cfgnode_0:           The first CFGNode.
+        :param cfgnode_1:           The second CFGNode.
         :return:                    None
         """
 
@@ -470,18 +475,23 @@ class CFGBase(Analysis):
         self._model.add_node(new_node.block_id, new_node)
 
     def _to_snippet(
-        self, cfg_node: CFGNode | None = None, addr=None, size=None, thumb=False, jumpkind=None, base_state=None
-    ):
+        self,
+        cfg_node: CFGNode | None = None,
+        addr: int | None = None,
+        size=None,
+        thumb: bool = False,
+        jumpkind: str | None = None,
+        base_state: SimState | None = None,
+    ) -> CodeNode:
         """
         Convert a CFGNode instance to a CodeNode object.
 
-        :param angr.analyses.CFGNode cfg_node: The CFGNode instance.
-        :param int addr: Address of the node. Only used when `cfg_node` is None.
-        :param bool thumb: Whether this is in THUMB mode or not. Only used for ARM code and when `cfg_node` is None.
-        :param str or None jumpkind: Jumpkind of this node.
-        :param SimState or None base_state: The state where BlockNode should be created from.
+        :param cfg_node: The CFGNode instance.
+        :param addr: Address of the node. Only used when `cfg_node` is None.
+        :param thumb: Whether this is in THUMB mode or not. Only used for ARM code and when `cfg_node` is None.
+        :param jumpkind: Jumpkind of this node.
+        :param base_state: The state where BlockNode should be created from.
         :return: A converted CodeNode instance.
-        :rtype: CodeNode
         """
 
         if cfg_node is not None:
@@ -511,17 +521,23 @@ class CFGBase(Analysis):
     def is_thumb_addr(self, addr):
         return addr in self._thumb_addrs
 
-    def _arm_thumb_filter_jump_successors(self, irsb, successors, get_ins_addr, get_exit_stmt_idx, get_jumpkind):
+    def _arm_thumb_filter_jump_successors(
+        self,
+        irsb,
+        successors: list,
+        get_ins_addr: Callable,
+        get_exit_stmt_idx: Callable,
+        get_jumpkind: Callable,
+    ) -> list:
         """
         Filter successors for THUMB mode basic blocks, and remove those successors that won't be taken normally.
 
         :param irsb:            The IRSB object.
-        :param list successors: A list of successors.
-        :param func get_ins_addr: A callable that returns the source instruction address for a successor.
-        :param func get_exit_stmt_idx: A callable that returns the source statement ID for a successor.
-        :param func get_jumpkind:      A callable that returns the jumpkind of a successor.
+        :param successors: A list of successors.
+        :param get_ins_addr: A callable that returns the source instruction address for a successor.
+        :param get_exit_stmt_idx: A callable that returns the source statement ID for a successor.
+        :param get_jumpkind:      A callable that returns the jumpkind of a successor.
         :return: A new list of successors after filtering.
-        :rtype: list
         """
 
         if not successors:
@@ -637,7 +653,7 @@ class CFGBase(Analysis):
         """
         Check if the address is inside any existing region.
 
-        :param int address: Address to check.
+        :param address:     Address to check.
         :return:            True if the address is within one of the memory regions, False otherwise.
         """
 
@@ -652,7 +668,7 @@ class CFGBase(Analysis):
         """
         Check if the address is inside any existing region, and return the end of that region.
 
-        :param int address: Address to check.
+        :param address:     Address to check.
         :return:            A tuple (True, region_end) if the address is within one of the memory regions, where
                             region_end is the end of that memory region; (False, None) otherwise.
         """
@@ -748,14 +764,13 @@ class CFGBase(Analysis):
 
         return True
 
-    def _should_skip_region(self, region_start):
+    def _should_skip_region(self, region_start: int) -> bool:
         """
         Some regions usually do not contain any executable code, but are still marked as executable. We should skip
         those regions by default.
 
-        :param int region_start: Address of the beginning of the region.
+        :param region_start:     Address of the beginning of the region.
         :return:                 True/False
-        :rtype:                  bool
         """
 
         obj = self.project.loader.find_object_containing(region_start, membership_check=False)
@@ -770,13 +785,13 @@ class CFGBase(Analysis):
 
         return False
 
-    def _executable_memory_regions(self, objects=None, force_segment=False):
+    def _executable_memory_regions(self, objects=None, force_segment: bool = False):
         """
         Get all executable memory regions from the binaries
 
         :param objects: A collection of binary objects to collect regions from. If None, regions from all project
                         binary objects are used.
-        :param bool force_segment: Rely on binary segments instead of sections.
+        :param force_segment: Rely on binary segments instead of sections.
         :return: A sorted list of tuples (beginning_address, end_address)
         """
 
@@ -907,26 +922,24 @@ class CFGBase(Analysis):
 
         return sorted(memory_regions, key=lambda x: x[0])
 
-    def _addr_in_exec_memory_regions(self, addr):
+    def _addr_in_exec_memory_regions(self, addr: int) -> bool:
         """
         Test if the address belongs to an executable memory region.
 
-        :param int addr: The address to test
+        :param addr: The address to test
         :return: True if the address belongs to an exectubale memory region, False otherwise
-        :rtype: bool
         """
 
         return any(start <= addr < end for start, end in self._exec_mem_regions)
 
-    def _addrs_belong_to_same_section(self, addr_a, addr_b):
+    def _addrs_belong_to_same_section(self, addr_a: int, addr_b: int) -> bool:
         """
         Test if two addresses belong to the same section.
 
-        :param int addr_a:  The first address to test.
-        :param int addr_b:  The second address to test.
+        :param addr_a:      The first address to test.
+        :param addr_b:      The second address to test.
         :return:            True if the two addresses belong to the same section or both of them do not belong to any
                             section, False otherwise.
-        :rtype:             bool
         """
 
         obj = self.project.loader.find_object_containing(addr_a, membership_check=False)
@@ -946,15 +959,14 @@ class CFGBase(Analysis):
 
         return src_section.contains_addr(addr_b)
 
-    def _addrs_belong_to_same_segment(self, addr_a, addr_b):
+    def _addrs_belong_to_same_segment(self, addr_a: int, addr_b: int) -> bool:
         """
         Test if two addresses belong to the same segment.
 
-        :param int addr_a:  The first address to test.
-        :param int addr_b:  The second address to test.
+        :param addr_a:      The first address to test.
+        :param addr_b:      The second address to test.
         :return:            True if the two addresses belong to the same segment or both of them do not belong to any
                             section, False otherwise.
-        :rtype:             bool
         """
 
         obj = self.project.loader.find_object_containing(addr_a, membership_check=False)
@@ -972,11 +984,11 @@ class CFGBase(Analysis):
 
         return src_segment.contains_addr(addr_b)
 
-    def _object_has_executable_sections(self, obj):
+    def _object_has_executable_sections(self, obj: Backend):
         """
         Check whether an object has at least one executable section.
 
-        :param cle.Backend obj: The object to test.
+        :param obj:             The object to test.
         :return:                None
         """
 
@@ -986,11 +998,11 @@ class CFGBase(Analysis):
         self._object_to_executable_sections[obj] = r
         return r
 
-    def _object_has_executable_segments(self, obj):
+    def _object_has_executable_segments(self, obj: Backend):
         """
         Check whether an object has at least one executable segment.
 
-        :param cle.Backend obj: The object to test.
+        :param obj:             The object to test.
         :return:                None
         """
 
@@ -1000,24 +1012,22 @@ class CFGBase(Analysis):
         self._object_to_executable_segments[obj] = r
         return r
 
-    def _addr_hooked_or_syscall(self, addr):
+    def _addr_hooked_or_syscall(self, addr: int) -> bool:
         """
         Check whether the address belongs to a hook or a syscall.
 
-        :param int addr:    The address to check.
+        :param addr:        The address to check.
         :return:            True if the address is hooked or belongs to a syscall. False otherwise.
-        :rtype:             bool
         """
 
         return self.project.is_hooked(addr) or self.project.simos.is_syscall_addr(addr)
 
-    def _fast_memory_load_byte(self, addr):
+    def _fast_memory_load_byte(self, addr: int) -> int | None:
         """
         Perform a fast memory loading of a byte.
 
-        :param int addr: Address to read from.
+        :param addr:     Address to read from.
         :return:         A char or None if the address does not exist.
-        :rtype:          int or None
         """
 
         try:
@@ -1025,14 +1035,13 @@ class CFGBase(Analysis):
         except KeyError:
             return None
 
-    def _fast_memory_load_bytes(self, addr, length):
+    def _fast_memory_load_bytes(self, addr: int, length: int) -> bytes | None:
         """
         Perform a fast memory loading of some data.
 
-        :param int addr: Address to read from.
-        :param int length: Size of the string to load.
+        :param addr: Address to read from.
+        :param length: Size of the string to load.
         :return:         A string or None if the address does not exist.
-        :rtype:          bytes or None
         """
 
         try:
@@ -1040,14 +1049,13 @@ class CFGBase(Analysis):
         except KeyError:
             return None
 
-    def _fast_memory_load_pointer(self, addr, size=None) -> int | None:
+    def _fast_memory_load_pointer(self, addr: int, size: int | None = None) -> int | None:
         """
         Perform a fast memory loading of a pointer.
 
-        :param int addr: Address to read from.
-        :param int size: Size of the pointer. Default to machine-word size.
+        :param addr:     Address to read from.
+        :param size:     Size of the pointer. Default to machine-word size.
         :return:         A pointer or None if the address does not exist.
-        :rtype:          int
         """
 
         try:
@@ -1055,22 +1063,20 @@ class CFGBase(Analysis):
         except KeyError:
             return None
 
-    def _load_func_addrs_from_symbols(self):
+    def _load_func_addrs_from_symbols(self) -> set[int]:
         """
         Get all possible function addresses that are specified by the symbols in the binary
 
         :return: A set of addresses that are probably functions
-        :rtype:  set
         """
 
         return {sym.rebased_addr for sym in self._binary.symbols if sym.is_function}
 
-    def _load_func_addrs_from_eh_frame(self):
+    def _load_func_addrs_from_eh_frame(self) -> set[int]:
         """
         Get possible function addresses from  .eh_frame.
 
         :return:    A set of addresses that are probably functions.
-        :rtype:     set
         """
 
         addrs = set()
@@ -1097,7 +1103,7 @@ class CFGBase(Analysis):
     # Analyze function features
     #
 
-    def _determine_function_returning(self, func, all_funcs_completed=False):
+    def _determine_function_returning(self, func: Function, all_funcs_completed: bool = False) -> bool | None:
         """
         Determine if a function returns or not.
 
@@ -1109,11 +1115,10 @@ class CFGBase(Analysis):
 
         A function returns if any of its block contains a ret instruction or any equivalence.
 
-        :param Function func:   The function to work on.
-        :param bool all_funcs_completed:    Whether we treat all functions as completed functions or not.
+        :param func:            The function to work on.
+        :param all_funcs_completed:         Whether we treat all functions as completed functions or not.
         :return:                True if the function returns, False if the function does not return, or None if it is
                                 not yet determinable with the information available at the moment.
-        :rtype:                 bool or None
         """
 
         if not self._inside_regions(func.addr):
@@ -1207,14 +1212,14 @@ class CFGBase(Analysis):
         # well this function does not return then
         return False
 
-    def _analyze_function_features(self, all_funcs_completed=False):
+    def _analyze_function_features(self, all_funcs_completed: bool = False):
         """
         For each function in the function_manager, try to determine if it returns or not. A function does not return if
         it calls another function that is known to be not returning, and this function does not have other exits.
 
         We might as well analyze other features of functions in the future.
 
-        :param bool all_funcs_completed:    Ignore _completed_functions set and treat all functions as completed. This
+        :param all_funcs_completed:         Ignore _completed_functions set and treat all functions as completed. This
                                             can be set to True after the entire CFG is built and _post_analysis() is
                                             called (at which point analysis on all functions must be completed).
         """
@@ -1575,12 +1580,12 @@ class CFGBase(Analysis):
     # Job management
     #
 
-    def _register_analysis_job(self, func_addr, job):
+    def _register_analysis_job(self, func_addr: int | SootMethodDescriptor, job):
         """
         Register an analysis job of a function to job manager. This allows us to track whether we have finished
         analyzing/recovering a function or not.
 
-        :param int func_addr: Address of the function that this job belongs to.
+        :param func_addr:     Address of the function that this job belongs to.
         :param job:           The job to register. Note that it does not necessarily be the a CFGJob instance. There
                               can be PendingJob or PendingJob or other instances, too.
         :return:              None
@@ -1591,11 +1596,11 @@ class CFGBase(Analysis):
             self._functions_without_jobs.pop(func_addr, None)
         jobs.add(job)
 
-    def _deregister_analysis_job(self, func_addr, job):
+    def _deregister_analysis_job(self, func_addr: int | SootMethodDescriptor, job):
         """
         Deregister/Remove an analysis job of a function from job manager.
 
-        :param int func_addr: Address of the function that this job belongs to.
+        :param func_addr:     Address of the function that this job belongs to.
         :param job:           The job to deregister.
         :return:              None
         """
@@ -1616,11 +1621,11 @@ class CFGBase(Analysis):
 
         return list(self._functions_without_jobs)
 
-    def _cleanup_analysis_jobs(self, finished_func_addrs=None):
+    def _cleanup_analysis_jobs(self, finished_func_addrs: list[int | SootMethodDescriptor] | None = None):
         """
         From job manager, remove all functions of which we have finished analysis.
 
-        :param list or None finished_func_addrs: A list of addresses of functions of which we have finished analysis.
+        :param finished_func_addrs:              A list of addresses of functions of which we have finished analysis.
                                                  A new list of function addresses will be obtained by calling
                                                  _get_finished_functions() if this parameter is None.
         :return:                                 None
@@ -1966,7 +1971,9 @@ class CFGBase(Analysis):
 
         return to_remove
 
-    def _process_irrational_functions(self, functions, predetermined_function_addrs, blockaddr_to_funcaddr):
+    def _process_irrational_functions(
+        self, functions: FunctionManager, predetermined_function_addrs, blockaddr_to_funcaddr: dict
+    ) -> set:
         """
         When force_complete_scan is enabled, for unresolveable indirect jumps, angr will find jump targets and mark
         them as individual functions. For example, usually the following pattern is seen:
@@ -1991,11 +1998,10 @@ class CFGBase(Analysis):
         In the example above, `process_irrational_functions` will remove function 0x400080, and merge it with function
         0x400010.
 
-        :param angr.knowledge_plugins.FunctionManager functions: all functions that angr recovers, including those ones
+        :param functions: all functions that angr recovers, including those ones
             that are misidentified as functions.
-        :param dict blockaddr_to_funcaddr: A mapping between block addresses and their function addresses.
+        :param blockaddr_to_funcaddr: A mapping between block addresses and their function addresses.
         :return: A set of addresses of all removed functions
-        :rtype: set
         """
 
         functions_to_remove = {}
@@ -2128,8 +2134,11 @@ class CFGBase(Analysis):
         return set(functions_to_remove.keys())
 
     def _process_irrational_function_starts(
-        self, functions, predetermined_function_addrs, blockaddr_to_funcaddr: dict[AddressType, MethodType]
-    ):
+        self,
+        functions: FunctionManager,
+        predetermined_function_addrs,
+        blockaddr_to_funcaddr: dict[AddressType, MethodType],
+    ) -> set:
         """
         Functions that are identified via function prologues can be starting after the actual beginning of the function.
         For example, the following function (with an incorrect start) might exist after a CFG recovery:
@@ -2147,9 +2156,8 @@ class CFGBase(Analysis):
         - The first function has only one non-empty jumpout site (e.g., the first function contains more than just nops
           and jumps), which points to the second function.
 
-        :param FunctionManager functions:   All functions that angr recovers.
+        :param functions:                   All functions that angr recovers.
         :return:                            A set of addresses of all removed functions.
-        :rtype:                             set
         """
 
         addrs = sorted(
@@ -2410,7 +2418,7 @@ class CFGBase(Analysis):
         all_edges: list[tuple[K, K, Any]],
         known_functions,
         blockaddr_to_funcaddr: dict[int, int],
-    ):
+    ) -> bool:
         """
         If source and destination belong to the same function, and the following criteria apply:
         - source node has only one default exit
@@ -2422,7 +2430,6 @@ class CFGBase(Analysis):
           exit, too
 
         :return:    True if it is a tail-call optimization. False otherwise.
-        :rtype:     bool
         """
 
         def _has_more_than_one_exit(node_):
@@ -2957,13 +2964,12 @@ class CFGBase(Analysis):
         return False
 
     @classmethod
-    def _get_nop_length(cls, insns):
+    def _get_nop_length(cls, insns) -> int:
         """
         Calculate the total size of leading nop instructions.
 
         :param insns: A list of capstone insn objects.
         :return: Number of bytes of leading nop instructions.
-        :rtype: int
         """
 
         nop_length = 0
@@ -2979,13 +2985,12 @@ class CFGBase(Analysis):
         return nop_length
 
     @staticmethod
-    def _one_fakeret_node_key(all_edges) -> K | None:
+    def _one_fakeret_node_key(all_edges: list) -> K | None:
         """
         Pick the first Ijk_FakeRet edge from all_edges, and return the destination node.
 
-        :param list all_edges: A list of networkx.Graph edges with data.
+        :param all_edges:      A list of networkx.Graph edges with data.
         :return:               The first FakeRet node, or None if nothing is found.
-        :rtype:                CFGNode key or None
         """
 
         for _, dst_key, data in all_edges:
@@ -3005,18 +3010,19 @@ class CFGBase(Analysis):
     # Indirect jumps processing
     #
 
-    def _resolve_indirect_jump_timelessly(self, addr, block, func_addr, jumpkind):
+    def _resolve_indirect_jump_timelessly(
+        self, addr: int, block, func_addr: int, jumpkind: str
+    ) -> tuple[bool, list[int]]:
         """
         Attempt to quickly resolve an indirect jump.
 
-        :param int addr:        Basic block address of this indirect jump.
+        :param addr:            Basic block address of this indirect jump.
         :param block:           The basic block. The type is determined by the backend being used. It's pyvex.IRSB if
                                 pyvex is used as the backend.
-        :param int func_addr:   Address of the function that this indirect jump belongs to.
-        :param str jumpkind:    The jumpkind.
+        :param func_addr:       Address of the function that this indirect jump belongs to.
+        :param jumpkind:        The jumpkind.
         :return:                A tuple of a boolean indicating whether the resolution is successful or not, and a list
                                 of resolved targets (ints).
-        :rtype:                 tuple
         """
 
         # pre-check: if re-lifting the block with full optimization (cross-instruction-optimization enabled) gives us
@@ -3040,16 +3046,21 @@ class CFGBase(Analysis):
                     return True, resolved_targets
         return False, []
 
-    def _indirect_jump_resolved(self, jump, jump_addr, resolved_by, targets):
+    def _indirect_jump_resolved(
+        self,
+        jump: IndirectJump | None,
+        jump_addr: int,
+        resolved_by: IndirectJumpResolver | None,
+        targets: list[int],
+    ):
         """
         Called when an indirect jump is successfully resolved.
 
-        :param IndirectJump jump:                   The resolved indirect jump, or None if an IndirectJump instance is
+        :param jump:                                The resolved indirect jump, or None if an IndirectJump instance is
                                                     not available.
-        :param int jump_addr:                       Address of the resolved indirect jump.
-        :param IndirectJumpResolver resolved_by:    The resolver used to resolve this indirect jump.
-        :param list targets:                        List of indirect jump targets.
-        :param CFGJob job:                          The job at the start of the block containing the indirect jump.
+        :param jump_addr:                           Address of the resolved indirect jump.
+        :param resolved_by:                         The resolver used to resolve this indirect jump.
+        :param targets:                             List of indirect jump targets.
 
         :return: None
         """
@@ -3063,11 +3074,11 @@ class CFGBase(Analysis):
         )
         self.kb.indirect_jumps.update_resolved_addrs(addr, targets)
 
-    def _indirect_jump_unresolved(self, jump):
+    def _indirect_jump_unresolved(self, jump: IndirectJump):
         """
         Called when we cannot resolve an indirect jump.
 
-        :param IndirectJump jump: The unresolved indirect jump.
+        :param jump: The unresolved indirect jump.
 
         :return: None
         """
@@ -3140,7 +3151,7 @@ class CFGBase(Analysis):
 
         return resolved, ij.resolved_targets, ij
 
-    def _process_unresolved_indirect_jumps(self):
+    def _process_unresolved_indirect_jumps(self) -> set[int]:
         """
         Resolve all unresolved indirect jumps found in previous scanning.
 
@@ -3150,7 +3161,6 @@ class CFGBase(Analysis):
         - For an up-to-date list, see analyses/cfg/indirect_jump_resolvers
 
         :return:    A set of concrete indirect jump targets (ints).
-        :rtype:     set
         """
 
         l.debug("%d indirect jumps to resolve.", len(self._indirect_jumps_to_resolve))

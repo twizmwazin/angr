@@ -426,7 +426,7 @@ class CallSiteMaker:
     def _find_variable_from_definition(self, def_: Definition):
         """
 
-        :param Definition def_: The reaching definition of a variable.
+        :param def_: The reaching definition of a variable.
         :return:                The variable that is defined.
         """
 
@@ -534,10 +534,10 @@ class CallSiteMaker:
         )
 
     @staticmethod
-    def _get_call_target(stmt):
+    def _get_call_target(stmt: Stmt.Call):
         """
 
-        :param Stmt.Call stmt:
+        :param stmt:
         :return:
         """
 
