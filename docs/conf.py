@@ -4,6 +4,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 from __future__ import annotations
 
+import builtins
 import datetime
 import importlib
 import inspect
@@ -307,6 +308,44 @@ def limit_global_toctree(_app, pagename, _templatename, context, _doctree):
     context["toctree"] = bounded
 
 
+# -- Builtin types: link to the Python documentation -------------------------
+# intersphinx only gets to resolve a reference once the Python domain has found
+# no match among angr's own objects. For a builtin such as ``bytes`` or
+# ``type``, the domain's fuzzy search does find one: a name it cannot find as a
+# class is retried as data and then as an attribute, so ``dict[int, bytes]``
+# linked to ``angr.analyses.cfg.cfb.Unknown.bytes`` and Sphinx warned that more
+# than one target was found.
+#
+# Tag builtin type references the way the ``:external+python:`` role does, so
+# that intersphinx resolves them from the Python inventory before the Python
+# domain sees them. Only names that inventory has are tagged: a tagged reference
+# never falls back to a local lookup.
+
+_BUILTIN_TYPES = frozenset(name for name, obj in vars(builtins).items() if isinstance(obj, type))
+
+
+def link_builtin_types_to_python(app, doctree):
+    """Have intersphinx resolve builtin type names from the Python docs."""
+    from sphinx import addnodes
+
+    inventory = getattr(app.env, "intersphinx_named_inventory", {}).get("python")
+    if not inventory:
+        return
+    known = inventory.get("py:class", {}).keys() | inventory.get("py:exception", {}).keys()
+
+    for node in doctree.findall(addnodes.pending_xref):
+        if (
+            node.get("refdomain") == "py"
+            and node.get("reftype") in {"class", "obj"}
+            and node.get("reftarget") in _BUILTIN_TYPES
+            and node.get("reftarget") in known
+            and not isinstance(node[0], addnodes.pending_xref_condition)
+        ):
+            node["intersphinx"] = True
+            node["inventory"] = "python"
+
+
 def setup(app):
     app.connect("autodoc-skip-member", skip_inherited_undocumented)
     app.connect("html-page-context", limit_global_toctree, priority=400)
+    app.connect("doctree-read", link_builtin_types_to_python)
