@@ -264,6 +264,26 @@ def _patch_directive_header_for_reexports() -> None:
 _patch_directive_header_for_reexports()
 
 
+# -- Module data that happens to be callable --------------------------------
+# Module-level data never gets a signature, so Sphinx 9 starts it with an empty
+# signature list, yet it still stores whatever an ``autodoc-process-signature``
+# handler returns into the list's first slot. sphinx-autodoc-typehints returns
+# a signature for any callable object, including callable instances such as
+# the gates in ``angr.analyses.decompiler.known_patterns.gating``. The store
+# raises IndexError, and autodoc logs "error while formatting signature" and
+# leaves the object out of the page.
+#
+# Answering first with an empty result, which is not None but is falsy, ends
+# the event without anything being stored.
+
+
+def no_signature_for_data(_app, what, _name, _obj, _options, _signature, _return_annotation):
+    """Keep other handlers from giving module-level data a signature."""
+    if what == "data":
+        return ()
+    return None
+
+
 # -- Global navigation sidebar ----------------------------------------------
 # ``index.rst`` declares ``:maxdepth: 2``, but furo asks for the global toctree
 # with an explicit ``maxdepth=-1``, and Sphinx lets an explicit argument
@@ -311,4 +331,5 @@ def limit_global_toctree(_app, pagename, _templatename, context, _doctree):
 
 def setup(app):
     app.connect("autodoc-skip-member", skip_inherited_undocumented)
+    app.connect("autodoc-process-signature", no_signature_for_data, priority=400)
     app.connect("html-page-context", limit_global_toctree, priority=400)
