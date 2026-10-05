@@ -16,3 +16,6 @@ build:
   tools:
     python: "3.12"
     rust: latest
+  jobs:
+    install:
+      - CARGO_PROFILE_RELEASE_OPT_LEVEL=0 uv sync --all-extras --group docs --no-default-groups
