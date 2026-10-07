@@ -833,6 +833,65 @@ class TestMemory(unittest.TestCase):
         assert state.solver.is_true(val[15:8] == sym[7:0])
         assert not val[7:0].variables & sym.variables
 
+    @staticmethod
+    def _symbolic_data(state, addr):
+        page = state.memory._pages[addr // state.memory.page_size]
+        return {off: mo.object for off, mo in page.symbolic_data.items()}
+
+    def test_concrete_store_drops_overwritten_symbolic_objects(self):
+        state = SimState(project=minimal_project("AMD64"), mode="symbolic")
+        a = claripy.BVS("a", 32)
+        b = claripy.BVS("b", 32)
+
+        state.memory.store(0x1000, a)
+        state.memory.store(0x1000, claripy.BVV(0, 32))
+        assert not self._symbolic_data(state, 0x1000)
+
+        # one concrete store over two objects
+        state.memory.store(0x1000, a)
+        state.memory.store(0x1004, b)
+        state.memory.store(0x1000, claripy.BVV(0, 64))
+        assert not self._symbolic_data(state, 0x1000)
+
+        # an uninitialized value, once loaded, is an object too
+        state.memory.load(0x1010, 4)
+        state.memory.store(0x1010, claripy.BVV(1, 32))
+        assert not self._symbolic_data(state, 0x1000)
+
+    def test_concrete_store_over_part_of_symbolic_objects(self):
+        state = SimState(project=minimal_project("AMD64"), mode="symbolic")
+        a = claripy.BVS("a", 64)
+        b = claripy.BVS("b", 32)
+        state.memory.store(0x1000, a)
+        state.memory.store(0x1008, b)
+
+        # over the head of a: a now starts after the overwritten bytes
+        state.memory.store(0x1000, claripy.BVV(0x1111, 16))
+        entries = self._symbolic_data(state, 0x1000)
+        assert list(entries) == [2, 8]
+        assert entries[2] is a and entries[8] is b
+
+        # inside a, where nothing is anchored: nothing changes
+        state.memory.store(0x1003, claripy.BVV(0x22, 8))
+        assert list(self._symbolic_data(state, 0x1000)) == [2, 8]
+
+        # over the tail of a and the head of b
+        state.memory.store(0x1006, claripy.BVV(0x33333333, 32))
+        entries = self._symbolic_data(state, 0x1000)
+        assert list(entries) == [2, 10]
+        assert entries[2] is a and entries[10] is b
+
+        expected = claripy.Concat(
+            claripy.BVV(0x1111, 16), a[47:40], claripy.BVV(0x22, 8), a[31:16], claripy.BVV(0x33333333, 32), b[15:0]
+        )
+        assert not state.solver.satisfiable(extra_constraints=[state.memory.load(0x1000, 12) != expected])
+
+        # over the rest of b
+        state.memory.store(0x100A, claripy.BVV(0x4444, 16))
+        assert list(self._symbolic_data(state, 0x1000)) == [2]
+        expected = claripy.Concat(a[47:40], claripy.BVV(0x22, 8), a[31:16], claripy.BVV(0x333333334444, 48))
+        assert not state.solver.satisfiable(extra_constraints=[state.memory.load(0x1002, 10) != expected])
+
     def test_allocate_stack_pages_stops_at_address_zero(self):
         state = SimState(project=minimal_project(ArchAMD64()), stack_end=0x1000)
 
@@ -1059,6 +1118,25 @@ class TestSymbolicBitmap(unittest.TestCase):
         bm.clear_range(0, 64)
         assert view.tobytes() == bytes(8)
         assert not any(bm.get(i) for i in range(64))
+
+    def test_clear_range_reports_symbolic_bytes(self):
+        bm = SymbolicBitmap(64, 0)
+        assert not bm.clear_range(0, 64)
+
+        bm.set(13, 1)
+        bm.set(30, 1)
+        bm.set(52, 1)
+        assert not bm.clear_range(9, 13)  # within one byte
+        assert not bm.clear_range(14, 30)  # a partial byte, whole bytes, a partial byte
+        assert bm.clear_range(12, 14)
+        assert bm.clear_range(20, 40)  # in a whole byte
+        assert bm.clear_range(50, 53)  # in a trailing partial byte
+        assert not bm.clear_range(0, 64)
+
+        bm.set(5, 1)
+        assert bm.clear_range(0, 64)  # the whole page
+        assert SymbolicBitmap(64, 1).clear_range(0, 64)
+        assert not SymbolicBitmap(64, 1).clear_range(3, 3)
 
     def test_copy_is_not_aliased(self):
         bm = SymbolicBitmap(64)
