@@ -821,6 +821,18 @@ class TestMemory(unittest.TestCase):
                     assert state.solver.is_true(state.memory.load(addr, 3, endness=endness) == stored)
                     assert not state.memory.load(addr + 3, 5).variables & data.variables
 
+    def test_load_from_inside_an_object_past_its_end(self):
+        # a load that starts inside a symbolic object takes from it only the bytes up to its end, also when no other
+        # entry follows the object on the page
+        state = SimState(project=minimal_project("AMD64"), mode="symbolic")
+        sym = claripy.BVS("sym", 16)
+        state.memory.store(0x100B, sym)
+
+        val = state.memory.load(0x100C, 2)
+        assert val.size() == 16
+        assert state.solver.is_true(val[15:8] == sym[7:0])
+        assert not val[7:0].variables & sym.variables
+
     def test_allocate_stack_pages_stops_at_address_zero(self):
         state = SimState(project=minimal_project(ArchAMD64()), stack_end=0x1000)
 

@@ -104,12 +104,16 @@ class UltraPage(MemoryObjectMixin, PageBase):
                 cycle(realaddr)
                 next_addr = subaddr + 1
 
-                # figure out how long the current object is (limit end of page)
+                # figure out how long the current object is (limit end of page). it may have started before subaddr,
+                # so only count its bytes from subaddr on
                 if cur_val is None:
                     obj_end = end
                 else:
-                    obj_end = subaddr + cur_val.length
-                    obj_end = min(end, obj_end)
+                    into = realaddr - cur_val.base
+                    if into < 0:
+                        # the object wraps around the end of the address space
+                        into += 1 << memory.state.arch.bits
+                    obj_end = min(end, subaddr + cur_val.length - into)
 
                 # determine how many bytes come from this object: scan forward until the end of the object, the first
                 # non-symbolic byte, or the start of the next object, whichever comes first
