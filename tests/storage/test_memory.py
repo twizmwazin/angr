@@ -805,6 +805,22 @@ class TestMemory(unittest.TestCase):
             state.memory.store(0xFFFFFFFF, symbol)
             assert state.memory.load(0, 1) is symbol[64 - 8 - 1 : 64 - 16]
 
+    def test_store_shorter_than_data(self):
+        # a store with an explicit size writes only that many bytes of its data: the rest of the data must not show up
+        # in the bytes after it, whether or not the page held anything before (and whether or not the store crosses
+        # a page boundary)
+        data = claripy.BVS("data", 64)
+        for endness, stored in (("Iend_BE", data[63:40]), ("Iend_LE", data[23:0])):
+            for addr in (0x1008, 0x1FFE):
+                for earlier_store in (False, True):
+                    state = SimState(project=minimal_project("AMD64"), mode="symbolic")
+                    if earlier_store:
+                        state.memory.store(0x1000, claripy.BVS("x", 8))
+                    state.memory.store(addr, data, size=3, endness=endness)
+
+                    assert state.solver.is_true(state.memory.load(addr, 3, endness=endness) == stored)
+                    assert not state.memory.load(addr + 3, 5).variables & data.variables
+
     def test_allocate_stack_pages_stops_at_address_zero(self):
         state = SimState(project=minimal_project(ArchAMD64()), stack_end=0x1000)
 
