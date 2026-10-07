@@ -14,11 +14,14 @@ if TYPE_CHECKING:
 @dataclass
 class IcicleStateTranslationData:
     """
-    Represents the saved information needed to convert an Icicle state back
-    to an angr state.
+    Describes how the contents of an Icicle VM line up with angr states: which
+    registers are synced, which pages are mapped and writable in the VM, and
+    the VM's instruction count when the current run started.
+
+    It holds no reference to a state, so keeping it around does not keep any
+    state (or its memory) alive.
     """
 
-    base_state: SimState[int, int]
     registers: set[str]
     mapped_pages: set[int]
     writable_pages: set[int]
@@ -34,9 +37,18 @@ class IcicleVMRef:
     Lets multiple SimStateIcicle plugins point at the same VM and observe each
     other's advancements via `generation`: each successful engine run bumps
     `generation`, invalidating any plugin still holding the prior value.
+
+    Everything the engine needs to know about the VM lives here rather than on
+    the states, because it describes the VM: `base_state` and
+    `base_translation_data` describe the VM's snapshot (the state it was built
+    from), and `translation_data` describes the VM as the last run left it,
+    which only the live state can continue from.
     """
 
     vm: Icicle
+    base_state: SimState[int, int]
+    base_translation_data: IcicleStateTranslationData
+    translation_data: IcicleStateTranslationData
     generation: int = 0
 
 
@@ -52,15 +64,11 @@ class SimStateIcicle(SimStatePlugin):
         self,
         vm_ref: IcicleVMRef | None = None,
         generation: int | None = None,
-        base_translation_data: IcicleStateTranslationData | None = None,
-        translation_data: IcicleStateTranslationData | None = None,
         dirty_pages: set[int] | None = None,
     ):
         super().__init__()
         self.vm_ref = vm_ref
         self.generation = generation
-        self.base_translation_data = base_translation_data
-        self.translation_data = translation_data
         self.dirty_pages = dirty_pages if dirty_pages is not None else set()
 
     @property
@@ -76,8 +84,6 @@ class SimStateIcicle(SimStatePlugin):
         return SimStateIcicle(
             vm_ref=self.vm_ref,
             generation=self.generation,
-            base_translation_data=self.base_translation_data,
-            translation_data=self.translation_data,
             dirty_pages=set(self.dirty_pages),
         )
 

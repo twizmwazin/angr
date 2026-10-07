@@ -10,9 +10,9 @@ integration tests for running the fauxware binary using the engine.
 
 from __future__ import annotations
 
+import gc
 import os
 from io import BytesIO
-from typing import cast
 from unittest import TestCase
 
 import archinfo
@@ -22,8 +22,9 @@ import angr
 from angr import sim_options as o
 from angr.emulator import Emulator, EmulatorStopReason
 from angr.engines.icicle import IcicleEngine, UberIcicleEngine
+from angr.sim_state import SimState
 from angr.state_plugins.edge_hitmap import SimStateEdgeHitmap
-from angr.state_plugins.icicle import IcicleStateTranslationData, SimStateIcicle
+from angr.state_plugins.icicle import SimStateIcicle
 from tests.common import bin_location
 
 
@@ -300,6 +301,45 @@ class TestSnapshotSync(TestCase):
         s2.memory.map_region(0x20000, 0x1000, 0b101)  # R + X, no W
         s2.memory.store(0x20000, 0xBB, size=8, endness="Iend_LE")
         assert engine.process(s2, num_inst=1)[0].regs.x1.concrete_value == 0xBB
+
+    def test_snapshot_restore_branch_from_earlier_state(self):
+        """Running a state the VM has already moved past restores the VM's
+        snapshot and syncs the state as a delta against the state the snapshot
+        was taken from."""
+        project = angr.load_shellcode("loop: ldr x1, [x0]; add x1, x1, #1; str x1, [x0]; b loop", "aarch64")
+        engine = IcicleEngine(project)
+        state = project.factory.blank_state(
+            remove_options={*o.symbolic},
+            add_options={o.ZERO_FILL_UNCONSTRAINED_MEMORY, o.ZERO_FILL_UNCONSTRAINED_REGISTERS},
+        )
+        state.memory.map_region(0x10000, 0x1000, 0b011)
+        state.regs.x0 = 0x10000
+
+        def counter(s):
+            return s.memory.load(0x10000, 8, endness="Iend_LE").concrete_value
+
+        # One loop iteration per run: the VM continues from each successor.
+        lineage = []
+        for _ in range(4):
+            state = engine.process(state, num_inst=4)[0]
+            lineage.append(state)
+        assert [counter(s) for s in lineage] == [1, 2, 3, 4]
+
+        # lineage[1] is no longer where the VM is, so this restores the snapshot.
+        assert not lineage[1].get_plugin("icicle").is_live
+        branch = engine.process(lineage[1], num_inst=4)[0]
+        assert counter(branch) == 3
+
+        # The branch is live, so this continues from it without a restore.
+        assert branch.get_plugin("icicle").is_live
+        assert counter(engine.process(branch, num_inst=4)[0]) == 4
+
+        # Permission changes are diffed against the snapshot too: the store
+        # must fault once the counter page is read-only.
+        read_only = lineage[3].copy()
+        read_only.memory.permissions(0x10000, 0b001)
+        assert engine.process(read_only, num_inst=4)[0].history.jumpkind == "Ijk_SigSEGV"
+        assert counter(engine.process(lineage[3], num_inst=4)[0]) == 5
 
 
 class TestDirtyPageTracking(TestCase):
@@ -947,10 +987,8 @@ class TestSimStateIciclePlugin(TestCase):
 
     def test_plugin_copy(self):
         """Test that the plugin is correctly copied when the state is copied."""
-        dummy_td = cast(IcicleStateTranslationData, None)
         plugin = SimStateIcicle(
             generation=42,
-            translation_data=dummy_td,
             dirty_pages={3, 4},
         )
         copied = plugin.copy({})
@@ -962,13 +1000,40 @@ class TestSimStateIciclePlugin(TestCase):
 
     def test_plugin_merge(self):
         """Test that merge returns False (not mergeable)."""
-        dummy_td = cast(IcicleStateTranslationData, None)
         plugin = SimStateIcicle(
             generation=1,
-            translation_data=dummy_td,
             dirty_pages=set(),
         )
         assert plugin.merge([], [], None) is False
+
+    def test_successors_do_not_keep_predecessors_alive(self):
+        """A successor must not keep the state it was run from alive. If it
+        does, every state of a long run stays alive, with all of its pages."""
+
+        def live_states() -> int:
+            gc.collect()
+            # type() rather than isinstance(): gc can return dead weak proxies, on which isinstance() raises
+            return sum(1 for obj in gc.get_objects() if type(obj) is SimState)
+
+        project = angr.load_shellcode("loop: ldr x1, [x0]; add x1, x1, #1; str x1, [x0]; b loop", "aarch64")
+        state = project.factory.blank_state(
+            remove_options={*o.symbolic},
+            add_options={o.ZERO_FILL_UNCONSTRAINED_MEMORY, o.ZERO_FILL_UNCONSTRAINED_REGISTERS},
+        )
+        state.memory.map_region(0x10000, 0x1000, 0b011)
+        state.regs.x0 = 0x10000
+        emulator = Emulator(IcicleEngine(project), state)
+        del state
+
+        for _ in range(10):
+            emulator.run(num_inst=8)
+        live_after_10_runs = live_states()
+        for _ in range(50):
+            emulator.run(num_inst=8)
+        live_after_60_runs = live_states()
+
+        assert emulator.state.memory.load(0x10000, 8, endness="Iend_LE").concrete_value == 120
+        assert live_after_60_runs == live_after_10_runs
 
 
 class TestContinuation(TestCase):
