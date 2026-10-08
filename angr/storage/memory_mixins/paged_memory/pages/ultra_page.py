@@ -182,8 +182,9 @@ class UltraPage(MemoryObjectMixin, PageBase):
                 data = int.from_bytes(concrete_data, "big")
 
         if type(data) is int or (data.object.op == "BVV" and not data.object.annotations):
-            # mark range as not symbolic
-            self.symbolic_bitmap.clear_range(addr, addr + size)
+            # mark range as not symbolic. if any of it was, drop the memory objects anchored there
+            if self.symbolic_bitmap.clear_range(addr, addr + size) and self.symbolic_data:
+                self._clear_symbolic_data(addr, addr + size, page_addr, memory=memory)
 
             # store
             ival = data if type(data) is int else data.object.args[0]
@@ -225,6 +226,28 @@ class UltraPage(MemoryObjectMixin, PageBase):
 
             # set.
             self.symbolic_data[addr] = data
+
+    def _anchor_object_at(self, offset: int, page_addr: int, memory=None) -> None:
+        """
+        Give the object covering byte ``offset``, if any, an entry at ``offset``, so that the bytes from ``offset`` on
+        keep finding it once the entries before ``offset`` are replaced or removed.
+        """
+        if offset < self.symbolic_bitmap.size and offset not in self.symbolic_data:
+            obj = self._get_object(offset, page_addr, memory=memory)
+            if obj is not None:
+                self.symbolic_data[offset] = obj
+
+    def _clear_symbolic_data(self, start: int, end: int, page_addr: int, memory=None) -> None:
+        """
+        Remove the symbolic_data entries anchored in [start, end), whose bytes are being overwritten with concrete data.
+        Otherwise they outlive every byte they described: copy() keeps copying them and they keep their ASTs alive.
+        """
+        keys = list(self.symbolic_data.irange(minimum=start, maximum=end - 1))
+        if not keys:
+            return
+        self._anchor_object_at(end, page_addr, memory=memory)
+        for key in keys:
+            del self.symbolic_data[key]
 
     @staticmethod
     def _object_prefix(mo: SimMemoryObject, length: int) -> SimMemoryObject:

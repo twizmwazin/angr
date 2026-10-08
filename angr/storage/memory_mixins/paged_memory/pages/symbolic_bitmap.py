@@ -113,38 +113,48 @@ class SymbolicBitmap:
         if lo:
             bits[lb] |= 0xFF >> (8 - lo)
 
-    def clear_range(self, start: int, stop: int) -> None:
+    def clear_range(self, start: int, stop: int) -> bool:
         """
-        Mark ``[start, stop)`` as concrete.
+        Mark ``[start, stop)`` as concrete. Return whether any byte of it was symbolic.
         """
         if start >= stop:
-            return
+            return False
         bits = self._bits
         if start <= 0 and stop >= self.size:
+            was_set = bool(self._uniform) if bits is None else bits.count(0) != len(bits)
             if self._pinned:
                 assert bits is not None
                 bits[:] = bytes(len(bits))
             else:
                 self._bits = None
                 self._uniform = 0
-            return
+            return was_set
         if bits is None:
             if not self._uniform:
-                return
+                return False
             bits = self._concretize()
 
         fb, fo = start >> 3, start & 7
         lb, lo = stop >> 3, stop & 7
         if fb == lb:
-            bits[fb] &= ~((0xFF << fo) & (0xFF >> (8 - lo))) & 0xFF
-            return
+            mask = (0xFF << fo) & (0xFF >> (8 - lo))
+            old = bits[fb]
+            bits[fb] = old & ~mask & 0xFF
+            return bool(old & mask)
+        was_set = False
         if fo:
-            bits[fb] &= ~(0xFF << fo) & 0xFF
+            mask = (0xFF << fo) & 0xFF
+            was_set = bool(bits[fb] & mask)
+            bits[fb] &= ~mask & 0xFF
             fb += 1
         if fb < lb:
+            was_set = was_set or bits.count(0, fb, lb) != lb - fb
             bits[fb:lb] = bytes(lb - fb)
         if lo:
-            bits[lb] &= ~(0xFF >> (8 - lo)) & 0xFF
+            mask = 0xFF >> (8 - lo)
+            was_set = was_set or bool(bits[lb] & mask)
+            bits[lb] &= ~mask & 0xFF
+        return was_set
 
     #
     # Range scans

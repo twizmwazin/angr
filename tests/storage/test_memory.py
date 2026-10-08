@@ -821,6 +821,23 @@ class TestMemory(unittest.TestCase):
                     assert state.solver.is_true(state.memory.load(addr, 3, endness=endness) == stored)
                     assert not state.memory.load(addr + 3, 5).variables & data.variables
 
+    def test_concrete_store_drops_overwritten_symbolic_objects(self):
+        state = SimState(project=minimal_project("AMD64"), mode="symbolic")
+        a = claripy.BVS("a", 64)
+        state.memory.load(0x1010, 4)  # an uninitialized value, once loaded, is an object too
+        state.memory.store(0x1000, a)
+        entries = state.memory._pages[1].symbolic_data
+        assert list(entries) == [0, 0x10]
+
+        state.memory.store(0x1010, claripy.BVV(0, 32))
+        assert list(entries) == [0]
+
+        # over the head of a: a now starts after the overwritten bytes
+        state.memory.store(0x1000, claripy.BVV(0x1111, 16))
+        assert list(entries) == [2] and entries[2].object is a
+        expected = claripy.Concat(claripy.BVV(0x1111, 16), a[47:0])
+        assert not state.solver.satisfiable(extra_constraints=[state.memory.load(0x1000, 8) != expected])
+
     def test_allocate_stack_pages_stops_at_address_zero(self):
         state = SimState(project=minimal_project(ArchAMD64()), stack_end=0x1000)
 
@@ -1047,6 +1064,25 @@ class TestSymbolicBitmap(unittest.TestCase):
         bm.clear_range(0, 64)
         assert view.tobytes() == bytes(8)
         assert not any(bm.get(i) for i in range(64))
+
+    def test_clear_range_reports_symbolic_bytes(self):
+        bm = SymbolicBitmap(64, 0)
+        assert not bm.clear_range(0, 64)
+
+        bm.set(13, 1)
+        bm.set(30, 1)
+        bm.set(52, 1)
+        assert not bm.clear_range(9, 13)  # within one byte
+        assert not bm.clear_range(14, 30)  # a partial byte, whole bytes, a partial byte
+        assert bm.clear_range(12, 14)
+        assert bm.clear_range(20, 40)  # in a whole byte
+        assert bm.clear_range(50, 53)  # in a trailing partial byte
+        assert not bm.clear_range(0, 64)
+
+        bm.set(5, 1)
+        assert bm.clear_range(0, 64)  # the whole page
+        assert SymbolicBitmap(64, 1).clear_range(0, 64)
+        assert not SymbolicBitmap(64, 1).clear_range(3, 3)
 
     def test_copy_is_not_aliased(self):
         bm = SymbolicBitmap(64)
