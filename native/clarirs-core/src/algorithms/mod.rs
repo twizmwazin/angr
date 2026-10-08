@@ -5,6 +5,7 @@ pub mod find_variable;
 pub mod reconstruct;
 pub mod replace;
 pub mod simplify;
+pub mod simplify_logic;
 pub mod walk;
 
 pub use canonicalize::{canonicalize, structurally_match};

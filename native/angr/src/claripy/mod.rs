@@ -84,6 +84,18 @@ fn py_excavate_ite<'py>(
     Base::from_ast(py, expr.get().ast().excavate_ite()?.simplify()?)
 }
 
+/// Simplify the boolean structure of `expr` over its predicates (every
+/// subexpression that is not an `And`, `Or` or `Not`), as a minimal sum of
+/// products or product of sums when it has at most `max_predicates` of them.
+#[pyfunction(name = "simplify_logic", signature = (expr, max_predicates = 8))]
+fn py_simplify_logic<'py>(
+    py: Python<'py>,
+    expr: Bound<'py, Bool>,
+    max_predicates: usize,
+) -> Result<Bound<'py, Base>, ClaripyError> {
+    Base::from_ast(py, expr.get().inner.simplify_logic(max_predicates)?)
+}
+
 #[pyfunction]
 fn is_true(expr: Bound<'_, PyAny>) -> Result<bool, ClaripyError> {
     if let Ok(bool_expr) = expr.extract::<CoerceBool>() {
@@ -295,6 +307,7 @@ pub fn claripy(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_simplify, m)?)?;
     m.add_function(wrap_pyfunction!(py_replace, m)?)?;
     m.add_function(wrap_pyfunction!(py_excavate_ite, m)?)?;
+    m.add_function(wrap_pyfunction!(py_simplify_logic, m)?)?;
     m.add_function(wrap_pyfunction!(is_true, m)?)?;
     m.add_function(wrap_pyfunction!(is_false, m)?)?;
     m.add_function(wrap_pyfunction!(ast::bool::ite_cases, m)?)?;
