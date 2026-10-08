@@ -243,6 +243,23 @@ class TestSnapshotSync(TestCase):
         assert len(result4.successors) == 1
         assert result4[0].regs.x1.concrete_value == 0xDD
 
+    def test_snapshot_restore_syncs_memory(self):
+        """A stale state (one whose VM has moved on) runs on its own memory, not the snapshot's."""
+        project = angr.load_shellcode("ldr x1, [x0]; ldr x1, [x0]", "aarch64")
+        engine = IcicleEngine(project)
+        state = project.factory.blank_state(
+            remove_options={*o.symbolic},
+            add_options={o.ZERO_FILL_UNCONSTRAINED_MEMORY, o.ZERO_FILL_UNCONSTRAINED_REGISTERS},
+        )
+        state.regs.x0 = 0x10000
+        state.memory.map_region(0x10000, 0x1000, 0b111)
+        state.memory.store(0x10000, 0xAA, size=8, endness="Iend_LE")
+
+        stale = engine.process(state, num_inst=1)[0]  # builds the VM and snapshots `state`
+        engine.process(stale, num_inst=1)  # the VM moves on
+        stale.memory.store(0x10000, 0xBB, size=8, endness="Iend_LE")
+        assert engine.process(stale, num_inst=1)[0].regs.x1.concrete_value == 0xBB
+
     def test_snapshot_sync_code_modification(self):
         """Code at the entry address can differ between states; each branch must
         re-lift instead of replaying a stale JIT'd block from a sibling state."""

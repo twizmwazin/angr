@@ -321,7 +321,6 @@ class IcicleEngine(SuccessorsEngine):
             candidate_pages = IcicleEngine._get_pages(state)
             mapped_pages: set[int] = set()
             writable_pages: set[int] = set()
-            base_state_pages: dict[int, typing.Any] = {}
         else:
             base_explicit = base.explicit_page_metadata
             candidate_pages = set(base_explicit).symmetric_difference(explicit_page_metadata)
@@ -330,7 +329,6 @@ class IcicleEngine(SuccessorsEngine):
                     candidate_pages.add(page_num)
             mapped_pages = set(base.mapped_pages)
             writable_pages = set(base.writable_pages)
-            base_state_pages = state.memory._pages
 
         for page_num in candidate_pages:
             addr = page_num * page_size
@@ -356,22 +354,16 @@ class IcicleEngine(SuccessorsEngine):
                     # R-only pages won't be visited by the writable-page loop
                     # below, so this is the only place to seed their content.
                     IcicleEngine._write_page(emu, state, page_num)
-            elif old_mapped and new_mapped and base is not None:
-                base_perm_bits = state.memory.permissions(addr).concrete_value
-                if base_perm_bits != perm_bits:
-                    emu.mem_protect(addr, page_size, perm_bits)
+            elif old_mapped and new_mapped:
+                emu.mem_protect(addr, page_size, perm_bits)
 
             if perm_bits & 2:
                 writable_pages.add(page_num)
             else:
                 writable_pages.discard(page_num)
 
-        # Writable pages: copy those whose content differs from the baseline.
-        # For full init (base is None), `base_state_pages` is empty so the
-        # CoW check unconditionally writes every writable page.
+        # Writable pages: the baseline's content is not kept, so copy them all.
         for page_num in writable_pages:
-            if state.memory._pages.get(page_num) is base_state_pages.get(page_num):
-                continue
             IcicleEngine._write_page(emu, state, page_num)
 
         # restore_snapshot zeroes the hitmap; full init starts with no
