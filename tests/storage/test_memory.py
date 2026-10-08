@@ -835,6 +835,21 @@ class TestMemory(unittest.TestCase):
         assert len(state.memory.allocate_stack_pages(0xFFF, 0x1000)) == 1
         assert state.memory.permissions(0) is not None
 
+    def test_symbolic_store_anchors_only_a_covering_object(self):
+        state = SimState(project=minimal_project("AMD64"), mode="symbolic")
+        a = claripy.BVS("a", 64)
+
+        # a covers the byte after the store, so it keeps an entry there
+        state.memory.store(0x1000, a)
+        state.memory.store(0x1002, claripy.BVS("b", 16))
+        entries = state.memory._pages[1].symbolic_data
+        assert list(entries) == [0, 2, 4] and entries[4].object is a
+
+        # nothing covers the byte after the store
+        state.memory.store(0x2000, claripy.BVS("c", 32))
+        state.memory.store(0x2004, claripy.BVS("d", 32))
+        assert list(state.memory._pages[2].symbolic_data) == [0, 4]
+
     def test_underconstrained(self):
         state = SimState(project=minimal_project("AMD64"), add_options={o.UNDER_CONSTRAINED_SYMEXEC})
 

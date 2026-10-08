@@ -210,14 +210,11 @@ class UltraPage(MemoryObjectMixin, PageBase):
             # mark range as symbolic
             self.symbolic_bitmap.set_range(addr, addr + size)
 
-            # set ending object
-            try:
-                endpiece = next(self.symbolic_data.irange(maximum=addr + size, reverse=True))
-            except StopIteration:
-                pass
-            else:
-                if endpiece != addr + size:
-                    self.symbolic_data[addr + size] = self.symbolic_data[endpiece]
+            # keep the object covering the byte after the store reachable from there
+            if addr + size < self.symbolic_bitmap.size and addr + size not in self.symbolic_data:
+                endobj = self._get_object(addr + size, page_addr, memory=memory)
+                if endobj is not None:
+                    self.symbolic_data[addr + size] = endobj
 
             # clear range
             for midpiece in self.symbolic_data.irange(maximum=addr + size - 1, minimum=addr, reverse=True):
