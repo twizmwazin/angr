@@ -6,3 +6,6 @@ pub use annotation::{Annotation, AnnotationType};
 pub use factory::AstFactory;
 pub use node::{AstNode, AstRef};
 pub use op::{AstOp, AstType};
+
+#[cfg(test)]
+mod test_multi_value;

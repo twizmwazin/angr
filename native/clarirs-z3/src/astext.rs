@@ -384,6 +384,11 @@ impl<'c> AstExtZ3<'c> for AstRef<'c> {
                                         .to_string(),
                                 ));
                             }
+                            AstOp::MultiValue(..) => {
+                                return Err(ClarirsError::ConversionError(
+                                    "MultiValue is not supported in the z3 backend".to_string(),
+                                ));
+                            }
 
                             // Float leaves and operations
                             AstOp::FPS(s, sort) => {

@@ -111,6 +111,13 @@ pub enum AstOp<'c> {
     Intersection(AstRef<'c>, AstRef<'c>),
     Widen(AstRef<'c>, AstRef<'c>),
 
+    /// A set of alternative values: the expression is any one of its members.
+    /// Members are bitvectors or floats that all share one sort. Built through
+    /// [`AstFactory::multi_value`], which flattens nested sets, sorts and
+    /// dedups the members, and never leaves fewer than two; the node itself
+    /// never inherits its members' annotations.
+    MultiValue(Vec<AstRef<'c>>),
+
     // Float leaves and operations
     FPS(InternedString, FSort),
     FPV(Float),
@@ -203,7 +210,7 @@ macro_rules! ast_op_arity {
 
 ast_op_arity! {
     leaf: [BoolS, BoolV, BVS, BVV, FPS, FPV, StringS, StringV],
-    nary: [And, Or, Xor, Add, Mul, Concat],
+    nary: [And, Or, Xor, Add, Mul, Concat, MultiValue],
     unary: [
         Not, Neg, ByteReverse, ZeroExt(n), SignExt(n), Extract(hi, lo), StrLen, StrToBV,
         FpToIEEEBV, FpToUBV(size, rm), FpToSBV(size, rm), FpNeg, FpAbs, FpSqrt(rm),
@@ -233,12 +240,13 @@ impl<'c> AstOp<'c> {
     }
 
     /// Returns true if the op is inherently symbolic regardless of whether it
-    /// has variables. VSA operations (Union, Intersection, Widen) are always
-    /// symbolic because they represent abstract multi-valued results.
+    /// has variables. VSA operations (Union, Intersection, Widen) and
+    /// MultiValue are always symbolic because they represent multi-valued
+    /// results.
     pub fn is_inherently_symbolic(&self) -> bool {
         matches!(
             self,
-            AstOp::Union(..) | AstOp::Intersection(..) | AstOp::Widen(..)
+            AstOp::Union(..) | AstOp::Intersection(..) | AstOp::Widen(..) | AstOp::MultiValue(..)
         )
     }
 
@@ -294,6 +302,10 @@ impl<'c> AstOp<'c> {
                 v.first().map(|a| a.ast_type()).unwrap_or(AstType::Bool)
             }
             AstOp::ITE(_, t, _) => t.ast_type(),
+            AstOp::MultiValue(v) => v
+                .first()
+                .map(|a| a.ast_type())
+                .unwrap_or(AstType::BitVec(0)),
 
             // Bitvectors
             AstOp::BVS(_, width) => AstType::BitVec(*width),
@@ -404,6 +416,17 @@ impl<'c> AstOp<'c> {
                 require(
                     t.ast_type() == e.ast_type(),
                     "ITE branches must have the same sort",
+                )
+            }
+            AstOp::MultiValue(v) => {
+                let first = nonempty(v)?;
+                require(
+                    matches!(first.ast_type(), AstType::BitVec(_) | AstType::Float(_)),
+                    "MultiValue requires bitvector or float members",
+                )?;
+                require(
+                    v.iter().all(|a| a.ast_type() == first.ast_type()),
+                    "MultiValue members must all have the same sort",
                 )
             }
 

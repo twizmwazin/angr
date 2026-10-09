@@ -40,11 +40,18 @@ pub trait AstFactory<'c>: Sized {
 
     /// Construct a node with `annotations` plus the relocatable annotations of
     /// the op's children, mirroring how operations propagate annotations.
+    ///
+    /// `MultiValue` is the exception: its members are alternatives, so their
+    /// annotations stay on the members, and the members are canonicalized as
+    /// [`AstFactory::multi_value`] does.
     fn make_ast_annotated(
         &'c self,
         op: AstOp<'c>,
         mut annotations: BTreeSet<Annotation>,
     ) -> Result<AstRef<'c>, ClarirsError> {
+        if let AstOp::MultiValue(members) = op {
+            return self.multi_value_annotated(members, annotations);
+        }
         annotations.extend(
             op.child_iter()
                 .flat_map(|c| c.annotations().clone())
@@ -768,6 +775,46 @@ pub trait AstFactory<'c>: Sized {
         rhs: impl IntoOwned<AstRef<'c>>,
     ) -> Result<AstRef<'c>, ClarirsError> {
         self.make_ast(AstOp::Widen(lhs.into_owned(), rhs.into_owned()))
+    }
+
+    // MultiValue methods
+
+    /// Build a set of alternative values. Nested unannotated `MultiValue`s are
+    /// flattened, members are deduplicated and ordered by structural hash, and
+    /// a single remaining member is returned as is. An empty set is an error.
+    fn multi_value(
+        &'c self,
+        members: impl IntoIterator<Item = AstRef<'c>>,
+    ) -> Result<AstRef<'c>, ClarirsError> {
+        self.multi_value_annotated(members, BTreeSet::new())
+    }
+
+    /// [`AstFactory::multi_value`] with `annotations` on the resulting set
+    /// node. The members' annotations are never copied onto it.
+    fn multi_value_annotated(
+        &'c self,
+        members: impl IntoIterator<Item = AstRef<'c>>,
+        annotations: BTreeSet<Annotation>,
+    ) -> Result<AstRef<'c>, ClarirsError> {
+        let mut flat: Vec<AstRef<'c>> = Vec::new();
+        for member in members {
+            match member.op() {
+                AstOp::MultiValue(inner) if member.annotations().is_empty() => {
+                    flat.extend(inner.iter().cloned())
+                }
+                _ => flat.push(member),
+            }
+        }
+        flat.sort_by_key(|m| m.hash());
+        flat.dedup_by_key(|m| m.hash());
+        match flat.len() {
+            0 => Err(ClarirsError::InvalidArguments(
+                "MultiValue requires at least one member".to_string(),
+            )),
+            1 if annotations.is_empty() => Ok(flat.pop().unwrap()),
+            1 => flat.pop().unwrap().annotate(annotations),
+            _ => self.make_ast_exact(AstOp::MultiValue(flat), annotations),
+        }
     }
 
     // Helper methods

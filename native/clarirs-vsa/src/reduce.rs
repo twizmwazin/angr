@@ -88,4 +88,24 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_reduce_multi_value_is_union_of_members() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let bv = |value: u64| ctx.bvv(BitVec::from((value, 8)));
+
+        let mv = ctx.multi_value([bv(2)?, bv(4)?, bv(6)?])?;
+        assert_eq!(
+            mv.reduce()?.into_bv()?,
+            StridedInterval::new(8, 2u8, 2u8, 6u8)
+        );
+
+        let shifted = ctx.add(&mv, bv(1)?)?;
+        assert_eq!(
+            shifted.reduce()?.into_bv()?,
+            StridedInterval::new(8, 2u8, 3u8, 7u8)
+        );
+
+        Ok(())
+    }
 }

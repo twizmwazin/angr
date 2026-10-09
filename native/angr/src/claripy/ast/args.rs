@@ -47,7 +47,8 @@ impl ExtractPyArgs for AstRef<'static> {
             | AstOp::Xor(args)
             | AstOp::Add(args)
             | AstOp::Mul(args)
-            | AstOp::Concat(args) => args
+            | AstOp::Concat(args)
+            | AstOp::MultiValue(args) => args
                 .iter()
                 .map(|a| wrap_child(py, a))
                 .collect::<Result<Vec<_>, _>>()?,

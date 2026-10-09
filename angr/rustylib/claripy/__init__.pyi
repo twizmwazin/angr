@@ -1,5 +1,7 @@
 """Type stubs for ``angr.rustylib.claripy`` (aliased at runtime as ``angr.claripy``)."""
 
+from typing import overload
+
 from . import annotation, ast, errors, fp, solver, vsa
 from .annotation import (
     Annotation,
@@ -135,6 +137,11 @@ def Neq(lhs: _BVLike, rhs: _BVLike) -> Bool: ...
 def simplify[T: Base](expr: T) -> T: ...
 def replace[T: Base](expr: T, old: Base, new: Base) -> T: ...
 def excavate_ite[T: Base](expr: T) -> T: ...
+@overload
+def MultiValue(*members: BV) -> BV: ...
+@overload
+def MultiValue(*members: FP) -> FP: ...
+def excavate_multi_value[T: Base](expr: T, limit: int | None = None) -> list[T] | None: ...
 def is_true(expr: object) -> bool: ...
 def is_false(expr: object) -> bool: ...
 
@@ -181,6 +188,7 @@ __all__ = [
     "InvalidExtractBounds",
     "LShR",
     "Mul",
+    "MultiValue",
     "Neq",
     "Not",
     "Or",
@@ -227,6 +235,7 @@ __all__ = [
     "ast",
     "errors",
     "excavate_ite",
+    "excavate_multi_value",
     "false",
     "fp",
     "fpAbs",

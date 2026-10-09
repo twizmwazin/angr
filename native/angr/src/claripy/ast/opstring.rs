@@ -91,6 +91,7 @@ impl ToOpString for AstRef<'static> {
             AstOp::Union(..) => "Union".to_string(),
             AstOp::Intersection(..) => "Intersection".to_string(),
             AstOp::Widen(..) => "Widen".to_string(),
+            AstOp::MultiValue(..) => "MultiValue".to_string(),
 
             // Floats
             AstOp::FPS(..) => "FPS".to_string(),

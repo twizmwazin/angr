@@ -192,6 +192,9 @@ pub(crate) fn simplify_float<'c>(
                 _ => Ok(ctx.ite(if_, then_, else_)?),
             }
         }
+        // Members may simplify to the same expression; rebuilding through the
+        // factory dedups them again and collapses a single survivor.
+        AstOp::MultiValue(_) => Ok(ctx.multi_value(state.get_all_simplified()?)?),
         _ => unreachable!("non-float op dispatched to simplify_float"),
     }
 }

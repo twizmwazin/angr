@@ -1512,6 +1512,9 @@ pub(crate) fn simplify_bv<'c>(
                 _ => Ok(ctx.ite(if_, then_, else_)?),
             }
         }
+        // Members may simplify to the same expression; rebuilding through the
+        // factory dedups them again and collapses a single survivor.
+        AstOp::MultiValue(_) => Ok(ctx.multi_value(state.get_all_simplified()?)?),
         AstOp::Union(..) => {
             let (lhs, rhs) = (
                 state.get_child_simplified(0)?,

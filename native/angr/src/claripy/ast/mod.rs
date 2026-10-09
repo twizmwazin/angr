@@ -174,6 +174,18 @@ pub fn xor<'py>(
     ))
 }
 
+/// A set of alternative values: the result is any one of `members`. Members
+/// must be bitvectors or floats of one sort; the set is flattened, deduplicated
+/// and ordered, and a single distinct member is returned as is.
+#[pyfunction(name = "MultiValue", signature = (*members))]
+pub fn multi_value<'py>(
+    py: Python<'py>,
+    members: Vec<Bound<'py, Base>>,
+) -> Result<Bound<'py, Base>, ClaripyError> {
+    let result = GLOBAL_CONTEXT.multi_value(members.iter().map(|m| m.get().ast()))?;
+    Base::from_ast(py, result.simplify_ext(true, true)?)
+}
+
 #[pyfunction(name = "If")]
 pub fn r#if<'py>(
     py: Python<'py>,

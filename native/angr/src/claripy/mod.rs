@@ -84,6 +84,27 @@ fn py_excavate_ite<'py>(
     Base::from_ast(py, expr.get().ast().excavate_ite()?.simplify()?)
 }
 
+/// The expressions `expr` stands for once every `MultiValue` in it is
+/// expanded, or `None` if there are more than `limit` of them. See
+/// `AstNode::excavate_multi_value` for how repeated sets are expanded.
+#[pyfunction(name = "excavate_multi_value", signature = (expr, limit=None))]
+fn py_excavate_multi_value<'py>(
+    py: Python<'py>,
+    expr: Bound<'py, Base>,
+    limit: Option<usize>,
+) -> Result<Option<Vec<Bound<'py, Base>>>, ClaripyError> {
+    expr.get()
+        .ast()
+        .excavate_multi_value(limit)?
+        .map(|values| {
+            values
+                .into_iter()
+                .map(|v| Base::from_ast(py, v))
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .transpose()
+}
+
 #[pyfunction]
 fn is_true(expr: Bound<'_, PyAny>) -> Result<bool, ClaripyError> {
     if let Ok(bool_expr) = expr.extract::<CoerceBool>() {
@@ -234,6 +255,7 @@ pub fn claripy(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
         ast::string::StrNeq,
         // Shared
         ast::r#if,
+        ast::multi_value,
         ast::not,
         ast::and,
         ast::or,
@@ -295,6 +317,7 @@ pub fn claripy(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_simplify, m)?)?;
     m.add_function(wrap_pyfunction!(py_replace, m)?)?;
     m.add_function(wrap_pyfunction!(py_excavate_ite, m)?)?;
+    m.add_function(wrap_pyfunction!(py_excavate_multi_value, m)?)?;
     m.add_function(wrap_pyfunction!(is_true, m)?)?;
     m.add_function(wrap_pyfunction!(is_false, m)?)?;
     m.add_function(wrap_pyfunction!(ast::bool::ite_cases, m)?)?;

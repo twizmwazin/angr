@@ -150,6 +150,7 @@ fn to_smtlib_op(ast: &AstRef<'_>, children: &[String]) -> String {
         AstOp::Union(..) => format!("(vsaunion {} {})", children[0], children[1]),
         AstOp::Intersection(..) => format!("(vsaintersection {} {})", children[0], children[1]),
         AstOp::Widen(..) => format!("(vsawiden {} {})", children[0], children[1]),
+        AstOp::MultiValue(..) => format!("(multivalue {})", children.join(" ")),
 
         // Floats
         AstOp::FPS(s, _) => smtlib_symbol(s.as_str()),

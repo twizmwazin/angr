@@ -150,6 +150,11 @@ impl BV {
                 &args[1].cast_bound::<BV>(py)?.get().inner,
                 &args[2].cast_bound::<BV>(py)?.get().inner,
             )?,
+            "MultiValue" => GLOBAL_CONTEXT.multi_value(
+                args.iter()
+                    .map(|a| a.cast_bound::<BV>(py).map(|m| m.get().inner.clone()))
+                    .collect::<Result<Vec<_>, _>>()?,
+            )?,
             _ => return Err(ClaripyError::InvalidOperation(op.to_string())),
         };
 
