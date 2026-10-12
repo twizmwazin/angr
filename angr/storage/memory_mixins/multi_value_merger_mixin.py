@@ -33,21 +33,13 @@ class MultiValueMergerMixin(MemoryMixin):
         # Apply the element limit on the store path too. Merging only happens at control-flow joins, so a
         # straight-line chain of ITEs (e.g., cmovs) would otherwise grow value sets exponentially.
         if isinstance(data, MultiValues):
-            data = self._limit_values(data)
+            data = data.limit(
+                self._element_limit,
+                self._top_func,
+                is_top_func=self._is_top_func if self._merge_into_top else None,
+                annotation_limit=self._annotation_limit,
+            )
         super().store(addr, data, size=size, **kwargs)
-
-    def _limit_values(self, data: MultiValues) -> MultiValues:
-        offset_to_values: dict[int, set[Any]] = {}
-        collapsed = False
-        for offset, values_set in data.items():
-            if len(values_set) > self._element_limit:
-                merged_size = max(len(v) for v in values_set) // self.state.arch.byte_width
-                values_set = self._collapse_values(values_set, merged_size)
-                collapsed = True
-            offset_to_values[offset] = set(values_set)
-        if not collapsed:
-            return data
-        return MultiValues(offset_to_values)
 
     def _merge_values(self, values: Iterable[tuple[Any, Any]], merged_size: int, **kwargs):
         values_set = {v for v, _ in values}
@@ -57,45 +49,14 @@ class MultiValueMergerMixin(MemoryMixin):
                 return {phi_var}
 
         # try to merge it in the traditional way
-        return self._collapse_values(values_set, merged_size)
-
-    def _collapse_values(self, values_set: set[Any], merged_size: int) -> set[Any]:
-        """
-        Collapse values_set into a single (possibly TOP) value when it contains TOP or exceeds the element limit.
-        Definition annotations of all values are migrated onto the result.
-        """
-        has_top = self._merge_into_top and any(self._is_top_func(v) for v in values_set)
-        if has_top or len(values_set) > self._element_limit:
-            if has_top:
-                ret_val = self._top_func(merged_size * self.state.arch.byte_width)
-            else:
-                # strip annotations from each value and see how many raw values there are in total
-                # We have to use hash manually to determine uniqueness here, because if __hash__ collides,
-                # python implicitly calls __eq__ to determine if the two objects are actually the same
-                # and that just results in a new AST for a BV. Python then tries to convert that AST to a bool
-                # which fails with the safeguard in claripy.ast.bool.Bool.__bool__.
-                stripped_values_dict = {v.hash(): v for v in values_set}
-                if len(stripped_values_dict) > 1:
-                    ret_val = self._top_func(merged_size * self.state.arch.byte_width)
-                else:
-                    # Get the AST back from the hash dict
-                    ret_val = stripped_values_dict[next(iter(stripped_values_dict))]
-
-            # migrate annotations
-            annotations = []
-            annotations_set = set()
-            for v in values_set:
-                for anno in v.annotations:
-                    if anno not in annotations_set:
-                        annotations.append(anno)
-                        annotations_set.add(anno)
-            if annotations:
-                annotations = sorted(annotations, key=str)
-                ret_val = ret_val.annotate(*annotations[: self._annotation_limit])
-            merged_val = {ret_val}
-        else:
-            merged_val = values_set
-        return merged_val
+        return MultiValues.collapse_values(
+            values_set,
+            merged_size * self.state.arch.byte_width,
+            self._element_limit,
+            self._top_func,
+            is_top_func=self._is_top_func if self._merge_into_top else None,
+            annotation_limit=self._annotation_limit,
+        )
 
     def copy(self, memo=None):
         copied = super().copy(memo)

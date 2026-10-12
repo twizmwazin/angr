@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterable, Iterator
 
 import archinfo
 
@@ -165,6 +165,89 @@ class MultiValues:
             else:
                 new_values[off] |= vs
         return MultiValues(new_values)
+
+    def limit(
+        self,
+        element_limit: int,
+        top_func: Callable[[int], claripy.ast.BV],
+        is_top_func: Callable[[claripy.ast.BV], bool] | None = None,
+        annotation_limit: int = 256,
+    ) -> MultiValues:
+        """
+        Collapse the values at every offset that holds more than `element_limit` values. See collapse_values().
+
+        :return:    self if no offset exceeds the limit, otherwise a new MultiValues object.
+        """
+        offset_to_values: dict[int, set[claripy.ast.BV]] = {}
+        collapsed = False
+        for offset, values in self.items():
+            if len(values) > element_limit:
+                bits = max(len(v) for v in values)
+                values = self.collapse_values(
+                    values,
+                    bits,
+                    element_limit,
+                    top_func,
+                    is_top_func=is_top_func,
+                    annotation_limit=annotation_limit,
+                )
+                collapsed = True
+            offset_to_values[offset] = set(values)
+        if not collapsed:
+            return self
+        return MultiValues(offset_to_values)
+
+    @staticmethod
+    def collapse_values(
+        values: Iterable[claripy.ast.BV],
+        bits: int,
+        element_limit: int,
+        top_func: Callable[[int], claripy.ast.BV],
+        is_top_func: Callable[[claripy.ast.BV], bool] | None = None,
+        annotation_limit: int = 256,
+    ) -> set[claripy.ast.BV]:
+        """
+        Collapse a set of values into a single (possibly TOP) value when it contains TOP or exceeds the element limit.
+        Annotations of all values are migrated onto the result.
+
+        :param values:              The values to collapse.
+        :param bits:                Width of the TOP value to create, in bits.
+        :param element_limit:       The maximum number of values to keep without collapsing.
+        :param top_func:            Creates a TOP value of the given width.
+        :param is_top_func:         Checks if a value is TOP. If provided, any TOP value forces the set to collapse
+                                    into TOP; if None, TOP values are treated like any other value.
+        :param annotation_limit:    The maximum number of annotations to migrate onto the collapsed value.
+        :return:                    The values, either unchanged or collapsed into a single value.
+        """
+        values_set = set(values)
+        has_top = is_top_func is not None and any(is_top_func(v) for v in values_set)
+        if not has_top and len(values_set) <= element_limit:
+            return values_set
+
+        if has_top:
+            ret_val = top_func(bits)
+        else:
+            # strip annotations from each value and see how many raw values there are in total
+            # We have to use hash manually to determine uniqueness here, because if __hash__ collides,
+            # python implicitly calls __eq__ to determine if the two objects are actually the same
+            # and that just results in a new AST for a BV. Python then tries to convert that AST to a bool
+            # which fails with the safeguard in claripy.ast.bool.Bool.__bool__.
+            stripped_values_dict = {v.hash(): v for v in values_set}
+            # if there is only one raw value, get the AST back from the hash dict
+            ret_val = top_func(bits) if len(stripped_values_dict) > 1 else next(iter(stripped_values_dict.values()))
+
+        # migrate annotations
+        annotations = []
+        annotations_set = set()
+        for v in values_set:
+            for anno in v.annotations:
+                if anno not in annotations_set:
+                    annotations.append(anno)
+                    annotations_set.add(anno)
+        if annotations:
+            annotations = sorted(annotations, key=str)
+            ret_val = ret_val.annotate(*annotations[:annotation_limit])
+        return {ret_val}
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, MultiValues):
