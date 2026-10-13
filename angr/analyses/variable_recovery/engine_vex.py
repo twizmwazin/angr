@@ -15,14 +15,15 @@ from angr.knowledge_plugins import Function
 from angr.sim_type import SimTypeBottom, SimTypeRef
 from angr.storage.memory_mixins.paged_memory.pages.multi_values import MultiValues
 
-from .engine_base import RichR, SimEngineVRBase
+from .annotations import type_of, typed
+from .engine_base import SimEngineVRBase
 from .irsb_scanner import VEXIRSBScanner
 
-binop_handler = SimEngineNostmtVEX["VariableRecoveryFastState", RichR, None].binop_handler
+binop_handler = SimEngineNostmtVEX["VariableRecoveryFastState", claripy.ast.BV, None].binop_handler
 
 
 class SimEngineVRVEX(
-    SimEngineNostmtVEX["VariableRecoveryFastState", RichR, None],
+    SimEngineNostmtVEX["VariableRecoveryFastState", claripy.ast.BV, None],
     SimEngineVRBase["VariableRecoveryFastState", Block],
 ):
     """
@@ -39,11 +40,11 @@ class SimEngineVRVEX(
 
     # Statement handlers
 
-    def _is_top(self, expr: RichR) -> bool:
+    def _is_top(self, expr: claripy.ast.BV) -> bool:
         return self.state.is_top(expr)
 
-    def _top(self, bits: int) -> RichR:
-        return RichR(self.state.top(bits))
+    def _top(self, bits: int) -> claripy.ast.BV:
+        return self.state.top(bits)
 
     def _process_block(self, whitelist=None):
         scanner = VEXIRSBScanner(self.project, logger=self.l)
@@ -109,7 +110,7 @@ class SimEngineVRVEX(
             self._store(addr, storedata, size)
 
             result_size = self.tyenv.sizeof(stmt.result)
-            self.tmps[stmt.result] = RichR(claripy.BVV(1, result_size))
+            self.tmps[stmt.result] = claripy.BVV(1, result_size)
 
     # Dirty helpers
 
@@ -150,7 +151,7 @@ class SimEngineVRVEX(
         if is_arm_arch(self.arch) and (self.ins_addr & 1) == 1 and self.stmt_idx < len(self.block.vex.statements) - 1:
             next_stmt = self.block.vex.statements[self.stmt_idx + 1]
             if isinstance(next_stmt, pyvex.IRStmt.WrTmp) and isinstance(next_stmt.data, pyvex.IRExpr.ITE):
-                return RichR(self.state.top(reg_size * 8))
+                return self.state.top(reg_size * 8)
 
         force_variable_size = None
         if self.stmts_to_lower and self.stmt_idx in self.stmts_to_lower and reg_size == 8:
@@ -176,7 +177,7 @@ class SimEngineVRVEX(
     def _handle_expr_VECRET(self, expr):
         return self._top(expr.result_size(self.tyenv))
 
-    def _handle_expr_Load(self, expr: pyvex.IRExpr.Load) -> RichR:
+    def _handle_expr_Load(self, expr: pyvex.IRExpr.Load) -> claripy.ast.BV:
         addr = self._expr(expr.addr)
         size = expr.result_size(self.tyenv) // 8
 
@@ -184,11 +185,11 @@ class SimEngineVRVEX(
 
     def _handle_expr_CCall(self, expr):  # pylint:disable=useless-return
         # ccalls don't matter
-        return RichR(self.state.top(expr.result_size(self.tyenv)))
+        return self.state.top(expr.result_size(self.tyenv))
 
-    def _handle_conversion(self, from_size, to_size, signed, operand) -> RichR:
+    def _handle_conversion(self, from_size, to_size, signed, operand) -> claripy.ast.BV:
         _ = self._expr(operand)
-        return RichR(self.state.top(to_size))
+        return self.state.top(to_size)
 
     # Function handlers
 
@@ -219,7 +220,7 @@ class SimEngineVRVEX(
                     else:
                         one_sp = sp.one_value()
                         if one_sp is not None:
-                            addr = RichR(loc.stack_offset + one_sp)
+                            addr = typed(loc.stack_offset + one_sp)
                             self._load(addr, loc.size)
 
         # clobber caller-saved registers
@@ -287,7 +288,7 @@ class SimEngineVRVEX(
                 )
 
     def _handle_expr_Const(self, expr):
-        return RichR(
+        return typed(
             claripy_value_bv(expr.con.type, expr.con.value, size=expr.con.size),
             typevar=typeconsts.int_type(expr.con.size),
         )
@@ -301,23 +302,23 @@ class SimEngineVRVEX(
     @binop_handler
     def _handle_binop_Add(self, expr):
         r0, r1 = self._expr(expr.args[0]), self._expr(expr.args[1])
-        sum_ = r0.data + r1.data
+        r0_tv = type_of(r0).typevar
+        r1_tv = type_of(r1).typevar
+        sum_ = r0 + r1
 
         result_size = expr.result_size(self.tyenv)
-        if r0.data.concrete and r1.data.concrete:
+        if r0.concrete and r1.concrete:
             # constants
-            return RichR(sum_, typevar=typeconsts.int_type(result_size), type_constraints=None)
+            return typed(sum_, typevar=typeconsts.int_type(result_size), type_constraints=None)
 
         typevar = None
-        if r0.typevar is not None and r1.data.concrete:
-            typevar = self.tv_manager.new_dtv(
-                r0.typevar, label=typevars.add_label(r1.data.concrete_value, r1.data.size())
-            )
+        if r0_tv is not None and r1.concrete:
+            typevar = self.tv_manager.new_dtv(r0_tv, label=typevars.add_label(r1.concrete_value, r1.size()))
 
         tc: set[typevars.TypeConstraint] = set()
-        if r0.typevar is not None and r1.typevar is not None:
-            tc.add(typevars.Subtype(r0.typevar, r1.typevar))
-        return RichR(
+        if r0_tv is not None and r1_tv is not None:
+            tc.add(typevars.Subtype(r0_tv, r1_tv))
+        return typed(
             sum_,
             typevar=typevar,
             type_constraints=tc,
@@ -326,20 +327,19 @@ class SimEngineVRVEX(
     @binop_handler
     def _handle_binop_Sub(self, expr):
         r0, r1 = self._expr(expr.args[0]), self._expr(expr.args[1])
-        diff = r0.data - r1.data
+        r0_tv = type_of(r0).typevar
+        diff = r0 - r1
 
         result_size = expr.result_size(self.tyenv)
-        if r0.data.concrete and r1.data.concrete:
+        if r0.concrete and r1.concrete:
             # constants
-            return RichR(diff, typevar=typeconsts.int_type(result_size), type_constraints=None)
+            return typed(diff, typevar=typeconsts.int_type(result_size), type_constraints=None)
 
         typevar = None
-        if r0.typevar is not None and r1.data.concrete:
-            typevar = self.tv_manager.new_dtv(
-                r0.typevar, label=typevars.sub_label(r1.data.concrete_value, r1.data.size())
-            )
+        if r0_tv is not None and r1.concrete:
+            typevar = self.tv_manager.new_dtv(r0_tv, label=typevars.sub_label(r1.concrete_value, r1.size()))
 
-        return RichR(
+        return typed(
             diff,
             typevar=typevar,
         )
@@ -349,44 +349,44 @@ class SimEngineVRVEX(
         r0 = self._expr(expr.args[0])
         r1 = self._expr(expr.args[1])
 
-        if r0.data.concrete and r1.data.concrete:
+        if r0.concrete and r1.concrete:
             # constants
-            return RichR(r0.data & r1.data)
+            return typed(r0 & r1)
 
-        if self.state.is_stack_address(r0.data):
-            r = r0.data
-        elif self.state.is_stack_address(r1.data):
-            r = r1.data
+        if self.state.is_stack_address(r0):
+            r = r0
+        elif self.state.is_stack_address(r1):
+            r = r1
         else:
             result_size = expr.result_size(self.tyenv)
             r = self.state.top(result_size)
-        return RichR(r)
+        return typed(r)
 
     @binop_handler
     def _handle_binop_Xor(self, expr):
         r0 = self._expr(expr.args[0])
         r1 = self._expr(expr.args[1])
 
-        if r0.data.concrete and r1.data.concrete:
+        if r0.concrete and r1.concrete:
             # constants
-            return RichR(r0.data ^ r1.data)
+            return typed(r0 ^ r1)
 
         result_size = expr.result_size(self.tyenv)
         r = self.state.top(result_size)
-        return RichR(r)
+        return typed(r)
 
     @binop_handler
     def _handle_binop_Or(self, expr):
         r0 = self._expr(expr.args[0])
         r1 = self._expr(expr.args[1])
 
-        if r0.data.concrete and r1.data.concrete:
+        if r0.concrete and r1.concrete:
             # constants
-            return RichR(r0.data | r1.data)
+            return typed(r0 | r1)
 
         result_size = expr.result_size(self.tyenv)
         r = self.state.top(result_size)
-        return RichR(r)
+        return typed(r)
 
     @binop_handler
     def _handle_binop_Not(self, expr):
@@ -394,53 +394,53 @@ class SimEngineVRVEX(
         r0 = self._expr(arg)
 
         result_size = expr.result_size(self.tyenv)
-        if r0.data.concrete:
+        if r0.concrete:
             # constants
-            return RichR(~r0.data)
+            return typed(~r0)
 
         r = self.state.top(result_size)
-        return RichR(r)
+        return typed(r)
 
     @binop_handler
     def _handle_binop_Mul(self, expr):
         r0, r1 = self._expr(expr.args[0]), self._expr(expr.args[1])
 
-        if r0.data.concrete and r1.data.concrete:
+        if r0.concrete and r1.concrete:
             # constants
-            mul = r0.data * r1.data
-            return RichR(mul)
+            mul = r0 * r1
+            return typed(mul)
 
         result_size = expr.result_size(self.tyenv)
         r = self.state.top(result_size)
-        return RichR(r)
+        return typed(r)
 
     @binop_handler
     def _handle_binop_MullS(self, expr):
         r0, r1 = self._expr(expr.args[0]), self._expr(expr.args[1])
 
-        if r0.data.concrete and r1.data.concrete:
+        if r0.concrete and r1.concrete:
             # constants
-            xt = r0.data.size()
-            mul = r0.data.sign_extend(xt) * r1.data.sign_extend(xt)
-            return RichR(mul, typevar=typeconsts.signed_int_type(mul.size()))
+            xt = r0.size()
+            mul = r0.sign_extend(xt) * r1.sign_extend(xt)
+            return typed(mul, typevar=typeconsts.signed_int_type(mul.size()))
 
         result_size = expr.result_size(self.tyenv)
         r = self.state.top(result_size)
-        return RichR(r, typevar=typeconsts.signed_int_type(result_size))
+        return typed(r, typevar=typeconsts.signed_int_type(result_size))
 
     @binop_handler
     def _handle_binop_MullU(self, expr):
         r0, r1 = self._expr(expr.args[0]), self._expr(expr.args[1])
 
-        if r0.data.concrete and r1.data.concrete:
+        if r0.concrete and r1.concrete:
             # constants
-            xt = r0.data.size()
-            mul = r0.data.zero_extend(xt) * r1.data.zero_extend(xt)
-            return RichR(mul, typevar=typeconsts.unsigned_int_type(mul.size()))
+            xt = r0.size()
+            mul = r0.zero_extend(xt) * r1.zero_extend(xt)
+            return typed(mul, typevar=typeconsts.unsigned_int_type(mul.size()))
 
         result_size = expr.result_size(self.tyenv)
         r = self.state.top(result_size)
-        return RichR(r, typevar=typeconsts.unsigned_int_type(result_size))
+        return typed(r, typevar=typeconsts.unsigned_int_type(result_size))
 
     @binop_handler
     def _handle_binop_DivMod(self, expr):
@@ -451,15 +451,15 @@ class SimEngineVRVEX(
         # determine signedness from VEX op name
         is_signed = "S" in expr.op  # Iop_DivModS64to32 vs Iop_DivModU64to32
 
-        if r0.data.concrete and r1.data.concrete:
+        if r0.concrete and r1.concrete:
             # constants
             try:
                 signed = "U" in expr.op  # Iop_DivModU64to32 vs Iop_DivMod
-                from_size = r0.data.size()
-                to_size = r1.data.size()
+                from_size = r0.size()
+                to_size = r1.size()
                 if signed:
-                    quotient = r0.data.SDiv(claripy.SignExt(from_size - to_size, r1.data))
-                    remainder = r0.data.SMod(claripy.SignExt(from_size - to_size, r1.data))
+                    quotient = r0.SDiv(claripy.SignExt(from_size - to_size, r1))
+                    remainder = r0.SMod(claripy.SignExt(from_size - to_size, r1))
                     quotient_size = to_size
                     remainder_size = to_size
                     result = claripy.Concat(
@@ -467,8 +467,8 @@ class SimEngineVRVEX(
                         claripy.Extract(quotient_size - 1, 0, quotient),
                     )
                 else:
-                    quotient = r0.data // claripy.ZeroExt(from_size - to_size, r1.data)
-                    remainder = r0.data % claripy.ZeroExt(from_size - to_size, r1.data)
+                    quotient = r0 // claripy.ZeroExt(from_size - to_size, r1)
+                    remainder = r0 % claripy.ZeroExt(from_size - to_size, r1)
                     quotient_size = to_size
                     remainder_size = to_size
                     result = claripy.Concat(
@@ -476,31 +476,31 @@ class SimEngineVRVEX(
                         claripy.Extract(quotient_size - 1, 0, quotient),
                     )
 
-                return RichR(result)
+                return typed(result)
             except ZeroDivisionError:
                 pass
 
         result_size = expr.result_size(self.tyenv)
         r = self.state.top(result_size)
         if is_signed:
-            return RichR(r, typevar=typeconsts.signed_int_type(result_size))
-        return RichR(r, typevar=typeconsts.unsigned_int_type(result_size))
+            return typed(r, typevar=typeconsts.signed_int_type(result_size))
+        return typed(r, typevar=typeconsts.unsigned_int_type(result_size))
 
     @binop_handler
     def _handle_binop_Div(self, expr):
         r0, r1 = self._expr(expr.args[0]), self._expr(expr.args[1])
 
-        if r0.data.concrete and r1.data.concrete:
+        if r0.concrete and r1.concrete:
             # constants
             try:
-                div = r0.data / r1.data
-                return RichR(div)
+                div = r0 / r1
+                return typed(div)
             except ZeroDivisionError:
                 pass
 
         result_size = expr.result_size(self.tyenv)
         r = self.state.top(result_size)
-        return RichR(r)
+        return typed(r)
 
     @binop_handler
     def _handle_binop_Mod(self, expr):
@@ -509,78 +509,81 @@ class SimEngineVRVEX(
         r1 = self._expr(arg1)
 
         result_size = expr.result_size(self.tyenv)
-        if r0.data.concrete and r1.data.concrete and r1.data.concrete_value != 0:
+        if r0.concrete and r1.concrete and r1.concrete_value != 0:
             # constants
             try:
-                if result_size != r1.data.size():
-                    remainder = r0.data.SMod(claripy.SignExt(result_size - r1.data.size(), r1.data))
+                if result_size != r1.size():
+                    remainder = r0.SMod(claripy.SignExt(result_size - r1.size(), r1))
                 else:
-                    remainder = r0.data.SMod(r1.data)
-                return RichR(remainder)
+                    remainder = r0.SMod(r1)
+                return typed(remainder)
             except ZeroDivisionError:
                 pass
 
         r = self.state.top(result_size)
-        return RichR(r)
+        return typed(r)
 
     @binop_handler
     def _handle_binop_Shr(self, expr):
         arg0, arg1 = expr.args
         r0 = self._expr(arg0)
+        r0_tv = type_of(r0).typevar
         r1 = self._expr(arg1)
 
         result_size = expr.result_size(self.tyenv)
-        if r0.data.concrete and r1.data.concrete:
+        if r0.concrete and r1.concrete:
             # constants
-            return RichR(
-                claripy.LShR(r0.data, r1.data.concrete_value),
+            return typed(
+                claripy.LShR(r0, r1.concrete_value),
                 typevar=typeconsts.unsigned_int_type(result_size),
                 type_constraints=None,
             )
 
         r = self.state.top(result_size)
-        return RichR(
+        return typed(
             r,
-            typevar=r0.typevar,
+            typevar=r0_tv,
         )
 
     @binop_handler
     def _handle_binop_Sar(self, expr):
         arg0, arg1 = expr.args
         r0 = self._expr(arg0)
+        r0_tv = type_of(r0).typevar
         r1 = self._expr(arg1)
 
         result_size = expr.result_size(self.tyenv)
-        if r0.data.concrete and r1.data.concrete:
+        if r0.concrete and r1.concrete:
             # constants
-            return RichR(
-                r0.data >> r1.data.concrete_value,
+            return typed(
+                r0 >> r1.concrete_value,
                 typevar=typeconsts.signed_int_type(result_size),
                 type_constraints=None,
             )
 
         r = self.state.top(result_size)
-        return RichR(r, typevar=r0.typevar)
+        return typed(r, typevar=r0_tv)
 
     @binop_handler
     def _handle_binop_Shl(self, expr):
         arg0, arg1 = expr.args
         r0 = self._expr(arg0)
+        r0_tv = type_of(r0).typevar
         r1 = self._expr(arg1)
 
         result_size = expr.result_size(self.tyenv)
-        if r0.data.concrete and r1.data.concrete:
+        if r0.concrete and r1.concrete:
             # constants
-            return RichR(
-                r0.data << r1.data.concrete_value,
+            return typed(
+                r0 << r1.concrete_value,
                 typevar=typeconsts.int_type(result_size),
                 type_constraints=None,
             )
 
         r = self.state.top(result_size)
-        return RichR(
+        return typed(
             r,
-            typevar=r0.typevar,
+            typevar=r0_tv,
         )
 
     @binop_handler
@@ -589,7 +592,7 @@ class SimEngineVRVEX(
         self._expr(arg0)
         self._expr(arg1)
 
-        return RichR(self.state.top(1))
+        return self.state.top(1)
 
     _handle_binop_CmpNE = _handle_binop_CmpEQ
     _handle_binop_CmpLE = _handle_binop_CmpEQ
@@ -599,4 +602,4 @@ class SimEngineVRVEX(
 
     def _handle_ExpCmpNE64(self, expr):
         _, _ = self._expr(expr.args[0]), self._expr(expr.args[1])
-        return RichR(self.state.top(expr.result_size(self.tyenv)))
+        return self.state.top(expr.result_size(self.tyenv))
