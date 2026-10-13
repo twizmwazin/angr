@@ -143,11 +143,13 @@ class ReachingDefinitionsState:
     # Util methods for working with the memory model
     #
 
-    def top(self, bits: int):
-        return self.live_definitions.top(bits)
+    @staticmethod
+    def top(bits: int) -> claripy.ast.BV:
+        return MultiValues.top(bits)
 
-    def is_top(self, *args):
-        return self.live_definitions.is_top(*args)
+    @staticmethod
+    def is_top(expr) -> bool:
+        return MultiValues.contains_top(expr)
 
     def heap_address(self, offset: int | HeapAddress) -> claripy.ast.BV:
         return self.live_definitions.heap_address(offset)

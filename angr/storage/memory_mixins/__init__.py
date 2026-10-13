@@ -39,6 +39,7 @@ from .paged_memory.pages import (
     RefcountMixin,
     UltraPage,
 )
+from .paged_memory.pages.multi_values import MultiValues
 from .paged_memory.privileged_mixin import PrivilegedPagingMixin
 from .paged_memory.stack_allocation_mixin import StackAllocationMixin
 from .regioned_memory import (
@@ -246,7 +247,7 @@ class MultiValuedMemory(
         if kwargs.get("name", "").startswith("merge_uc_"):
             # this is a hack. when this condition is satisfied, _default_value() is called inside Listpage.merge() to
             # create temporary values. we simply return a TOP value here.
-            return self.state.top(size * self.state.arch.byte_width)
+            return MultiValues.top(size * self.state.arch.byte_width)
 
         # we never fill default values for non-existent loads
         kwargs["fill_missing"] = False

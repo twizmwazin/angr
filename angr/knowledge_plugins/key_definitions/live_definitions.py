@@ -263,26 +263,6 @@ class LiveDefinitions:
             values_other.add(mo_other)
         return values_self == values_other
 
-    @staticmethod
-    def top(bits: int):
-        """
-        Get a TOP value.
-
-        :param bits:    Width of the TOP value (in bits).
-        :return:        The TOP value.
-        """
-        return MultiValues.top(bits)
-
-    @staticmethod
-    def is_top(expr) -> bool:
-        """
-        Check if the given expression is a TOP value.
-
-        :param expr:    The given expression.
-        :return:        True if the expression is TOP or contains TOP, False otherwise.
-        """
-        return MultiValues.contains_top(expr)
-
     def stack_address(self, offset: int) -> claripy.ast.bv.BV:
         base = claripy.BVS("stack_base", self.arch.bits, explicit_name=True)
         if offset:
@@ -945,7 +925,7 @@ class LiveDefinitions:
             addr = pointer
         else:
             assert isinstance(pointer, claripy.ast.BV)
-            if self.is_top(pointer):
+            if MultiValues.contains_top(pointer):
                 return None
 
             # TODO this can be simplified with the walrus operator
