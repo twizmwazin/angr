@@ -86,7 +86,6 @@ class LiveDefinitions:
     INITIAL_SP_16BIT = 0x7F00
     INITIAL_SP_32BIT = 0x7FFF0000
     INITIAL_SP_64BIT = 0x7FFFFFFF0000
-    _tops = {}
 
     __slots__ = (
         "__weakref__",
@@ -137,8 +136,6 @@ class LiveDefinitions:
         self.registers: MultiValuedMemory = (
             MultiValuedMemory(
                 memory_id="reg",
-                top_func=self.top,
-                is_top_func=self.is_top,
                 skip_missing_values_during_merging=False,
                 page_kwargs={"mo_cmp": self._mo_cmp},
                 endness=self.arch.register_endness,
@@ -151,8 +148,6 @@ class LiveDefinitions:
         self.stack: MultiValuedMemory = (
             MultiValuedMemory(
                 memory_id="mem",
-                top_func=self.top,
-                is_top_func=self.is_top,
                 skip_missing_values_during_merging=False,
                 page_kwargs={"mo_cmp": self._mo_cmp},
                 element_limit=element_limit,
@@ -164,8 +159,6 @@ class LiveDefinitions:
         self.memory: MultiValuedMemory = (
             MultiValuedMemory(
                 memory_id="mem",
-                top_func=self.top,
-                is_top_func=self.is_top,
                 skip_missing_values_during_merging=False,
                 page_kwargs={"mo_cmp": self._mo_cmp},
                 element_limit=element_limit,
@@ -177,8 +170,6 @@ class LiveDefinitions:
         self.heap: MultiValuedMemory = (
             MultiValuedMemory(
                 memory_id="mem",
-                top_func=self.top,
-                is_top_func=self.is_top,
                 skip_missing_values_during_merging=False,
                 page_kwargs={"mo_cmp": self._mo_cmp},
                 element_limit=element_limit,
@@ -280,12 +271,7 @@ class LiveDefinitions:
         :param bits:    Width of the TOP value (in bits).
         :return:        The TOP value.
         """
-
-        if bits in LiveDefinitions._tops:
-            return LiveDefinitions._tops[bits]
-        r = claripy.BVS("TOP", bits, explicit_name=True)
-        LiveDefinitions._tops[bits] = r
-        return r
+        return MultiValues.top(bits)
 
     @staticmethod
     def is_top(expr) -> bool:
@@ -293,14 +279,9 @@ class LiveDefinitions:
         Check if the given expression is a TOP value.
 
         :param expr:    The given expression.
-        :return:        True if the expression is TOP, False otherwise.
+        :return:        True if the expression is TOP or contains TOP, False otherwise.
         """
-        if isinstance(expr, claripy.ast.Base):
-            if expr.op == "BVS" and expr.args[0] == "TOP":
-                return True
-            if "TOP" in expr.variables:
-                return True
-        return False
+        return MultiValues.contains_top(expr)
 
     def stack_address(self, offset: int) -> claripy.ast.bv.BV:
         base = claripy.BVS("stack_base", self.arch.bits, explicit_name=True)

@@ -21,6 +21,7 @@ from angr.errors import AngrRuntimeError
 from angr.knowledge_plugins.functions.function import Function
 from angr.sim_variable import SimVariable
 from angr.storage.memory_mixins import MultiValuedMemory
+from angr.storage.memory_mixins.paged_memory.pages.multi_values import MultiValues
 from angr.utils.cowdict import DefaultChainMapCOW
 
 if TYPE_CHECKING:
@@ -197,8 +198,6 @@ class VariableRecoveryStateBase:
     The base abstract state for variable recovery analysis.
     """
 
-    _tops = {}
-
     def __init__(
         self,
         block_addr: int,
@@ -230,8 +229,6 @@ class VariableRecoveryStateBase:
         else:
             self.stack_region: MultiValuedMemory = MultiValuedMemory(
                 memory_id="mem",
-                top_func=self.top,
-                is_top_func=self.is_top,
                 phi_maker=self._make_phi_variable,
                 skip_missing_values_during_merging=True,
                 page_kwargs={"mo_cmp": self._mo_cmp},
@@ -244,8 +241,6 @@ class VariableRecoveryStateBase:
         else:
             self.register_region: MultiValuedMemory = MultiValuedMemory(
                 memory_id="reg",
-                top_func=self.top,
-                is_top_func=self.is_top,
                 phi_maker=self._make_phi_variable,
                 skip_missing_values_during_merging=True,
                 page_kwargs={"mo_cmp": self._mo_cmp},
@@ -258,8 +253,6 @@ class VariableRecoveryStateBase:
         else:
             self.global_region: MultiValuedMemory = MultiValuedMemory(
                 memory_id="mem",
-                top_func=self.top,
-                is_top_func=self.is_top,
                 phi_maker=self._make_phi_variable,
                 skip_missing_values_during_merging=True,
                 page_kwargs={"mo_cmp": self._mo_cmp},
@@ -287,15 +280,11 @@ class VariableRecoveryStateBase:
 
     @staticmethod
     def top(bits) -> claripy.ast.BV:
-        if bits in VariableRecoveryStateBase._tops:
-            return VariableRecoveryStateBase._tops[bits]
-        r = claripy.BVS("top", bits, explicit_name=True)
-        VariableRecoveryStateBase._tops[bits] = r
-        return r
+        return MultiValues.top(bits)
 
     @staticmethod
     def is_top(thing) -> bool:
-        return bool(isinstance(thing, claripy.ast.BV) and thing.op == "BVS" and thing.args[0] == "top")
+        return MultiValues.is_top(thing)
 
     @staticmethod
     def extract_variables(expr: claripy.ast.Base) -> Generator[tuple[int, SimVariable]]:

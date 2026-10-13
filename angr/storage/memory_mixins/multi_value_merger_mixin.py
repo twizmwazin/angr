@@ -14,16 +14,12 @@ class MultiValueMergerMixin(MemoryMixin):
         *args,
         element_limit=5,
         annotation_limit=256,
-        top_func=None,
-        is_top_func=None,
         phi_maker=None,
         merge_into_top=True,
         **kwargs,
     ):
         self._element_limit = element_limit
         self._annotation_limit = annotation_limit
-        self._top_func: Callable = top_func
-        self._is_top_func: Callable = is_top_func
         self._phi_maker: Callable | None = phi_maker
         self._merge_into_top = merge_into_top
 
@@ -35,8 +31,7 @@ class MultiValueMergerMixin(MemoryMixin):
         if isinstance(data, MultiValues):
             data = data.limit(
                 self._element_limit,
-                self._top_func,
-                is_top_func=self._is_top_func if self._merge_into_top else None,
+                merge_into_top=self._merge_into_top,
                 annotation_limit=self._annotation_limit,
             )
         super().store(addr, data, size=size, **kwargs)
@@ -53,8 +48,7 @@ class MultiValueMergerMixin(MemoryMixin):
             values_set,
             merged_size * self.state.arch.byte_width,
             self._element_limit,
-            self._top_func,
-            is_top_func=self._is_top_func if self._merge_into_top else None,
+            merge_into_top=self._merge_into_top,
             annotation_limit=self._annotation_limit,
         )
 
@@ -62,8 +56,6 @@ class MultiValueMergerMixin(MemoryMixin):
         copied = super().copy(memo)
         copied._element_limit = self._element_limit
         copied._annotation_limit = self._annotation_limit
-        copied._top_func = self._top_func
-        copied._is_top_func = self._is_top_func
         copied._phi_maker = self._phi_maker
         copied._merge_into_top = self._merge_into_top
         return copied

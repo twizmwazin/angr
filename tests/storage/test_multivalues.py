@@ -84,31 +84,39 @@ class TestMultiValues(TestCase):
     def test_limit_keeps_offsets_within_the_limit(self):
         mv = MultiValues({0: {claripy.BVV(i, 8) for i in range(3)}, 1: {claripy.BVV(0x22, 8)}})
 
-        assert mv.limit(3, _top) is mv
+        assert mv.limit(3) is mv
 
     def test_limit_collapses_offsets_over_the_limit(self):
         annotated = {claripy.BVV(i, 8).annotate(_Anno(i)) for i in range(4)}
         mv = MultiValues({0: annotated, 1: {claripy.BVV(0x22, 8)}})
 
-        result = mv.limit(3, _top)
+        result = mv.limit(3)
 
         assert mv[0] == annotated
         (collapsed,) = result[0]
-        assert collapsed.op == "BVS" and collapsed.args[0] == "TOP" and collapsed.size() == 8
+        assert MultiValues.is_top(collapsed) and collapsed.size() == 8
         assert {anno.n for anno in collapsed.annotations} == {0, 1, 2, 3}
         assert result[1] == {claripy.BVV(0x22, 8)}
 
-    def test_collapse_values_into_top_only_when_is_top_func_is_given(self):
-        values = {_top(8), claripy.BVV(1, 8)}
+    def test_collapse_values_into_top_only_when_merging_into_top(self):
+        values = {MultiValues.top(8) + 1, claripy.BVV(1, 8)}
 
-        assert MultiValues.collapse_values(values, 8, 5, _top) == values
-        (collapsed,) = MultiValues.collapse_values(values, 8, 5, _top, is_top_func=_is_top)
-        assert _is_top(collapsed)
+        assert MultiValues.collapse_values(values, 8, 5, merge_into_top=False) == values
+        assert MultiValues.collapse_values(values, 8, 5) == {MultiValues.top(8)}
+
+    def test_top(self):
+        top = MultiValues.top(8)
+
+        assert MultiValues.top(8) is top
+        assert MultiValues.is_top(top)
+        assert not MultiValues.is_top(top + 1)
+        assert MultiValues.contains_top(top + 1)
+        assert not MultiValues.contains_top(claripy.BVS("x", 8))
 
     def test_collapse_values_respects_the_annotation_limit(self):
         values = {claripy.BVV(i, 8).annotate(_Anno(i)) for i in range(4)}
 
-        (collapsed,) = MultiValues.collapse_values(values, 8, 1, _top, annotation_limit=2)
+        (collapsed,) = MultiValues.collapse_values(values, 8, 1, annotation_limit=2)
 
         assert len(collapsed.annotations) == 2
 
@@ -133,14 +141,6 @@ class _Anno(claripy.Annotation):
 
     def __hash__(self):
         return hash(("_Anno", self.n))
-
-
-def _top(bits: int) -> claripy.ast.BV:
-    return claripy.BVS("TOP", bits, explicit_name=True)
-
-
-def _is_top(v: claripy.ast.BV) -> bool:
-    return v.op == "BVS" and v.args[0] == "TOP"
 
 
 if __name__ == "__main__":

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Iterable, Iterator
 
 import archinfo
 
 from angr import claripy
 from angr.storage.memory_object import bv_slice
+
+_TOPS: dict[int, claripy.ast.BV] = {}
 
 
 class MultiValues:
@@ -166,11 +168,37 @@ class MultiValues:
                 new_values[off] |= vs
         return MultiValues(new_values)
 
+    @staticmethod
+    def top(bits: int) -> claripy.ast.BV:
+        """
+        Get the TOP value of the given width. TOP represents an unknown value.
+
+        :param bits:    Width of the TOP value (in bits).
+        :return:        The TOP value.
+        """
+        r = _TOPS.get(bits)
+        if r is None:
+            r = _TOPS[bits] = claripy.BVS("TOP", bits, explicit_name=True)
+        return r
+
+    @staticmethod
+    def is_top(v: claripy.ast.Base) -> bool:
+        """
+        Check if the given value is TOP itself.
+        """
+        return isinstance(v, claripy.ast.BV) and v.op == "BVS" and v.args[0] == "TOP"
+
+    @staticmethod
+    def contains_top(v: claripy.ast.Base) -> bool:
+        """
+        Check if the given value is TOP or is an expression over TOP.
+        """
+        return isinstance(v, claripy.ast.Base) and "TOP" in v.variables
+
     def limit(
         self,
         element_limit: int,
-        top_func: Callable[[int], claripy.ast.BV],
-        is_top_func: Callable[[claripy.ast.BV], bool] | None = None,
+        merge_into_top: bool = True,
         annotation_limit: int = 256,
     ) -> MultiValues:
         """
@@ -187,8 +215,7 @@ class MultiValues:
                     values,
                     bits,
                     element_limit,
-                    top_func,
-                    is_top_func=is_top_func,
+                    merge_into_top=merge_into_top,
                     annotation_limit=annotation_limit,
                 )
                 collapsed = True
@@ -202,8 +229,7 @@ class MultiValues:
         values: Iterable[claripy.ast.BV],
         bits: int,
         element_limit: int,
-        top_func: Callable[[int], claripy.ast.BV],
-        is_top_func: Callable[[claripy.ast.BV], bool] | None = None,
+        merge_into_top: bool = True,
         annotation_limit: int = 256,
     ) -> set[claripy.ast.BV]:
         """
@@ -213,19 +239,18 @@ class MultiValues:
         :param values:              The values to collapse.
         :param bits:                Width of the TOP value to create, in bits.
         :param element_limit:       The maximum number of values to keep without collapsing.
-        :param top_func:            Creates a TOP value of the given width.
-        :param is_top_func:         Checks if a value is TOP. If provided, any TOP value forces the set to collapse
-                                    into TOP; if None, TOP values are treated like any other value.
+        :param merge_into_top:      If True, any value that contains TOP forces the set to collapse into TOP;
+                                    otherwise, such values are treated like any other value.
         :param annotation_limit:    The maximum number of annotations to migrate onto the collapsed value.
         :return:                    The values, either unchanged or collapsed into a single value.
         """
         values_set = set(values)
-        has_top = is_top_func is not None and any(is_top_func(v) for v in values_set)
+        has_top = merge_into_top and any(MultiValues.contains_top(v) for v in values_set)
         if not has_top and len(values_set) <= element_limit:
             return values_set
 
         if has_top:
-            ret_val = top_func(bits)
+            ret_val = MultiValues.top(bits)
         else:
             # strip annotations from each value and see how many raw values there are in total
             # We have to use hash manually to determine uniqueness here, because if __hash__ collides,
@@ -234,7 +259,9 @@ class MultiValues:
             # which fails with the safeguard in claripy.ast.bool.Bool.__bool__.
             stripped_values_dict = {v.hash(): v for v in values_set}
             # if there is only one raw value, get the AST back from the hash dict
-            ret_val = top_func(bits) if len(stripped_values_dict) > 1 else next(iter(stripped_values_dict.values()))
+            ret_val = (
+                MultiValues.top(bits) if len(stripped_values_dict) > 1 else next(iter(stripped_values_dict.values()))
+            )
 
         # migrate annotations
         annotations = []
