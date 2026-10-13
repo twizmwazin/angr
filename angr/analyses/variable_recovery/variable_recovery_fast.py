@@ -60,7 +60,7 @@ from angr.sim_variable import (
     SimStackVariable,
     SimVariable,
 )
-from angr.storage.memory_mixins.paged_memory.pages.multi_values import MultiValues
+from angr.utils.multi_value import mv_one_value, mv_segments
 
 from .engine_ail import SimEngineVRAIL
 from .engine_vex import SimEngineVRVEX
@@ -820,11 +820,11 @@ class VariableRecoveryFast(ForwardAnalysis, VariableRecoveryBase):  # pylint:dis
 
         if self._track_sp and block.addr in self._node_to_cc:
             # readjusting sp at the end for blocks that end in a call
-            sp: MultiValues = state.register_region.load(self.project.arch.sp_offset, size=self.project.arch.bytes)
-            sp_v = sp.one_value()
+            sp: claripy.ast.BV = state.register_region.load(self.project.arch.sp_offset, size=self.project.arch.bytes)
+            sp_v = mv_one_value(sp)
             if sp_v is None:
                 l.warning("Unexpected stack pointer value at the end of the function. Pick the first one.")
-                sp_v = next(iter(next(iter(sp.values()))))
+                sp_v = mv_segments(sp)[0][1][0]
 
             adjusted = False
 

@@ -28,6 +28,7 @@ from angr.procedures import SIM_LIBRARIES
 from angr.procedures.definitions import SimSyscallLibrary
 from angr.sim_type import SimTypeChar, SimTypePointer
 from angr.sim_variable import SimMemoryVariable
+from angr.utils.multi_value import mv_one_value
 
 from .api_obf_type2_finder import APIObfuscationType2Finder
 from .hash_lookup_api_deobfuscator import HashLookupAPIDeobfuscator
@@ -229,7 +230,7 @@ class APIObfuscationFinder(Analysis):
                         except SimMemoryMissingError:
                             args.append((arg_idx, claripy.BVV(0xDEADBEEF, self.project.arch.bits)))
                             continue
-                        arg_value = mv.one_value()
+                        arg_value = mv_one_value(mv)
                         if arg_value is None:
                             arg_value = claripy.BVV(0xDEADBEEF, self.project.arch.bits)
                         args.append((arg_idx, arg_value))

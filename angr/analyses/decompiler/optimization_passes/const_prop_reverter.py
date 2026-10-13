@@ -12,6 +12,7 @@ from angr.analyses.decompiler.structuring import DreamStructurer, SAILRStructure
 from angr.analyses.decompiler.variable_map import variable_map_of
 from angr.knowledge_plugins.key_definitions.atoms import MemoryLocation
 from angr.knowledge_plugins.key_definitions.constants import OP_BEFORE
+from angr.utils.multi_value import mv_segments
 
 from .optimization_pass import OptimizationPass, OptimizationPassStage
 
@@ -201,12 +202,12 @@ class ConstPropOptReverter(OptimizationPass):
                 if not state_load_vals:
                     continue
 
-                state_vals = list(state_load_vals.values())
+                state_vals = mv_segments(state_load_vals)
                 # the symbolic variable MUST resolve to only a single value
                 if len(state_vals) != 1:
                     continue
 
-                state_val = next(iter(state_vals[0]))
+                state_val = state_vals[0][1][0]
                 if hasattr(state_val, "concrete") and state_val.concrete:
                     const_value = claripy.Solver().eval(state_val, 1)[0]
                 else:

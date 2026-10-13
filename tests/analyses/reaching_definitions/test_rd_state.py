@@ -14,6 +14,7 @@ from angr.analyses.reaching_definitions.rd_state import ReachingDefinitionsState
 from angr.analyses.reaching_definitions.subject import SubjectType
 from angr.code_location import CodeLocation
 from angr.knowledge_plugins.key_definitions.live_definitions import LiveDefinitions
+from angr.utils.multi_value import mv_one_value
 from tests.common import bin_location
 
 TESTS_LOCATION = os.path.join(bin_location, "tests")
@@ -53,8 +54,8 @@ class TestReachingDefinitionsState(TestCase):
         rtoc_offset = arch.registers["rtoc"][0]
         rtoc_definition_value = state.registers.load(rtoc_offset, size=8)
 
-        self.assertIsNotNone(rtoc_definition_value.one_value())
-        v = rtoc_definition_value.one_value()
+        self.assertIsNotNone(mv_one_value(rtoc_definition_value))
+        v = mv_one_value(rtoc_definition_value)
         self.assertFalse(v.symbolic)
         self.assertEqual(v.concrete_value, rtoc_value)
 

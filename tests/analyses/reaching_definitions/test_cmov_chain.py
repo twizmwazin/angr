@@ -6,6 +6,7 @@ from unittest import TestCase, main
 
 import angr
 from angr.knowledge_plugins.key_definitions.atoms import Register
+from angr.utils.multi_value import mv_segments
 
 # A basic block excerpted from a stripped x86-64 binary: 22 and/cmp/cmov steps on rcx/rdx, ending in a
 # call that is replaced with ret. ReachingDefinitions used to double its value sets on every cmov.
@@ -41,7 +42,7 @@ class TestCmovChain(TestCase):
         for reg_name in ("rcx", "rdx", "rdi"):
             reg_offset, reg_size = proj.arch.registers[reg_name]
             mv = end_state.registers.load(reg_offset, size=reg_size)
-            for values in mv.values():
+            for _, values in mv_segments(mv):
                 assert len(values) <= limit
 
         # the definitions of rdi at the end of the block must survive the collapse

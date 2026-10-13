@@ -17,6 +17,7 @@ from angr.sim_options import TRACK_MEMORY_ACTIONS, ZERO_FILL_UNCONSTRAINED_MEMOR
 from angr.sim_type import SimTypeBottom, SimTypeFunction, SimTypePointer
 from angr.state_plugins.sim_action import SimActionData
 from angr.utils.graph import GraphUtils
+from angr.utils.multi_value import mv_one_value
 
 from .irsb_reg_collector import IRSBRegisterCollector
 
@@ -236,7 +237,7 @@ class StringObfuscationFinder(Analysis):
                             except SimMemoryMissingError:
                                 args.append((arg_idx, claripy.BVV(0xDEADBEEF, self.project.arch.bits)))
                                 continue
-                            arg_value = mv.one_value()
+                            arg_value = mv_one_value(mv)
                             if arg_value is None:
                                 arg_value = claripy.BVV(0xDEADBEEF, self.project.arch.bits)
                             args.append((arg_idx, arg_value))
@@ -367,7 +368,7 @@ class StringObfuscationFinder(Analysis):
                     except SimMemoryMissingError:
                         args.append(claripy.BVV(0xDEADBEEF, self.project.arch.bits))
                         continue
-                    v = mv.one_value()
+                    v = mv_one_value(mv)
                     if v is not None and v.concrete:
                         args.append(v)
                     else:

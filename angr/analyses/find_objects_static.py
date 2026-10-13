@@ -11,8 +11,8 @@ from angr.analyses.reaching_definitions.function_handler import FunctionHandler
 from angr.analyses.vtable import VtableFinder
 from angr.knowledge_plugins.key_definitions.atoms import MemoryLocation, Register
 from angr.knowledge_plugins.key_definitions.constants import OP_AFTER, OP_BEFORE
-from angr.storage.memory_mixins.paged_memory.pages.multi_values import MultiValues
 from angr.utils.cpp import is_cpp_funcname_ctor
+from angr.utils.multi_value import mv_from_segments, mv_one_value
 
 if TYPE_CHECKING:
     from angr.analyses.reaching_definitions.function_handler import FunctionCallData
@@ -79,7 +79,7 @@ class NewFunctionHandler(FunctionHandler):
             else:
                 size_arg_reg_offset = self.project.arch.registers["rdi"][0]
                 size_arg_reg_size = word_size
-            v0 = state.registers.load(size_arg_reg_offset, size_arg_reg_size).one_value()
+            v0 = mv_one_value(state.registers.load(size_arg_reg_offset, size_arg_reg_size))
             size = v0.concrete_value if v0 is not None and v0.concrete else None
 
             if size is not None:
@@ -96,7 +96,7 @@ class NewFunctionHandler(FunctionHandler):
             atom = Register(ret_val_reg_offset, ret_val_reg_size)
             data.depends(
                 atom,
-                value=MultiValues(claripy.BVV(self.max_addr, word_size * state.arch.byte_width)),
+                value=claripy.BVV(self.max_addr, word_size * state.arch.byte_width),
             )
             # setting the values pointed by rax to zero
             memory_location = MemoryLocation(self.max_addr, size)
@@ -104,7 +104,7 @@ class NewFunctionHandler(FunctionHandler):
 
             for offset in range(0, size, word_size):
                 offset_to_values[offset] = {claripy.BVV(0, word_size * state.arch.byte_width)}
-            data.depends(memory_location, value=MultiValues(offset_to_values))
+            data.depends(memory_location, value=mv_from_segments(offset_to_values))
             self.max_addr += size
 
         else:
@@ -115,7 +115,7 @@ class NewFunctionHandler(FunctionHandler):
                     # this class
                     # also if the func is a constructor(not stripped binaries)
                     for addr, possible_object in self.possible_objects_dict.items():
-                        v1 = state.registers.load(72, state.arch.bits // state.arch.byte_width).one_value()
+                        v1 = mv_one_value(state.registers.load(72, state.arch.bits // state.arch.byte_width))
                         obj_addr = v1.concrete_value if v1 is not None and v1.concrete else None
                         if obj_addr is not None and addr == obj_addr:
                             col_ind = self.project.kb.functions[function_address].demangled_name.rfind("::")
@@ -179,7 +179,7 @@ class StaticObjectFinder(Analysis):
                     else:
                         ret_val_reg_offset = self.project.arch.registers["rax"][0]
                         ret_val_reg_size = word_size
-                    v0 = rd_before_node.registers.load(ret_val_reg_offset, ret_val_reg_size).one_value()
+                    v0 = mv_one_value(rd_before_node.registers.load(ret_val_reg_offset, ret_val_reg_size))
                     addr_of_new_obj = v0.concrete_value if v0 is not None and v0.concrete else None
 
                     # we need the state right before the call
@@ -195,7 +195,7 @@ class StaticObjectFinder(Analysis):
                     else:
                         this_ptr_reg_offset = self.project.arch.registers["rdi"][0]
                         this_ptr_reg_size = word_size
-                    v1 = rd_after_node.registers.load(this_ptr_reg_offset, this_ptr_reg_size).one_value()
+                    v1 = mv_one_value(rd_after_node.registers.load(this_ptr_reg_offset, this_ptr_reg_size))
                     addr_in_rdi = v1.concrete_value if v1 is not None and v1.concrete else None
 
                     if addr_of_new_obj is not None and addr_of_new_obj == addr_in_rdi:

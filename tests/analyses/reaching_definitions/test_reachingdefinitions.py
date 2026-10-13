@@ -25,6 +25,7 @@ from angr.knowledge_plugins.key_definitions.live_definitions import LiveDefiniti
 from angr.storage.memory_mixins import MultiValuedMemory
 from angr.storage.memory_object import SimMemoryObject
 from angr.utils.constants import DEFAULT_STATEMENT
+from angr.utils.multi_value import mv_one_value
 
 
 class InsnAndNodeObserveTestingUtils:
@@ -300,7 +301,7 @@ class TestReachingDefinitions(TestCase):
         )
         live_defs = rda.observed_results[("node", func.addr, OP_BEFORE)]
         rtoc_offset, rtoc_size = project.arch.registers["rtoc"]
-        v = live_defs.registers.load(rtoc_offset, size=rtoc_size).one_value()
+        v = mv_one_value(live_defs.registers.load(rtoc_offset, size=rtoc_size))
         assert v is not None and v.concrete_value == rtoc_value
 
     def test_reaching_definition_analysis_exposes_its_subject(self):
@@ -476,7 +477,7 @@ class TestReachingDefinitions(TestCase):
             size=4,
             endness=project.arch.register_endness,
         )
-        assert claripy.is_true(mv.one_value() == claripy.BVV(1, 32))
+        assert claripy.is_true(mv_one_value(mv) == claripy.BVV(1, 32))
 
     def test_conditional_return(self):
         bin_path = _binary_path("check_dap", arch="armel")

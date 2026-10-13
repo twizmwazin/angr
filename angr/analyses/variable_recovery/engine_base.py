@@ -20,8 +20,8 @@ from angr.sim_variable import (
     SimStackVariable,
     SimVariable,
 )
-from angr.storage.memory_mixins.paged_memory.pages.multi_values import MultiValues
 from angr.utils.constants import MAX_ACCESS_SIZE, MAX_FIELD_OFFSET, MAX_POINTSTO_BITS
+from angr.utils.multi_value import mv_leaves, mv_segments
 
 #
 # The base engine used in VariableRecoveryFast
@@ -188,16 +188,15 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
                 if variable is None:
                     # TODO: how to determine the size for a lea?
                     try:
-                        vs: MultiValues | None = self.state.stack_region.load(stack_addr, size=1)
+                        vs: claripy.ast.BV | None = self.state.stack_region.load(stack_addr, size=1)
                     except SimMemoryMissingError:
                         vs = None
 
                     if vs is not None:
                         # extract variables
-                        for values in vs.values():
-                            for v in values:
-                                for var_stack_offset, var in self.state.extract_variables(v):
-                                    existing_vars.append((var, var_stack_offset))
+                        for v in mv_leaves(vs):
+                            for var_stack_offset, var in self.state.extract_variables(v):
+                                existing_vars.append((var, var_stack_offset))
 
                     if not existing_vars:
                         existing_vars = [(v, 0) for v in variable_manager.find_variables_by_stack_offset(stack_offset)]
@@ -224,7 +223,7 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
                 if vs is None:
                     top = self.state.top(self.project.arch.byte_width)
                     top = self.state.annotate_with_variables(top, [(0, variable)])
-                    vs = MultiValues(top)
+                    vs = top
                 self.state.stack_region.store(stack_addr, vs)
 
         elif self.state.is_global_variable_address(data):
@@ -331,7 +330,7 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
             or not create_variable
         ):
             # only store the value. don't worry about variables.
-            v = MultiValues(richr.data)
+            v = richr.data
             self.state.register_region.store(offset, v)
             return
 
@@ -355,12 +354,11 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
             # next check if we are overwriting *part* of an existing variable that is not an input variable
             addr_and_variables = set()
             try:
-                vs: MultiValues = self.state.register_region.load(
+                vs: claripy.ast.BV = self.state.register_region.load(
                     offset, size=size, endness=self.project.arch.register_endness
                 )
-                for values in vs.values():
-                    for value in values:
-                        addr_and_variables.update(self.state.extract_variables(value))
+                for value in mv_leaves(vs):
+                    addr_and_variables.update(self.state.extract_variables(value))
             except SimMemoryMissingError:
                 pass
             input_vars = self.state.variable_manager[self.func_addr].input_variables()
@@ -381,7 +379,7 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
 
         # FIXME: The offset does not have to be 0
         annotated_data = self.state.annotate_with_variables(data, [(0, variable)])
-        v = MultiValues(annotated_data)
+        v = annotated_data
         self.state.register_region.store(offset, v)
         # register with the variable manager
         self.state.variable_manager[self.func_addr].write_to(variable, None, codeloc, atom=dst, overwrite=False)
@@ -667,10 +665,9 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
 
             addr_and_variables = set()
             try:
-                vs: MultiValues = self.state.stack_region.load(stack_addr, size, endness=endness)
-                for values in vs.values():
-                    for value in values:
-                        addr_and_variables.update(self.state.extract_variables(value))
+                vs: claripy.ast.BV = self.state.stack_region.load(stack_addr, size, endness=endness)
+                for value in mv_leaves(vs):
+                    addr_and_variables.update(self.state.extract_variables(value))
             except SimMemoryMissingError:
                 pass
 
@@ -753,7 +750,7 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
         codeloc = CodeLocation(
             self.block.addr, self.stmt_idx, ins_addr=self.ins_addr, block_idx=getattr(self.block, "idx", None)
         )
-        values: MultiValues | None = None
+        values: claripy.ast.BV | None = None
         if abs_addr is not None:
             with contextlib.suppress(SimMemoryMissingError):
                 values = self.state.global_region.load(
@@ -761,10 +758,9 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
                 )
 
         if values is not None:
-            for vs in values.values():
-                for v in vs:
-                    for var_offset, var in self.state.extract_variables(v):
-                        variable_manager.write_to(var, var_offset, codeloc, atom=stmt)
+            for v in mv_leaves(values):
+                for var_offset, var in self.state.extract_variables(v):
+                    variable_manager.write_to(var, var_offset, codeloc, atom=stmt)
         else:
             for var, var_offset in existing_vars:
                 variable_manager.write_to(var, var_offset, codeloc, atom=stmt)
@@ -878,7 +874,7 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
 
                 if concrete_offset is not None:
                     try:
-                        values: MultiValues | None = self.state.stack_region.load(
+                        values: claripy.ast.BV | None = self.state.stack_region.load(
                             self.state.stack_addr_from_offset(concrete_offset),
                             size=size,
                             endness=self.project.arch.memory_endness,
@@ -891,12 +887,11 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
 
                 all_vars: set[tuple[int, SimVariable]] = set()
                 if values:
-                    for vs in values.values():
-                        for v in vs:
-                            for _, var_ in self.state.extract_variables(v):
-                                if isinstance(var_, SimStackVariable):
-                                    var_offset = stack_offset - var_.offset
-                                    all_vars.add((var_offset, var_))
+                    for v in mv_leaves(values):
+                        for _, var_ in self.state.extract_variables(v):
+                            if isinstance(var_, SimStackVariable):
+                                var_offset = stack_offset - var_.offset
+                                all_vars.add((var_offset, var_))
 
                 if not all_vars and concrete_offset is not None:
                     variables = self.state.variable_manager[self.func_addr].find_variables_by_stack_offset(
@@ -1128,7 +1123,7 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
         codeloc = self._codeloc()
 
         try:
-            values: MultiValues | None = self.state.register_region.load(offset, size=size)
+            values: claripy.ast.BV | None = self.state.register_region.load(offset, size=size)
         except SimMemoryMissingError:
             values = None
 
@@ -1137,7 +1132,7 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
             if values is None:
                 r_value = self.state.top(size * self.project.arch.byte_width)
             else:
-                r_value = next(iter(next(iter(values.values()))))
+                r_value = mv_segments(values)[0][1][0]
             return RichR(r_value, variable=None, typevar=None)
 
         if not values:
@@ -1167,7 +1162,7 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
             self.state.register_region.store(offset, value)
             value_list = [{value}]
         else:
-            value_list = list(values.values())
+            value_list = [vs for _, vs in mv_segments(values)]
 
         variable_set = set()
         for value_set in value_list:
