@@ -457,6 +457,24 @@ class TestVariableRecovery(unittest.TestCase):
             False,
         )
 
+    def test_global_variable_offset_zero_is_not_none(self):
+        # an access to the start of a global used to be recorded with offset None on some paths and 0 on others, so
+        # the same access ended up recorded twice under two offsets
+        binary_path = os.path.join(test_location, "x86_64", "decompiler", "head.o")
+        proj = angr.Project(binary_path, auto_load_libs=False)
+        cfg = proj.analyses.CFGFast(normalize=True, data_references=True)
+        proj.analyses.CompleteCallingConventions(recover_variables=True, analyze_callsites=True)
+        proj.analyses.Decompiler(cfg.kb.functions["write_header"], cfg=cfg.model)
+
+        global_manager = proj.kb.dec_variables.get_global_manager("pseudocode")
+        assert global_manager._stmt_to_variable
+        for vars_and_offsets in global_manager._stmt_to_variable.values():
+            offsets_by_var: dict[Any, set[int | None]] = {}
+            for var, offset in vars_and_offsets:
+                offsets_by_var.setdefault(var, set()).add(offset)
+            for var, offsets in offsets_by_var.items():
+                assert not {0, None} <= offsets, f"{var} is recorded with both offset 0 and offset None"
+
     def test_format_string_type_hints_sscanf(self):
         """
         Test that VariableRecoveryFast extracts type hints from format strings.

@@ -38,6 +38,7 @@ class VariableAccess(Serializable):
         self.variable: SimVariable = variable
         self.access_type: int = access_type
         self.location: CodeLocation = location
+        # offset into the variable; 0 for an access to its start, None when the offset is unknown
         self.offset: int | None = offset
         self.atom_hash: int | None = atom_hash
 

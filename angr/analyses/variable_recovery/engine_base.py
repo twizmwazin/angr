@@ -255,8 +255,6 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
 
         # record all variables
         for var, offset in existing_vars:
-            if offset == 0:
-                offset = None
             variable_manager.record_variable(codeloc, var, offset, atom=src_expr)
 
         return existing_vars
@@ -313,8 +311,6 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
 
         # invoke variable_manager.reference_at for every variable
         for var, offset in list(existing_vars):
-            if offset == 0:
-                offset = None
             variable_manager.reference_at(var, offset, codeloc, atom=src)
 
     def _assign_to_register(self, offset, richr, size, src=None, dst=None, create_variable: bool = True):  # pylint:disable=unused-argument
@@ -384,7 +380,7 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
         v = MultiValues(annotated_data)
         self.state.register_region.store(offset, v)
         # register with the variable manager
-        self.state.variable_manager[self.func_addr].write_to(variable, None, codeloc, atom=dst, overwrite=False)
+        self.state.variable_manager[self.func_addr].write_to(variable, 0, codeloc, atom=dst, overwrite=False)
 
         if richr.typevar is not None:
             if not self.state.typevars.has_type_variable_for(variable):
@@ -518,7 +514,7 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
         annotated_data = self.state.annotate_with_variables(data, [(var_offset or 0, variable)])
         self.vvar_region[vvar_id] = annotated_data
         self.state.variable_manager[self.func_addr].write_to(
-            variable, var_offset or None, codeloc, atom=dst, overwrite=False
+            variable, var_offset or 0, codeloc, atom=dst, overwrite=False
         )
 
         if vvar.was_stack:
@@ -675,12 +671,9 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
                 pass
 
             for var_offset, var in addr_and_variables:
-                offset_into_var = var_offset
-                if offset_into_var == 0:
-                    offset_into_var = None
                 self.state.variable_manager[self.func_addr].write_to(
                     var,
-                    offset_into_var,
+                    var_offset,
                     codeloc,
                     atom=atom,
                 )
@@ -1073,12 +1066,17 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
         # the loop may register new globals into this set: iterate over a snapshot
         snapshot = list(existing_vars)
         for variable, var_offset in snapshot:
-            concrete = (
-                cast(int, var_offset[0].concrete_value) * cast(int, var_offset[1])
-                if isinstance(var_offset, tuple) and var_offset[0] is not None and var_offset[0].concrete
-                else None
-            )
-            variable_manager.read_from(variable, concrete or None, codeloc, atom=expr)
+            if not isinstance(var_offset, tuple):
+                # already recorded for this atom
+                concrete = var_offset
+            elif var_offset[0] is None:
+                concrete = 0
+            elif var_offset[0].concrete:
+                concrete = cast(int, var_offset[0].concrete_value) * cast(int, var_offset[1])
+            else:
+                # unknown offset
+                concrete = None
+            variable_manager.read_from(variable, concrete, codeloc, atom=expr)
 
         variable, _ = next(iter(existing_vars))
         # create type constraints
@@ -1173,9 +1171,7 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
         for value_set in value_list:
             for value in value_set:
                 for _, var in self.state.extract_variables(value):
-                    self.state.variable_manager[self.func_addr].read_from(
-                        var, None, codeloc, atom=expr, overwrite=False
-                    )
+                    self.state.variable_manager[self.func_addr].read_from(var, 0, codeloc, atom=expr, overwrite=False)
                     variable_set.add(var)
 
         if offset == self.project.arch.sp_offset:
@@ -1324,9 +1320,7 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
 
         variable_set = set()
         for var_offset, var in self.state.extract_variables(value):
-            self.state.variable_manager[self.func_addr].read_from(
-                var, var_offset or None, codeloc, atom=expr, overwrite=False
-            )
+            self.state.variable_manager[self.func_addr].read_from(var, var_offset, codeloc, atom=expr, overwrite=False)
             variable_set.add(var)
 
         if (
