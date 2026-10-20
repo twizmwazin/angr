@@ -252,10 +252,6 @@ pub fn claripy(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
         "SimplificationAvoidanceAnnotation",
         annotation.getattr("SimplificationAvoidanceAnnotation")?,
     )?;
-    m.add(
-        "StridedIntervalAnnotation",
-        annotation.getattr("StridedIntervalAnnotation")?,
-    )?;
     m.add("RegionAnnotation", annotation.getattr("RegionAnnotation")?)?;
     m.add(
         "UninitializedAnnotation",

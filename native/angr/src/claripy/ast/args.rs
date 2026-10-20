@@ -29,6 +29,29 @@ impl ExtractPyArgs for AstRef<'static> {
                 name.as_str().into_bound_py_any(py)?,
                 size.into_bound_py_any(py)?,
             ],
+            AstOp::SI(name, size, bounds) => {
+                let mut args = vec![
+                    name.as_str().into_bound_py_any(py)?,
+                    size.into_bound_py_any(py)?,
+                ];
+                match bounds.as_ref() {
+                    SIBounds::Empty => args.extend([
+                        py.None().into_bound(py),
+                        py.None().into_bound(py),
+                        py.None().into_bound(py),
+                    ]),
+                    SIBounds::Interval {
+                        stride,
+                        lower_bound,
+                        upper_bound,
+                    } => args.extend([
+                        stride.into_bound_py_any(py)?,
+                        lower_bound.into_bound_py_any(py)?,
+                        upper_bound.into_bound_py_any(py)?,
+                    ]),
+                }
+                args
+            }
             AstOp::BVV(bit_vec) => vec![
                 bit_vec.to_biguint().into_bound_py_any(py)?,
                 bit_vec.len().into_bound_py_any(py)?,

@@ -5,7 +5,6 @@ from .annotation import (
     Annotation,
     RegionAnnotation,
     SimplificationAvoidanceAnnotation,
-    StridedIntervalAnnotation,
     UninitializedAnnotation,
 )
 from .ast.base import Base
@@ -213,7 +212,6 @@ __all__ = [
     "StrSubstr",
     "StrSuffixOf",
     "StrToInt",
-    "StridedIntervalAnnotation",
     "String",
     "StringS",
     "StringV",

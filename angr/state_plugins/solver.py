@@ -423,19 +423,25 @@ class SimSolver(SimStatePlugin):
             ):
                 l.warning("Variable %s being retrieved with different settings than it was tracked with", name)
         else:
-            r = claripy.BVS(
-                name,
-                size,
-                explicit_name=explicit_name,
-                **kwargs,
-            )
             if any(x is not None for x in (min, max, stride)):
                 # Strided-interval bounds are stored unsigned; wrap any signed
                 # bound to its two's-complement representation at this width.
                 mask = (1 << size) - 1
-                si_min = None if min is None else min & mask
-                si_max = None if max is None else max & mask
-                r = r.annotate(claripy.annotation.StridedIntervalAnnotation(stride, si_min, si_max))
+                r = claripy.SI(
+                    size,
+                    1 if stride is None else stride,
+                    0 if min is None else min & mask,
+                    mask if max is None else max & mask,
+                    name=name,
+                    explicit_name=explicit_name,
+                )
+            else:
+                r = claripy.BVS(
+                    name,
+                    size,
+                    explicit_name=explicit_name,
+                    **kwargs,
+                )
             if uninitialized:
                 r = r.annotate(claripy.annotation.UninitializedAnnotation())
             if key is not None:

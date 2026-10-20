@@ -38,6 +38,20 @@ impl BV {
     ) -> Result<Py<BV>, ClaripyError> {
         let inner = match op {
             "BVS" => GLOBAL_CONTEXT.bvs(args[0].extract::<String>(py)?, args[1].extract(py)?)?,
+            "SI" => {
+                let name = args[0].extract::<String>(py)?;
+                let bits = args[1].extract(py)?;
+                match args[2].extract::<Option<BigUint>>(py)? {
+                    None => GLOBAL_CONTEXT.esi_named(name, bits)?,
+                    Some(stride) => GLOBAL_CONTEXT.si_named(
+                        name,
+                        bits,
+                        stride,
+                        args[3].extract(py)?,
+                        args[4].extract(py)?,
+                    )?,
+                }
+            }
             "BVV" => GLOBAL_CONTEXT.bvv(BitVec::from((
                 args[0].extract::<BigUint>(py)?,
                 args[1].extract::<u32>(py)?,
@@ -1303,13 +1317,21 @@ binop!(Neq, neq, Bool);
 
 // VSA Stuff
 
-#[pyfunction]
+/// A strided interval: the values `lower_bound`, `lower_bound + stride`, ...,
+/// `upper_bound`. Negative bounds are taken as two's complement at `bits`.
+///
+/// Without a `name` the interval is named after its bounds, so equal intervals
+/// are the same AST. A `name` gets a unique suffix like `BVS` unless
+/// `explicit_name` is set.
+#[pyfunction(signature = (bits, stride, lower_bound, upper_bound, name = None, explicit_name = false))]
 pub fn SI(
     py: Python<'_>,
     bits: u32,
     stride: BigUint,
     lower_bound: BigInt,
     upper_bound: BigInt,
+    name: Option<NameString>,
+    explicit_name: bool,
 ) -> Result<Bound<'_, BV>, ClaripyError> {
     // Convert potentially negative bounds to unsigned values in the bitvector's domain
     let modulus = BigInt::from(1) << bits;
@@ -1329,12 +1351,18 @@ pub fn SI(
     .to_biguint()
     .expect("upper_bound conversion failed");
 
-    BV::new(
-        py,
-        &GLOBAL_CONTEXT
-            .si(bits, stride, lower_bound, upper_bound)?
-            .simplify_ext(true, true)?,
-    )
+    let si = match name {
+        None => GLOBAL_CONTEXT.si(bits, stride, lower_bound, upper_bound)?,
+        Some(name) => {
+            let mut name: String = name.into();
+            if !explicit_name {
+                let counter = BVS_COUNTER.fetch_add(1, Ordering::Relaxed);
+                name = format!("{name}_{counter}_{bits}");
+            }
+            GLOBAL_CONTEXT.si_named(name, bits, stride, lower_bound, upper_bound)?
+        }
+    };
+    BV::new(py, &si.simplify_ext(true, true)?)
 }
 
 #[pyfunction]

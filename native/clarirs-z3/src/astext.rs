@@ -236,8 +236,9 @@ impl<'c> AstExtZ3<'c> for AstRef<'c> {
                                 Z3_mk_and(z3_ctx, 2, args.as_ptr()).try_into()?
                             }
 
-                            // Bitvector leaves and operations
-                            AstOp::BVS(s, w) => {
+                            // Bitvector leaves and operations. z3 has no strided
+                            // intervals, so an SI is the free variable it names.
+                            AstOp::BVS(s, w) | AstOp::SI(s, w, _) => {
                                 let s_cstr = std::ffi::CString::new(s.as_str()).unwrap();
                                 let sym = require(Z3_mk_string_symbol(z3_ctx, s_cstr.as_ptr()))?;
                                 let sort = require(Z3_mk_bv_sort(z3_ctx, *w))?;

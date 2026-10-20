@@ -11,7 +11,7 @@ pub(crate) fn simplify_bv<'c>(
     let bv_expr = state.expr.clone();
 
     match bv_expr.op() {
-        AstOp::BVS(..) | AstOp::BVV(..) => Ok(bv_expr),
+        AstOp::BVS(..) | AstOp::BVV(..) | AstOp::SI(..) => Ok(bv_expr),
         AstOp::Not(..) => {
             let arc = state.get_child_simplified(0)?;
             match arc.op() {

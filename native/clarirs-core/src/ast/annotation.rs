@@ -46,12 +46,6 @@ pub enum AnnotationType {
         obj_hash: i64,
     },
     SimplificationAvoidance,
-    StridedInterval {
-        stride: BigUint,
-        lower_bound: BigUint,
-        upper_bound: BigUint,
-    },
-    EmptyStridedInterval,
     Region {
         region_id: String,
         region_base_addr: BigUint,
@@ -79,8 +73,6 @@ impl Annotation {
         match self.type_ {
             AnnotationType::Unknown { ref name, .. } => name,
             AnnotationType::SimplificationAvoidance => "SimplificationAvoidanceAnnotation",
-            AnnotationType::StridedInterval { .. } => "StridedIntervalAnnotation",
-            AnnotationType::EmptyStridedInterval => "EmptyStridedIntervalAnnotation",
             AnnotationType::Region { .. } => "RegionAnnotation",
             AnnotationType::Uninitialized => "UninitializedAnnotation",
         }

@@ -101,4 +101,27 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_reduce_si_leaves() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+
+        let si = ctx.si_named("x", 8, 2u8.into(), 4u8.into(), 10u8.into())?;
+        assert_eq!(
+            si.reduce()?.into_bv()?,
+            StridedInterval::new(8, 2u8, 4u8, 10u8)
+        );
+        assert_eq!(
+            ctx.add(&si, &si)?.reduce()?.into_bv()?,
+            StridedInterval::new(8, 2u8, 8u8, 20u8)
+        );
+
+        assert_eq!(ctx.esi(8)?.reduce()?.into_bv()?, StridedInterval::empty(8));
+        assert_eq!(
+            ctx.bvs("y", 8)?.reduce()?.into_bv()?,
+            StridedInterval::top(8)
+        );
+
+        Ok(())
+    }
 }

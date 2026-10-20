@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from angr import claripy
-from angr.claripy.annotation import StridedIntervalAnnotation, UninitializedAnnotation
+from angr.claripy.annotation import UninitializedAnnotation
 from angr.storage.memory_mixins.memory_mixin import MemoryMixin
 
 l = logging.getLogger(name=__name__)
@@ -21,7 +21,7 @@ class AbstractMergerMixin(MemoryMixin):
         values = list(values)
         ours = values[0][0]
 
-        # a never-written default value is dropped in favor of values from other paths. Only a bare BVS qualifies:
+        # a never-written default value is dropped in favor of values from other paths. Only a bare leaf qualifies:
         # the annotation propagates through every operation, so derived values must still take part in the merge
         initialized = [v for v, _ in values if not self._is_raw_uninitialized(v)]
         if not initialized:
@@ -40,7 +40,7 @@ class AbstractMergerMixin(MemoryMixin):
 
     @staticmethod
     def _is_raw_uninitialized(v) -> bool:
-        return v.op == "BVS" and v.has_annotation_type(UninitializedAnnotation)
+        return v.op in ("BVS", "SI") and v.has_annotation_type(UninitializedAnnotation)
 
     @staticmethod
     def _canonicalize(v):
@@ -53,10 +53,8 @@ class AbstractMergerMixin(MemoryMixin):
         simplified = claripy.vsa.simplify(v)
         if simplified.op == "BVV":
             return simplified
-        si_anno = simplified.get_annotation(StridedIntervalAnnotation)
-        if si_anno is None:
+        if simplified.op != "SI" or simplified.args[2] is None:
             return v
-        extra_annotations = [
-            a for a in v.annotations if not isinstance(a, StridedIntervalAnnotation | UninitializedAnnotation)
-        ]
-        return claripy.BVS("merged", len(v)).annotate(si_anno, *extra_annotations)
+        _, bits, stride, lower_bound, upper_bound = simplified.args
+        extra_annotations = [a for a in v.annotations if not isinstance(a, UninitializedAnnotation)]
+        return claripy.SI(bits, stride, lower_bound, upper_bound, name="merged").annotate(*extra_annotations)

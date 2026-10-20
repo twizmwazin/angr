@@ -159,7 +159,7 @@ fn to_smtlib_op(ast: &AstRef<'_>, children: &[String]) -> String {
         ),
 
         // Bitvectors
-        AstOp::BVS(s, _) => smtlib_symbol(s.as_str()),
+        AstOp::BVS(s, _) | AstOp::SI(s, ..) => smtlib_symbol(s.as_str()),
         AstOp::BVV(bit_vec) => format!("(_ bv{} {})", bit_vec.to_biguint(), bit_vec.len()),
         AstOp::Xor(..) if ast.ast_type().is_bool() => format!("(xor {})", children.join(" ")),
         AstOp::Xor(..) => format!(
@@ -339,7 +339,9 @@ impl<'c> AstNode<'c> {
 fn var_declaration(ast: &AstRef<'_>) -> Option<(String, String)> {
     match ast.op() {
         AstOp::BoolS(s) => Some((smtlib_symbol(s.as_str()), "Bool".to_string())),
-        AstOp::BVS(s, width) => Some((smtlib_symbol(s.as_str()), format!("(_ BitVec {width})"))),
+        AstOp::BVS(s, width) | AstOp::SI(s, width, _) => {
+            Some((smtlib_symbol(s.as_str()), format!("(_ BitVec {width})")))
+        }
         // SMT-LIB's FloatingPoint significand width counts the implicit hidden
         // bit, which clarirs' FSort::mantissa does not.
         AstOp::FPS(s, sort) => Some((

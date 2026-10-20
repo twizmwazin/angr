@@ -710,6 +710,29 @@ pub trait AstFactory<'c>: Sized {
 
     // VSA methods
 
+    /// A strided interval leaf named `name`.
+    fn si_named<S: AsRef<str>>(
+        &'c self,
+        name: S,
+        size: u32,
+        stride: BigUint,
+        lower_bound: BigUint,
+        upper_bound: BigUint,
+    ) -> Result<AstRef<'c>, ClarirsError> {
+        let interned = self.intern_string(name);
+        self.make_ast(AstOp::SI(
+            interned,
+            size,
+            Box::new(SIBounds::Interval {
+                stride,
+                lower_bound,
+                upper_bound,
+            }),
+        ))
+    }
+
+    /// A strided interval leaf named after its bounds, so equal intervals
+    /// are the same AST.
     fn si(
         &'c self,
         size: u32,
@@ -718,32 +741,18 @@ pub trait AstFactory<'c>: Sized {
         upper_bound: BigUint,
     ) -> Result<AstRef<'c>, ClarirsError> {
         let name = format!("SI{size}_{stride}_{lower_bound}_{upper_bound}");
-        let interned = self.intern_string(name);
-        self.make_ast_annotated(
-            AstOp::BVS(interned, size),
-            BTreeSet::from([Annotation::new(
-                AnnotationType::StridedInterval {
-                    stride,
-                    lower_bound,
-                    upper_bound,
-                },
-                false,
-                false,
-            )]),
-        )
+        self.si_named(name, size, stride, lower_bound, upper_bound)
     }
 
-    fn esi(&'c self, size: u32) -> Result<AstRef<'c>, ClarirsError> {
-        let name = format!("ESI{size}");
+    /// An empty strided interval leaf named `name`.
+    fn esi_named<S: AsRef<str>>(&'c self, name: S, size: u32) -> Result<AstRef<'c>, ClarirsError> {
         let interned = self.intern_string(name);
-        self.make_ast_annotated(
-            AstOp::BVS(interned, size),
-            BTreeSet::from([Annotation::new(
-                AnnotationType::EmptyStridedInterval,
-                false,
-                false,
-            )]),
-        )
+        self.make_ast(AstOp::SI(interned, size, Box::new(SIBounds::Empty)))
+    }
+
+    /// The empty strided interval of the given width.
+    fn esi(&'c self, size: u32) -> Result<AstRef<'c>, ClarirsError> {
+        self.esi_named(format!("ESI{size}"), size)
     }
 
     fn union(

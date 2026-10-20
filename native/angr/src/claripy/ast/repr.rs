@@ -167,6 +167,20 @@ fn args_of(ast: &AstRef<'static>) -> Vec<Arg> {
         AstOp::BVS(name, width) => {
             vec![Arg::Lit(name.to_string()), Arg::Lit(width.to_string())]
         }
+        AstOp::SI(name, width, bounds) => {
+            let mut args = vec![Arg::Lit(name.to_string()), Arg::Lit(width.to_string())];
+            match bounds.as_ref() {
+                SIBounds::Empty => args.extend((0..3).map(|_| Arg::Lit("None".to_string()))),
+                SIBounds::Interval {
+                    stride,
+                    lower_bound,
+                    upper_bound,
+                } => args.extend(
+                    [stride, lower_bound, upper_bound].map(|v| Arg::Lit(v.to_str_radix(10))),
+                ),
+            }
+            args
+        }
         AstOp::BVV(value) => vec![
             Arg::Lit(value.to_biguint().to_str_radix(10)),
             Arg::Lit(value.len().to_string()),
@@ -214,7 +228,7 @@ fn op_repr(
 ) -> String {
     if details < FULL_REPR {
         match ast.op() {
-            AstOp::BVS(name, _) => return name.to_string(),
+            AstOp::BVS(name, _) | AstOp::SI(name, ..) => return name.to_string(),
             AstOp::BoolV(_) => return args[0].clone(),
             AstOp::BVV(value) => {
                 let rendered = bitvec_repr(&value.to_biguint(), value.len());

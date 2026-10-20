@@ -2171,8 +2171,7 @@ class JumpTableResolver(IndirectJumpResolver):
         else:
             try:
                 jumptable_si = claripy.vsa.simplify(jumptable_addr)
-                si_annotation = jumptable_si.get_annotation(claripy.annotation.StridedIntervalAnnotation)
-                stride = si_annotation.stride if si_annotation is not None else 0
+                stride = (jumptable_si.args[2] or 0) if jumptable_si.op == "SI" else 0
             except claripy.ClaripyError:
                 return None
 

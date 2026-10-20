@@ -125,11 +125,14 @@ pub fn canonicalize<'c>(
             && let Some(canonical_name) = var_mapping.get(original_name)
         {
             // Create the canonical variable with the same type and size as the original
-            let canonical_var = match var.ast_type() {
-                AstType::Bool => ctx.bools(canonical_name.as_str())?,
-                AstType::BitVec(size) => ctx.bvs(canonical_name.as_str(), size)?,
-                AstType::Float(sort) => ctx.fps(canonical_name.as_str(), sort)?,
-                AstType::String => ctx.strings(canonical_name.as_str())?,
+            let canonical_var = match (var.op(), var.ast_type()) {
+                (AstOp::SI(_, size, bounds), _) => {
+                    ctx.make_ast(AstOp::SI(canonical_name.clone(), *size, bounds.clone()))?
+                }
+                (_, AstType::Bool) => ctx.bools(canonical_name.as_str())?,
+                (_, AstType::BitVec(size)) => ctx.bvs(canonical_name.as_str(), size)?,
+                (_, AstType::Float(sort)) => ctx.fps(canonical_name.as_str(), sort)?,
+                (_, AstType::String) => ctx.strings(canonical_name.as_str())?,
             };
             replacement_map.insert(var.hash(), canonical_var);
         }
@@ -284,6 +287,18 @@ mod tests {
         assert_eq!(canonical, dyn_canonical_expected);
         assert_eq!(map.len(), 1);
         assert_eq!(counter, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_canonicalize_keeps_si_bounds() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+
+        let si = |name| ctx.si_named(name, 32, 4u8.into(), 0u8.into(), 16u8.into());
+        let (_, _, canonical) = canonicalize(&ctx.add(&si("x")?, &ctx.bvs("y", 32)?)?)?;
+
+        assert_eq!(canonical, ctx.add(&si("v0")?, &ctx.bvs("v1", 32)?)?);
 
         Ok(())
     }

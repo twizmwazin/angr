@@ -108,19 +108,6 @@ impl PyAnnotation {
         let any = slf.as_any();
         let annotation = if any.cast::<SimplificationAvoidanceAnnotation>().is_ok() {
             Annotation::new(AnnotationType::SimplificationAvoidance, false, false)
-        } else if let Ok(si) = any.cast::<StridedIntervalAnnotation>() {
-            let si = si.get();
-            Annotation::new(
-                AnnotationType::StridedInterval {
-                    stride: si.stride.clone(),
-                    lower_bound: si.lower_bound.clone(),
-                    upper_bound: si.upper_bound.clone(),
-                },
-                false,
-                false,
-            )
-        } else if any.cast::<EmptyStridedIntervalAnnotation>().is_ok() {
-            Annotation::new(AnnotationType::EmptyStridedInterval, false, false)
         } else if let Ok(region) = any.cast::<RegionAnnotation>() {
             let region = region.get();
             Annotation::new(
@@ -199,22 +186,6 @@ impl PyAnnotation {
                 PyClassInitializer::from(PyAnnotation)
                     .add_subclass(SimplificationAvoidanceAnnotation),
             )?),
-            AnnotationType::StridedInterval {
-                stride,
-                lower_bound,
-                upper_bound,
-            } => upcast(Bound::new(
-                py,
-                PyClassInitializer::from(PyAnnotation).add_subclass(StridedIntervalAnnotation {
-                    stride: stride.clone(),
-                    lower_bound: lower_bound.clone(),
-                    upper_bound: upper_bound.clone(),
-                }),
-            )?),
-            AnnotationType::EmptyStridedInterval => upcast(Bound::new(
-                py,
-                PyClassInitializer::from(PyAnnotation).add_subclass(EmptyStridedIntervalAnnotation),
-            )?),
             AnnotationType::Region {
                 region_id,
                 region_base_addr,
@@ -269,95 +240,6 @@ impl SimplificationAvoidanceAnnotation {
 
     fn __repr__(&self) -> &'static str {
         "SimplificationAvoidanceAnnotation()"
-    }
-}
-
-/// `claripy.annotation.StridedIntervalAnnotation`
-#[pyclass(extends = PyAnnotation, subclass, frozen, weakref, module = "angr.rustylib.claripy.annotation")]
-pub struct StridedIntervalAnnotation {
-    #[pyo3(get)]
-    stride: BigUint,
-    #[pyo3(get)]
-    lower_bound: BigUint,
-    #[pyo3(get)]
-    upper_bound: BigUint,
-}
-
-#[pymethods]
-impl StridedIntervalAnnotation {
-    #[new]
-    fn py_new(
-        stride: BigUint,
-        lower_bound: BigUint,
-        upper_bound: BigUint,
-    ) -> PyClassInitializer<Self> {
-        PyClassInitializer::from(PyAnnotation).add_subclass(StridedIntervalAnnotation {
-            stride,
-            lower_bound,
-            upper_bound,
-        })
-    }
-
-    #[classattr]
-    fn relocatable() -> bool {
-        false
-    }
-
-    #[classattr]
-    fn eliminatable() -> bool {
-        false
-    }
-
-    fn __reduce__<'py>(slf: PyRef<'py, Self>) -> (Bound<'py, PyType>, (BigUint, BigUint, BigUint)) {
-        (
-            slf.py().get_type::<Self>(),
-            (
-                slf.stride.clone(),
-                slf.lower_bound.clone(),
-                slf.upper_bound.clone(),
-            ),
-        )
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "StridedIntervalAnnotation(stride={}, lower_bound={}, upper_bound={})",
-            self.stride, self.lower_bound, self.upper_bound
-        )
-    }
-}
-
-/// `claripy.annotation.EmptyStridedIntervalAnnotation`
-#[pyclass(extends = PyAnnotation, subclass, frozen, weakref, module = "angr.rustylib.claripy.annotation")]
-pub struct EmptyStridedIntervalAnnotation;
-
-#[pymethods]
-impl EmptyStridedIntervalAnnotation {
-    #[new]
-    #[pyo3(signature = (*_args, **_kwargs))]
-    fn py_new(
-        _args: &Bound<'_, PyTuple>,
-        _kwargs: Option<&Bound<'_, PyDict>>,
-    ) -> PyClassInitializer<Self> {
-        PyClassInitializer::from(PyAnnotation).add_subclass(EmptyStridedIntervalAnnotation)
-    }
-
-    #[classattr]
-    fn relocatable() -> bool {
-        false
-    }
-
-    #[classattr]
-    fn eliminatable() -> bool {
-        false
-    }
-
-    fn __reduce__<'py>(slf: PyRef<'py, Self>) -> (Bound<'py, PyType>, ()) {
-        (slf.py().get_type::<Self>(), ())
-    }
-
-    fn __repr__(&self) -> &'static str {
-        "EmptyStridedIntervalAnnotation()"
     }
 }
 
@@ -442,8 +324,6 @@ impl UninitializedAnnotation {
 pub(crate) fn import(_: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<PyAnnotation>()?;
     m.add_class::<SimplificationAvoidanceAnnotation>()?;
-    m.add_class::<StridedIntervalAnnotation>()?;
-    m.add_class::<EmptyStridedIntervalAnnotation>()?;
     m.add_class::<RegionAnnotation>()?;
     m.add_class::<UninitializedAnnotation>()?;
     Ok(())

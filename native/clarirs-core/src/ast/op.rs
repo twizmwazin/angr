@@ -1,6 +1,8 @@
 use std::collections::BTreeSet;
 use std::fmt::Debug;
 
+use num_bigint::BigUint;
+
 use crate::ast::node::AstRef;
 use crate::prelude::*;
 
@@ -31,6 +33,19 @@ impl AstType {
     pub fn is_string(&self) -> bool {
         matches!(self, AstType::String)
     }
+}
+
+/// The set of values an [`AstOp::SI`] leaf stands for. Bounds are unsigned
+/// values in the leaf's width; an interval whose upper bound is below its
+/// lower bound wraps around.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum SIBounds {
+    Empty,
+    Interval {
+        stride: BigUint,
+        lower_bound: BigUint,
+        upper_bound: BigUint,
+    },
 }
 
 /// The single operation enum for all AST nodes. A node's type (bool, bitvec,
@@ -106,7 +121,11 @@ pub enum AstOp<'c> {
     StrIndexOf(AstRef<'c>, AstRef<'c>, AstRef<'c>),
     StrToBV(AstRef<'c>),
 
-    // VSA bitvector operations (always symbolic)
+    // VSA bitvector leaves and operations (always symbolic)
+    /// A named bitvector variable whose values VSA takes from the bounds.
+    /// Every other backend treats it as a plain `BVS` of the same name. The
+    /// bounds are boxed to keep them from growing every other variant.
+    SI(InternedString, u32, Box<SIBounds>),
     Union(Vec<AstRef<'c>>),
     Intersection(Vec<AstRef<'c>>),
     Widen(AstRef<'c>, AstRef<'c>),
@@ -202,7 +221,7 @@ macro_rules! ast_op_arity {
 }
 
 ast_op_arity! {
-    leaf: [BoolS, BoolV, BVS, BVV, FPS, FPV, StringS, StringV],
+    leaf: [BoolS, BoolV, BVS, BVV, SI, FPS, FPV, StringS, StringV],
     nary: [And, Or, Xor, Add, Mul, Concat, Union, Intersection],
     unary: [
         Not, Neg, ByteReverse, ZeroExt(n), SignExt(n), Extract(hi, lo), StrLen, StrToBV,
@@ -233,18 +252,22 @@ impl<'c> AstOp<'c> {
     }
 
     /// Returns true if the op is inherently symbolic regardless of whether it
-    /// has variables. VSA operations (Union, Intersection, Widen) are always
+    /// has variables. VSA operations (SI, Union, Intersection, Widen) are always
     /// symbolic because they represent abstract multi-valued results.
     pub fn is_inherently_symbolic(&self) -> bool {
         matches!(
             self,
-            AstOp::Union(..) | AstOp::Intersection(..) | AstOp::Widen(..)
+            AstOp::SI(..) | AstOp::Union(..) | AstOp::Intersection(..) | AstOp::Widen(..)
         )
     }
 
     pub fn variables(&self) -> BTreeSet<InternedString> {
         match self {
-            AstOp::BoolS(s) | AstOp::BVS(s, _) | AstOp::FPS(s, _) | AstOp::StringS(s) => {
+            AstOp::BoolS(s)
+            | AstOp::BVS(s, _)
+            | AstOp::SI(s, ..)
+            | AstOp::FPS(s, _)
+            | AstOp::StringS(s) => {
                 let mut set = BTreeSet::new();
                 set.insert(s.clone());
                 set
@@ -296,7 +319,7 @@ impl<'c> AstOp<'c> {
             AstOp::ITE(_, t, _) => t.ast_type(),
 
             // Bitvectors
-            AstOp::BVS(_, width) => AstType::BitVec(*width),
+            AstOp::BVS(_, width) | AstOp::SI(_, width, _) => AstType::BitVec(*width),
             AstOp::BVV(bv) => AstType::BitVec(bv.len()),
             AstOp::Add(v) | AstOp::Mul(v) | AstOp::Union(v) | AstOp::Intersection(v) => {
                 AstType::BitVec(v.first().map(|a| a.size()).unwrap_or(0))
@@ -376,6 +399,7 @@ impl<'c> AstOp<'c> {
             | AstOp::BoolV(..)
             | AstOp::BVS(..)
             | AstOp::BVV(..)
+            | AstOp::SI(..)
             | AstOp::FPS(..)
             | AstOp::FPV(..)
             | AstOp::StringS(..)

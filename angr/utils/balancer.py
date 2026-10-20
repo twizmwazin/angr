@@ -6,7 +6,7 @@ from collections.abc import Generator
 from typing import cast, overload
 
 from angr import claripy
-from angr.claripy.annotation import RegionAnnotation, StridedIntervalAnnotation
+from angr.claripy.annotation import RegionAnnotation
 from angr.claripy.ast import BV, FP, Base, Bool
 from angr.claripy.errors import ClaripyError, ClaripyOperationError
 from angr.errors import AngrError
@@ -77,7 +77,7 @@ class Balancer:
             min_int = 0
             mn = self._lower_bounds.get(k, min_int) & max_int
             mx = self._upper_bounds.get(k, max_int) & max_int
-            bound_si = claripy.BVS("bound", len(ast)).annotate(StridedIntervalAnnotation(1, mn, mx))
+            bound_si = claripy.SI(len(ast), 1, mn, mx, name="bound")
             log.debug("Yielding bound %s for %s.", bound_si, ast)
             if ast.op == "Reverse":
                 yield (cast(BV, ast.args[0]), ast.intersection(bound_si).reversed)
@@ -140,9 +140,8 @@ class Balancer:
         mask = (1 << len(a)) - 1
         mx = Balancer._max(a) & mask
         mn = Balancer._min(a) & mask
-        si_anno = si.get_annotation(StridedIntervalAnnotation)
-        stride = si_anno.stride if si_anno is not None else 0
-        return claripy.BVS("bounds", len(a)).annotate(StridedIntervalAnnotation(stride, mn, mx))
+        stride = (si.args[2] or 0) if si.op == "SI" else 0
+        return claripy.SI(len(a), stride, mn, mx, name="bounds")
 
     @staticmethod
     def _min(a: BV, signed=False) -> int:
@@ -693,7 +692,7 @@ class Balancer:
 
         match truism.op:
             case "__eq__":
-                bound = claripy.BVS("bound", size).annotate(StridedIntervalAnnotation(1, lo, hi))
+                bound = claripy.SI(size, 1, lo, hi, name="bound")
                 return expr == bound
             case "__ne__":
                 if c == 0 and hi < max_int:

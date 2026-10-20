@@ -64,6 +64,7 @@ impl ToOpString for AstRef<'static> {
             // Bitvectors
             AstOp::BVS(..) => "BVS".to_string(),
             AstOp::BVV(..) => "BVV".to_string(),
+            AstOp::SI(..) => "SI".to_string(),
             AstOp::Neg(..) => "__neg__".to_string(),
             AstOp::Add(..) => "__add__".to_string(),
             AstOp::Sub(..) => "__sub__".to_string(),

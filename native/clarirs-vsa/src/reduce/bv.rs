@@ -54,31 +54,20 @@ pub(crate) fn reduce_bv(
     children: &[ReduceResult],
 ) -> Result<StridedInterval, ClarirsError> {
     Ok(match ast.op() {
-        AstOp::BVS(_, bits) => {
-            // If there is an SI or ESI annotation, use it. Otherwise, return top.
-            ast.annotations()
-                .iter()
-                .find_map(|ann| {
-                    if let AnnotationType::StridedInterval {
-                        stride,
-                        lower_bound,
-                        upper_bound,
-                    } = ann.type_()
-                    {
-                        Some(StridedInterval::new(
-                            *bits,
-                            stride.clone(),
-                            lower_bound.clone(),
-                            upper_bound.clone(),
-                        ))
-                    } else if let AnnotationType::EmptyStridedInterval = ann.type_() {
-                        Some(StridedInterval::empty(*bits))
-                    } else {
-                        None
-                    }
-                })
-                .unwrap_or_else(|| StridedInterval::top(*bits))
-        }
+        AstOp::BVS(_, bits) => StridedInterval::top(*bits),
+        AstOp::SI(_, bits, bounds) => match bounds.as_ref() {
+            SIBounds::Empty => StridedInterval::empty(*bits),
+            SIBounds::Interval {
+                stride,
+                lower_bound,
+                upper_bound,
+            } => StridedInterval::new(
+                *bits,
+                stride.clone(),
+                lower_bound.clone(),
+                upper_bound.clone(),
+            ),
+        },
         AstOp::BVV(bv) => StridedInterval::constant(bv.len(), bv.to_biguint()),
         AstOp::Not(..) => child_si(children, 0)?.bitnot(),
         AstOp::And(..) => fold_si(children, StridedInterval::bitand)?,
