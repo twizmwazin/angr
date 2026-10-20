@@ -60,3 +60,6 @@ class AMD64ElfGotResolver(IndirectJumpResolver):
         dest = self.project.hooked_by(target)
         l.debug("Resolved target to %s", dest.display_name)
         return True, [target]
+
+
+__all__ = ("AMD64ElfGotResolver",)

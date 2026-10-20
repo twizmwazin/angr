@@ -79,3 +79,6 @@ class VVarAndTmpUsesCollector(AILBlockViewer):
 
     def _handle_Tmp(self, expr_idx: int, expr: Tmp, stmt_idx: int, stmt: Statement | None, block: Block | None):
         self.tmp_and_uselocs[(expr.tmp_idx, expr.bits)].add((expr, stmt_idx))
+
+
+__all__ = ("VVarAndTmpUsesCollector",)

@@ -17,3 +17,6 @@ class strxfrm(angr.SimProcedure):
         self.inline_call(strncpy, dest, src, n, src_len=src_len.ret_expr)
 
         return src_len.ret_expr
+
+
+__all__ = ("strxfrm",)

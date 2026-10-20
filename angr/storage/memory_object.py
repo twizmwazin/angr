@@ -193,3 +193,11 @@ def bv_slice(value: claripy.ast.BV, offset: int, size: int, rev: bool, bw: int) 
     if size == 0:
         return claripy.BVV(b"")
     return value[bitstart - 1 : bitstart - size * bw]
+
+
+__all__ = (
+    "SimLabeledMemoryObject",
+    "SimMemoryObject",
+    "bv_slice",
+    "obj_bit_size",
+)

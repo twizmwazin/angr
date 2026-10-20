@@ -42,3 +42,6 @@ class gethostbyname(angr.SimProcedure):
             endness="Iend_LE",
         )
         return place
+
+
+__all__ = ("gethostbyname",)

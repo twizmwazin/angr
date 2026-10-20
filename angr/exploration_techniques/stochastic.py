@@ -54,3 +54,6 @@ class StochasticSearch(ExplorationTechnique):
             simgr.stashes[stash] = [weighted_pick(simgr.stashes[stash])]
 
         return simgr
+
+
+__all__ = ("StochasticSearch",)

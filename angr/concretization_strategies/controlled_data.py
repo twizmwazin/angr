@@ -56,3 +56,6 @@ class SimConcretizationStrategyControlledData(SimConcretizationStrategy):
         if not solutions:
             solutions = None
         return solutions
+
+
+__all__ = ("SimConcretizationStrategyControlledData",)

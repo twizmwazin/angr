@@ -53,3 +53,11 @@ def go_type_at(project: Project, addr: int) -> SimType | None:
         return project.kb.go_signatures.type(name)
     except Exception:  # pylint:disable=broad-exception-caught
         return None
+
+
+__all__ = (
+    "SIGNED_SIMTYPES",
+    "go_type_at",
+    "go_type_name_at",
+    "simtype_signed",
+)

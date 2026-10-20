@@ -246,3 +246,10 @@ class RustcVersionIdentification(Analysis):
 
 
 AnalysesHub.register_default("RustcVersionIdentification", RustcVersionIdentification)
+
+
+__all__ = (
+    "RUSTC_COMMENT_RE",
+    "STD_CRATE_PREFIXES",
+    "RustcVersionIdentification",
+)

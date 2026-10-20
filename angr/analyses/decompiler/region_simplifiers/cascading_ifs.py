@@ -91,3 +91,6 @@ class CascadingIfsRemover(SequenceWalker):
                     self._cond_opts,
                 )
                 node.true_node = true_node.true_node
+
+
+__all__ = ("CascadingIfsRemover",)

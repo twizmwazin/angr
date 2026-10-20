@@ -486,3 +486,6 @@ class EagerEvaluation(PeepholeOptimizationExprBase):
             v = sign_extend(expr.operand.value, expr.to_bits)
             return Const(expr.idx, v, expr.to_bits, **expr.operand.tags)
         return None
+
+
+__all__ = ("EagerEvaluation",)

@@ -23,3 +23,9 @@ class fputs(angr.SimProcedure):
 
 
 fputs_unlocked = fputs
+
+
+__all__ = (
+    "fputs",
+    "fputs_unlocked",
+)

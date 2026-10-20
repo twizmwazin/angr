@@ -873,3 +873,17 @@ def read_go_type_descriptors(project: Project, use_cache: bool = True) -> GoType
             del _CACHE[next(iter(_CACHE))]
         _CACHE[key] = result
     return result
+
+
+__all__ = (
+    "IMETHOD_SIZE",
+    "KIND_MASK",
+    "METHOD_SIZE",
+    "NAME_EMBEDDED",
+    "TFLAG_EXTRA_STAR",
+    "TFLAG_NAMED",
+    "TFLAG_UNCOMMON",
+    "UNCOMMON_SIZE",
+    "GoTypeDescriptors",
+    "read_go_type_descriptors",
+)

@@ -16,3 +16,6 @@ class SystemCurrentTimeMillis(JavaSimProcedure):
         log.debug("Called SimProcedure java.lang.System.currentTimeMillis with args")
 
         return claripy.BVV(int(time() * 1000), 64)
+
+
+__all__ = ("SystemCurrentTimeMillis",)

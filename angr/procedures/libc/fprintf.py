@@ -31,3 +31,6 @@ class __fprintf_chk(fprintf):
     # ignored, as in __printf_chk.
     def run(self, file_ptr, flag, fmt):  # type:ignore[reportIncompatibleMethodOverride] # pylint:disable=unused-argument
         return super().run(file_ptr, fmt)
+
+
+__all__ = ("fprintf",)

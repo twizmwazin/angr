@@ -34,3 +34,6 @@ class getenv(angr.SimProcedure):
                 return m_line + (name_len.max_null_index + 1)
             p += self.state.arch.bytes
         return 0
+
+
+__all__ = ("getenv",)

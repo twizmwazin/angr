@@ -108,3 +108,6 @@ class GoGlobalTypes(OptimizationPass):
             var = SimMemoryVariable(addr, size, ident=global_manager.next_variable_ident("global"))
             global_manager.set_variable("global", addr, var)
         global_manager.set_variable_type(var, ty, mark_manual=True)
+
+
+__all__ = ("GoGlobalTypes",)

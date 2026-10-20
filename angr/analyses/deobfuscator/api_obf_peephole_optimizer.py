@@ -77,3 +77,9 @@ class APIObfType3PeepholeOptimizer(PeepholeOptimizationExprBase):
 
 EXPR_OPTS.append(APIObfType1PeepholeOptimizer)
 EXPR_OPTS.append(APIObfType3PeepholeOptimizer)
+
+
+__all__ = (
+    "APIObfType1PeepholeOptimizer",
+    "APIObfType3PeepholeOptimizer",
+)

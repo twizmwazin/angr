@@ -701,3 +701,42 @@ def _goarch(arch) -> str | None:
     if goarch in ("mips", "mips64", "ppc64") and arch.memory_endness == "Iend_LE":
         goarch += "le"
     return goarch
+
+
+__all__ = (
+    "DW_AT_GO_CLOSURE_OFFSET",
+    "DW_AT_GO_DICT_INDEX",
+    "DW_AT_GO_ELEM",
+    "DW_AT_GO_EMBEDDED_FIELD",
+    "DW_AT_GO_KEY",
+    "DW_AT_GO_KIND",
+    "DW_AT_GO_PACKAGE_NAME",
+    "DW_AT_GO_RUNTIME_TYPE",
+    "KIND_ARRAY",
+    "KIND_BOOL",
+    "KIND_CHAN",
+    "KIND_COMPLEX64",
+    "KIND_COMPLEX128",
+    "KIND_FLOAT32",
+    "KIND_FLOAT64",
+    "KIND_FUNC",
+    "KIND_INT",
+    "KIND_INT8",
+    "KIND_INT16",
+    "KIND_INT32",
+    "KIND_INT64",
+    "KIND_INTERFACE",
+    "KIND_MAP",
+    "KIND_PTR",
+    "KIND_SLICE",
+    "KIND_STRING",
+    "KIND_STRUCT",
+    "KIND_UINT",
+    "KIND_UINT8",
+    "KIND_UINT16",
+    "KIND_UINT32",
+    "KIND_UINT64",
+    "KIND_UINTPTR",
+    "KIND_UNSAFE_POINTER",
+    "read_go_dwarf_signatures",
+)

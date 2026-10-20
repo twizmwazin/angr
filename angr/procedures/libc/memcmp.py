@@ -67,3 +67,6 @@ class memcmp(angr.SimProcedure):
             self.state.add_constraints(claripy.Or(*[n - definite_size == c for c in conditional_rets]))
             return ret_expr
         return definite_answer
+
+
+__all__ = ("memcmp",)

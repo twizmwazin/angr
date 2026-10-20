@@ -475,3 +475,16 @@ def get_structurer_option() -> DecompilationOption | None:
         if opt.cls == "recursive_structurer" and opt.param == "structurer_cls":
             return opt
     return None
+
+
+__all__ = (
+    "DEFAULT_MAX_AIL_STATEMENTS",
+    "DEFAULT_MAX_FUNCTION_BLOCKS",
+    "PARAM_TO_OPTION",
+    "DecompilationOption",
+    "O",
+    "get_structurer_option",
+    "options",
+    "options_by_category",
+    "parse_known_patterns",
+)

@@ -54,3 +54,9 @@ class IFuncResolver(angr.SimProcedure):
 
         self.state.globals[("ifunc_resolution", funcaddr)] = value
         self.jump(value)
+
+
+__all__ = (
+    "IFuncResolver",
+    "LinuxLoader",
+)

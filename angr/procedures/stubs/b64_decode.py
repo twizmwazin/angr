@@ -13,3 +13,6 @@ class b64_decode(angr.SimProcedure):
         cpy = self.inline_call(strncpy, dst, src, length)
         self.state.memory.store(dst + 16, claripy.BVV(0, 8))
         return cpy.ret_expr
+
+
+__all__ = ("b64_decode",)

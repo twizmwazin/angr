@@ -216,3 +216,9 @@ class DFAMixin:
                     if src is data or (isinstance(src, Expression) and src.likes(data)):
                         return block, stmt
         return None, None
+
+
+__all__ = (
+    "DFAMixin",
+    "StackDefinition",
+)

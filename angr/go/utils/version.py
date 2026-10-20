@@ -121,3 +121,13 @@ _OS_TO_GOOS = {
 def identify_goos(project: Project) -> str | None:
     """The binary's GOOS, when its container format tells; None otherwise."""
     return _OS_TO_GOOS.get(project.loader.main_object.os)
+
+
+__all__ = (
+    "GoVersionRange",
+    "go_minor_version",
+    "go_version_range",
+    "identify_go_version",
+    "identify_goos",
+    "parse_go_version",
+)

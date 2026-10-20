@@ -203,3 +203,10 @@ class IndirectJump(Serializable):
             " " + status if status else "",
             " <guessed>" if self.jumptable_entries_guessed else "",
         )
+
+
+__all__ = (
+    "IndirectJump",
+    "IndirectJumpType",
+    "JumptableInfo",
+)

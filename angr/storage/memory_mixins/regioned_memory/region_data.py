@@ -244,3 +244,10 @@ class RegionMap:
             base_address = descriptor.base_address
 
         return descriptor.region_id, absolute_address - base_address, descriptor.related_function_address
+
+
+__all__ = (
+    "AddressWrapper",
+    "RegionDescriptor",
+    "RegionMap",
+)

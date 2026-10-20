@@ -562,3 +562,10 @@ class SimWindows(SimOS):
         else:
             raise TypeError(f"security_cookie_init must SecurityCookieInit, not {type(sc_init).__name__}")
         setattr(state.mem[cookie], f"uint{state.arch.bits}_t", sc_value)
+
+
+__all__ = (
+    "VS_SECURITY_COOKIES",
+    "SecurityCookieInit",
+    "SimWindows",
+)

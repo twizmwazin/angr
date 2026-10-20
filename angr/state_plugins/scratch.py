@@ -188,3 +188,6 @@ class SimStateScratch(SimStatePlugin):
 
 
 SimState.register_default("scratch", SimStateScratch)
+
+
+__all__ = ("SimStateScratch",)

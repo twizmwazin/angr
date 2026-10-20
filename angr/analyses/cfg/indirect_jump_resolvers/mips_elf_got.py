@@ -146,3 +146,6 @@ class MipsElfGotResolver(IndirectJumpResolver):
                 self._simproc_cache[simproc.display_name] = addr
 
         return self._simproc_cache.get(symbol_name)
+
+
+__all__ = ("MipsElfGotResolver",)

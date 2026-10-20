@@ -332,3 +332,10 @@ SimMemView.types = ALL_TYPES  # identity purposefully here
 
 SimState.register_default("mem", SimMemView)
 SimState.register_default("regs", SimRegNameView)
+
+
+__all__ = (
+    "SimMemView",
+    "SimRegNameView",
+    "StructMode",
+)

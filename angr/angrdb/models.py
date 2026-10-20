@@ -313,3 +313,24 @@ class DbCallsitePrototype(Base):
     kind = Column(Integer)  # CallsitePrototypeKind value
     cc = Column(TEXT)  # JSON, as in function.proto
     prototype = Column(TEXT)  # JSON, as in function.proto
+
+
+__all__ = (
+    "Base",
+    "DbBookmark",
+    "DbCFGModel",
+    "DbCallGraph",
+    "DbCallsitePrototype",
+    "DbComment",
+    "DbDecVariableCollection",
+    "DbDecompilationCache",
+    "DbFunction",
+    "DbInformation",
+    "DbKnowledgeBase",
+    "DbLabel",
+    "DbObject",
+    "DbPattern",
+    "DbStructuredCode",
+    "DbVariableCollection",
+    "DbXRefs",
+)

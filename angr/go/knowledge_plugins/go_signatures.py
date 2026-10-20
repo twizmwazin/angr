@@ -798,3 +798,13 @@ def _result_registers(ty, arch) -> tuple[int, int]:
 
 
 KnowledgeBasePlugin.register_default("go_signatures", GoSignatures)
+
+
+__all__ = (
+    "GoInferredSignature",
+    "GoSignatures",
+    "available_signature_dbs",
+    "is_placeholder_type",
+    "load_signature_db",
+    "placeholder_group",
+)

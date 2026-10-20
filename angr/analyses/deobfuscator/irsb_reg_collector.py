@@ -52,3 +52,6 @@ class IRSBRegisterCollector(SimEngineNostmtVEX[None, None, None]):
 
     def _handle_expr_Const(self, expr):
         return None
+
+
+__all__ = ("IRSBRegisterCollector",)

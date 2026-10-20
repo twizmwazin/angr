@@ -38,3 +38,6 @@ class Obfuscations(KnowledgeBasePlugin):
 
 
 KnowledgeBasePlugin.register_default("obfuscations", Obfuscations)
+
+
+__all__ = ("Obfuscations",)

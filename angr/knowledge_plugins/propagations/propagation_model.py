@@ -81,3 +81,6 @@ class PropagationModel(Serializable):
         else:
             state, _ = preds[0].merge(*preds[1:])
         return state
+
+
+__all__ = ("PropagationModel",)

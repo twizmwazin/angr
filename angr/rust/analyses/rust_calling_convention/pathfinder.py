@@ -135,3 +135,6 @@ class Pathfinder:
         except NetworkXError:
             pass
         return path
+
+
+__all__ = ("Pathfinder",)

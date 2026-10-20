@@ -57,3 +57,6 @@ def condition_to_lambda(condition, default=False):
         )
 
     return condition_function, static_addrs
+
+
+__all__ = ("condition_to_lambda",)

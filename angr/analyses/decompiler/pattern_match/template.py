@@ -268,3 +268,13 @@ def _fit_expr(node: dsl.PatternExpr, tree: ShapeTree, depth: int) -> Fit:
     if isinstance(node, dsl.PChoice):
         return max((_fit_expr(alt, tree, depth) for alt in node.alternatives), default=Fit.NONE)
     raise TypeError(f"{type(node).__name__} is not an expression pattern")
+
+
+__all__ = (
+    "TEMPLATE_TOKENIZER",
+    "Fit",
+    "ShapeTree",
+    "match_shape",
+    "parse_shape",
+    "shape_of",
+)

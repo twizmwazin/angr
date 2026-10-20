@@ -1399,3 +1399,24 @@ class DirectedGraphHelper[T]:
             if self._node_order[src] >= self._node_order[dst]:
                 loop_heads.add(dst)
         return loop_heads
+
+
+__all__ = (
+    "ContainerNode",
+    "DirectedGraphHelper",
+    "Dominators",
+    "GraphUtils",
+    "LinkedListNode",
+    "PostDominators",
+    "SCCPlaceholder",
+    "TemporaryNode",
+    "compute_dominance_frontier",
+    "compute_dominance_intervals",
+    "dfs_back_edges",
+    "dominates",
+    "dominates_by_intervals",
+    "inverted_idoms",
+    "shallow_reverse",
+    "subgraph_between_nodes",
+    "to_acyclic_graph",
+)

@@ -17,3 +17,6 @@ class SimSootValue_IntConstant(SimSootValue):
     @classmethod
     def from_sootvalue(cls, soot_value, state):
         return cls(soot_value.value, soot_value.type)
+
+
+__all__ = ("SimSootValue_IntConstant",)

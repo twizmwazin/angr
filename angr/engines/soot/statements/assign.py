@@ -30,3 +30,6 @@ class SimSootStmt_Assign(SimSootStmt):
         src_val = src_expr.expr
         l.debug("Assign %r := %r", dst, src_val)
         self.state.memory.store(dst, src_val)
+
+
+__all__ = ("SimSootStmt_Assign",)

@@ -78,3 +78,6 @@ class AILCallable(VEXCallable):
                 to_stash="deadended",
             )
         return pg2
+
+
+__all__ = ("AILCallable",)

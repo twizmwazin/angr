@@ -25,3 +25,6 @@ def merge_transitions(transitions, existing_transitions):
     [_add_to_existing(x[0], x[1]) for x in transitions.items()]
 
     return existing_transitions
+
+
+__all__ = ("merge_transitions",)

@@ -41,3 +41,6 @@ class NodeReplacer(SequenceWalker):
         if has_non_block:
             return SequenceNode(node.addr, nodes=nodes_copy)
         return MultiNode(nodes_copy, addr=node.addr, idx=node.idx)
+
+
+__all__ = ("NodeReplacer",)

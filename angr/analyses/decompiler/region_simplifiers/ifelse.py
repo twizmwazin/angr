@@ -89,3 +89,6 @@ class IfElseFlattener(SequenceWalker):
                 else_node = node.else_node
                 node.else_node = None
                 insert_node(parent, "after", else_node, index, **kwargs)
+
+
+__all__ = ("IfElseFlattener",)

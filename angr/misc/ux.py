@@ -32,3 +32,11 @@ def deprecated[R, **P](replacement: str | None = None) -> Callable[[Callable[P, 
         return inner
 
     return outer
+
+
+__all__ = (
+    "already_complained",
+    "deprecated",
+    "once",
+    "once_set",
+)

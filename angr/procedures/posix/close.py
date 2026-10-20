@@ -8,3 +8,6 @@ class close(angr.SimProcedure):
         if self.state.posix.close(fd):
             return 0
         return -1
+
+
+__all__ = ("close",)

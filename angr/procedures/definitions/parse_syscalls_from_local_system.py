@@ -51,5 +51,13 @@ def main():
         dump_mapping(abi, mapping)
 
 
+__all__ = (
+    "dump_mapping",
+    "main",
+    "parse_gdb_xml_file",
+    "parse_unistd_include_header",
+)
+
+
 if __name__ == "__main__":
     main()

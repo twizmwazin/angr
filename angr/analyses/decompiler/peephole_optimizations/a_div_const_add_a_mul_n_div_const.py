@@ -49,3 +49,6 @@ class ADivConstAddAMulNDivConst(PeepholeOptimizationExprBase):
                         return BinaryOp(expr.idx, "Div", [mul, N0], False, **expr.tags)
 
         return None
+
+
+__all__ = ("ADivConstAddAMulNDivConst",)

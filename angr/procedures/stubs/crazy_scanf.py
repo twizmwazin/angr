@@ -18,3 +18,6 @@ class crazy_scanf(angr.SimProcedure):
         self.state.memory.store(three + 11, claripy.BVV(0, 8))
 
         return claripy.BVV(3)
+
+
+__all__ = ("crazy_scanf",)

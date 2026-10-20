@@ -547,3 +547,13 @@ def set_comments(
         )
 
     return _run(project_id, items, COMMENT_KINDS, apply_item, dry_run=dry_run, stop_on_error=stop_on_error)
+
+
+__all__ = (
+    "COMMENT_KINDS",
+    "RENAME_KINDS",
+    "TYPE_KINDS",
+    "rename",
+    "set_comments",
+    "set_type",
+)

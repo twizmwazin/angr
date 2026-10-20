@@ -23,3 +23,6 @@ class transmit(orig_transmit):
             self.state.get_plugin("zen_plugin").analyze_transmit(self.state, buf)
 
         return super().run(fd, buf, count, tx_bytes)
+
+
+__all__ = ("transmit",)

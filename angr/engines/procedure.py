@@ -69,3 +69,9 @@ class ProcedureEngine(ProcedureMixin, SuccessorsEngine):
         if procedure is None:
             raise errors.SimEngineError("Must provide the procedure explicitly to use ProcedureEngine")
         self.process_procedure(self.state, successors, procedure, **kwargs)
+
+
+__all__ = (
+    "ProcedureEngine",
+    "ProcedureMixin",
+)

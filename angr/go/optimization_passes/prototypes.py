@@ -201,3 +201,10 @@ class GoPrototypeApplier:
         return GoSimTypeFunction(
             [recv, *proto.args[1:]], proto.returnty, arg_names=proto.arg_names, variadic=proto.variadic
         ).with_arch(self.project.arch)
+
+
+__all__ = (
+    "GoPrototypeApplier",
+    "GoPrototypes",
+    "receiver_type_from_name",
+)

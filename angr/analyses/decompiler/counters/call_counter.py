@@ -67,3 +67,9 @@ class AILCallCounter(SequenceWalker):
         self.calls += ctr.calls
         self.call_exprs += ctr.call_exprs
         self.non_label_stmts += sum(1 for stmt in node.statements if not isinstance(stmt, Label))
+
+
+__all__ = (
+    "AILBlockCallCounter",
+    "AILCallCounter",
+)

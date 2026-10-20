@@ -664,3 +664,9 @@ class PCodeIRSBConverter(Converter):
 
     def _convert_new(self) -> None:
         raise NotImplementedError("Cannot currently emulate new operator")
+
+
+__all__ = (
+    "PCodeIRSBConverter",
+    "opcode_to_generic_name",
+)

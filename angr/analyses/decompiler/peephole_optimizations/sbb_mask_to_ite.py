@@ -76,3 +76,6 @@ class SbbMaskToITE(PeepholeOptimizationExprBase):
                 **expr.tags,
             )
         return None
+
+
+__all__ = ("SbbMaskToITE",)

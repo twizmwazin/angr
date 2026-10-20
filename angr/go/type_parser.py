@@ -486,3 +486,10 @@ def _embedded_field_name(type_str: str) -> str:
     if "[" in base:
         base = base[: base.index("[")]
     return base.rsplit(".", 1)[-1]
+
+
+__all__ = (
+    "SHAPE_PREFIX",
+    "GoTypeParseError",
+    "GoTypeParser",
+)

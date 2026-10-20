@@ -457,3 +457,6 @@ class SimLinux(SimUserland):
                 if register.name == "gs":
                     return register.vex_offset
         return None
+
+
+__all__ = ("SimLinux",)

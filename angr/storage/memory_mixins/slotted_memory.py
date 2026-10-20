@@ -149,3 +149,6 @@ class SlottedMemoryMixin(MemoryMixin):
                     changes.add(addr + i)
 
         return changes
+
+
+__all__ = ("SlottedMemoryMixin",)

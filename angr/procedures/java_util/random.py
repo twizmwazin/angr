@@ -12,3 +12,6 @@ class NextInt(JavaSimProcedure):
         self.state.solver.add(rand.UGE(0))
         self.state.solver.add(rand.ULT(bound))
         return rand
+
+
+__all__ = ("NextInt",)

@@ -129,3 +129,16 @@ class MapKeySet(JavaSimProcedure):
         set_ref.store_field(self.state, SIZE, "int", set_size)
 
         return set_ref
+
+
+__all__ = (
+    "MAP_KEYS",
+    "MAP_SIZE",
+    "MapContainsKey",
+    "MapGet",
+    "MapInit",
+    "MapKeySet",
+    "MapPut",
+    "MapSize",
+    "get_map_key",
+)

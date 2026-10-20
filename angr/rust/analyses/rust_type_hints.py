@@ -47,3 +47,6 @@ class RustTypeHintsAnalysis(Analysis):
 
 
 AnalysesHub.register_default("RustTypeHints", RustTypeHintsAnalysis)
+
+
+__all__ = ("RustTypeHintsAnalysis",)

@@ -191,3 +191,9 @@ class SimDebugVariablePlugin(SimStatePlugin):
 
 
 SimState.register_default("dvars", SimDebugVariablePlugin)
+
+
+__all__ = (
+    "SimDebugVariable",
+    "SimDebugVariablePlugin",
+)

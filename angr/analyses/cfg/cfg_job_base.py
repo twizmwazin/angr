@@ -139,3 +139,9 @@ class CFGJobBase:
         if isinstance(self.addr, SootAddressDescriptor):
             return f"<Entry {self.addr} {self.jumpkind}>"
         return f"<Entry {self.addr:#08x} % {self.jumpkind}>"
+
+
+__all__ = (
+    "CFGJobBase",
+    "FunctionKey",
+)

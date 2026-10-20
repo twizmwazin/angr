@@ -65,3 +65,10 @@ class NameResolutionMixin(MemoryMixin):
             named_addr, named_size = self._resolve_location_name(addr, is_write=False)
             return super().load(named_addr, size=named_size if size is None else size, **kwargs)
         return super().load(addr, size=size, **kwargs)
+
+
+__all__ = (
+    "NameResolutionMixin",
+    "stn_map",
+    "tag_map",
+)

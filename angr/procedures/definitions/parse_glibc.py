@@ -110,5 +110,11 @@ def main():
         f.write(json.dumps(d, indent="\t"))
 
 
+__all__ = (
+    "DISPOSITIONS",
+    "main",
+)
+
+
 if __name__ == "__main__":
     main()

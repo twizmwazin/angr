@@ -113,3 +113,12 @@ class pthread_once(angr.SimProcedure):
         return 0
 
     # TODO: static exits
+
+
+__all__ = (
+    "pthread_cond_signal",
+    "pthread_create",
+    "pthread_mutex_lock",
+    "pthread_mutex_unlock",
+    "pthread_once",
+)

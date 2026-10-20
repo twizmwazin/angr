@@ -353,3 +353,31 @@ class ClosingObjectNode(CodegenNode):
     """A closing bracket, brace, or parenthesis."""
 
     __slots__ = ()
+
+
+__all__ = (
+    "BaseStructuredCodeGenerator",
+    "BinaryOpNode",
+    "CConstantType",
+    "ClosingObjectNode",
+    "CodegenNode",
+    "ConstantNode",
+    "ExpressionNode",
+    "FunctionCallNode",
+    "FunctionNode",
+    "FunctionRef",
+    "IdentType",
+    "IndexedVariableNode",
+    "InstructionMapping",
+    "InstructionMappingElement",
+    "LabelNode",
+    "PositionMapping",
+    "PositionMappingElement",
+    "StructFieldNode",
+    "UnaryOpNode",
+    "VariableFieldNode",
+    "VariableNode",
+    "register_display_name",
+    "variable_display_name",
+    "vector_convert_name",
+)

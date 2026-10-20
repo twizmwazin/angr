@@ -23,3 +23,6 @@ class RegionWalker:
 
     def walk_node(self, region, node):  # pylint:disable=no-self-use,unused-argument
         raise NotImplementedError("Please override this method with your own logic")
+
+
+__all__ = ("RegionWalker",)

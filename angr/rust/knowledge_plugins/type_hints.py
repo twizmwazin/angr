@@ -31,3 +31,6 @@ class TypeHints(KnowledgeBasePlugin):
 
 
 KnowledgeBasePlugin.register_default("type_hints", TypeHints)
+
+
+__all__ = ("TypeHints",)

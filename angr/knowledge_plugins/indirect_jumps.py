@@ -34,3 +34,6 @@ class IndirectJumps(KnowledgeBasePlugin, dict):
 
 
 KnowledgeBasePlugin.register_default("indirect_jumps", IndirectJumps)
+
+
+__all__ = ("IndirectJumps",)

@@ -432,3 +432,6 @@ class _FusingRewriter(AILBlockRewriter):
                 self.changed = True
                 return Return(stmt.idx, fused, **stmt.tags)
         return super()._handle_Return(stmt_idx, stmt, block)
+
+
+__all__ = ("GoValueFuser",)

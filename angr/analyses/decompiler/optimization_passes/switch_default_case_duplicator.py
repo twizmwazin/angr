@@ -199,3 +199,6 @@ class SwitchDefaultCaseDuplicator(OptimizationPass):
                         )
 
         self.out_graph = out_graph
+
+
+__all__ = ("SwitchDefaultCaseDuplicator",)

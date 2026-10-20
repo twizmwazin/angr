@@ -1370,3 +1370,13 @@ class RegionIdentifier(Analysis):
 
 
 register_analysis(RegionIdentifier, "RegionIdentifier")
+
+
+__all__ = (
+    "CONDITIONNODE_ADDR",
+    "RegionIdentifier",
+    "TGraph",
+    "TManager",
+    "TNode",
+    "TOverlay",
+)

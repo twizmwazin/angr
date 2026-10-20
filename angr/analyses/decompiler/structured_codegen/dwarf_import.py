@@ -192,3 +192,9 @@ class ImportSourceCode(BaseStructuredCodeGenerator, Analysis):
 
 
 register_analysis(ImportSourceCode, "ImportSourceCode")
+
+
+__all__ = (
+    "ImportSourceCode",
+    "ImportedLine",
+)

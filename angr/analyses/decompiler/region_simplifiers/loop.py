@@ -251,3 +251,6 @@ class LoopSimplifier(SequenceWalker):
             if last_stmt is not None and is_statement_terminating(last_stmt, self.functions):
                 return
             self.continue_preludes[loop].append(block)
+
+
+__all__ = ("LoopSimplifier",)

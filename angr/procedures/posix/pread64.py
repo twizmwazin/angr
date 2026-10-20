@@ -45,3 +45,6 @@ class pread64(angr.SimProcedure):
             return -1
 
         return result
+
+
+__all__ = ("pread64",)

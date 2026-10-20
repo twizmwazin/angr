@@ -284,3 +284,6 @@ class Bswap(PeepholeOptimizationExprBase):
                         if the_expr_1.likes(the_expr_2):
                             return True, the_expr_1
         return False, None
+
+
+__all__ = ("Bswap",)

@@ -114,3 +114,6 @@ class printf(Func):
             return False
 
         return True
+
+
+__all__ = ("printf",)

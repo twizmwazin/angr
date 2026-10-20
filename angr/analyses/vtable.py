@@ -91,3 +91,9 @@ class VtableFinder(Analysis):
 
 
 AnalysesHub.register_default("VtableFinder", VtableFinder)
+
+
+__all__ = (
+    "Vtable",
+    "VtableFinder",
+)

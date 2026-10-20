@@ -106,3 +106,6 @@ class MultiValueMergerMixin(MemoryMixin):
         copied._phi_maker = self._phi_maker
         copied._merge_into_top = self._merge_into_top
         return copied
+
+
+__all__ = ("MultiValueMergerMixin",)

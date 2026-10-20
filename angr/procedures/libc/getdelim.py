@@ -119,3 +119,6 @@ class getdelim(angr.SimProcedure):
         self.state.memory.store(line_ptrptr, dst, endness=self.arch.memory_endness)
 
         return real_size
+
+
+__all__ = ("getdelim",)

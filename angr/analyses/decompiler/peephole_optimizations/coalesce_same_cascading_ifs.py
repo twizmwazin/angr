@@ -29,3 +29,6 @@ class CoalesceSameCascadingIfs(PeepholeOptimizationStmtBase):
                 stmt.idx, cond, new_true_target, stmt.false_target, false_target_idx=stmt.false_target_idx, **stmt.tags
             )
         return None
+
+
+__all__ = ("CoalesceSameCascadingIfs",)

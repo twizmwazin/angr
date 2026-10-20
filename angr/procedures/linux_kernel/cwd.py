@@ -29,3 +29,9 @@ class chdir(angr.SimProcedure):
         # normalize it, so that the cwd stays an absolute path relative to the current root
         self.state.fs.chdir(cwd)
         return 0
+
+
+__all__ = (
+    "chdir",
+    "getcwd",
+)

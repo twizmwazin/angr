@@ -41,3 +41,6 @@ class MemoryWatcher(ExplorationTechnique):
             simgr = simgr.step(stash=stash, **kwargs)
 
         return simgr
+
+
+__all__ = ("MemoryWatcher",)

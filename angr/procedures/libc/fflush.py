@@ -15,3 +15,9 @@ class fflush(angr.SimProcedure):
 
 
 fflush_unlocked = fflush
+
+
+__all__ = (
+    "fflush",
+    "fflush_unlocked",
+)

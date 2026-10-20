@@ -82,3 +82,9 @@ class KeyDefinitionManager(KnowledgeBasePlugin):
 
 
 KnowledgeBasePlugin.register_default("defs", KeyDefinitionManager)
+
+
+__all__ = (
+    "KeyDefinitionManager",
+    "RDAObserverControl",
+)

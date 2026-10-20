@@ -135,3 +135,6 @@ class RustTypehoon(Typehoon):
 
 
 AnalysesHub.register_default("RustTypehoon", RustTypehoon)
+
+
+__all__ = ("RustTypehoon",)

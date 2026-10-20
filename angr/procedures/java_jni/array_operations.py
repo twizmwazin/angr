@@ -311,3 +311,22 @@ class SetArrayRegion(JNISimProcedure):
 
         # and store them in the java memory
         self.state.javavm_memory.store_array_elements(array, start_idx, elements)
+
+
+__all__ = (
+    "GetArrayElements",
+    "GetArrayLength",
+    "GetArrayRegion",
+    "GetObjectArrayElement",
+    "NewArray",
+    "NewBooleanArray",
+    "NewByteArray",
+    "NewCharArray",
+    "NewIntArray",
+    "NewLongArray",
+    "NewObjectArray",
+    "NewShortArray",
+    "ReleaseArrayElements",
+    "SetArrayRegion",
+    "SetObjectArrayElement",
+)

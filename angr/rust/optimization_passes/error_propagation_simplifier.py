@@ -212,3 +212,9 @@ class ErrorPropagationSimplifier(SequenceOptimizationPass):
         self._remove_dead_assignments(walker.dead_assignments)
 
         self.out_seq = self.seq
+
+
+__all__ = (
+    "ErrorPropagationSimplifier",
+    "ErrorPropagationWalker",
+)

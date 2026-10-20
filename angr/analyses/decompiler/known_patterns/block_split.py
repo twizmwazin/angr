@@ -106,3 +106,9 @@ def split_ail_block(
             rewrite_phi_sources(succ, (block.addr, block.idx), (last.addr, last.idx), idx_alloc)
 
     return b_pre, b_mid, b_post
+
+
+__all__ = (
+    "rewrite_phi_sources",
+    "split_ail_block",
+)

@@ -341,3 +341,15 @@ def resolve_variable(
         global_addr=best.global_addr,
         ambiguous=True,
     )
+
+
+__all__ = (
+    "ResolvedVariable",
+    "VariableKind",
+    "concrete_variables",
+    "list_variable_names",
+    "parse_address",
+    "resolve_function",
+    "resolve_variable",
+    "validate_name",
+)

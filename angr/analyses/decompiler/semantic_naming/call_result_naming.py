@@ -221,3 +221,9 @@ class CallResultNaming(ClinicNamingBase):
         # Don't overwrite if already recorded with a name
         if var not in self._result_vars:
             self._result_vars[var] = suggested_name
+
+
+__all__ = (
+    "FUNCTION_RESULT_NAMES",
+    "CallResultNaming",
+)

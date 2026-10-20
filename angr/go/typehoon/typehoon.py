@@ -103,3 +103,6 @@ class GoTypehoon(Typehoon):
 
 
 AnalysesHub.register_default("GoTypehoon", GoTypehoon)
+
+
+__all__ = ("GoTypehoon",)

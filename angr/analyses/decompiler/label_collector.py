@@ -31,3 +31,6 @@ class LabelCollector:
         for stmt in block.statements:
             if isinstance(stmt, ailment.Stmt.Label):
                 self.labels[stmt.name].append((block.addr, block.idx))
+
+
+__all__ = ("LabelCollector",)

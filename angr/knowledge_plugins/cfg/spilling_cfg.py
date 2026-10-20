@@ -1616,3 +1616,14 @@ class SpillingCFG:
         nodes_state = state["nodes"]
         self._nodes = SpillingCFGNodeDict.__new__(SpillingCFGNodeDict)
         self._nodes.__setstate__(nodes_state)
+
+
+__all__ = (
+    "USE_SPILLING_CFGNODE_DICT",
+    "CFGSegmentStore",
+    "SpillingCFG",
+    "SpillingCFGNodeDict",
+    "block_key_to_addr",
+    "block_key_to_size",
+    "get_block_key",
+)

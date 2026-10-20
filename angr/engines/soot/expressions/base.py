@@ -19,3 +19,6 @@ class SimSootExpr:
 
     def _translate_value(self, value):
         return angr.engines.soot.values.translate_value(value, self.state)
+
+
+__all__ = ("SimSootExpr",)

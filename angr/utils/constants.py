@@ -172,3 +172,16 @@ def should_use_hex(value: int, bits: int | None = None) -> bool:
 
     # 10. common error codes
     return bits in {32, 64} and (u & 0xFFFF0000) in {0xC0000000, 0x80000000}
+
+
+__all__ = (
+    "DEFAULT_STATEMENT",
+    "MAGIC_CONSTANTS",
+    "MAX_ACCESS_SIZE",
+    "MAX_FIELD_OFFSET",
+    "MAX_POINTSTO_BITS",
+    "MAX_TYPE_NESTING",
+    "SWITCH_MISSING_DEFAULT_NODE_ADDR",
+    "is_alignment_mask",
+    "should_use_hex",
+)

@@ -93,3 +93,6 @@ class SwitchExpressionSimplifier(SequenceWalker):
         if changed and r is None:
             return node
         return r
+
+
+__all__ = ("SwitchExpressionSimplifier",)

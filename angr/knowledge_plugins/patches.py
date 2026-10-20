@@ -129,3 +129,9 @@ class PatchManager(KnowledgeBasePlugin):
 
 
 KnowledgeBasePlugin.register_default("patches", PatchManager)
+
+
+__all__ = (
+    "Patch",
+    "PatchManager",
+)

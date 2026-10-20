@@ -490,3 +490,6 @@ class X87CmpF(PeepholeOptimizationExprBase):
         ):
             return None
         return X87CmpF._match_masked_cmpf(expr.operands[0], inner_mask)
+
+
+__all__ = ("X87CmpF",)

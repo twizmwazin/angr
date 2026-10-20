@@ -72,3 +72,6 @@ class GoGlobals(KnowledgeBasePlugin):
 
 
 KnowledgeBasePlugin.register_default("go_globals", GoGlobals)
+
+
+__all__ = ("GoGlobals",)

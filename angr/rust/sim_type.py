@@ -1117,3 +1117,26 @@ _RUST_SIMTYPE_CLASSES = [
 ]
 for _cls in _RUST_SIMTYPE_CLASSES:
     IDENT_TO_CLS[_cls._ident] = _cls
+
+
+__all__ = (
+    "DEFAULT_VEC_FIELDS_ORDER",
+    "EnumVariant",
+    "RustSimEnum",
+    "RustSimStruct",
+    "RustSimType",
+    "RustSimTypeArray",
+    "RustSimTypeBottom",
+    "RustSimTypeFunction",
+    "RustSimTypeInt",
+    "RustSimTypeNumOffset",
+    "RustSimTypeOption",
+    "RustSimTypeReference",
+    "RustSimTypeResult",
+    "RustSimTypeSize",
+    "RustSimTypeSlice",
+    "RustSimTypeStrRef",
+    "RustSimTypeUnit",
+    "RustSimTypeVec",
+    "is_composite_type",
+)

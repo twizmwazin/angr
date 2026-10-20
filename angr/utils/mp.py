@@ -125,3 +125,11 @@ def protect_stdio_from_forked_children() -> None:
 
     os.register_at_fork(after_in_child=_detach_child_stdio)
     _stdio_fork_hook_installed = True
+
+
+__all__ = (
+    "Closure",
+    "Initializer",
+    "mp_context",
+    "protect_stdio_from_forked_children",
+)

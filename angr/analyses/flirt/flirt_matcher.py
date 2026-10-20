@@ -353,3 +353,10 @@ class FlirtMatcher:
             self.func_matched(self.func, addr, func)
 
         return True
+
+
+__all__ = (
+    "FlirtMatcher",
+    "crc16",
+    "crc16_table",
+)

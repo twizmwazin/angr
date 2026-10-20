@@ -116,3 +116,12 @@ STD_STRING_INDEX = make_template(
     default_enabled=False,
     gate=STRING_WITNESSED,
 )
+
+
+__all__ = (
+    "STD_BASIC_STRING",
+    "STD_STRING_EMPTY",
+    "STD_STRING_INDEX",
+    "STD_STRING_LENGTH",
+    "STRING_WITNESSED",
+)

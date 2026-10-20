@@ -1151,3 +1151,18 @@ class SimSolver(SimStatePlugin):
 
 
 SimState.register_default("solver", SimSolver)
+
+
+__all__ = (
+    "SimSolver",
+    "break_time",
+    "concrete_path_bool",
+    "concrete_path_list",
+    "concrete_path_not_bool",
+    "concrete_path_scalar",
+    "concrete_path_tuple",
+    "disable_timing",
+    "enable_timing",
+    "error_converter",
+    "timed_function",
+)

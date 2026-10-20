@@ -108,3 +108,6 @@ class RemoveRedundantITEComparisons(PeepholeOptimizationExprBase):
             Const(self.manager.next_atom(), ite.iffalse.value & mask, expr.to_bits),
             **ite.tags,
         )
+
+
+__all__ = ("RemoveRedundantITEComparisons",)

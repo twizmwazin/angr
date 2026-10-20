@@ -301,5 +301,17 @@ def main():
         f.write(json.dumps(metadata, indent=2))
 
 
+__all__ = (
+    "MAX_UNIQUE_STRING_LEN",
+    "UNIQUE_STRING_COUNT",
+    "get_basic_info",
+    "get_unique_strings",
+    "main",
+    "process_exc_file",
+    "run_pelf",
+    "run_sigmake",
+)
+
+
 if __name__ == "__main__":
     main()

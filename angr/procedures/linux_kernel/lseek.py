@@ -40,3 +40,6 @@ class lseek(angr.SimProcedure):
         if self.state.solver.is_false(success):
             return -1
         return claripy.If(success, simfd.tell(), -1)
+
+
+__all__ = ("lseek",)

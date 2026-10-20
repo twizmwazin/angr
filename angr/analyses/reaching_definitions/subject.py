@@ -63,3 +63,9 @@ class Subject:
     @property
     def visitor(self) -> FunctionGraphVisitor | SingleNodeGraphVisitor:
         return self._visitor
+
+
+__all__ = (
+    "Subject",
+    "SubjectType",
+)

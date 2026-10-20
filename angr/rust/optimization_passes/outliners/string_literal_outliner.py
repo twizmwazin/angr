@@ -118,3 +118,6 @@ class StringLiteralOutliner(OptimizationPass, DFAMixin, SSAVariableMixin):
                 block.statements = new_stmts
 
         self.out_graph = self._graph
+
+
+__all__ = ("StringLiteralOutliner",)

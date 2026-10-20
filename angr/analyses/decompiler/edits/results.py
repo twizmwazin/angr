@@ -44,3 +44,9 @@ class EditResult:
     new: Any = None
     refresh: Refresh = field(default_factory=Refresh)
     detail: dict[str, Any] = field(default_factory=dict)
+
+
+__all__ = (
+    "EditResult",
+    "Refresh",
+)

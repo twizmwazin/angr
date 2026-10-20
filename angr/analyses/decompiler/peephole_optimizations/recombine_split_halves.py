@@ -86,3 +86,6 @@ class RecombineSplitHalves(PeepholeOptimizationExprBase):
             and expr.operand.to_bits == n
             and expr.operand.operand.likes(a)
         )
+
+
+__all__ = ("RecombineSplitHalves",)

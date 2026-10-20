@@ -18,3 +18,6 @@ libc.add_alias("abort", "__stack_chk_fail")
 # Mach-O naming convention adds an underscore prefix to function names
 for name in list(libc.procedures):
     libc.add_alias(name, "_" + name)
+
+
+__all__ = ("libc",)

@@ -61,3 +61,6 @@ class GoGlobalsRecovery(Analysis):
 
 
 AnalysesHub.register_default("GoGlobalsRecovery", GoGlobalsRecovery)
+
+
+__all__ = ("GoGlobalsRecovery",)

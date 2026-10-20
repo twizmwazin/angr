@@ -31,3 +31,9 @@ class SimXbox(SimOS):
             cc = SimCCStdcall(self.project.arch)
             hooker = stub_cls(cc=cc, display_name=export_name, library_name="xboxkrnl.exe", is_stub=True)
             self.project.hook(addr, hooker, replace=True)
+
+
+__all__ = (
+    "SimXbox",
+    "xbe",
+)

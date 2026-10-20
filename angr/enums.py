@@ -13,3 +13,6 @@ class Flavors(StrEnum):
     DEFAULT_FLAVOR = "pseudocode"
     RUST_FLAVOR = "rust"
     GO_FLAVOR = "go"
+
+
+__all__ = ("Flavors",)

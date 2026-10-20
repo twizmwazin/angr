@@ -30,3 +30,9 @@ class FindClass(JNISimProcedure):
         class_name = self._load_string_from_native_memory(name_ptr)
         class_descriptor = self.state.javavm_classloader.get_class(class_name, init_class=True)
         return self.state.jni_references.create_new_reference(class_descriptor)
+
+
+__all__ = (
+    "FindClass",
+    "GetSuperclass",
+)

@@ -316,3 +316,6 @@ class AnnotatedCFG:
             loop = tuple(x[-1] for x in loop_lst)
             print(" => ".join([f"0x{x:08x}" for x in loop]))
             self.add_loop(loop)
+
+
+__all__ = ("AnnotatedCFG",)

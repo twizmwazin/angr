@@ -149,3 +149,6 @@ class IncrementalDominators:
                 if dfs[k] != self._dfs[k]:
                     print(f"{k!r}: {dfs[k]!r} {self._dfs[k]!r}")
                     raise ValueError("dfs do not match")
+
+
+__all__ = ("IncrementalDominators",)

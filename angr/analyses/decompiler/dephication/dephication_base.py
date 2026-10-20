@@ -98,3 +98,6 @@ class DephicationBase(Analysis):
 
     def _rewrite_container(self) -> Any:
         raise NotImplementedError
+
+
+__all__ = ("DephicationBase",)

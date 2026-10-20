@@ -298,3 +298,9 @@ class PatternMatchSimplifier(SequenceOptimizationPass):
         )
         walker.walk(self.seq)
         self.out_seq = self.seq
+
+
+__all__ = (
+    "PatternMatchSimplifier",
+    "PatternMatchWalker",
+)

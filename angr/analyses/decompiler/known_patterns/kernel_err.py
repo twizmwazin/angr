@@ -96,3 +96,11 @@ IS_ERR = make_template("IS_ERR", _build_is_err, default_enabled=False, gate=LINU
 IS_ERR_OR_NULL = make_template("IS_ERR_OR_NULL", _build_is_err_or_null, default_enabled=False, gate=LINUX_KERNEL)
 
 ALL_KERNEL_ERR_TEMPLATES = [IS_ERR_OR_NULL, IS_ERR]
+
+
+__all__ = (
+    "ALL_KERNEL_ERR_TEMPLATES",
+    "IS_ERR",
+    "IS_ERR_OR_NULL",
+    "MAX_ERRNO",
+)

@@ -104,3 +104,6 @@ class snprintf(Func):
                         break
 
         return self.format_spec_char is not None
+
+
+__all__ = ("snprintf",)

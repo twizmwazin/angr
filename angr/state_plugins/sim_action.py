@@ -322,3 +322,12 @@ class SimActionData(SimAction):
         c.condition = self._copy_object(self.condition)
         c.fallback = self._copy_object(self.fallback)
         c.fd = self._copy_object(self.fd)
+
+
+__all__ = (
+    "SimAction",
+    "SimActionConstraint",
+    "SimActionData",
+    "SimActionExit",
+    "SimActionOperation",
+)

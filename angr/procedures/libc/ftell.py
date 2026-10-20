@@ -21,3 +21,9 @@ class ftell(angr.SimProcedure):
 
 
 ftello = ftell
+
+
+__all__ = (
+    "ftell",
+    "ftello",
+)

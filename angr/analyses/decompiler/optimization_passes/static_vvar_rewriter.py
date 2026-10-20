@@ -356,3 +356,13 @@ class StaticVVarRewriter(OptimizationPass):
             if old_static_buffers == self._static_buffers and old_static_vvars == self._static_vvars:
                 # no new aliases found
                 break
+
+
+__all__ = (
+    "FixedBuffer",
+    "FixedBufferPtr",
+    "Offset",
+    "StaticVVarRewriter",
+    "VVarAliasVisitor",
+    "VVarRewritingVisitor",
+)

@@ -410,3 +410,6 @@ class RemoveRedundantConversions(PeepholeOptimizationExprBase):
                     **expr.tags,
                 )
         return None
+
+
+__all__ = ("RemoveRedundantConversions",)

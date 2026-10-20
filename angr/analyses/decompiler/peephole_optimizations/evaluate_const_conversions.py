@@ -107,3 +107,6 @@ class EvaluateConstConversions(PeepholeOptimizationExprBase):
             return Const(inner.idx, inner.value, expr.to_bits, **inner.tags)
 
         return None
+
+
+__all__ = ("EvaluateConstConversions",)

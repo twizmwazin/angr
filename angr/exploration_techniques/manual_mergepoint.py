@@ -80,3 +80,6 @@ class ManualMergepoint(ExplorationTechnique):
             simgr = simgr.move("merge_tmp", stash)
 
         return simgr
+
+
+__all__ = ("ManualMergepoint",)

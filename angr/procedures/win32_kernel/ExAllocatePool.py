@@ -11,3 +11,6 @@ class ExAllocatePool(angr.SimProcedure):
         memset = angr.SIM_PROCEDURES["libc"]["memset"]
         self.inline_call(memset, addr, claripy.BVV(0, 8), NumberOfBytes)  # zerofill
         return addr
+
+
+__all__ = ("ExAllocatePool",)

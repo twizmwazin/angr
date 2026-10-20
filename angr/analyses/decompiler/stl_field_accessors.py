@@ -91,3 +91,11 @@ def stl_accessor_name(ty: SimType, field_name: str) -> str | None:
     if accessor is None:
         return None
     return f"{ty.name}::{accessor}"
+
+
+__all__ = (
+    "CPP_STD_TYPE_COLLECTION",
+    "STD_BASIC_STRING",
+    "STD_VECTOR_PREFIX",
+    "stl_accessor_name",
+)

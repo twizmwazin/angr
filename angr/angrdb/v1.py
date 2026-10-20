@@ -341,3 +341,6 @@ class AngrDbV1:
             f"Unsupported case: The block addr {addr:#x} is not an external function or block. "
             f"This probably indicates a bug in angrdb generation."
         )
+
+
+__all__ = ("AngrDbV1",)

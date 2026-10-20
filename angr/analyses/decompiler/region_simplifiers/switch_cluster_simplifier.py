@@ -668,3 +668,19 @@ class FindFirstNodeInSet(SequenceWalker):
             self.first_node = node
         if self.first_node is None:
             super()._handle(node, **kwargs)
+
+
+__all__ = (
+    "CmpOp",
+    "ConditionalRegion",
+    "FindFirstNodeInSet",
+    "SwitchCaseRegion",
+    "SwitchClusterFinder",
+    "SwitchClusterReplacer",
+    "filter_cond_regions",
+    "is_simple_jump_node",
+    "simplify_lowered_switches",
+    "simplify_lowered_switches_core",
+    "simplify_switch_clusters",
+    "update_switch_case_list",
+)

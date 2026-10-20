@@ -2032,3 +2032,9 @@ class _ExprRewriter(AILBlockRewriter):
             self.changed = True
             return self._o._stmt(call, stmt.idx)
         return stmt  # unchanged: the original statement, as the base handlers return
+
+
+__all__ = (
+    "GoRuntimeRewriter",
+    "classify_runtime_call",
+)

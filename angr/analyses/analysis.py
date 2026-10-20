@@ -435,3 +435,17 @@ AnalysesHub.register_preset("default", default_analyses)
 
 def register_analysis(cls, name):
     AnalysesHub.register_default(name, cls)
+
+
+__all__ = (
+    "GIL_RELEASE_INTERVAL",
+    "AnalysesHub",
+    "AnalysesHubWithDefault",
+    "Analysis",
+    "AnalysisFactory",
+    "AnalysisLogEntry",
+    "KnownAnalysesPlugin",
+    "default_analyses",
+    "register_analysis",
+    "t",
+)

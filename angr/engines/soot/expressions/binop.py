@@ -27,3 +27,6 @@ class SimSootExpr_Binop(SimSootExpr):
         "cmpl": operator.lt,
         "cmp": operator.ne,
     }
+
+
+__all__ = ("SimSootExpr_Binop",)

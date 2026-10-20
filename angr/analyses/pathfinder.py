@@ -282,3 +282,14 @@ def find_successor(successors: SimSuccessors, target_addr: int) -> tuple[SimStat
 
 
 AnalysesHub.register_default("Pathfinder", Pathfinder)
+
+
+__all__ = (
+    "Pathfinder",
+    "SimStateMarker",
+    "SuccessorsKind",
+    "TestPathReport",
+    "Unreachable",
+    "find_successor",
+    "nilref",
+)

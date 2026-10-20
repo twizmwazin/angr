@@ -431,3 +431,6 @@ class Typehoon(Analysis):
 
 
 AnalysesHub.register_default("Typehoon", Typehoon)
+
+
+__all__ = ("Typehoon",)

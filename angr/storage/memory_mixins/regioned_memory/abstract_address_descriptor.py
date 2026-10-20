@@ -35,3 +35,6 @@ class AbstractAddressDescriptor:
 
     def clear(self):
         self._regioned_addrs.clear()
+
+
+__all__ = ("AbstractAddressDescriptor",)

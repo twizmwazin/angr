@@ -613,3 +613,9 @@ class BlockSimplifier:
         if multi_stmts_updated:
             new_block = new_block.copy(statements=statements)
         return new_block, stmts_updated or multi_stmts_updated, exprs_updated
+
+
+__all__ = (
+    "BlockSimplifier",
+    "PeepholeOptimizationBundle",
+)

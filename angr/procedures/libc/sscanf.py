@@ -12,3 +12,6 @@ class sscanf(ScanfFormatParser):
     def run(self, data, fmt):
         fmt_str = self._parse(fmt)
         return fmt_str.interpret(self.va_arg, addr=data)
+
+
+__all__ = ("sscanf",)

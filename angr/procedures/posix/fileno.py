@@ -17,3 +17,9 @@ class fileno(angr.SimProcedure):
 
 
 fileno_unlocked = fileno
+
+
+__all__ = (
+    "fileno",
+    "fileno_unlocked",
+)

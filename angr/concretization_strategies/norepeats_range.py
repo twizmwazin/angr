@@ -36,3 +36,6 @@ class SimConcretizationStrategyNorepeatsRange(SimConcretizationStrategy):
 
         self._repeat_min = max(self._repeat_min, max(o._repeat_min for o in others))
         self._repeat_granularity = max(self._repeat_granularity, max(o._repeat_granularity for o in others))
+
+
+__all__ = ("SimConcretizationStrategyNorepeatsRange",)

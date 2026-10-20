@@ -96,3 +96,9 @@ class ModSimplifier(OptimizationPass):
                 _l.debug("new block: %s", new_block.statements)
 
             self._update_block(block, new_block)
+
+
+__all__ = (
+    "ModSimplifier",
+    "ModSimplifierAILEngine",
+)

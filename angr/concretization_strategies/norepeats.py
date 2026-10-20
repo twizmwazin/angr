@@ -35,3 +35,6 @@ class SimConcretizationStrategyNorepeats(SimConcretizationStrategy):
             if c.hash() not in seen:
                 seen.add(c.hash())
                 self._repeat_constraints.append(c)
+
+
+__all__ = ("SimConcretizationStrategyNorepeats",)

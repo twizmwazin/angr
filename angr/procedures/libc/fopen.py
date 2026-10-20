@@ -62,3 +62,9 @@ class fopen(angr.SimProcedure):
         # still possible that open failed
         null = claripy.BVV(0, self.state.arch.bits)
         return claripy.If(fd == fd_concr, file_struct_ptr, null)
+
+
+__all__ = (
+    "fopen",
+    "mode_to_flag",
+)

@@ -9,3 +9,6 @@ class DirtyAddrsMixin(MemoryMixin):
         if self.category == "mem":
             self.state.scratch.dirty_addrs.update(range(addr, addr + size))
         super().store(addr, data, size=size, **kwargs)
+
+
+__all__ = ("DirtyAddrsMixin",)

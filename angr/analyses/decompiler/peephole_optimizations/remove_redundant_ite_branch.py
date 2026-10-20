@@ -29,3 +29,6 @@ class RemoveRedundantITEBranches(PeepholeOptimizationExprBase):
                 return ITE(expr.idx, expr.cond, expr.iftrue, expr.iffalse.iftrue, **expr.tags)
 
         return None
+
+
+__all__ = ("RemoveRedundantITEBranches",)

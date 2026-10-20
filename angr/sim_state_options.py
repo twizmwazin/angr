@@ -401,3 +401,9 @@ class SimStateOptions:
         """
 
         cls.register_option(name, {bool}, default=False, description=description)
+
+
+__all__ = (
+    "SimStateOptions",
+    "StateOption",
+)

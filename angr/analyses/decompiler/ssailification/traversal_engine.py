@@ -931,3 +931,11 @@ class SimEngineSSATraversal(SimEngineLightAIL[TraversalState, Value, None, None]
     _handle_unop_unpack = _unreachable
     _handle_unop_Sqrt = _unreachable
     _handle_unop_RSqrtEst = _unreachable
+
+
+__all__ = (
+    "CUTOFF",
+    "DefInfo",
+    "SimEngineSSATraversal",
+    "offset_sort_key",
+)

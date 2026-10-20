@@ -33,3 +33,6 @@ class AMulConstSubA(PeepholeOptimizationExprBase):
                 )
 
         return None
+
+
+__all__ = ("AMulConstSubA",)

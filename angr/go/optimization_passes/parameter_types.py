@@ -39,3 +39,6 @@ class GoParameterTypes(OptimizationPass):
             if var is None or ty is None or i in untyped:
                 continue
             var_manager.set_variable_type(var, ty.with_arch(self.project.arch), mark_manual=True)
+
+
+__all__ = ("GoParameterTypes",)

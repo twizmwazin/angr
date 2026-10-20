@@ -61,3 +61,6 @@ class free(Func):
                 return False
 
         return len(malloc_vals) != len(set(malloc_vals))
+
+
+__all__ = ("free",)

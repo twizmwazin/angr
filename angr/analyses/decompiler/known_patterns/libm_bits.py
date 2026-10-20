@@ -305,3 +305,23 @@ ALL_LIBM_TEMPLATES = [
     LIBM_FABS,
     LIBM_FABSF,
 ]
+
+
+__all__ = (
+    "ABS32",
+    "ABS64",
+    "ALL_LIBM_TEMPLATES",
+    "INF64",
+    "LIBM_COPYSIGN",
+    "LIBM_COPYSIGNF",
+    "LIBM_FABS",
+    "LIBM_FABSF",
+    "LIBM_FNEG",
+    "LIBM_FNEGF",
+    "LIBM_ISINF",
+    "LIBM_ISNAN",
+    "LIBM_ISNANF",
+    "LIBM_ISUNORDERED",
+    "SIGN32",
+    "SIGN64",
+)

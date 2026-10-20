@@ -208,3 +208,6 @@ class RecursiveStructurer(Analysis):
 
 
 register_analysis(RecursiveStructurer, "RecursiveStructurer")
+
+
+__all__ = ("RecursiveStructurer",)

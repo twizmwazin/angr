@@ -234,3 +234,9 @@ class StructuredCodeManagerSerializer:
             manager.cached[(db_code.func_addr, db_code.flavor)] = cache
 
         return manager
+
+
+__all__ = (
+    "ConstFormatsSerializer",
+    "StructuredCodeManagerSerializer",
+)

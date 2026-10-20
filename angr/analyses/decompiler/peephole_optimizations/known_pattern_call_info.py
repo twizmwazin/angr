@@ -69,3 +69,6 @@ class KnownPatternCallInfo(PeepholeOptimizationExprBase):
                     self.type_hints.append((atom, param.type_hint))
 
         return new_expr
+
+
+__all__ = ("KnownPatternCallInfo",)

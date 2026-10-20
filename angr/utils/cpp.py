@@ -15,3 +15,6 @@ def is_cpp_funcname_ctor(name: str) -> bool:
         return False
     parts = name.split("::")
     return bool(len(parts) == 2 and parts[0] and parts[0] + "()" == parts[1])
+
+
+__all__ = ("is_cpp_funcname_ctor",)

@@ -72,3 +72,6 @@ class calloc(Func):
             return False
 
         return True
+
+
+__all__ = ("calloc",)

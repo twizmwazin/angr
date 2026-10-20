@@ -81,3 +81,9 @@ class DerefCoercionSimplifierUninlined(OptimizationPass, SRDAMixin, CFAMixin, AI
                     block.statements.remove(stmt)
 
         self.out_graph = self._graph
+
+
+__all__ = (
+    "DEREF_COERCION_FUNCTIONS",
+    "DerefCoercionSimplifierUninlined",
+)

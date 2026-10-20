@@ -18,3 +18,6 @@ class SimConcretizationStrategySolutions(SimConcretizationStrategy):
         if len(addrs) <= self._limit:
             return addrs
         return None
+
+
+__all__ = ("SimConcretizationStrategySolutions",)

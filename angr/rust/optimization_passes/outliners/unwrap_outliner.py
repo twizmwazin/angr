@@ -189,3 +189,13 @@ class UnwrapOutliner(OptimizationPass, CFAMixin, SRDAMixin, DFAMixin, CFGTransfo
                 self._try_outline(block, unwrap_failed_func_name)
 
         self.out_graph = self._graph
+
+
+__all__ = (
+    "OPTION_UNWRAP_FAILED_FUNCTION",
+    "RESULT_UNWRAP_FAILED_FUNCTION",
+    "UNWRAP_FAILED_FUNCTIONS",
+    "UNWRAP_FUNCTIONS",
+    "UnwrapOutliner",
+    "UnwrapSimplifierState",
+)

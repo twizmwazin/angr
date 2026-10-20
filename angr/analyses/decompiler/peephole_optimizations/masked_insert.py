@@ -161,3 +161,6 @@ class SimplifyMaskedInsert(PeepholeOptimizationExprBase):
         if i_shift >= expr.to_bits:
             return Convert(expr.idx, expr.from_bits, expr.to_bits, expr.is_signed, ins.base, **expr.tags)
         return None
+
+
+__all__ = ("SimplifyMaskedInsert",)

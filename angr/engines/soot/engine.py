@@ -407,3 +407,6 @@ class SootMixin(SuccessorsEngine, ProcedureMixin):
         return state.project.simos.state_call(
             native_addr, *final_args, base_state=state, prototype=prototype, ret_type=java_method.ret
         )
+
+
+__all__ = ("SootMixin",)

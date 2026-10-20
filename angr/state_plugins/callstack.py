@@ -472,3 +472,9 @@ class CallStackAction:
 
 
 SimState.register_default("callstack", CallStack)
+
+
+__all__ = (
+    "CallStack",
+    "CallStackAction",
+)

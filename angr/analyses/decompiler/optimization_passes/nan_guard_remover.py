@@ -138,3 +138,6 @@ class NaNGuardRemover(OptimizationPass):
         if isinstance(target, Const):
             target = target.value
         return isinstance(target, int) and block.addr == target and (target_idx is None or block.idx == target_idx)
+
+
+__all__ = ("NaNGuardRemover",)

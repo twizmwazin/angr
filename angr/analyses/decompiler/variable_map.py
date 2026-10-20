@@ -400,3 +400,9 @@ class VariableMap:
                 vm._returntys[int(idx)] = ty
 
         return vm
+
+
+__all__ = (
+    "VariableMap",
+    "variable_map_of",
+)

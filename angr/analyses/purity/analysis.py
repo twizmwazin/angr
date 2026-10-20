@@ -78,3 +78,6 @@ class AILPurityAnalysis(Analysis, ForwardAnalysisForClinic[StateType]):
 
     def _compare_states(self, node, old_state, new_state) -> bool:
         return old_state.vars == new_state.vars
+
+
+__all__ = ("AILPurityAnalysis",)

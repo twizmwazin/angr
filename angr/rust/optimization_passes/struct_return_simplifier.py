@@ -159,3 +159,6 @@ class StructReturnSimplifier(OptimizationPass, SRDAMixin, CFGTransformationMixin
                             block.statements.remove(stmt)
         for block in blocks_to_remove:
             self.remove_block(block)
+
+
+__all__ = ("StructReturnSimplifier",)

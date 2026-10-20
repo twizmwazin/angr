@@ -98,3 +98,6 @@ class strstr(angr.SimProcedure):
 
         self.state.add_constraints(*c)
         return r
+
+
+__all__ = ("strstr",)

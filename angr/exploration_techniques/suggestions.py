@@ -157,3 +157,9 @@ class Suggestions(ExplorationTechnique):
                             l.info("...using variables from file %s", description[1])
                     else:
                         l.info("...using uncategorized variable %s", description)
+
+
+__all__ = (
+    "Suggestions",
+    "ast_weight",
+)

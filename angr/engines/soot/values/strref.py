@@ -36,3 +36,6 @@ class SimSootValue_StringRef(SimSootValue):
         str_ref = SimSootValue_StringRef(state.memory.get_new_uuid())
         state.memory.store(str_ref, value)
         return str_ref
+
+
+__all__ = ("SimSootValue_StringRef",)

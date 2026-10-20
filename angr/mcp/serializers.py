@@ -143,3 +143,13 @@ def serialize_symbol(symbol: Any) -> dict[str, Any]:
         "is_import": symbol.is_import,
         "is_export": symbol.is_export,
     }
+
+
+__all__ = (
+    "serialize_basic_block",
+    "serialize_cfg_stats",
+    "serialize_function",
+    "serialize_function_summary",
+    "serialize_symbol",
+    "serialize_xref",
+)

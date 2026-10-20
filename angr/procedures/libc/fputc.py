@@ -22,3 +22,11 @@ class fputc(angr.SimProcedure):
 putc = fputc
 fputc_unlocked = fputc
 putc_unlocked = fputc
+
+
+__all__ = (
+    "fputc",
+    "fputc_unlocked",
+    "putc",
+    "putc_unlocked",
+)

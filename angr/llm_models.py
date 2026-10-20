@@ -24,3 +24,12 @@ class VariableTypeChange(BaseModel):
 
 class VariableTypeSuggestions(BaseModel):
     type_changes: list[VariableTypeChange]
+
+
+__all__ = (
+    "FunctionNameSuggestion",
+    "VariableNameSuggestions",
+    "VariableRename",
+    "VariableTypeChange",
+    "VariableTypeSuggestions",
+)

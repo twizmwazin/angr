@@ -47,3 +47,10 @@ class ParsedInstruction:
         self.ins_addr = ins_addr
         self.min_stmt_idx = min_stmt_idx
         self.max_stmt_idx = max_stmt_idx
+
+
+__all__ = (
+    "DEFAULT_LOCATION",
+    "ParsedInstruction",
+    "SimActLocation",
+)

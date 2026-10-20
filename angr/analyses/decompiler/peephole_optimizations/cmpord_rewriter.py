@@ -71,3 +71,6 @@ class CmpORDRewriter(PeepholeOptimizationStmtBase):
             stmt.false_target_idx,
             **stmt.tags,
         )
+
+
+__all__ = ("CmpORDRewriter",)

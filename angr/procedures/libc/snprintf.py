@@ -34,3 +34,6 @@ class __snprintf_chk(FormatParser):
         self.state.memory.store(dst_ptr + (out_str.size() // self.arch.byte_width), claripy.BVV(0, 8))
 
         return out_str.size() // self.arch.byte_width
+
+
+__all__ = ("snprintf",)

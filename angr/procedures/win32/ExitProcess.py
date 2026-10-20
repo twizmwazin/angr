@@ -8,3 +8,6 @@ class ExitProcess(angr.SimProcedure):
 
     def run(self, exit_status):
         self.exit(exit_status)
+
+
+__all__ = ("ExitProcess",)

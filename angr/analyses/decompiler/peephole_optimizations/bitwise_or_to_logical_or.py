@@ -33,3 +33,6 @@ class BitwiseOrToLogicalOr(PeepholeOptimizationExprBase):
             return BinaryOp(expr.idx, op, (new_left, new_right), False, bits=expr.bits, **expr.tags)
 
         return expr
+
+
+__all__ = ("BitwiseOrToLogicalOr",)

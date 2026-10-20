@@ -54,3 +54,10 @@ def is_in_readonly_segment(project: Project, addr: int) -> bool:
     if seg is not None:
         return not seg.is_writable
     return False
+
+
+__all__ = (
+    "is_in_readonly_section",
+    "is_in_readonly_segment",
+    "is_pc",
+)

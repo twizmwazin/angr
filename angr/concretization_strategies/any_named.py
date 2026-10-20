@@ -34,3 +34,6 @@ class SimConcretizationStrategyAnyNamed(SimConcretizationStrategy):
         memory.state.solver.add(addr == target)
 
         return [target]
+
+
+__all__ = ("SimConcretizationStrategyAnyNamed",)

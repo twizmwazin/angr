@@ -3222,3 +3222,6 @@ class CFGBase(Analysis):
             self._indirect_jump_unresolved(jump)
 
         return set() if targets is None else set(targets)
+
+
+__all__ = ("CFGBase",)

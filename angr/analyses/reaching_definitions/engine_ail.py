@@ -1185,3 +1185,6 @@ class SimEngineRDAIL(SimEngineNostmtAIL[ReachingDefinitionsState, MultiValues, N
 
     def _handle_expr_MultiStatementExpression(self, expr):
         return self._top(expr.bits)
+
+
+__all__ = ("SimEngineRDAIL",)

@@ -101,3 +101,6 @@ class ObfuscationDetector(Analysis):
 
 
 AnalysesHub.register_default("ObfuscationDetector", ObfuscationDetector)
+
+
+__all__ = ("ObfuscationDetector",)

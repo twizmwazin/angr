@@ -39,3 +39,6 @@ class RewriteConvMul(PeepholeOptimizationExprBase):
                 return Convert(new_expr.idx, op0.from_bits, op0.to_bits, False, new_expr, **expr.tags)
 
         return None
+
+
+__all__ = ("RewriteConvMul",)

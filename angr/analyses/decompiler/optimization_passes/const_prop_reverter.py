@@ -464,3 +464,9 @@ class ConstPropOptReverter(OptimizationPass):
             if isinstance(data, Call):
                 return data
         return None
+
+
+__all__ = (
+    "BlockWalker",
+    "ConstPropOptReverter",
+)

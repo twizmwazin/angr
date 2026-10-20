@@ -6,3 +6,6 @@ from .close import close
 # :/
 class closedir(close):
     pass
+
+
+__all__ = ("closedir",)

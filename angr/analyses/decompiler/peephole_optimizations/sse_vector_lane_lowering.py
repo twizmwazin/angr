@@ -180,3 +180,11 @@ class SSEVectorLaneLowering(PeepholeOptimizationExprBase):
         if isinstance(expr, Extract):
             return Extract(expr.idx, n_bits, lowered, expr.offset, expr.endness, **expr.tags)
         return Convert(expr.idx, lowered.bits, n_bits, expr.is_signed, lowered, **expr.tags)
+
+
+__all__ = (
+    "SSEVectorLaneLowering",
+    "lane0",
+    "lower_lane0",
+    "upper_lanes_zero",
+)

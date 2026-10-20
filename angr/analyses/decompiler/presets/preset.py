@@ -35,3 +35,6 @@ class DecompilationPreset:
                 passes.append(pass_)
 
         return passes
+
+
+__all__ = ("DecompilationPreset",)

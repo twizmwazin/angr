@@ -275,3 +275,6 @@ class InlinedStrlenSimplifier(OptimizationPass):
             if isinstance(stmt, Assignment) and stmt.dst.likes(var):
                 return stmt.src
         return None
+
+
+__all__ = ("InlinedStrlenSimplifier",)

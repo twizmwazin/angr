@@ -23,3 +23,10 @@ def detect_test_env():
 
 
 is_testing = detect_test_env()
+
+
+__all__ = (
+    "TESTER_MODULE_NAMES",
+    "detect_test_env",
+    "is_testing",
+)

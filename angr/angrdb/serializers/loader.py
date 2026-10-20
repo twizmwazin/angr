@@ -191,3 +191,10 @@ class LoaderSerializer:
                 obj.binary = name_to_path.get(obj.binary_basename)
 
         return loader
+
+
+__all__ = (
+    "LoadArgsJSONDecoder",
+    "LoadArgsJSONEncoder",
+    "LoaderSerializer",
+)

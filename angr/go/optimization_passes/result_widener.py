@@ -344,3 +344,9 @@ class GoResultWidener(OptimizationPass):
             if word is not None:
                 words.add(word)
         return frozenset(words), unknown
+
+
+__all__ = (
+    "RET_FLOOR_TAG",
+    "GoResultWidener",
+)

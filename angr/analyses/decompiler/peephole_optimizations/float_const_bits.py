@@ -78,3 +78,6 @@ class FloatConstBits(PeepholeOptimizationExprBase):
             vector_size=expr.vector_size,
             **expr.tags,
         )
+
+
+__all__ = ("FloatConstBits",)

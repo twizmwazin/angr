@@ -26,3 +26,6 @@ class BooleanCounter(AILBlockViewer):
 
         self._handle_expr(0, expr.operands[0], stmt_idx, stmt, block)
         self._handle_expr(1, expr.operands[1], stmt_idx, stmt, block)
+
+
+__all__ = ("BooleanCounter",)

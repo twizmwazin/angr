@@ -460,3 +460,9 @@ class StructInstantiationSimplifier(OptimizationPass, SRDAMixin, CFAMixin, DFAMi
 
         self.fix_stack_vvar_uses()
         self.out_graph = self._graph
+
+
+__all__ = (
+    "StructBuilder",
+    "StructInstantiationSimplifier",
+)

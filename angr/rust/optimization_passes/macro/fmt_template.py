@@ -152,3 +152,20 @@ def num_args(pieces: list[str | Placeholder]) -> int:
             if p.precision_indirect and p.precision is not None:
                 n = max(n, p.precision + 1)
     return n
+
+
+__all__ = (
+    "ALTERNATE_FLAG",
+    "DEBUG_LOWER_HEX_FLAG",
+    "DEBUG_UPPER_HEX_FLAG",
+    "DEFAULT_FLAGS",
+    "MAX_TEMPLATE_SIZE",
+    "PRECISION_FLAG",
+    "SIGN_AWARE_ZERO_PAD_FLAG",
+    "SIGN_MINUS_FLAG",
+    "SIGN_PLUS_FLAG",
+    "WIDTH_FLAG",
+    "Placeholder",
+    "decode_template",
+    "num_args",
+)

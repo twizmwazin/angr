@@ -60,3 +60,6 @@ class memcmp(Func):
         outval2 = s.solver.eval(s.regs.eax)
 
         return not (outval1 != 0 or outval2 == 0)
+
+
+__all__ = ("memcmp",)

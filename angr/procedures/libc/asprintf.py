@@ -33,3 +33,6 @@ class asprintf(FormatParser):
         self.state.memory.store(str_ptrptr, dst, endness=self.arch.memory_endness)
 
         return length
+
+
+__all__ = ("asprintf",)

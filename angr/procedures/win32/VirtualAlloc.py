@@ -114,3 +114,10 @@ class VirtualAlloc(angr.SimProcedure):
 
         self.state.heap.mmap_base = new_base
         return addr
+
+
+__all__ = (
+    "VirtualAlloc",
+    "convert_prot",
+    "deconvert_prot",
+)

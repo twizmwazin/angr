@@ -58,3 +58,10 @@ def resource_event(state, exception):
             reason=exception.args,
         )
         break
+
+
+__all__ = (
+    "SimEvent",
+    "event_id_count",
+    "resource_event",
+)

@@ -691,3 +691,11 @@ class SimSystemPosix(SimStatePlugin):
 
 
 SimState.register_default("posix", SimSystemPosix)
+
+
+__all__ = (
+    "PosixDevFS",
+    "PosixProcFS",
+    "SimSystemPosix",
+    "max_fds",
+)

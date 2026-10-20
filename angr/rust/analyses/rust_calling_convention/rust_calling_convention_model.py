@@ -22,3 +22,6 @@ class RustCallingConventionModel:
 
     def __str__(self):
         return pformat({"Inferred prototype": self.inferred_prototype}, indent=2)
+
+
+__all__ = ("RustCallingConventionModel",)

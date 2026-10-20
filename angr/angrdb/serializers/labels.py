@@ -58,3 +58,6 @@ class LabelsSerializer:
             labels[db_label.addr] = db_label.name
 
         return labels
+
+
+__all__ = ("LabelsSerializer",)

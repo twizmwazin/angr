@@ -342,3 +342,11 @@ class APIObfuscationFinder(Analysis):
 
 
 AnalysesHub.register_default("APIObfuscationFinder", APIObfuscationFinder)
+
+
+__all__ = (
+    "APIDeobFuncDescriptor",
+    "APIObfuscationFinder",
+    "APIObfuscationType",
+    "Type1AssignmentFinder",
+)

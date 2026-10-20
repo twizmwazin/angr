@@ -615,3 +615,14 @@ class FormatMacroSimplifier(OptimizationPass, CFAMixin, DFAMixin, SRDAMixin, SSA
             for stmt in stmts:
                 if stmt in block.statements:
                     block.statements.remove(stmt)
+
+
+__all__ = (
+    "FORMAT_FUNCTIONS",
+    "FORMAT_TRAITS",
+    "NEW_ARGUMENTS_FUNCTION",
+    "NEW_ARGUMENT_FUNCTION",
+    "FormatMacroSimplifier",
+    "FormatWrapperIdentification",
+    "FormatWrappers",
+)

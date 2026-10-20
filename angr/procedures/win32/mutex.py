@@ -10,3 +10,9 @@ class CreateMutexA(angr.SimProcedure):
 
 class CreateMutexEx(CreateMutexA):
     pass
+
+
+__all__ = (
+    "CreateMutexA",
+    "CreateMutexEx",
+)

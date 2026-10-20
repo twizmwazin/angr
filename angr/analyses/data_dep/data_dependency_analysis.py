@@ -589,3 +589,9 @@ class DataDependencyGraphAnalysis(Analysis):
 
 # register this analysis
 AnalysesHub.register_default("DataDep", DataDependencyGraphAnalysis)
+
+
+__all__ = (
+    "DataDependencyGraphAnalysis",
+    "NodalAnnotation",
+)

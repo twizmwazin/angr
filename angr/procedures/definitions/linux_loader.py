@@ -38,3 +38,6 @@ lib.set_library_names(
     ],
 )
 lib.add_all_from_dict(P["linux_loader"])
+
+
+__all__ = ("lib",)

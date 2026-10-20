@@ -38,3 +38,6 @@ class SimSootValue_StaticFieldRef(SimSootValue):
         field_id = resolve_field(state, field_class, field_name, field_type)
         # return field ref
         return cls.from_field_id(field_id)
+
+
+__all__ = ("SimSootValue_StaticFieldRef",)

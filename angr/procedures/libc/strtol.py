@@ -260,3 +260,6 @@ class strtol(angr.SimProcedure):
             endptr, nptr + num_bytes, condition=(endptr != 0), endness=self.state.arch.memory_endness
         )
         return claripy.If(expression, value, 0)
+
+
+__all__ = ("strtol",)

@@ -40,3 +40,10 @@ class SimSootStmt_TableSwitch(SwitchBase):
 
 class SimSootStmt_LookupSwitch(SwitchBase):
     pass
+
+
+__all__ = (
+    "SimSootStmt_LookupSwitch",
+    "SimSootStmt_TableSwitch",
+    "SwitchBase",
+)

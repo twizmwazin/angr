@@ -76,3 +76,6 @@ class __memset_chk(memset):
     # pylint:disable=arguments-differ, missing-class-docstring
     def run(self, dst_addr, char, num, _destlen):  # type:ignore[reportIncompatibleMethodOverride]
         return super().run(dst_addr, char, num)
+
+
+__all__ = ("memset",)

@@ -23,3 +23,6 @@ class TopMergerMixin(MemoryMixin):
         copied = super().copy(memo)
         copied._top_func = self._top_func
         return copied
+
+
+__all__ = ("TopMergerMixin",)

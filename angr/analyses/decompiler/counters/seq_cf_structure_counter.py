@@ -61,3 +61,6 @@ class ControlFlowStructureCounter(SequenceWalker):
             self.for_loops += 1
 
         return super()._handle_Loop(node, **kwargs)
+
+
+__all__ = ("ControlFlowStructureCounter",)

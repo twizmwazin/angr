@@ -24,3 +24,6 @@ class ShlToMul(PeepholeOptimizationExprBase):
             )
 
         return None
+
+
+__all__ = ("ShlToMul",)

@@ -556,3 +556,12 @@ class LambdaIterIter(LambdaAttrIter):
 
 
 SimState.register_default("history", SimStateHistory)
+
+
+__all__ = (
+    "HistoryIter",
+    "LambdaAttrIter",
+    "LambdaIterIter",
+    "SimStateHistory",
+    "TreeIter",
+)

@@ -54,3 +54,10 @@ class Checkpoint:
         self._last = time.perf_counter()
         if self.callback is not None:
             self.callback()
+
+
+__all__ = (
+    "YIELD_INTERVAL",
+    "YIELD_SLEEP",
+    "Checkpoint",
+)

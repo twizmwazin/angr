@@ -21,3 +21,6 @@ class strlen(Func):
         test_output = [s]
         max_steps = 20
         return TestData(test_input, test_output, length, max_steps)
+
+
+__all__ = ("strlen",)

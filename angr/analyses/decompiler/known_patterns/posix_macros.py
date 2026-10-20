@@ -317,3 +317,16 @@ WTERMSIG = make_template("WTERMSIG", _build_wtermsig, platforms=("linux",), defa
 MAJOR = make_template("major", _build_major, platforms=("linux",), default_enabled=True, name="gnu_dev_major")
 
 ALL_POSIX_MACRO_TEMPLATES = [*S_ISTYPE_TEMPLATES, WIFEXITED, WIFSIGNALED, WIFSTOPPED, WTERMSIG, MAJOR]
+
+
+__all__ = (
+    "ALL_POSIX_MACRO_TEMPLATES",
+    "MAJOR",
+    "S_IFMT",
+    "S_ISTYPE_TEMPLATES",
+    "WIFEXITED",
+    "WIFSIGNALED",
+    "WIFSTOPPED",
+    "WTERMSIG",
+    "macro_operand",
+)

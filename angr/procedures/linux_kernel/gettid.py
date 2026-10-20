@@ -8,3 +8,6 @@ class gettid(angr.SimProcedure):
 
     def run(self):
         return self.state.posix.pid
+
+
+__all__ = ("gettid",)

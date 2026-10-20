@@ -498,3 +498,6 @@ lib.add_number_mapping_from_dict(
         587: "timerfd_settime",
     },
 )
+
+
+__all__ = ("lib",)

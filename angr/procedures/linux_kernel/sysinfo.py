@@ -57,3 +57,9 @@ class sysinfo(angr.SimProcedure):
         }
         sysinfo_ty.with_arch(self.arch).store(self.state, info, value)
         return 0
+
+
+__all__ = (
+    "sysinfo",
+    "sysinfo_ty",
+)

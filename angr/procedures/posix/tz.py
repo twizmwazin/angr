@@ -8,3 +8,6 @@ class tzset(angr.SimProcedure):
     # important because on my libc this contains inlined iolib ops and thus can't be executed when simprocs are enabled.
     def run(self):  # pylint: disable=arguments-differ
         pass
+
+
+__all__ = ("tzset",)

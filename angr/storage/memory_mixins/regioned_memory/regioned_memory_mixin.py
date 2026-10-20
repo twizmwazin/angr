@@ -441,3 +441,9 @@ class RegionedMemoryMixin(MemoryMixin):
 
         else:
             raise SimAbstractMemoryError(f"Unsupported address type {type(addr_e)}")
+
+
+__all__ = (
+    "RegionedMemoryMixin",
+    "invalid_read_ctr",
+)

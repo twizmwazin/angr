@@ -26,3 +26,6 @@ class BoolExprXor1(PeepholeOptimizationExprBase):
                 )
 
         return None
+
+
+__all__ = ("BoolExprXor1",)

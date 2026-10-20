@@ -42,3 +42,6 @@ class ClinicFactory(KnowledgeBasePlugin):
 
 
 KnowledgeBasePlugin.register_default("clinic_factory", ClinicFactory)
+
+
+__all__ = ("ClinicFactory",)

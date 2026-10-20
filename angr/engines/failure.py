@@ -31,3 +31,6 @@ class SimEngineFailure(SuccessorsEngine, ProcedureMixin):
             return self.process_procedure(state, successors, terminator, arguments=[], **kwargs)
 
         return super().process_successors(successors, **kwargs)
+
+
+__all__ = ("SimEngineFailure",)

@@ -56,3 +56,6 @@ class ExtendedByteAndMask(PeepholeOptimizationExprBase):
                     )
 
         return None
+
+
+__all__ = ("ExtendedByteAndMask",)

@@ -24,3 +24,6 @@ _decls = {
 for name, proto in _decls.items():
     if proto is not None:
         libstdcpp.set_prototype(name, proto)
+
+
+__all__ = ("libstdcpp",)

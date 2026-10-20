@@ -120,3 +120,6 @@ class CmpMaskedShift(PeepholeOptimizationExprBase):
             rounding_mode=expr.rounding_mode,
             **expr.tags,
         )
+
+
+__all__ = ("CmpMaskedShift",)

@@ -106,3 +106,6 @@ class ConstantValueManager:
             load_callback=PropagatorLoadCallback(self.project).propagator_load_callback,
         )
         self.mapping = prop.replacements
+
+
+__all__ = ("ConstantValueManager",)

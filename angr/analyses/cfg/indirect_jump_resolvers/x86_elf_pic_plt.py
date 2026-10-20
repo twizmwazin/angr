@@ -84,3 +84,6 @@ class X86ElfPicPltResolver(IndirectJumpResolver):
         target = state.solver.eval_one(successors.flat_successors[0].ip)
 
         return True, [target]
+
+
+__all__ = ("X86ElfPicPltResolver",)

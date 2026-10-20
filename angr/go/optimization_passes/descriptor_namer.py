@@ -57,3 +57,6 @@ class GoDescriptorNamer(OptimizationPass):
                 if var.addr == addr and (var.name is None or var.name.startswith("g_")):
                     var.name = name
                     var.renamed = True
+
+
+__all__ = ("GoDescriptorNamer",)

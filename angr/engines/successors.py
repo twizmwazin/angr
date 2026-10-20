@@ -604,3 +604,10 @@ class SuccessorsEngine(SimEngine[HeavyState, SimSuccessors]):
         :param kwargs:          Any extra arguments. Do not fail if you are passed unexpected arguments.
         """
         successors.processed = False  # mark failure
+
+
+__all__ = (
+    "HeavyState",
+    "SimSuccessors",
+    "SuccessorsEngine",
+)

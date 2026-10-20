@@ -49,3 +49,6 @@ class ConvShlShr(PeepholeOptimizationExprBase):
                         )
 
         return None
+
+
+__all__ = ("ConvShlShr",)

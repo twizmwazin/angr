@@ -617,3 +617,6 @@ class _VVarWidener(AILBlockRewriter):
                 **expr.tags,
             )
         return super()._handle_expr(expr_idx, expr, stmt_idx, stmt, block)
+
+
+__all__ = ("Float128PairCoalescer",)

@@ -679,3 +679,10 @@ class SpOffset(RegisterOffset):
         if type(other) is not SpOffset or self.reg != other.reg:
             return NotImplemented
         return self.offset > other.offset
+
+
+__all__ = (
+    "ArithmeticExpression",
+    "RegisterOffset",
+    "SpOffset",
+)

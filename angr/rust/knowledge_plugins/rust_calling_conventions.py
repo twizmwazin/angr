@@ -40,3 +40,6 @@ class RustCallingConventions(KnowledgeBasePlugin, MutableMapping):
 
 
 KnowledgeBasePlugin.register_default("rust_calling_conventions", RustCallingConventions)
+
+
+__all__ = ("RustCallingConventions",)

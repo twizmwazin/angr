@@ -11,3 +11,6 @@ class AMD64DirtyRewriter(X86DirtyRewriter):
     __slots__ = ()
 
     HELPER_PREFIX = "amd64g_dirtyhelper_"
+
+
+__all__ = ("AMD64DirtyRewriter",)

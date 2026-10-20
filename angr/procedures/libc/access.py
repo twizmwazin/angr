@@ -11,3 +11,6 @@ class access(angr.SimProcedure):
         ret = claripy.BVS("access", self.arch.sizeof["int"])
         self.state.add_constraints(claripy.Or(ret == 0, ret == -1))
         return ret
+
+
+__all__ = ("access",)

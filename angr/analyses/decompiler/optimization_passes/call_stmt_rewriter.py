@@ -42,3 +42,6 @@ class CallStatementRewriter(OptimizationPass):
 
         if changed:
             self.out_graph = self._graph
+
+
+__all__ = ("CallStatementRewriter",)

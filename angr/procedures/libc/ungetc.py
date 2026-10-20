@@ -19,3 +19,6 @@ class ungetc(angr.SimProcedure):
             self.state.posix.fd[fileno]._pos -= 1
 
         return c & 0xFF
+
+
+__all__ = ("ungetc",)

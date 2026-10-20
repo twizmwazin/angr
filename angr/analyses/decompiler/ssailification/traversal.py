@@ -162,3 +162,6 @@ class TraversalAnalysis:
         # memory optimization:
         if self._ail_graph.in_degree[node] <= 1:
             del self.input_states[node]
+
+
+__all__ = ("TraversalAnalysis",)

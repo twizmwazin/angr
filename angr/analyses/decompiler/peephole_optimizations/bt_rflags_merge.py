@@ -62,3 +62,6 @@ class BTRflagsMergeBitExtraction(PeepholeOptimizationExprBase):
                 )
 
         return None
+
+
+__all__ = ("BTRflagsMergeBitExtraction",)

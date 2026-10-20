@@ -37,3 +37,6 @@ class SignBitTest(PeepholeOptimizationExprBase):
             return None
         zero = Const(self.manager.next_atom(), 0, x.bits)
         return BinaryOp(expr.idx, "CmpLT" if is_neg else "CmpGE", [x, zero], True, bits=1, **expr.tags)
+
+
+__all__ = ("SignBitTest",)

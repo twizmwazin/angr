@@ -593,3 +593,11 @@ class SRDAView:
             reg2vvarid = self._seed_from_dominators(block, idoms, block_reg_defs)
             self._observe_block(block, reg2vvarid, no_insn_ops, stmt_ops, node_ops, observations)
         return observations
+
+
+__all__ = (
+    "RegVVarPredicate",
+    "SRDAView",
+    "StackVVarPredicate",
+    "get_call_clobbered_regs",
+)

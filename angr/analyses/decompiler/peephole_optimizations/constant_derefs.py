@@ -64,3 +64,6 @@ class ConstantDereferences(PeepholeOptimizationExprBase):
         # FIXME: Handle floating point here
 
         return None
+
+
+__all__ = ("ConstantDereferences",)

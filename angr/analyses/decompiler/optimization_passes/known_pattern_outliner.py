@@ -210,3 +210,6 @@ class KnownPatternOutliner(OptimizationPass):
             ]
             if len(kept) != len(block.statements):
                 block.statements = kept
+
+
+__all__ = ("KnownPatternOutliner",)

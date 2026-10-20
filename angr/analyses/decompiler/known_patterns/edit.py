@@ -484,3 +484,11 @@ def _rebuild(node: Any, path: NodePath, new_node: dsl.PatternNode) -> Any:
     if isinstance(node, dsl.PChoice):
         return dsl.PChoice(*value)
     return dataclasses.replace(node, **{step: value})
+
+
+__all__ = (
+    "LEAF_MODES",
+    "NodePath",
+    "PatternEditor",
+    "describe",
+)

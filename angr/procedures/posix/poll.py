@@ -53,3 +53,6 @@ class poll(angr.SimProcedure):
                 )
 
         return claripy.BVV(0, 1).concat(claripy.BVS("poll_ret", self.state.arch.bits - 1))
+
+
+__all__ = ("poll",)

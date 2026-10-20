@@ -121,3 +121,6 @@ class SAILRStructurer(PhoenixStructurer):
 
         # if we have another tie, or we never used improved heuristics, then we do the default ordering.
         return super()._order_virtualizable_edges(graph, best_edges, node_seq)
+
+
+__all__ = ("SAILRStructurer",)

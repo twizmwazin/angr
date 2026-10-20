@@ -234,3 +234,6 @@ class LoopSeer(ExplorationTechnique):
             f = func
 
         return f
+
+
+__all__ = ("LoopSeer",)

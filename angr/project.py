@@ -1080,3 +1080,13 @@ class Project:
         if code <= CFG_PAGED_EXECUTABLE_BYTES:
             return None
         return min(max(CFG_SEGMENT_BUDGET_MIN, code * 16), CFG_SEGMENT_BUDGET_MAX)
+
+
+__all__ = (
+    "CACHE_CONFIG_KEYS",
+    "CFG_PAGED_EXECUTABLE_BYTES",
+    "CFG_SEGMENT_BUDGET_MAX",
+    "CFG_SEGMENT_BUDGET_MIN",
+    "Project",
+    "load_shellcode",
+)

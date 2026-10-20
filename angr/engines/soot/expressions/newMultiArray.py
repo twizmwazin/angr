@@ -85,3 +85,6 @@ class SimSootExpr_NewMultiArray(SimSootExpr):
             )
         # otherwise, we allocate a simple Array
         return SimSootExpr_NewArray.new_array(state, element_type, size)
+
+
+__all__ = ("SimSootExpr_NewMultiArray",)

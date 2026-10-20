@@ -233,3 +233,6 @@ class MagicDivisionSimplifier(PeepholeOptimizationExprBase):
         if all(((v & mask) * m) >> (n + s) == (v & mask) // d for v in _samples(n)):
             return self._div(root if root is not None else e, x, d, False)
         return None
+
+
+__all__ = ("MagicDivisionSimplifier",)

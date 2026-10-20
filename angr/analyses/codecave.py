@@ -75,3 +75,10 @@ class CodeCaveAnalysis(Analysis):
 
 
 AnalysesHub.register_default("CodeCaves", CodeCaveAnalysis)
+
+
+__all__ = (
+    "CodeCave",
+    "CodeCaveAnalysis",
+    "CodeCaveClassification",
+)

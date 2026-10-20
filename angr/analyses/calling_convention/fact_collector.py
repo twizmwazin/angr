@@ -1716,3 +1716,20 @@ class FactCollector(Analysis):
 
 
 AnalysesHub.register_default("FunctionFactCollector", FactCollector)
+
+
+__all__ = (
+    "KIND_CONST",
+    "KIND_REG",
+    "KIND_SP",
+    "KIND_STACKVAL",
+    "SCALAR_IN_VECTOR_OP_RE",
+    "SUBKIND_BP",
+    "SUBKIND_SP",
+    "FactCollector",
+    "FactCollectorState",
+    "FactData",
+    "SimEngineFactCollectorVEX",
+    "binop_handler",
+    "dirty_handler",
+)

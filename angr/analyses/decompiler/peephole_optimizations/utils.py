@@ -19,3 +19,6 @@ def get_expr_shift_left_amount(expr: BinaryOp) -> int | None:
         if v & (v - 1) == 0:
             return v.bit_length() - 1
     return None
+
+
+__all__ = ("get_expr_shift_left_amount",)

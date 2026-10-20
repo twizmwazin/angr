@@ -57,3 +57,6 @@ class NarrowFPOperations(PeepholeOptimizationExprBase):
             bits=expr.bits if is_cmp else w0,
             **expr.tags,
         )
+
+
+__all__ = ("NarrowFPOperations",)

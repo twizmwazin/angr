@@ -12,3 +12,6 @@ class Exit(JavaSimProcedure):
 
     def run(self, exit_code):
         self.exit(exit_code)
+
+
+__all__ = ("Exit",)

@@ -22,3 +22,6 @@ class ParseDouble(JavaSimProcedure):
             return claripy.FPV(double_val, claripy.FSORT_DOUBLE)
 
         return claripy.StrToInt(str_)
+
+
+__all__ = ("ParseDouble",)

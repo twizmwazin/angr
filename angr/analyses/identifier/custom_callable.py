@@ -132,3 +132,6 @@ class IdentifierCallable:
         if self._perform_merge:
             caller.merge()
         self.result_state = caller.active[0]
+
+
+__all__ = ("IdentifierCallable",)

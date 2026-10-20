@@ -305,3 +305,9 @@ class receive_until(Func):
         test.expected_output_args = [test.expected_output_args[o] for o in self.arg_order]
         if not self.has_return:
             test.expected_return_val = None
+
+
+__all__ = (
+    "receive_until",
+    "receive_until_fd",
+)

@@ -237,3 +237,6 @@ class EagerStdStringConcatenationPass(OptimizationPass):
         if isinstance(t, SimTypePointer) and isinstance(t.pts_to, SimTypeChar):
             return True
         return EagerStdStringConcatenationPass._is_std_string_type(t)
+
+
+__all__ = ("EagerStdStringConcatenationPass",)

@@ -73,3 +73,6 @@ class IndirectJumpResolver:
 
         # if true, the jump target is hooked
         return bool(self.project.is_hooked(target))
+
+
+__all__ = ("IndirectJumpResolver",)

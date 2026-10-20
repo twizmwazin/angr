@@ -216,3 +216,10 @@ class DebugVariableManager(KnowledgeBasePlugin):
 
 
 KnowledgeBasePlugin.register_default("dvars", DebugVariableManager)
+
+
+__all__ = (
+    "DebugVariable",
+    "DebugVariableContainer",
+    "DebugVariableManager",
+)

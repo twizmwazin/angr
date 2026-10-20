@@ -35,3 +35,6 @@ class BasePointerOffsetAndMask(PeepholeOptimizationExprBase):
             return expr.operands[0]
 
         return None
+
+
+__all__ = ("BasePointerOffsetAndMask",)

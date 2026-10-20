@@ -32,3 +32,6 @@ class time(angr.SimProcedure):
             self.last_time = result
         self.state.memory.store(pointer, result, condition=(pointer != 0))
         return result
+
+
+__all__ = ("time",)

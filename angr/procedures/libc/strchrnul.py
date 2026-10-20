@@ -17,3 +17,6 @@ class strchrnul(angr.SimProcedure):
 
         strlen = self.inline_call(angr.SIM_PROCEDURES["libc"]["strlen"], s_addr)
         return claripy.If(a == 0, s_addr + strlen.ret_expr, a)
+
+
+__all__ = ("strchrnul",)

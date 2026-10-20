@@ -281,3 +281,10 @@ class SootClassHierarchy(Analysis):
 
 
 AnalysesHub.register_default("SootClassHierarchy", SootClassHierarchy)
+
+
+__all__ = (
+    "NoConcreteDispatch",
+    "SootClassHierarchy",
+    "SootClassHierarchyError",
+)

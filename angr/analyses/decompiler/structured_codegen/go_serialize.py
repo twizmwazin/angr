@@ -1178,3 +1178,13 @@ def register_all() -> None:
     _register(GoBoxedValue, codegen_pb2.CCK_GO_BOXED_VALUE, _ser_boxed_value, _parse_boxed_value)
     _register(GoTypeAssertion, codegen_pb2.CCK_GO_TYPE_ASSERTION, _ser_type_assertion, _parse_type_assertion)
     _register(GoSliceLiteral, codegen_pb2.CCK_GO_SLICE_LITERAL, _ser_slice_literal, _parse_slice_literal)
+
+
+__all__ = (
+    "GoParseContext",
+    "GoSerializeContext",
+    "parse_codegen",
+    "rebuild_ast_to_pos",
+    "register_all",
+    "serialize_codegen",
+)

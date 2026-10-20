@@ -177,3 +177,6 @@ class Callable:
         if self._step_limit:
             pg2.stash(filter_func=lambda p: p.history.depth >= self._step_limit, to_stash="step_limited")
         return pg2
+
+
+__all__ = ("Callable",)

@@ -125,3 +125,11 @@ class DerefCoercionSimplifier(OptimizationPass, SRDAMixin, CFAMixin):
         walker = StrCmpSimplifierWalker(self)
         for block in self._graph.nodes():
             walker.walk(block)
+
+
+__all__ = (
+    "STR_CMP_EQ_FUNCTION",
+    "STR_CMP_NE_FUNCTION",
+    "DerefCoercionSimplifier",
+    "StrCmpSimplifierWalker",
+)

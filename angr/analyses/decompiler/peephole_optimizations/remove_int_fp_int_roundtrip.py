@@ -54,3 +54,6 @@ class RemoveIntFPIntRoundTrip(PeepholeOptimizationExprBase):
         ):
             return inner.operand
         return None
+
+
+__all__ = ("RemoveIntFPIntRoundTrip",)

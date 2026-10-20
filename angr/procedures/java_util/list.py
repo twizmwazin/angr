@@ -97,3 +97,12 @@ class ListSize(JavaSimProcedure):
             return this_ref.load_field(self.state, SIZE, "int")
         except KeyError:
             return claripy.BVS("list_size", 32)
+
+
+__all__ = (
+    "ListAdd",
+    "ListGet",
+    "ListGetFirst",
+    "ListInit",
+    "ListSize",
+)

@@ -33,3 +33,10 @@ def library_dir() -> Path:
 @functools.cache
 def load() -> ctypes.CDLL:
     return ctypes.CDLL(library_dir() / LIBRARY_NAME)
+
+
+__all__ = (
+    "LIBRARY_NAME",
+    "library_dir",
+    "load",
+)

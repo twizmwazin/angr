@@ -170,3 +170,9 @@ class SSEMoveMask(PeepholeOptimizationExprBase):
             if lane_bytes in MOVEMASK_OPS and m[1].bits >= lane_bytes * 8:
                 return self._sign_bit(expr, m[1], lane_bytes)
         return BinaryOp(expr.idx, "And", [term, expr.operands[1]], expr.signed, bits=expr.bits, **expr.tags)
+
+
+__all__ = (
+    "MOVEMASK_OPS",
+    "SSEMoveMask",
+)

@@ -20,3 +20,6 @@ class LengthLimiter(ExplorationTechnique):
         simgr = simgr.step(stash=stash, **kwargs)
         simgr.move("active", "_DROP" if self._drop else "cut", self._filter)
         return simgr
+
+
+__all__ = ("LengthLimiter",)

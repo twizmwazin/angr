@@ -17,3 +17,6 @@ class strdup(angr.SimProcedure):
         self.inline_call(strncpy, new_s, s, src_len + 1, src_len=src_len)
 
         return new_s
+
+
+__all__ = ("strdup",)

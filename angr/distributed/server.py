@@ -195,3 +195,6 @@ class Server:
                     worker._proc.kill()
 
             self._workers = []
+
+
+__all__ = ("Server",)

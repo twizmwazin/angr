@@ -80,3 +80,6 @@ class GraphDephication(DephicationBase):  # pylint:disable=abstract-method
 
 
 register_analysis(GraphDephication, "GraphDephication")
+
+
+__all__ = ("GraphDephication",)

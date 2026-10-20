@@ -22,3 +22,6 @@ class FlirtNode:
 
     def __repr__(self) -> str:
         return f"<FlirtNode length={self.length} leaf={self.leaf}>"
+
+
+__all__ = ("FlirtNode",)

@@ -12,3 +12,6 @@ class system(angr.SimProcedure):
     def run(self, cmd):
         retcode = self.state.solver.Unconstrained("system_returncode", 8, key=("api", "system"))
         return retcode.zero_extend(self.arch.sizeof["int"] - 8)
+
+
+__all__ = ("system",)

@@ -30,3 +30,6 @@ class LabelMergerMixin(MemoryMixin):
 
     def copy(self, memo=None):
         return super().copy(memo)
+
+
+__all__ = ("LabelMergerMixin",)

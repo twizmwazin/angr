@@ -315,3 +315,9 @@ class FlirtAnalysis(Analysis):
 
 
 AnalysesHub.register_default("Flirt", FlirtAnalysis)
+
+
+__all__ = (
+    "MAX_UNIQUE_STRING_LEN",
+    "FlirtAnalysis",
+)

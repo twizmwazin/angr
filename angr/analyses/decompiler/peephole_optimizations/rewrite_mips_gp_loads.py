@@ -52,3 +52,6 @@ class RewriteMipsGpLoads(PeepholeOptimizationExprBase):
             return Const(self.manager.next_atom(), value, expr.size * self.project.arch.byte_width, **expr.tags)
 
         return None
+
+
+__all__ = ("RewriteMipsGpLoads",)

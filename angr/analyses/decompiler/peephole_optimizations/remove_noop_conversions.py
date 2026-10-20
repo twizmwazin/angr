@@ -66,3 +66,6 @@ class RemoveNoopConversions(PeepholeOptimizationExprBase):
                 )
 
         return None
+
+
+__all__ = ("RemoveNoopConversions",)

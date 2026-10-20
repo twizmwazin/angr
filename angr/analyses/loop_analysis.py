@@ -348,3 +348,13 @@ class LoopAnalysis(ForwardAnalysis, Analysis):
 
 
 register_analysis(LoopAnalysis, "LoopAnalysis")
+
+
+__all__ = (
+    "AnnotatedVariable",
+    "Condition",
+    "LoopAnalysis",
+    "LoopAnalysisState",
+    "SootBlockProcessor",
+    "VariableTypes",
+)

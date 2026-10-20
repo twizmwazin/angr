@@ -104,3 +104,6 @@ class UniqueSearch(ExplorationTechnique):
         addrs_a = tuple(state_a.history.bbl_addrs)
         addrs_b = tuple(state_b.history.bbl_addrs)
         return SequenceMatcher(a=addrs_a, b=addrs_b).ratio()
+
+
+__all__ = ("UniqueSearch",)

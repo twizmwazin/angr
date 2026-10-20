@@ -161,3 +161,11 @@ class ExprOpSwapper(SequenceOptimizationPass):
         walker = OuterWalker(self._expr_operators)
         walker.walk(self.seq)
         self.out_seq = self.seq
+
+
+__all__ = (
+    "ExprOpSwapper",
+    "ExpressionReplacer",
+    "OpDescriptor",
+    "OuterWalker",
+)

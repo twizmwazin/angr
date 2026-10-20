@@ -114,3 +114,12 @@ class SimSootExpr_StaticInvoke(InvokeBase):
 class SimSootExpr_InterfaceInvoke(SimSootExpr_VirtualInvoke):
     def _resolve_invoke_target(self, expr, state):
         return super()._resolve_invoke_target(expr, state)
+
+
+__all__ = (
+    "InvokeBase",
+    "SimSootExpr_InterfaceInvoke",
+    "SimSootExpr_SpecialInvoke",
+    "SimSootExpr_StaticInvoke",
+    "SimSootExpr_VirtualInvoke",
+)

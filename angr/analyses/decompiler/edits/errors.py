@@ -54,3 +54,16 @@ class TypeParseError(DecompilationEditError):
 
 class UnsupportedEditError(DecompilationEditError):
     """The requested edit is not supported for this kind of target."""
+
+
+__all__ = (
+    "AmbiguousFunctionError",
+    "DecompilationEditError",
+    "FunctionNotFoundError",
+    "InvalidNameError",
+    "NameCollisionError",
+    "NotDecompiledError",
+    "TypeParseError",
+    "UnsupportedEditError",
+    "VariableNotFoundError",
+)

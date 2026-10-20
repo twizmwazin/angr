@@ -68,3 +68,9 @@ class Undefined:
 
 
 UNDEFINED = Undefined()
+
+
+__all__ = (
+    "UNDEFINED",
+    "Undefined",
+)

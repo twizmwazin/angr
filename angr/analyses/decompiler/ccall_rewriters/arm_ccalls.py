@@ -410,3 +410,6 @@ class ARMCCallRewriter(CCallRewriterBase):
         if r.bits == ccall.bits:
             return r
         return Expr.Convert(ccall.idx, r.bits, ccall.bits, False, r, **ccall.tags)
+
+
+__all__ = ("ARMCCallRewriter",)

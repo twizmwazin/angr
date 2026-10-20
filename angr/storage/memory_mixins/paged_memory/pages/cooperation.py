@@ -338,3 +338,11 @@ class BasicClaripyCooperation(CooperationBase):
     def _zero_objects(cls, addr, size, memory=None, **kwargs):
         data = claripy.BVV(0, size * memory.state.arch.byte_width if memory is not None else 8)
         return cls._decompose_objects(addr, data, "Iend_BE", memory=memory, **kwargs)
+
+
+__all__ = (
+    "BasicClaripyCooperation",
+    "CooperationBase",
+    "MemoryObjectMixin",
+    "MemoryObjectSetMixin",
+)

@@ -2853,3 +2853,13 @@ class KnownPatternFinder(Analysis):
 
 
 AnalysesHub.register_default("KnownPatternFinder", KnownPatternFinder)
+
+
+__all__ = (
+    "BlockLoc",
+    "ExprPath",
+    "KnownPatternFinder",
+    "KnownPatternMatch",
+    "OutlineResult",
+    "UnsupportedOutlineError",
+)

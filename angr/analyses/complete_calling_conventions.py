@@ -547,3 +547,10 @@ class CompleteCallingConventionsAnalysis(Analysis):
 
 
 register_analysis(CompleteCallingConventionsAnalysis, "CompleteCallingConventions")
+
+
+__all__ = (
+    "DEAD_WORKER_GRACE_PERIOD",
+    "CallingConventionAnalysisMode",
+    "CompleteCallingConventionsAnalysis",
+)

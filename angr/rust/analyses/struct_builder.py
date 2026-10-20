@@ -155,3 +155,6 @@ class StructBuilder(Analysis):
 
 
 AnalysesHub.register_default("StructBuilder", StructBuilder)
+
+
+__all__ = ("StructBuilder",)

@@ -351,3 +351,6 @@ class DecompilationCache(Serializable):
             cache.go_sigs_deps = dict(cmsg.go_sigs_deps)
 
         return cache
+
+
+__all__ = ("DecompilationCache",)

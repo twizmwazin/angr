@@ -17,3 +17,6 @@ class RemoveRedundantInsert(PeepholeOptimizationExprBase):
             return expr.value
 
         return None
+
+
+__all__ = ("RemoveRedundantInsert",)

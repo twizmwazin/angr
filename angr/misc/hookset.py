@@ -104,3 +104,9 @@ class HookedMethod:
         new_hooked = HookedMethod(new_func)
         new_hooked.pending = list(self.pending)
         return new_hooked
+
+
+__all__ = (
+    "HookSet",
+    "HookedMethod",
+)

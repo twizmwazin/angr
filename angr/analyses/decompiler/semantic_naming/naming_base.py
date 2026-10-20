@@ -177,3 +177,10 @@ class RegionNamingBase(SemanticNamingBase):
     ):
         super().__init__(variable_manager, functions, variable_map)
         self._region = region
+
+
+__all__ = (
+    "ClinicNamingBase",
+    "RegionNamingBase",
+    "SemanticNamingBase",
+)

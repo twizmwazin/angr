@@ -8,3 +8,6 @@ class time(angr.SimProcedure):
     def run(self, time_ptr):
         linux_time = angr.SIM_PROCEDURES["linux_kernel"]["time"]
         return self.inline_call(linux_time, time_ptr).ret_expr
+
+
+__all__ = ("time",)

@@ -13,3 +13,6 @@ class Caller(angr.SimProcedure):
 
     def after_call(self, target_addr=None, target_cc=None):
         pass
+
+
+__all__ = ("Caller",)

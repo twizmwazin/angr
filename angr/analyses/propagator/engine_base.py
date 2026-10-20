@@ -59,3 +59,6 @@ class SimEnginePropagatorBaseMixin[StateType, DataType_co, BlockType: BlockProto
             result_state = state
 
         return result_state
+
+
+__all__ = ("SimEnginePropagatorBaseMixin",)

@@ -40,3 +40,6 @@ class memccpy(angr.SimProcedure):
         self.state.memory.store(dst_addr, src_mem, size=copy_len, endness="Iend_BE")
 
         return claripy.If(c_found, dst_addr + c_pos + 1, claripy.BVV(0, self.state.arch.bits))
+
+
+__all__ = ("memccpy",)

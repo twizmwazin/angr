@@ -87,3 +87,6 @@ class SimStateLoopData(SimStatePlugin):
 
 
 SimState.register_default("loop_data", SimStateLoopData)
+
+
+__all__ = ("SimStateLoopData",)

@@ -76,3 +76,10 @@ class OperatorCounter(AILBlockViewer):
         if expr.op in self.operators:
             self.count += 1
         return super()._handle_UnaryOp(expr_idx, expr, stmt_idx, stmt, block)
+
+
+__all__ = (
+    "OperatorCounter",
+    "RegisterExpressionCounter",
+    "SingleExpressionCounter",
+)

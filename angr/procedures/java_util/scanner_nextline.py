@@ -21,3 +21,6 @@ class ScannerNextLine(JavaSimProcedure):
         except KeyError:
             self.state.globals["java.util.Scanner"] = [str_ref]
         return str_ref
+
+
+__all__ = ("ScannerNextLine",)

@@ -223,3 +223,21 @@ WINDOWS_KERNEL_DRIVER = TargetGate("windows-kernel-driver", lambda ctx: ctx.is_w
 #: Either of the two kernel targets, the audience for the intrusive
 #: doubly-linked-list idioms, which ``list_head`` and ``LIST_ENTRY`` share.
 KERNEL_TARGET = any_of(LINUX_KERNEL, WINDOWS_KERNEL_DRIVER)
+
+
+__all__ = (
+    "KERNEL_TARGET",
+    "LINUX_KERNEL",
+    "WINDOWS_KERNEL_DRIVER",
+    "AllOf",
+    "AnyOf",
+    "CorroboratedBy",
+    "CorroboratedByPattern",
+    "GateContext",
+    "PatternGate",
+    "TargetGate",
+    "all_of",
+    "any_of",
+    "corroborated_by",
+    "corroborated_by_pattern",
+)

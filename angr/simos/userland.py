@@ -163,3 +163,6 @@ class SimUserland(SimOS):
 
         proc.addr = mapno * self.syscall_addr_alignment + self.kernel_base
         return proc
+
+
+__all__ = ("SimUserland",)

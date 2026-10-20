@@ -36,3 +36,6 @@ class AShlConstSubA(PeepholeOptimizationExprBase):
                 )
 
         return None
+
+
+__all__ = ("AShlConstSubA",)

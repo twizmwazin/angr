@@ -25,3 +25,6 @@ class openat(angr.SimProcedure):
             return -1
 
         return fd
+
+
+__all__ = ("openat",)

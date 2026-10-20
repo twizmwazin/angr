@@ -7,3 +7,6 @@ import angr
 class set_tid_address(angr.SimProcedure):
     def run(self, tidptr):
         return 1  # Assume it's single-threaded, so only tid 1 exists
+
+
+__all__ = ("set_tid_address",)

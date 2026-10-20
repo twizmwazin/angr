@@ -2609,5 +2609,24 @@ def main():
     do_it(args.win32json_api_directory)
 
 
+__all__ = (
+    "OVERRIDE_OUTPARAMS",
+    "altnames",
+    "api_namespaces",
+    "create_angr_type_from_json",
+    "do_it",
+    "dump_root",
+    "get_angr_type_from_name",
+    "get_typeref_if_available",
+    "guid",
+    "guid_fields",
+    "handle_json_type",
+    "is_anonymous_struct",
+    "known_struct_names",
+    "main",
+    "typelib",
+)
+
+
 if __name__ == "__main__":
     main()

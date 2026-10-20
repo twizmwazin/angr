@@ -351,3 +351,9 @@ class SimSlicer:
         self._backward_handler_expr(expr.cond, state)
         self._backward_handler_expr(expr.iftrue, state)
         self._backward_handler_expr(expr.iffalse, state)
+
+
+__all__ = (
+    "SimLightState",
+    "SimSlicer",
+)

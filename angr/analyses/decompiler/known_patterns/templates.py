@@ -111,3 +111,9 @@ def make_template(
         name=name or call_name,
         gate=gate,
     )
+
+
+__all__ = (
+    "KnownPatternTemplate",
+    "make_template",
+)

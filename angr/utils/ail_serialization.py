@@ -347,3 +347,20 @@ def pack_static_buffers(static_buffers: dict[str, Any]) -> ail_types_pb2.StaticB
 
 def parse_static_buffers(msg: ail_types_pb2.StaticBuffers) -> dict[str, Any]:
     return {key: FixedBuffer(entry.ident, entry.size, entry.content) for key, entry in msg.entries.items()}
+
+
+__all__ = (
+    "BlockPool",
+    "pack_arg_vvars",
+    "pack_graph",
+    "pack_ite_exprs",
+    "pack_static_buffers",
+    "pack_static_vvars",
+    "parse_arg_vvars",
+    "parse_graph",
+    "parse_ite_exprs",
+    "parse_static_buffers",
+    "parse_static_vvars",
+    "simvar_from_bytes_polymorphic",
+    "simvar_to_bytes_polymorphic",
+)

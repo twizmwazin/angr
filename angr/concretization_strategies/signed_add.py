@@ -29,3 +29,6 @@ class SimConcretizationStrategySignedAdd(SimConcretizationStrategy):
                 if new_arg < self._subtraction_limit:
                     addr.op = "__sub__"
                     addr.args = (addr.args[0], claripy.BVV(new_arg, addr.args[1].size()))
+
+
+__all__ = ("SimConcretizationStrategySignedAdd",)

@@ -254,3 +254,9 @@ class BooleanNaming(ClinicNamingBase):
                 info["direct_condition"],
                 info["comparison_result"],
             )
+
+
+__all__ = (
+    "BOOLEAN_FLAG_NAMES",
+    "BooleanNaming",
+)

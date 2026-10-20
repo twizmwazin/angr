@@ -62,3 +62,6 @@ class ClassIdentifier(Analysis):
 
 
 AnalysesHub.register_default("ClassIdentifier", ClassIdentifier)
+
+
+__all__ = ("ClassIdentifier",)

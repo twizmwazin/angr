@@ -122,3 +122,9 @@ class CodeTagging(Analysis):
 
 
 AnalysesHub.register_default("CodeTagging", CodeTagging)
+
+
+__all__ = (
+    "CodeTagging",
+    "CodeTags",
+)

@@ -1969,3 +1969,14 @@ class VFG(ForwardAnalysis[SimState, VFGNode, VFGJob, BlockID, SimState], Analysi
 
 
 AnalysesHub.register_default("VFG", VFG)
+
+
+__all__ = (
+    "VFG",
+    "AnalysisTask",
+    "CallAnalysis",
+    "FunctionAnalysis",
+    "PendingJob",
+    "VFGJob",
+    "VFGNode",
+)

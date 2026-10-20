@@ -577,3 +577,6 @@ class ReachingDefinitionsState:
         endness: archinfo.Endness = archinfo.Endness.BE,
     ):
         return self.live_definitions.deref(pointer, size, endness)
+
+
+__all__ = ("ReachingDefinitionsState",)

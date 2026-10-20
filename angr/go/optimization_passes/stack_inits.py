@@ -961,3 +961,10 @@ class GoSmallMapFolder(OptimizationPass, CFGTransformationMixin):
         varid = self.vvar_id_start
         self.vvar_id_start += 1
         return varid
+
+
+__all__ = (
+    "GoSmallMapFolder",
+    "SmallMapFolder",
+    "StackClearFolder",
+)

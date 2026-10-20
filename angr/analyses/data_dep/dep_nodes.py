@@ -171,3 +171,14 @@ class RegDepNode(VarDepNode):
     @property
     def reg_size(self) -> int:
         return self._sim_act.size.ast // 8
+
+
+__all__ = (
+    "BaseDepNode",
+    "ConstantDepNode",
+    "DepNodeTypes",
+    "MemDepNode",
+    "RegDepNode",
+    "TmpDepNode",
+    "VarDepNode",
+)

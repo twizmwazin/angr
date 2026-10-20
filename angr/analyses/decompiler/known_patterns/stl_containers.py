@@ -122,3 +122,11 @@ STD_VECTOR_INDEX_TEMPLATES = [
     make_std_vector_index_template("long long", 8, "long long"),
 ]
 STD_VECTOR_INT_INDEX = STD_VECTOR_INDEX_TEMPLATES[2]
+
+
+__all__ = (
+    "STD_VECTOR_INDEX_TEMPLATES",
+    "STD_VECTOR_INT_EMPTY",
+    "STD_VECTOR_INT_INDEX",
+    "make_std_vector_index_template",
+)

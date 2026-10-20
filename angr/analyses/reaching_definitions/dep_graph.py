@@ -427,3 +427,6 @@ class DepGraph:
                 seen.add(succ)
                 if predicate.matches(succ):
                     queue.append(newpath)
+
+
+__all__ = ("DepGraph",)

@@ -44,3 +44,6 @@ class StringObfType1PeepholeOptimizer(PeepholeOptimizationExprBase):
 
 
 EXPR_OPTS.append(StringObfType1PeepholeOptimizer)
+
+
+__all__ = ("StringObfType1PeepholeOptimizer",)

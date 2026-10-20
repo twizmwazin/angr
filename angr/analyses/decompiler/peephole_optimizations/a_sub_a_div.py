@@ -34,3 +34,6 @@ class ASubADiv(PeepholeOptimizationExprBase):
                     )
 
         return None
+
+
+__all__ = ("ASubADiv",)

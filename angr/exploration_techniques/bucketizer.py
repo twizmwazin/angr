@@ -94,3 +94,6 @@ class Bucketizer(ExplorationTechnique):
 
         n = math.log2(t[transition])
         return bool(n.is_integer())
+
+
+__all__ = ("Bucketizer",)

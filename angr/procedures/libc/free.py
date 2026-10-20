@@ -8,3 +8,6 @@ class free(angr.SimProcedure):
 
     def run(self, ptr):
         self.state.heap._free(ptr)
+
+
+__all__ = ("free",)

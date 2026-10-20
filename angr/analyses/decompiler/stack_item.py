@@ -34,3 +34,9 @@ class StackItem:
 
     def __repr__(self):
         return f"<StackItem {self.name} {self.item_type!s} at {self.offset:#x} ({self.size}b)>"
+
+
+__all__ = (
+    "StackItem",
+    "StackItemType",
+)

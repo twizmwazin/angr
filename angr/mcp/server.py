@@ -937,3 +937,26 @@ def create_server() -> FastMCP:
 # Imported last: edit_tools registers its tools on ``mcp`` and imports the helpers defined above,
 # so it has to come after them.
 from . import edit_tools  # noqa: F401  pylint:disable=wrong-import-position,unused-import
+
+__all__ = (
+    "StdoutGuardMiddleware",
+    "close_project",
+    "create_server",
+    "decompile_function",
+    "find_functions_by_pattern",
+    "get_basic_blocks",
+    "get_callgraph",
+    "get_cfg",
+    "get_decompilation_flavor",
+    "get_exports",
+    "get_function_info",
+    "get_imports",
+    "get_strings",
+    "get_xrefs",
+    "list_functions",
+    "list_projects",
+    "load_binary",
+    "mcp",
+    "recover_calling_conventions",
+    "set_decompilation_flavor",
+)

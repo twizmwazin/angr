@@ -346,3 +346,6 @@ class TypeDBLoader(Analysis):
 
 
 AnalysesHub.register_default("TypeDBLoader", TypeDBLoader)
+
+
+__all__ = ("TypeDBLoader",)

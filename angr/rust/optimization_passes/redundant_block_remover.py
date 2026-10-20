@@ -77,3 +77,6 @@ class RedundantBlockRemover(OptimizationPass, CFAMixin, CFGTransformationMixin):
         self._remove_redundant_blocks()
         self._remove_redundant_blocks(dephicate=True)
         self.out_graph = self._graph
+
+
+__all__ = ("RedundantBlockRemover",)

@@ -11,3 +11,9 @@ class GetCommandLineA(angr.SimProcedure):
 class GetCommandLineW(angr.SimProcedure):
     def run(self):
         return self.project.simos.wcmdln_ptr
+
+
+__all__ = (
+    "GetCommandLineA",
+    "GetCommandLineW",
+)

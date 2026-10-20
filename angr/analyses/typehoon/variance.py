@@ -16,3 +16,6 @@ class Variance(enum.Enum):
 
     COVARIANT = 0
     CONTRAVARIANT = 1
+
+
+__all__ = ("Variance",)

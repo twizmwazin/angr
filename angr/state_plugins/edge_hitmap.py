@@ -66,3 +66,6 @@ class SimStateEdgeHitmap(SimStatePlugin):
             else:
                 log.warning("Cannot merge edge hitmaps of different sizes")
         return True
+
+
+__all__ = ("SimStateEdgeHitmap",)

@@ -82,3 +82,6 @@ class memcpy(Func):
             self.memmove_safe = False
 
         return True
+
+
+__all__ = ("memcpy",)

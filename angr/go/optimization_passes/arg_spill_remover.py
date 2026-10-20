@@ -98,3 +98,6 @@ class GoArgSpillRemover(OptimizationPass):
             and src.operand.was_stack
             and src.operand.stack_offset == 0
         )
+
+
+__all__ = ("GoArgSpillRemover",)

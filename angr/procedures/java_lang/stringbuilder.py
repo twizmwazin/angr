@@ -42,3 +42,9 @@ class StringBuilderAppend(JavaSimProcedure):
         this_ref.store_field(self.state, "str", "java.lang.String", new_str_ref)
 
         return this_ref
+
+
+__all__ = (
+    "StringBuilderAppend",
+    "StringBuilderInit",
+)

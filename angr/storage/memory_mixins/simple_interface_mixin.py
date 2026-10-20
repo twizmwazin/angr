@@ -68,3 +68,6 @@ class SimpleInterfaceMixin(MemoryMixin):
         if endness is None:
             return self.endness
         return endness
+
+
+__all__ = ("SimpleInterfaceMixin",)

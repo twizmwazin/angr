@@ -419,3 +419,9 @@ class VSA_DDG(Analysis):
 
 
 AnalysesHub.register_default("VSA_DDG", VSA_DDG)
+
+
+__all__ = (
+    "VSA_DDG",
+    "DefUseChain",
+)

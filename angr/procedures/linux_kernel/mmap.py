@@ -15,3 +15,9 @@ class mmap2(mmap):
             offset = offset.zero_extend(32)
             offset *= 0x1000
         return super().run(addr, length, prot, flags, fd, offset)
+
+
+__all__ = (
+    "mmap2",
+    "old_mmap",
+)

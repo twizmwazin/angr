@@ -25,3 +25,6 @@ class UnsupportedJNIFunction(JNISimProcedure):
         # return unconstrained
         symbol_name = f"unconstrained_ret_of_jni_func_{function_name}"
         return self.state.solver.Unconstrained(symbol_name, native_arch_size)
+
+
+__all__ = ("UnsupportedJNIFunction",)

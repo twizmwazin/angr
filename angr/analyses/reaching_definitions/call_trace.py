@@ -71,3 +71,9 @@ class CallTrace:
         t = CallTrace(self.target)
         t.callsites = self.callsites[::]
         return t
+
+
+__all__ = (
+    "CallSite",
+    "CallTrace",
+)

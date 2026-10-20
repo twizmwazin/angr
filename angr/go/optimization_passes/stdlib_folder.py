@@ -632,3 +632,6 @@ class _ListAccessorRewriter(AILBlockRewriter):
                 self.changed = True
                 return new
         return new_expr
+
+
+__all__ = ("GoStdlibFolder",)

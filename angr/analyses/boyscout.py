@@ -72,3 +72,6 @@ class BoyScout(Analysis):
 
 
 AnalysesHub.register_default("BoyScout", BoyScout)
+
+
+__all__ = ("BoyScout",)

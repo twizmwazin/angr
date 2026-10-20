@@ -656,3 +656,11 @@ class InlinedWcscpySimplifierLate(InlinedWcscpySimplifier):
 
     STAGE = OptimizationPassStage.AFTER_SSA_LEVEL1_TRANSFORMATION
     NAME = "Simplify inlined wcscpy (late)"
+
+
+__all__ = (
+    "ASCII_DIGITS",
+    "ASCII_PRINTABLES",
+    "InlinedWcscpySimplifier",
+    "InlinedWcscpySimplifierLate",
+)

@@ -13,3 +13,6 @@ class strnlen(angr.SimProcedure):
 
         maxlen = self.state.solver.eval_one(n)
         return self.inline_call(strlen, s, maxlen=maxlen).ret_expr
+
+
+__all__ = ("strnlen",)

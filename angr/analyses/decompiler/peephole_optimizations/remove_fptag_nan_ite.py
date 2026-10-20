@@ -77,3 +77,6 @@ def _is_nan(e) -> bool:
 
 def _is_zero(e) -> bool:
     return isinstance(e, Const) and isinstance(e.value, int) and e.value == 0
+
+
+__all__ = ("RemoveFptagNanITE",)

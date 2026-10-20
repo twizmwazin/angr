@@ -265,3 +265,9 @@ def _strip_lane0(expr, n_bits: int):
         else:
             break
     return expr if changed else None
+
+
+__all__ = (
+    "SSEScalarLowering",
+    "SSEVectorConvertLowering",
+)

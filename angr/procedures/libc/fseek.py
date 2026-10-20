@@ -33,3 +33,9 @@ class fseek(angr.SimProcedure):
 
 
 fseeko = fseek
+
+
+__all__ = (
+    "fseek",
+    "fseeko",
+)

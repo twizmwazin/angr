@@ -241,3 +241,9 @@ class GraphVisitor[NodeType]:
         for src, dst in back_edges:
             self._back_edges_by_src[src].add(dst)
             self._back_edges_by_dst[dst].add(src)
+
+
+__all__ = (
+    "GraphVisitor",
+    "NodeType",
+)

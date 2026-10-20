@@ -95,3 +95,6 @@ class realloc(Func):
             returned_locs2.append(state.solver.eval(state.regs.eax))
 
         return returned_locs != returned_locs2
+
+
+__all__ = ("realloc",)

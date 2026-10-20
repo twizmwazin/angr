@@ -1023,3 +1023,13 @@ class AMD64CCallRewriter(CCallRewriterBase):
                 return Expr.Const(expr.idx, expr.value_int & ((1 << bits) - 1), bits, **tags)
             return Expr.Convert(self.ail_manager.next_atom(), 64, bits, False, expr, **tags)
         return expr
+
+
+__all__ = (
+    "AMD64_ADC_SBB_OPS",
+    "AMD64CCallRewriter",
+    "AMD64_CondBitMasks",
+    "AMD64_CondBitOffsets",
+    "AMD64_CondTypes",
+    "AMD64_OpTypes",
+)

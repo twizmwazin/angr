@@ -60,3 +60,6 @@ class ReturnDuplicatorHigh(OptimizationPass, ReturnDuplicatorBase):
         self._ri = self._recover_regions(graph_copy)
         if self._analyze_core(graph_copy):
             self.out_graph = self._simplify_graph(graph_copy)
+
+
+__all__ = ("ReturnDuplicatorHigh",)

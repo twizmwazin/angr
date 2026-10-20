@@ -32,3 +32,6 @@ class DirtyRewriterBase:
 
     def _rewrite_expr(self, dirty: DirtyExpression) -> Expression | None:
         raise NotImplementedError
+
+
+__all__ = ("DirtyRewriterBase",)

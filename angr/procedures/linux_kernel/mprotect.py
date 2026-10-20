@@ -42,3 +42,6 @@ class mprotect(angr.SimProcedure):
             self.state.memory.permissions(page, prot & 7)
         l.debug("... = 0 (good)")
         return 0
+
+
+__all__ = ("mprotect",)

@@ -25,3 +25,10 @@ class IsBadCodePtr(angr.SimProcedure):
             return (~self.state.memory.permissions(ptr)[2]).zero_extend(self.state.arch.bits - 1)
         except angr.errors.SimMemoryError:
             return 1
+
+
+__all__ = (
+    "IsBadCodePtr",
+    "IsBadReadPtr",
+    "IsBadWritePtr",
+)

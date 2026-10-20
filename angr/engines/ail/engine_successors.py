@@ -22,3 +22,6 @@ class AILMixin(SuccessorsEngine):
         subengine.process(self.state, block=block)  # type: ignore
 
         successors.processed = True
+
+
+__all__ = ("AILMixin",)

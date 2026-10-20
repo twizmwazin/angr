@@ -16,3 +16,6 @@ class futex(angr.SimProcedure):
             return 0
         l.debug("futex(futex_op=%d)", op)
         return self.state.solver.Unconstrained("futex", self.arch.sizeof["int"], key=("api", "futex"))
+
+
+__all__ = ("futex",)

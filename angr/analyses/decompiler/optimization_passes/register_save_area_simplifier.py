@@ -267,3 +267,6 @@ class RegisterSaveAreaSimplifier(OptimizationPass):
                 continue
 
         return result
+
+
+__all__ = ("RegisterSaveAreaSimplifier",)

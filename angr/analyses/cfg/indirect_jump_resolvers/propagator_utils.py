@@ -45,3 +45,6 @@ class PropagatorLoadCallback:
                 return False
 
         return False
+
+
+__all__ = ("PropagatorLoadCallback",)

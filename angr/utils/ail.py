@@ -560,3 +560,27 @@ class CallVisitor(AILBlockViewer):
     def visit(self, graph):
         for block in graph.nodes:
             self.walk(block)
+
+
+__all__ = (
+    "BlockDefs",
+    "CallFinder",
+    "CallVisitor",
+    "GraphVVarDefs",
+    "HasExprWalker",
+    "deref_vvar_and_offset",
+    "dirty_has_side_effects",
+    "extract_partial_expr",
+    "extract_vvar_and_offset",
+    "find_call",
+    "get_terminal_call",
+    "has_call",
+    "is_expr_used_as_reg_base_value",
+    "is_head_controlled_loop_block",
+    "is_head_controlled_loop_jump",
+    "is_phi_assignment",
+    "is_scalar_int_convert",
+    "unwrap_combo_reg_vvar_reference",
+    "unwrap_stack_vvar_reference",
+    "unwrap_stack_vvar_reference_with_offset",
+)

@@ -302,3 +302,9 @@ class SLivenessAnalysis(Analysis):
 
 
 register_analysis(SLivenessAnalysis, "SLiveness")
+
+
+__all__ = (
+    "SLivenessAnalysis",
+    "SLivenessModel",
+)

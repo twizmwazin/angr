@@ -13,3 +13,6 @@ class SymbolicMergerMixin(MemoryMixin):
         for tm, fv in values:
             merged_val = claripy.If(fv, tm, merged_val)
         return merged_val
+
+
+__all__ = ("SymbolicMergerMixin",)

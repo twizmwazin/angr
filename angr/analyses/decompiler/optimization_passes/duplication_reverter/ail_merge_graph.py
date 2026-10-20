@@ -514,3 +514,9 @@ class AILMergeGraph:
                 graph.remove_node(original_node)
 
         return graph, updated_blocks
+
+
+__all__ = (
+    "AILBlockSplit",
+    "AILMergeGraph",
+)

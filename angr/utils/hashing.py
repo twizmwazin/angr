@@ -62,3 +62,9 @@ _DUMP_BY_TYPE = {
     int: _dump_int,
     type: _dump_type,
 }
+
+
+__all__ = (
+    "md5_unpacker",
+    "stable_hash",
+)

@@ -221,3 +221,10 @@ class KnowledgeBaseSnapshot:
             func._prototype_sources = dict(sources)
             func._prototypes_resolved = set(resolved)
             func.calling_convention = cc
+
+
+__all__ = (
+    "KnowledgeBase",
+    "KnowledgeBaseSnapshot",
+    "kb_ctr",
+)

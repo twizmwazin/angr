@@ -249,3 +249,10 @@ class TraversalState:
                     merge_occurred = True
 
         return merge_occurred
+
+
+__all__ = (
+    "TraversalState",
+    "Value",
+    "has_conflicting_value_types",
+)

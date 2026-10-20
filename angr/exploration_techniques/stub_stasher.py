@@ -17,3 +17,6 @@ class StubStasher(ExplorationTechnique):
         simgr.step(stash=stash, **kwargs)
         simgr.move(stash, "stub", filter_func=self.post_filter)
         return simgr
+
+
+__all__ = ("StubStasher",)

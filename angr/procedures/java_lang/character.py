@@ -29,3 +29,9 @@ class CharacterIsSpaceChar(JavaSimProcedure):
 
         # Should we add other unicode SPACE_SEPARATOR?
         return claripy.If(char_str == " ", claripy.BVV(1, 32), claripy.BVV(0, 32))
+
+
+__all__ = (
+    "CharacterIsDigit",
+    "CharacterIsSpaceChar",
+)

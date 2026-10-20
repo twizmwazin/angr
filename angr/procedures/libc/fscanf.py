@@ -19,3 +19,6 @@ class fscanf(ScanfFormatParser):
 
         fmt_str = self._parse(fmt)
         return fmt_str.interpret(self.va_arg, simfd=simfd)
+
+
+__all__ = ("fscanf",)

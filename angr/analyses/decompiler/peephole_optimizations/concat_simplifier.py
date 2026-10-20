@@ -249,3 +249,6 @@ class ConcatSimplifier(PeepholeOptimizationExprBase):
             )
 
         return None
+
+
+__all__ = ("ConcatSimplifier",)

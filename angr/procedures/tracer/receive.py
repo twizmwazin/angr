@@ -20,3 +20,6 @@ class receive(orig_receive):
             fd = claripy.BVV(0, self.state.arch.bits)
 
         return super().run(fd, buf, count, rx_bytes)
+
+
+__all__ = ("receive",)

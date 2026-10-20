@@ -19,3 +19,9 @@ class SimSootStmt_ReturnVoid(SimSootStmt):
 
     def _execute(self):
         pass
+
+
+__all__ = (
+    "SimSootStmt_Return",
+    "SimSootStmt_ReturnVoid",
+)

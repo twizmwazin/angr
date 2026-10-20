@@ -29,3 +29,6 @@ class SimFreeBSD(SimUserland):
 
     def syscall_abi(self, state) -> str:
         return "freebsd"
+
+
+__all__ = ("SimFreeBSD",)

@@ -516,3 +516,11 @@ class VariableRecoveryStateBase:
         if self.variable_manager[self.function.addr].is_phi_variable(phi_variable):
             return variable in self.variable_manager[self.function.addr].get_phi_subvariables(phi_variable)
         return False
+
+
+__all__ = (
+    "VariableAnnotation",
+    "VariableRecoveryBase",
+    "VariableRecoveryStateBase",
+    "parse_stack_pointer",
+)

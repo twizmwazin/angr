@@ -136,3 +136,12 @@ class PatchFinderAnalysis(Analysis):
 AnalysesHub.register_default("OverlappingFunctions", OverlappingFunctionsAnalysis)
 AnalysesHub.register_default("FunctionAlignment", FunctionAlignmentAnalysis)
 AnalysesHub.register_default("PatchFinder", PatchFinderAnalysis)
+
+
+__all__ = (
+    "AtypicallyAlignedFunction",
+    "FunctionAlignmentAnalysis",
+    "OverlappingFunctionsAnalysis",
+    "PatchFinderAnalysis",
+    "PatchedOutFunctionality",
+)

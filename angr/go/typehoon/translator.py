@@ -270,3 +270,10 @@ GoSimTypeHandlers = {
     GoSimTypeTuple: GoTypeTranslator._translate_GoSimStruct,
     GoSimTypeFunction: GoTypeTranslator._translate_GoSimTypeFunction,
 }
+
+
+__all__ = (
+    "GoSimTypeHandlers",
+    "GoTypeConstHandlers",
+    "GoTypeTranslator",
+)

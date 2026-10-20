@@ -12,3 +12,6 @@ class NoReturnUnconstrained(angr.SimProcedure):  # pylint:disable=redefined-buil
 
     def run(self, **kwargs):  # pylint:disable=unused-argument
         self.exit(self.state.solver.Unconstrained("unconstrained_exit_code", self.state.arch.bits))
+
+
+__all__ = ("NoReturnUnconstrained",)

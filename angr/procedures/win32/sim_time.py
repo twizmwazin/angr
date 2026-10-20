@@ -133,3 +133,12 @@ class GetTickCount64(angr.SimProcedure):
         if angr.options.USE_SYSTEM_TIMES in self.state.options:
             return int(time.process_time() * 1000) + 12345
         return self.state.solver.BVS("GetTickCount64_result", 64, key=("api", "GetTickCount64"))
+
+
+__all__ = (
+    "GetLocalTime",
+    "GetSystemTimeAsFileTime",
+    "GetTickCount",
+    "GetTickCount64",
+    "QueryPerformanceCounter",
+)

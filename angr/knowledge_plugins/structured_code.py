@@ -323,3 +323,12 @@ class StructuredCodeManager(KnowledgeBasePlugin):
 
 
 KnowledgeBasePlugin.register_default("decompilations", StructuredCodeManager)
+
+
+__all__ = (
+    "DECOMPILATION_CACHE_LIMIT",
+    "USE_SPILLING_CODE_CACHE",
+    "CacheKey",
+    "SpillingDecompilationDict",
+    "StructuredCodeManager",
+)

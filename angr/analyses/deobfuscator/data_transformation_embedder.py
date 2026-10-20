@@ -642,3 +642,6 @@ class DataTransformationEmbedder(Analysis):
     @staticmethod
     def _has_reg_vvars(vvars: list[VirtualVariable]) -> bool:
         return any(vvar.parameter_category == VirtualVariableCategory.REGISTER for vvar in vvars)
+
+
+__all__ = ("DataTransformationEmbedder",)

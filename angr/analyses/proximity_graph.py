@@ -445,3 +445,16 @@ class ProximityGraphAnalysis(Analysis):
 
 
 AnalysesHub.register_default("Proximity", ProximityGraphAnalysis)
+
+
+__all__ = (
+    "BaseProxiNode",
+    "CallProxiNode",
+    "FunctionProxiNode",
+    "IntegerProxiNode",
+    "ProxiNodeTypes",
+    "ProximityGraphAnalysis",
+    "StringProxiNode",
+    "UnknownProxiNode",
+    "VariableProxiNode",
+)

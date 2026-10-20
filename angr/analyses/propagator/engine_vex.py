@@ -294,3 +294,10 @@ class SimEnginePropagatorVEX(
                     v = (anno.offset, anno.size, anno.value)
                     if v not in self.state.block_initial_reg_values[self.block.addr, dst.concrete_value]:
                         self.state.block_initial_reg_values[self.block.addr, dst.concrete_value].append(v)
+
+
+__all__ = (
+    "SimEnginePropagatorVEX",
+    "binop_handler",
+    "dirty_handler",
+)

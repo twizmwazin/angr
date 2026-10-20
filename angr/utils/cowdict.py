@@ -211,3 +211,10 @@ class DefaultChainMapCOW[K, V](ChainMapCOW):
             obj.maps = [{}, *self.maps]
             obj._deleted = set(self._deleted)
         return obj
+
+
+__all__ = (
+    "ChainMapCOW",
+    "DefaultChainMapCOW",
+    "merge_candidate_keys",
+)

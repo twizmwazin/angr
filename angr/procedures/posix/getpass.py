@@ -18,3 +18,6 @@ class getpass(angr.SimProcedure):
 
         # return the buffer
         return buf
+
+
+__all__ = ("getpass",)

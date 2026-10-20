@@ -111,3 +111,9 @@ class VariableManagerSerializer:
             variable_manager=variable_manager,
             func_addr=db_varcoll.func_addr if db_varcoll.func_addr != -1 else None,
         )
+
+
+__all__ = (
+    "VariableManagerSerializer",
+    "sqlalchemy",
+)

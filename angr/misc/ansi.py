@@ -45,3 +45,11 @@ def color(c: Color | BackgroundColor, bright: bool):
     if bright and isinstance(c, BackgroundColor):
         raise ValueError("Backgrounds should not be bright")
     return f"{_ansi_prefix}{c.value};1m" if bright else f"{_ansi_prefix}{c.value}m"
+
+
+__all__ = (
+    "BackgroundColor",
+    "Color",
+    "clear",
+    "color",
+)

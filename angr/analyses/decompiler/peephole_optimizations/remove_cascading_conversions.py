@@ -46,3 +46,6 @@ class RemoveCascadingConversions(PeepholeOptimizationExprBase):
                     return Convert(expr.idx, expr.from_bits, expr.to_bits, expr.is_signed, and0, **expr.tags)
 
         return None
+
+
+__all__ = ("RemoveCascadingConversions",)

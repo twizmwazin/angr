@@ -156,3 +156,6 @@ class _StackVVarRewriter(AILBlockRewriter):
             if operand.size == result.size:
                 return operand
         return result
+
+
+__all__ = ("SSAVariableMixin",)

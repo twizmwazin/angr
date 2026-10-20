@@ -148,3 +148,6 @@ class SimHeapBrk(SimHeapBase):
 
 
 SimState.register_default("heap", SimHeapBrk)
+
+
+__all__ = ("SimHeapBrk",)

@@ -1227,3 +1227,6 @@ class StructurerBase(Analysis):
             if same_idx:
                 default_node_candidates = same_idx
         return default_node_candidates[0] if default_node_candidates else None
+
+
+__all__ = ("StructurerBase",)

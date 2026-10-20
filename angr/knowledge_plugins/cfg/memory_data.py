@@ -173,3 +173,10 @@ class MemoryData(Serializable):
             _IDX_TO_SORT[cmsg.type],
             reference_size=cmsg.reference_size if cmsg.HasField("reference_size") else None,
         )
+
+
+__all__ = (
+    "MEMORY_DATA_SORTS",
+    "MemoryData",
+    "MemoryDataSort",
+)

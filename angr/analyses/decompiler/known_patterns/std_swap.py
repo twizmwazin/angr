@@ -129,3 +129,9 @@ STD_SWAP_TEMPLATES = [
 ]
 #: the word-sized, as-written spelling, the one the fixture tests
 STD_SWAP = STD_SWAP_TEMPLATES[0]
+
+
+__all__ = (
+    "STD_SWAP",
+    "STD_SWAP_TEMPLATES",
+)

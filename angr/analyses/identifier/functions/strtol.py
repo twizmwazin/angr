@@ -82,3 +82,10 @@ class strtol(Func):
         max_steps = 20
         test = TestData(test_input, test_output, return_val, max_steps)
         return runner.test(func, test)
+
+
+__all__ = (
+    "digs",
+    "int2base",
+    "strtol",
+)

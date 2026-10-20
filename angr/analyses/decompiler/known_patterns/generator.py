@@ -910,3 +910,11 @@ class PatternGenerator:
             if any(lo <= a < hi for a in ins_addrs):
                 blocks.append(b)
         return blocks
+
+
+__all__ = (
+    "PatternGenerationError",
+    "PatternGenerator",
+    "Span",
+    "stmt_ins_addrs",
+)

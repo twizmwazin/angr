@@ -340,3 +340,6 @@ class ITERegionConverter(OptimizationPass):
         return (isinstance(stmt, Assignment) and isinstance(stmt.dst, VirtualVariable)) or (
             isinstance(stmt, SideEffectStatement) and isinstance(stmt.ret_expr, VirtualVariable)
         )
+
+
+__all__ = ("ITERegionConverter",)

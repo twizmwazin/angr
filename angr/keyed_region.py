@@ -560,3 +560,10 @@ class KeyedRegion:
                     return
 
         item.add_object(stored_object)
+
+
+__all__ = (
+    "KeyedRegion",
+    "RegionObject",
+    "StoredObject",
+)

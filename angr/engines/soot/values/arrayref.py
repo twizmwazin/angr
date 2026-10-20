@@ -121,3 +121,9 @@ class SimSootValue_ArrayRef(SimSootValue):
                 length,
             )
             state.solver.add(claripy.And(length.SGT(idx), zero.SLE(idx)))
+
+
+__all__ = (
+    "SimSootValue_ArrayBaseRef",
+    "SimSootValue_ArrayRef",
+)

@@ -97,3 +97,6 @@ class CmpFValueLowering(SequenceOptimizationPass):
             return None
         _CmpFValueRewriter(self.manager).walk(block)
         return None
+
+
+__all__ = ("CmpFValueLowering",)

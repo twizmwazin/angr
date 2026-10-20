@@ -45,3 +45,6 @@ class RemoveEmptyIfBody(PeepholeOptimizationStmtBase):
             )
 
         return None
+
+
+__all__ = ("RemoveEmptyIfBody",)

@@ -357,3 +357,6 @@ class PropagatorAnalysis(ForwardAnalysis, Analysis):  # pylint:disable=abstract-
 
 
 register_analysis(PropagatorAnalysis, "Propagator")
+
+
+__all__ = ("PropagatorAnalysis",)

@@ -37,3 +37,6 @@ class CustomStrings(KnowledgeBasePlugin):
 
 
 KnowledgeBasePlugin.register_default("custom_strings", CustomStrings)
+
+
+__all__ = ("CustomStrings",)

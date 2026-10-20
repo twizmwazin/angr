@@ -1597,3 +1597,34 @@ def vexop_to_simop(op, extended=True, fp=True):
 
 
 make_operations()
+
+
+__all__ = (
+    "OP_ATTRS_PATTERN",
+    "UNSUPPORTED_EVEX_OPS",
+    "SimIROp",
+    "add_operations",
+    "all_operations",
+    "arithmetic_operation_map",
+    "bitwise_operation_map",
+    "classified",
+    "common_unsupported_generics",
+    "conversions",
+    "explicit_attrs",
+    "fp_ops",
+    "generic_names",
+    "make_operations",
+    "op_attrs",
+    "operation_map",
+    "operations",
+    "other_operations",
+    "rm_map",
+    "shift_operation_map",
+    "supports_vector",
+    "translate_rm",
+    "unclassified",
+    "unsupported",
+    "unsupported_conversions",
+    "vector_operations",
+    "vexop_to_simop",
+)

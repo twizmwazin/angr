@@ -204,3 +204,12 @@ class KnownPattern:
         proto = SimTypeFunction(args, returnty).with_arch(arch)
         assert isinstance(proto, SimTypeFunction)
         return proto
+
+
+__all__ = (
+    "CppRef",
+    "KnownPattern",
+    "PatternParam",
+    "TypeRef",
+    "resolve_typeref",
+)

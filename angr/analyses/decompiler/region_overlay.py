@@ -1728,3 +1728,13 @@ class RegionOverlayGraph[T: RegionBound](networkx.DiGraph[Tx[T]] if TYPE_CHECKIN
     # NOTE: this does not respect the intended semantics of as_view
     def to_directed(self, as_view: bool = False) -> networkx.DiGraph[Tx[T]]:
         return self.materialize()
+
+
+__all__ = (
+    "OverlayManager",
+    "RegionBound",
+    "RegionOverlay",
+    "RegionOverlayGraph",
+    "Tx",
+    "merge_edge_data",
+)

@@ -271,3 +271,6 @@ class FunctionPrototypeInference(OptimizationPass, CFAMixin, SSAVariableMixin):
 
         self.fix_stack_vvar_uses()
         self.out_graph = self._graph
+
+
+__all__ = ("FunctionPrototypeInference",)

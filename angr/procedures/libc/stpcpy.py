@@ -22,3 +22,6 @@ class stpcpy(angr.SimProcedure):
 class __stpcpy_chk(stpcpy):
     def run(self, dst, src, _destlen):  # type:ignore[reportIncompatibleMethodOverride]
         return super().run(dst, src)
+
+
+__all__ = ("stpcpy",)

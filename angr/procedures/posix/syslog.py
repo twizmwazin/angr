@@ -14,3 +14,6 @@ class syslog(FormatParser):
         if not formatted.symbolic:
             formatted = self.state.solver.eval(formatted, cast_to=bytes)
         l.info("Syslog priority %s: %s", priority, formatted)
+
+
+__all__ = ("syslog",)

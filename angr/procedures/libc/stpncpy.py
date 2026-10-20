@@ -27,3 +27,6 @@ class stpncpy(angr.SimProcedure):
         # stpncpy returns a pointer to the written NUL, i.e. dst + min(strlen(src), n);
         # when src has no NUL inside the n-byte window the result is dst + n.
         return dst + claripy.If(claripy.ULE(src_len, n), src_len, n)
+
+
+__all__ = ("stpncpy",)

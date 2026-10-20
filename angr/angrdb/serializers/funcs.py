@@ -187,3 +187,6 @@ class FunctionManagerSerializer:
                 return True
             return hooker.returns
         return None
+
+
+__all__ = ("FunctionManagerSerializer",)

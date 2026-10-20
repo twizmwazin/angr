@@ -18,3 +18,6 @@ def decode_utf16_string(data: bytes) -> str:
         return data.decode("utf-16-le")
     except UnicodeDecodeError:
         return "<utf16-decode-error>"
+
+
+__all__ = ("decode_utf16_string",)

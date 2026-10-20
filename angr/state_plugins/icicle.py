@@ -85,3 +85,10 @@ class SimStateIcicle(SimStatePlugin):
 
 
 SimState.register_default("icicle", SimStateIcicle)
+
+
+__all__ = (
+    "IcicleStateTranslationData",
+    "IcicleVMRef",
+    "SimStateIcicle",
+)

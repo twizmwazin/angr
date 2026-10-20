@@ -142,3 +142,9 @@ class XRefManager(KnowledgeBasePlugin, Serializable):
 
 
 KnowledgeBasePlugin.register_default("xrefs", XRefManager)
+
+
+__all__ = (
+    "XRefManager",
+    "XrefDict",
+)

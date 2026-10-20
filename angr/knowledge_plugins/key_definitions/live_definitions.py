@@ -1029,3 +1029,10 @@ class LiveDefinitions:
         if offset:
             return base + offset
         return base
+
+
+__all__ = (
+    "DefinitionAnnotation",
+    "DerefSize",
+    "LiveDefinitions",
+)

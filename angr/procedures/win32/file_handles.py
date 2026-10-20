@@ -46,3 +46,10 @@ class WriteFile(angr.SimProcedure):
         bytes_written = simfd.write(lpBuffer, nNumberOfBytesToWrite)
         self.state.mem[lpNumberOfBytesWritten].long = bytes_written
         return 1
+
+
+__all__ = (
+    "GetStdHandle",
+    "ReadFile",
+    "WriteFile",
+)

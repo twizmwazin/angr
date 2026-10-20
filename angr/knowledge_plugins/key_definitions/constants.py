@@ -28,3 +28,12 @@ OP_AFTER = ObservationPointType.OP_AFTER
 ObservationPoint = tuple[
     Literal["insn", "node", "stmt", "exit"], int | tuple[int, int] | tuple[int, int, int], ObservationPointType
 ]
+
+
+__all__ = (
+    "DEBUG",
+    "OP_AFTER",
+    "OP_BEFORE",
+    "ObservationPoint",
+    "ObservationPointType",
+)

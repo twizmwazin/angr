@@ -227,3 +227,6 @@ class RegisterSaveAreaSimplifierAdvanced(OptimizationPass):
                 return False
 
         return False
+
+
+__all__ = ("RegisterSaveAreaSimplifierAdvanced",)

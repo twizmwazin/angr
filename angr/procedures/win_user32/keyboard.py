@@ -13,3 +13,6 @@ class GetKeyboardType(angr.SimProcedure):
         if self.state.solver.is_true(param == 2):
             return 12
         return 0
+
+
+__all__ = ("GetKeyboardType",)

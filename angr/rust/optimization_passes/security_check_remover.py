@@ -37,3 +37,9 @@ class SecurityCheckRemover(OptimizationPass, CFAMixin, CFGTransformationMixin):
         for block in list(self._graph.nodes):
             if self.match_call(block, SECURITY_CHECK_FUNCTIONS):
                 self.remove_block(block)
+
+
+__all__ = (
+    "SECURITY_CHECK_FUNCTIONS",
+    "SecurityCheckRemover",
+)

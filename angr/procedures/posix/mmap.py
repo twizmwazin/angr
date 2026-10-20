@@ -141,3 +141,16 @@ class mmap(angr.SimProcedure):
         self.state.heap.mmap_base = new_base
 
         return addr
+
+
+__all__ = (
+    "MAP_ANONYMOUS",
+    "MAP_FIXED",
+    "MAP_PRIVATE",
+    "MAP_SHARED",
+    "PROT_EXEC",
+    "PROT_NONE",
+    "PROT_READ",
+    "PROT_WRITE",
+    "mmap",
+)

@@ -99,3 +99,6 @@ class MipsGpSettingSimplifier(OptimizationPass):
                     return first_block, idx
 
         return None
+
+
+__all__ = ("MipsGpSettingSimplifier",)

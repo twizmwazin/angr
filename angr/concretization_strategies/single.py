@@ -13,3 +13,6 @@ class SimConcretizationStrategySingle(SimConcretizationStrategy):
         if len(addrs) == 1:
             return addrs
         return None
+
+
+__all__ = ("SimConcretizationStrategySingle",)

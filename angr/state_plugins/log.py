@@ -79,3 +79,6 @@ class SimStateLog(SimStatePlugin):
 
 
 SimState.register_default("log", SimStateLog)
+
+
+__all__ = ("SimStateLog",)

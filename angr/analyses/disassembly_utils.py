@@ -113,3 +113,10 @@ def decode_instruction(arch, instr):
                 instr.branch_type = "direct"
 
             instr.branch_target_operand = len(instr.insn.operands) - 1
+
+
+__all__ = (
+    "INS_GROUP_INFO",
+    "INS_INFO",
+    "decode_instruction",
+)

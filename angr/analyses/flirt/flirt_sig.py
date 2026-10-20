@@ -369,3 +369,10 @@ class FlirtSignatureParsed:
 
         obj.root = obj.parse_tree(file_obj, root=True)
         return obj
+
+
+__all__ = (
+    "FlirtSignature",
+    "FlirtSignatureError",
+    "FlirtSignatureParsed",
+)

@@ -183,3 +183,10 @@ class Patterns(KnowledgeBasePlugin):
 
 
 KnowledgeBasePlugin.register_default("patterns", Patterns)
+
+
+__all__ = (
+    "PatternStats",
+    "Patterns",
+    "StoredPattern",
+)

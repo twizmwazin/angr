@@ -521,3 +521,6 @@ class WinStackCanarySimplifier(OptimizationPass):
                 )
             )
         )
+
+
+__all__ = ("WinStackCanarySimplifier",)

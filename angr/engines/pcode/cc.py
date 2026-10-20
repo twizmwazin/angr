@@ -146,3 +146,16 @@ def register_pcode_arch_default_cc(arch: ArchPcode):
         if cc is SimCCUnknown:
             l.warning("Unknown default cc for arch %s", arch.name)
         register_default_cc(arch.name, cc)
+
+
+__all__ = (
+    "SimCCM68k",
+    "SimCCPARISC",
+    "SimCCPCodeBase",
+    "SimCCPowerPC",
+    "SimCCRISCV",
+    "SimCCSH4",
+    "SimCCSPARC",
+    "SimCCXtensa",
+    "register_pcode_arch_default_cc",
+)

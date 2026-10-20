@@ -16,3 +16,6 @@ class SimSootExpr_New(SimSootExpr):
         # return object reference
         # => fields getting lazy initialized in the javavm memory
         self.expr = SimSootValue_ThisRef(heap_alloc_id=self.state.memory.get_new_uuid(), type_=obj_class.name)
+
+
+__all__ = ("SimSootExpr_New",)

@@ -37,3 +37,6 @@ class GetLastInputInfo(angr.SimProcedure):
     def fill_concrete(self):
         self.cbSize = claripy.BVV(3, 32)
         self.dwTime = claripy.BVV(3, 32)
+
+
+__all__ = ("GetLastInputInfo",)

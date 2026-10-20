@@ -46,3 +46,6 @@ class BookmarksSerializer:
         for db_bookmark in db_kb.bookmarks:
             bookmarks.append(Bookmark(db_bookmark.addr, db_bookmark.label or "", db_bookmark.created_at))
         return bookmarks
+
+
+__all__ = ("BookmarksSerializer",)

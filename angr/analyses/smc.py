@@ -156,3 +156,10 @@ class SelfModifyingCodeAnalysis(Analysis):
 
 
 AnalysesHub.register_default("SMC", SelfModifyingCodeAnalysis)
+
+
+__all__ = (
+    "SelfModifyingCodeAnalysis",
+    "TraceActions",
+    "TraceClassifier",
+)

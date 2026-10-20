@@ -164,3 +164,6 @@ class RetAddrSaveSimplifier(OptimizationPass):
                     )
 
         return retaddr_restore_stmts
+
+
+__all__ = ("RetAddrSaveSimplifier",)

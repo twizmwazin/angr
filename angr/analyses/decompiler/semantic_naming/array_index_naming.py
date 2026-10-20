@@ -218,3 +218,10 @@ class ArrayIndexNaming(ClinicNamingBase):
 
             self._var_to_new_name[var] = new_name
             self._name_counter += 1
+
+
+__all__ = (
+    "ARRAY_INDEX_NAMES",
+    "MIN_WEAK_INDEX_USES",
+    "ArrayIndexNaming",
+)

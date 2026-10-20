@@ -331,3 +331,10 @@ class getopt_long_only(_GetOptBase):
     # pylint:disable=arguments-differ
     def run(self, argc, argv, optstring, longopts, longindex):
         return self._getopt(argc, argv, optstring, longopts=longopts, longindex=longindex, long_only=True)
+
+
+__all__ = (
+    "getopt",
+    "getopt_long",
+    "getopt_long_only",
+)

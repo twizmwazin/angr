@@ -292,3 +292,10 @@ class InlinedMemsetSimplifierLate(InlinedMemsetSimplifier):
 
     STAGE = OptimizationPassStage.AFTER_SSA_LEVEL1_TRANSFORMATION
     NAME = "Simplify inlined memset (late)"
+
+
+__all__ = (
+    "ConstAssignmentInfo",
+    "InlinedMemsetSimplifier",
+    "InlinedMemsetSimplifierLate",
+)

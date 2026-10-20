@@ -1504,3 +1504,18 @@ class BinDiff(Analysis):
 
 
 AnalysesHub.register_default("BinDiff", BinDiff)
+
+
+__all__ = (
+    "DIFF_TYPE",
+    "DIFF_VALUE",
+    "BinDiff",
+    "ConstantChange",
+    "Difference",
+    "FunctionDiff",
+    "NormalizedBlock",
+    "NormalizedFunction",
+    "UnmatchedStatementsException",
+    "compare_statement_dict",
+    "differing_constants",
+)

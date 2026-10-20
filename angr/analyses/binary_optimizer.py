@@ -666,3 +666,12 @@ class BinaryOptimizer(Analysis):
 
 
 AnalysesHub.register_default("BinaryOptimizer", BinaryOptimizer)
+
+
+__all__ = (
+    "BinaryOptimizer",
+    "ConstantPropagation",
+    "DeadAssignment",
+    "RedundantStackVariable",
+    "RegisterReallocation",
+)

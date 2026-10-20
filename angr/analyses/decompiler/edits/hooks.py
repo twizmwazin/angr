@@ -91,3 +91,11 @@ NULL_HOOKS = NullEditHooks()
 
 def coerce_hooks(hooks: EditHooks | None) -> EditHooks:
     return NULL_HOOKS if hooks is None else hooks
+
+
+__all__ = (
+    "NULL_HOOKS",
+    "EditHooks",
+    "NullEditHooks",
+    "coerce_hooks",
+)

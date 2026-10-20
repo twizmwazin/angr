@@ -356,3 +356,11 @@ class PointerNaming(ClinicNamingBase):
             self._name_counter[category] += 1
 
             l.debug("Identified pointer %s (score=%d, patterns=%s)", var.name, info["score"], info["patterns"])
+
+
+__all__ = (
+    "POINTER_NAMES",
+    "POINTER_PARAM_FUNCTIONS",
+    "POINTER_RETURNING_FUNCTIONS",
+    "PointerNaming",
+)

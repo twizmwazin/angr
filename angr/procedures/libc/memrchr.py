@@ -38,3 +38,6 @@ class memrchr(angr.SimProcedure):
             result = claripy.If((b == c) & in_bounds, s_addr + i, result)
 
         return result
+
+
+__all__ = ("memrchr",)

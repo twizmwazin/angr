@@ -11,3 +11,6 @@ def is_pyinstaller() -> bool:
                 (e.g., development mode).
     """
     return getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
+
+
+__all__ = ("is_pyinstaller",)

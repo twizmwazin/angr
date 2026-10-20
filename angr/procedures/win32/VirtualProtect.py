@@ -60,3 +60,6 @@ class VirtualProtect(angr.SimProcedure):
 
         self.state.mem[lpfOldProtect].dword = deconvert_prot(first_prot)
         return 1
+
+
+__all__ = ("VirtualProtect",)

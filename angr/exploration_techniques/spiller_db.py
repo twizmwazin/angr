@@ -26,3 +26,13 @@ except ImportError:
     Base = None
     OperationalError = None
     sessionmaker = None
+
+
+__all__ = (
+    "Base",
+    "OperationalError",
+    "PickledState",
+    "create_engine",
+    "sessionmaker",
+    "sqlalchemy",
+)

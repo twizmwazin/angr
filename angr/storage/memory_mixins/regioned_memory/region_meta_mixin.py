@@ -233,3 +233,10 @@ class MemoryRegionMetaMixin(MemoryMixin):
         print("%sA-locs:" % (" " * indent))
         for aloc_id, aloc in self.alocs.items():
             print("{}<0x{:x}> {}".format(" " * (indent + 2), aloc_id, aloc))
+
+
+__all__ = (
+    "AbstractLocation",
+    "MemoryRegionMetaMixin",
+    "Segment",
+)

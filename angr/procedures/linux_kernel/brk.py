@@ -18,3 +18,6 @@ class brk(angr.SimProcedure):
         r = self.state.posix.set_brk(new_brk)
         l.debug("brk(%s) = %s", new_brk, r)
         return r
+
+
+__all__ = ("brk",)

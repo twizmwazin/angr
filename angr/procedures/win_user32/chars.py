@@ -13,3 +13,9 @@ class CharNextA(angr.SimProcedure):
 class CharPrevA(angr.SimProcedure):
     def run(self, start, ptr):
         return claripy.If(start == ptr, start, ptr - 1)
+
+
+__all__ = (
+    "CharNextA",
+    "CharPrevA",
+)

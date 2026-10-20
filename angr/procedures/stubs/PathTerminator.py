@@ -8,3 +8,6 @@ class PathTerminator(angr.SimProcedure):
 
     def run(self):
         return
+
+
+__all__ = ("PathTerminator",)

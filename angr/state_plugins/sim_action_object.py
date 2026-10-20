@@ -283,3 +283,10 @@ class SimActionObject:
 
     def bv_to_fp(self) -> SimActionObject:
         return ast_preserving_op(self.ast.raw_to_fp)
+
+
+__all__ = (
+    "SimActionObject",
+    "ast_preserving_op",
+    "ast_stripping_decorator",
+)

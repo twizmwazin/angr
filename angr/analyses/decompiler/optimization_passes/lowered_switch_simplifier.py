@@ -1183,3 +1183,10 @@ class LoweredSwitchSimplifier(StructuringOptimizationPass):
         if len(cases_0) > len(cases_1):
             return False
         return all(case in cases_1 for case in cases_0)
+
+
+__all__ = (
+    "Case",
+    "LoweredSwitchSimplifier",
+    "StableVarExprHasher",
+)

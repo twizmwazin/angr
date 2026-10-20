@@ -571,3 +571,11 @@ class CFBlanket(Analysis):
 
 AnalysesHub.register_default("CFB", CFBlanket)
 AnalysesHub.register_default("CFBlanket", CFBlanket)
+
+
+__all__ = (
+    "CFBlanket",
+    "CFBlanketView",
+    "MemoryRegion",
+    "Unknown",
+)

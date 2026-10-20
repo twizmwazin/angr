@@ -91,3 +91,6 @@ class SimStateJNIReferences(SimStatePlugin):
 # TODO use a default JavaVM preset
 #      see for reference: angr/engines/__init__.py
 SimState.register_default("jni_references", SimStateJNIReferences)
+
+
+__all__ = ("SimStateJNIReferences",)

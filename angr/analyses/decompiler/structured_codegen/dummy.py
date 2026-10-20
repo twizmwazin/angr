@@ -51,3 +51,6 @@ class DummyStructuredCodeGenerator(BaseStructuredCodeGenerator, Serializable):
         )
         codegen.notes = _parse_notes(cmsg.notes_json)
         return codegen
+
+
+__all__ = ("DummyStructuredCodeGenerator",)

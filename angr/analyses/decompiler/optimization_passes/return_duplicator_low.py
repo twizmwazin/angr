@@ -165,3 +165,6 @@ class ReturnDuplicatorLow(StructuringOptimizationPass, ReturnDuplicatorBase):
         This analysis is run in a loop in analyze() for a maximum of max_opt_iters times.
         """
         return self._analyze_core(self.out_graph)
+
+
+__all__ = ("ReturnDuplicatorLow",)

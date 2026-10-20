@@ -134,3 +134,9 @@ def find_exact_cores(
 
     cores.sort(key=lambda c: -c.savings)
     return cores
+
+
+__all__ = (
+    "ExactCore",
+    "find_exact_cores",
+)

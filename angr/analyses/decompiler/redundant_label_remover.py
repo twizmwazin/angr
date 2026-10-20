@@ -136,3 +136,6 @@ class RedundantLabelRemover:
                             **last_stmt.target.tags,
                         )
                         last_stmt.target_idx = self._new_jump_target[tpl][1]
+
+
+__all__ = ("RedundantLabelRemover",)

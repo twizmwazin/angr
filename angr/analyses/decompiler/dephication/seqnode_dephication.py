@@ -165,3 +165,10 @@ class SeqNodeDephication(DephicationBase):
 
 
 register_analysis(SeqNodeDephication, "SeqNodeDephication")
+
+
+__all__ = (
+    "PhiAssignmentCollector",
+    "SeqNodeDephication",
+    "SeqNodeRewriter",
+)

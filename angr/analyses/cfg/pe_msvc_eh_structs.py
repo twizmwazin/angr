@@ -458,3 +458,35 @@ def parse_try_block_map(memory, addr: int, count: int) -> list[TryBlockMapEntry]
             )
         )
     return entries
+
+
+__all__ = (
+    "CXXFRAMEHANDLER3_SIGNATURE",
+    "EH4_SCOPETABLE_HEADER_SIZE",
+    "EH4_SCOPETABLE_RECORD_SIZE",
+    "EH_PROLOG3_CATCH_DISCRIM",
+    "EH_PROLOG3_COMMON",
+    "EH_PROLOG3_DISCRIM",
+    "EH_PROLOG3_DISCRIM_OFFSET",
+    "EH_PROLOG3_GS_DISCRIM",
+    "FUNCINFO_MAGIC",
+    "FUNCINFO_SIZE",
+    "HANDLERTYPE_SIZE",
+    "SEH_PROLOG4_COMMON",
+    "SEH_PROLOG4_DISCRIM",
+    "SEH_PROLOG4_DISCRIM_OFFSET",
+    "SEH_PROLOG4_GS_DISCRIM",
+    "TRYBLOCKMAPENTRY_SIZE",
+    "UNWINDMAPENTRY_SIZE",
+    "EH4ScopeRecord",
+    "EH4ScopeTable",
+    "FuncInfo",
+    "HandlerType",
+    "TryBlockMapEntry",
+    "UnwindMapEntry",
+    "parse_eh4_scopetable",
+    "parse_funcinfo",
+    "parse_handler_array",
+    "parse_try_block_map",
+    "parse_unwind_map",
+)

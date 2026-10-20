@@ -13,3 +13,6 @@ def type_tag(cls: type) -> int:
     if tag is None:
         tag = _TAG_CACHE[cls] = zlib.crc32(cls.__qualname__.encode())
     return tag
+
+
+__all__ = ("type_tag",)

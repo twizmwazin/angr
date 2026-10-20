@@ -436,3 +436,9 @@ def populate_model(
                         if tmp_atom not in model.all_tmp_uses[block_loc]:
                             model.all_tmp_uses[block_loc][tmp_atom] = set()
                         model.all_tmp_uses[block_loc][tmp_atom].add((tmp_at_use, use_stmt_idx))
+
+
+__all__ = (
+    "SRDAModel",
+    "populate_model",
+)

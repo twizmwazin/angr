@@ -969,3 +969,9 @@ class ErrorRecord:
 
     def __eq__(self, other):
         return self is other or self.state is other
+
+
+__all__ = (
+    "ErrorRecord",
+    "SimulationManager",
+)

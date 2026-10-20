@@ -40,3 +40,6 @@ class TagSlicer(OptimizationPass):
             n.statements = [s for s in n.statements if s is not None]
 
         self.out_graph = self._graph
+
+
+__all__ = ("TagSlicer",)

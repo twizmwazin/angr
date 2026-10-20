@@ -29,3 +29,6 @@ class SimSootExpr_Phi(SimSootExpr):
             if value is not None:
                 self.expr = value
                 return
+
+
+__all__ = ("SimSootExpr_Phi",)

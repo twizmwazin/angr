@@ -8,3 +8,6 @@ class LoadLibrary(JavaSimProcedure):
 
     def run(self, lib):  # pylint: disable=arguments-differ,unused-argument
         pass
+
+
+__all__ = ("LoadLibrary",)

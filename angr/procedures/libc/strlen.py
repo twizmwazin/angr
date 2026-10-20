@@ -109,3 +109,6 @@ class strlen(angr.SimProcedure):
             self.state.add_constraints(result == rresult)
             result = rresult
         return result
+
+
+__all__ = ("strlen",)

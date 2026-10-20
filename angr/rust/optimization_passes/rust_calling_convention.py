@@ -26,3 +26,6 @@ class RustCallingConvention(OptimizationPass):
         # later in the same run. Only the Rust flavor's entry changes; the C prototype stays as it is.
         self._func.set_prototype(Flavors.RUST_FLAVOR, rcc.prototype, source=PrototypeSource.SIGNATURES)
         self._func.calling_convention = rcc.calling_convention
+
+
+__all__ = ("RustCallingConvention",)

@@ -76,3 +76,12 @@ class StringCharAt(JavaSimProcedure):
 
         char_str = claripy.StrSubstr(index, claripy.BVV(1, 32), self.state.memory.load(this_str))
         return SimSootValue_StringRef.new_string(self.state, char_str)
+
+
+__all__ = (
+    "StringCharAt",
+    "StringConcat",
+    "StringEquals",
+    "StringLength",
+    "StringSplit",
+)

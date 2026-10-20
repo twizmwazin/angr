@@ -475,3 +475,10 @@ class LanguageDetector(Analysis):
 
 
 AnalysesHub.register_default("LanguageDetector", LanguageDetector)
+
+
+__all__ = (
+    "LanguageDetectionConfidenceLevel",
+    "LanguageDetectionResult",
+    "LanguageDetector",
+)

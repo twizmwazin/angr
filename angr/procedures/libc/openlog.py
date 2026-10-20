@@ -9,3 +9,6 @@ class openlog(angr.SimProcedure):
     def run(self, ident, option, facility):
         # A stub for openlog that does not do anything yet.
         return
+
+
+__all__ = ("openlog",)

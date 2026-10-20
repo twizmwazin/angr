@@ -55,3 +55,10 @@ class dup3(angr.SimProcedure):
         # copy old_fd to new_fd so they point to the same FD
         self.state.posix.fd[newfd] = self.state.posix.fd[oldfd]
         return newfd
+
+
+__all__ = (
+    "dup",
+    "dup2",
+    "dup3",
+)

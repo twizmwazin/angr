@@ -295,3 +295,6 @@ class CFGTransformationMixin:
         self._update_phi_variables_after_removing_block(self._graph, [second_block], block, candidates=succs)
 
         return first_block, second_block
+
+
+__all__ = ("CFGTransformationMixin",)

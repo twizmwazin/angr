@@ -246,3 +246,9 @@ class SReachingDefinitionsAnalysis(Analysis, SReachingDefinitions):
 
 
 register_analysis(SReachingDefinitionsAnalysis, "SReachingDefinitions")
+
+
+__all__ = (
+    "SReachingDefinitions",
+    "SReachingDefinitionsAnalysis",
+)

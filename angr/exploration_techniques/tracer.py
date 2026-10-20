@@ -1096,3 +1096,11 @@ class Tracer(ExplorationTechnique):
                     indices.append(descr[2])
 
         return sorted(indices)
+
+
+__all__ = (
+    "RepHook",
+    "Tracer",
+    "TracerDesyncError",
+    "TracingMode",
+)

@@ -103,3 +103,13 @@ def replace_argument_pairs(call: Call, callback) -> Call:
         new_call.args = new_args
         return new_call
     return call
+
+
+__all__ = (
+    "CallRewriter",
+    "SideEffectStatementRewriter",
+    "extract_callee",
+    "extract_str",
+    "extract_str_from_addr",
+    "replace_argument_pairs",
+)

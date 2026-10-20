@@ -80,3 +80,9 @@ class DeobfuscatedStringsNote(DecompilationNote):
         for entry in d.get("strings", []):
             note.add_string(entry["type"], base64.b64decode(entry["value"]), ref_addr=entry["ref_addr"])
         return note
+
+
+__all__ = (
+    "DeobfuscatedString",
+    "DeobfuscatedStringsNote",
+)

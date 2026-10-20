@@ -8,3 +8,6 @@ class setbuf(angr.SimProcedure):
 
     def run(self, stream, buf):
         return
+
+
+__all__ = ("setbuf",)

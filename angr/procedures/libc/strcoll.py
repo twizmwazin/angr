@@ -11,3 +11,6 @@ class strcoll(angr.SimProcedure):
 
         # Defaults to strcmp, if the current locale is "C" or "POSIX".
         return self.inline_call(strcmp, s1, s2).ret_expr
+
+
+__all__ = ("strcoll",)

@@ -169,3 +169,9 @@ class FindCallsTo(AILBlockViewer):
             assert block is not None
             self.found_calls.append((block, stmt_idx, expr))
         return super()._handle_Call(expr_idx, expr, stmt_idx, stmt, block)
+
+
+__all__ = (
+    "FindCallsTo",
+    "HashLookupAPIDeobfuscator",
+)

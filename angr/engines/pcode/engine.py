@@ -240,3 +240,6 @@ class HeavyPcodeMixin(
                     exit_stmt_idx=DEFAULT_STATEMENT,
                     exit_ins_addr=self.state.scratch.ins_addr,
                 )
+
+
+__all__ = ("HeavyPcodeMixin",)

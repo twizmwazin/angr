@@ -22,3 +22,6 @@ class ASubASubN(PeepholeOptimizationExprBase):
             return expr.operands[1].operands[1]
 
         return None
+
+
+__all__ = ("ASubASubN",)

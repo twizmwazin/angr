@@ -51,3 +51,9 @@ class LibcUnistdHandlers(FunctionHandler):
         data.depends(data.ret_atoms, value=ret_val)
 
     handle_impl_send = handle_impl_write
+
+
+__all__ = (
+    "FDAtom",
+    "LibcUnistdHandlers",
+)

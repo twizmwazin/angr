@@ -66,3 +66,11 @@ class VEXTmp(VEXVariable):
 
     def __repr__(self):
         return f"<tmp {self.tmp}>"
+
+
+__all__ = (
+    "VEXMemVar",
+    "VEXReg",
+    "VEXTmp",
+    "VEXVariable",
+)

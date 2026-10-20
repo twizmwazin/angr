@@ -70,3 +70,6 @@ class VVarUsesCollector(AILBlockViewer):
                 (expr, AILCodeLocation(block.addr, block.idx, stmt_idx, stmt.tags.get("ins_addr")))
             )
         self.vvars.add(expr.varid)
+
+
+__all__ = ("VVarUsesCollector",)

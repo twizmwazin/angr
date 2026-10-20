@@ -125,3 +125,11 @@ def find_block_by_similarity(block, graph, node_list=None):
         _l.warning("found multiple similar blocks")
 
     return similar_blocks[0]
+
+
+__all__ = (
+    "ail_graph_similarity",
+    "ail_similarity_to_orig_blocks",
+    "find_block_by_similarity",
+    "longest_ail_graph_subseq",
+)

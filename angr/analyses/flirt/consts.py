@@ -159,3 +159,16 @@ class FlirtParseFlag(int, Enum):
 class FlirtFunctionFlag(int, Enum):
     FUNCTION_LOCAL = 0x2
     FUNCTION_UNRESOLVED_COLLISION = 0x8
+
+
+__all__ = (
+    "FLIRT_ARCH_TO_ARCHNAME",
+    "FLIRT_OS_TO_OSNAME",
+    "FlirtAppType",
+    "FlirtArch",
+    "FlirtFeatureFlag",
+    "FlirtFileType",
+    "FlirtFunctionFlag",
+    "FlirtOSType",
+    "FlirtParseFlag",
+)

@@ -29,3 +29,11 @@ class getresuid(angr.SimProcedure):
         self.state.memory.store(euid_addr, uid)
         self.state.memory.store(suid_addr, uid)
         return 0
+
+
+__all__ = (
+    "getgid",
+    "getresgid",
+    "getresuid",
+    "getuid",
+)

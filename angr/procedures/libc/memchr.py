@@ -50,3 +50,6 @@ class memchr(angr.SimProcedure):
         self.state.add_constraints(claripy.If(a != 0, claripy.ULT(chrpos, n), True))
 
         return a
+
+
+__all__ = ("memchr",)

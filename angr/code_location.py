@@ -259,3 +259,10 @@ class AILCodeLocation:
     @property
     def ins_addr(self):
         return self.insn_addr
+
+
+__all__ = (
+    "AILCodeLocation",
+    "CodeLocation",
+    "ExternalCodeLocation",
+)

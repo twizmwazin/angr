@@ -13,3 +13,9 @@ class getpid(angr.SimProcedure):
 class getppid(angr.SimProcedure):
     def run(self):
         return self.state.posix.ppid
+
+
+__all__ = (
+    "getpid",
+    "getppid",
+)

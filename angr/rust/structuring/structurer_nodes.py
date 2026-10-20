@@ -67,3 +67,9 @@ class IfLetNode(BaseNode):
         if self.false_node:
             s += ", else {\n" + self.false_node.dbg_repr(indent + INDENT_DELTA) + "\n}"
         return s
+
+
+__all__ = (
+    "IfLetNode",
+    "PatternMatchNode",
+)

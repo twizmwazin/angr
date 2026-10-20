@@ -20,3 +20,6 @@ class RemoveRedundantDerefs(PeepholeOptimizationExprBase):
             # *(&v) ==> v
             return expr.addr.operand
         return None
+
+
+__all__ = ("RemoveRedundantDerefs",)

@@ -63,3 +63,6 @@ class PagedMemoryMultiValueMixin(MemoryMixin):
                 pageoff = 0
 
         return annotations
+
+
+__all__ = ("PagedMemoryMultiValueMixin",)

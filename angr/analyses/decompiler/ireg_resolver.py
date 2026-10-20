@@ -394,3 +394,11 @@ class IRegisterResolver:
         tags = dict(ireg.tags)
         tags["reg_name"] = self._arch.translate_register_name(offset, size=ireg.size)
         return Register(ireg.idx, offset, ireg.bits, **tags)
+
+
+__all__ = (
+    "MAX_CALLER_SCAN_BLOCKS",
+    "BlockKey",
+    "IRegisterResolver",
+    "RegState",
+)

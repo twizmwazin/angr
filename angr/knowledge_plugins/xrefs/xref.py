@@ -145,3 +145,6 @@ class XRef(Serializable):
             dst=self.dst,
             xref_type=self.type,
         )
+
+
+__all__ = ("XRef",)

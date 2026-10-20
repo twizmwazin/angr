@@ -70,3 +70,6 @@ class DataNormalizationMixin(MemoryMixin):
             raise TypeError("Bad value passed to memory", thing) from None
         else:
             return raw_to_bv()
+
+
+__all__ = ("DataNormalizationMixin",)

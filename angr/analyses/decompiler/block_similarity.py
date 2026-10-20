@@ -205,3 +205,12 @@ def longest_ail_subseq(
         return None, [None] * len(stmts_list)
 
     return subseq, [index_of_similar_stmts(subseq, stmts, graph=graph) for stmts in stmts_list]
+
+
+__all__ = (
+    "has_similar_stmt",
+    "in_other",
+    "index_of_similar_stmts",
+    "is_similar",
+    "longest_ail_subseq",
+)

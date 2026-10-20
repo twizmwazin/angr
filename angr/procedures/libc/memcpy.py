@@ -42,3 +42,6 @@ class memcpy(angr.SimProcedure):
 class __memcpy_chk(memcpy):
     def run(self, dst_addr, src_addr, limit, _destlen):  # type:ignore[reportIncompatibleMethodOverride]
         return super().run(dst_addr, src_addr, limit)
+
+
+__all__ = ("memcpy",)

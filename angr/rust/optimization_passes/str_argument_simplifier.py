@@ -118,3 +118,6 @@ class StrArgumentSimplifier(OptimizationPass, SRDAMixin):
         walker = CallRewriter(self.replace_call)
         for block in self._graph.nodes:
             walker.walk(block)
+
+
+__all__ = ("StrArgumentSimplifier",)

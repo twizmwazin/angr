@@ -86,3 +86,6 @@ class FunctionGraphVisitor(GraphVisitor):
 
         start_node = start_nodes[0]
         return list(dfs_back_edges(self.graph, start_node))
+
+
+__all__ = ("FunctionGraphVisitor",)

@@ -462,3 +462,17 @@ class LoopAnalysis(Analysis):
 
 
 register_analysis(LoopAnalysis, "LoopAnalysis")
+
+
+__all__ = (
+    "ASTNodeBase",
+    "AssignmentNode",
+    "AssignmentToASTVisitor",
+    "BinOpNode",
+    "ConstNode",
+    "LoopAnalysis",
+    "LoopBodyAssignmentCollector",
+    "LoopBodyControlStatementCollector",
+    "LoopVisitor",
+    "VarNode",
+)

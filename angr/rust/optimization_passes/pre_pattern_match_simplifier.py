@@ -312,3 +312,6 @@ class PrePatternMatchSimplifier(OptimizationPass, ReturnDuplicatorBase, DFAMixin
         if self._analyze_core(graph_copy):
             self.out_graph = self._simplify_graph(graph_copy)
         self._group_move_stmts()
+
+
+__all__ = ("PrePatternMatchSimplifier",)

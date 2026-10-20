@@ -499,3 +499,12 @@ class SimHostFilesystem(SimConcreteFilesystem):
             )
         except OSError:
             return None
+
+
+__all__ = (
+    "SimConcreteFilesystem",
+    "SimFilesystem",
+    "SimHostFilesystem",
+    "SimMount",
+    "Stat",
+)

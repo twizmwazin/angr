@@ -47,3 +47,9 @@ class VariableSourceAnnotation(Annotation):
     @staticmethod
     def from_state(state):
         return VariableSourceAnnotation(state.scratch.bbl_addr, state.scratch.stmt_idx, state.scratch.ins_addr)
+
+
+__all__ = (
+    "StackLocationAnnotation",
+    "VariableSourceAnnotation",
+)

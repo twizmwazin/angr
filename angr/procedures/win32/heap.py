@@ -43,3 +43,13 @@ class GlobalAlloc(HeapAlloc):
 class HeapFree(angr.SimProcedure):
     def run(self, HeapHandle, Flags, lpMem):  # pylint:disable=arguments-differ, unused-argument
         return 1
+
+
+__all__ = (
+    "GetProcessHeap",
+    "GlobalAlloc",
+    "HeapAlloc",
+    "HeapCreate",
+    "HeapFree",
+    "HeapReAlloc",
+)

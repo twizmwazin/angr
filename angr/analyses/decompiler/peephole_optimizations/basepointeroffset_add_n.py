@@ -33,3 +33,6 @@ class BasePointerOffsetAddN(PeepholeOptimizationExprBase):
             return r
 
         return None
+
+
+__all__ = ("BasePointerOffsetAddN",)

@@ -989,3 +989,12 @@ class StringObfuscationFinder(Analysis):
 
 
 AnalysesHub.register_default("StringObfuscationFinder", StringObfuscationFinder)
+
+
+__all__ = (
+    "ALL_X64_XMM_REGS",
+    "STEP_LIMIT_ANALYSIS",
+    "STEP_LIMIT_FIND",
+    "StringDeobFuncDescriptor",
+    "StringObfuscationFinder",
+)

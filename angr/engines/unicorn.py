@@ -484,3 +484,6 @@ class SimEngineUnicorn(SuccessorsEngine):
         successors.processed = True
 
         return None
+
+
+__all__ = ("SimEngineUnicorn",)

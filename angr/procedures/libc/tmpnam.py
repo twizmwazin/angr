@@ -20,3 +20,6 @@ class tmpnam(angr.SimProcedure):
         self.state.memory.store(addr, tmp_file_path.encode() + b"\x00")
 
         return addr
+
+
+__all__ = ("tmpnam",)

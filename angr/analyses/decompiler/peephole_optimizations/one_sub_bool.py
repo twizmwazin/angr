@@ -32,3 +32,6 @@ class OneSubBool(PeepholeOptimizationExprBase):
                 )
 
         return None
+
+
+__all__ = ("OneSubBool",)

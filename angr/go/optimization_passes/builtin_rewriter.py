@@ -3400,3 +3400,6 @@ class _VVarSubstituter(AILBlockRewriter):
     def _handle_VirtualVariable(self, expr_idx, expr: VirtualVariable, stmt_idx, stmt, block):
         new = self._replacements.get(expr.varid)
         return new if new is not None else expr
+
+
+__all__ = ("GoBuiltinRewriter",)

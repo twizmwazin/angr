@@ -456,3 +456,9 @@ def prepare_native_return_state(native_state):
     Note: Redirection needed for pickling.
     """
     return SootMixin.prepare_native_return_state(native_state)
+
+
+__all__ = (
+    "SimJavaVM",
+    "prepare_native_return_state",
+)

@@ -64,3 +64,6 @@ class UnconstrainedMethod(JavaSimProcedure):
                 return None
 
         return ret_value
+
+
+__all__ = ("UnconstrainedMethod",)

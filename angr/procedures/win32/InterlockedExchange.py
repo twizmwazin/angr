@@ -14,3 +14,6 @@ class InterlockedExchange(angr.SimProcedure):
             )
 
         return old_value
+
+
+__all__ = ("InterlockedExchange",)

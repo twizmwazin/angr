@@ -59,3 +59,6 @@ class CallsitePrototypesSerializer:
                 db_entry.addr, cc, proto, kind=CallsitePrototypeKind(db_entry.kind), flavor=db_entry.flavor
             )
         return callsite_prototypes
+
+
+__all__ = ("CallsitePrototypesSerializer",)

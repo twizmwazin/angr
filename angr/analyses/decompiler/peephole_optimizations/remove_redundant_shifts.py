@@ -112,3 +112,6 @@ class RemoveRedundantShifts(PeepholeOptimizationExprBase):
                         return op1.operands[0]
 
         return None
+
+
+__all__ = ("RemoveRedundantShifts",)

@@ -11,3 +11,9 @@ class InitializeCriticalSectionAndSpinCount(angr.SimProcedure):
 class InitializeCriticalSectionEx(angr.SimProcedure):
     def run(self, lpCriticalSection, dwSpinCount, Flags):
         return 1
+
+
+__all__ = (
+    "InitializeCriticalSectionAndSpinCount",
+    "InitializeCriticalSectionEx",
+)

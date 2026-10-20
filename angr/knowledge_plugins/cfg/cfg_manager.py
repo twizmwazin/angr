@@ -125,3 +125,6 @@ class CFGManager(KnowledgeBasePlugin):
 
 
 KnowledgeBasePlugin.register_default("cfgs", CFGManager)
+
+
+__all__ = ("CFGManager",)

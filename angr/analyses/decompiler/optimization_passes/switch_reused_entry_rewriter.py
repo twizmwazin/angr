@@ -132,3 +132,6 @@ class SwitchReusedEntryRewriter(OptimizationPass):
                 # we are virtualizing these edges, so we don't need to add the edge from goto_node to the entry_node
 
         self.out_graph = out_graph
+
+
+__all__ = ("SwitchReusedEntryRewriter",)

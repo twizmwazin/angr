@@ -825,3 +825,10 @@ class Identifier(Analysis):
 
 
 AnalysesHub.register_default("Identifier", Identifier)
+
+
+__all__ = (
+    "NUM_TESTS",
+    "FuncInfo",
+    "Identifier",
+)

@@ -98,3 +98,10 @@ class receive_n2(Func):
 
     def pre_test(self, func, runner):
         return True
+
+
+__all__ = (
+    "receive_n2",
+    "receive_n3",
+    "receive_n4",
+)

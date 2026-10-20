@@ -9,3 +9,9 @@ class Converter:
     @staticmethod
     def convert(irsb, manager):
         raise NotImplementedError
+
+
+__all__ = (
+    "Converter",
+    "SkipConversionNotice",
+)

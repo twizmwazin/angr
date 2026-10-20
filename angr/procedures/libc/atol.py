@@ -12,3 +12,6 @@ class atol(angr.SimProcedure):
     def run(self, s):
         strtol = angr.SIM_PROCEDURES["libc"]["strtol"]
         return strtol.strtol_inner(s, self.state, self.state.memory, 10, True)[1]
+
+
+__all__ = ("atol",)

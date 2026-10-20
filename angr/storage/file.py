@@ -1193,3 +1193,19 @@ class SimPacketsSlots(SimFileBase):
             )
 
         return True
+
+
+__all__ = (
+    "Flags",
+    "SimFile",
+    "SimFileBase",
+    "SimFileDescriptor",
+    "SimFileDescriptorBase",
+    "SimFileDescriptorDuplex",
+    "SimFileStream",
+    "SimPackets",
+    "SimPacketsSlots",
+    "SimPacketsStream",
+    "dialogue_counter",
+    "file_counter",
+)

@@ -599,3 +599,10 @@ class UberIcicleEngine(SimEngineFailure, SimEngineSyscall, HooksMixin, IcicleEng
     syscalls and hooks. Most users will prefer to use this engine instead of the
     IcicleEngine directly.
     """
+
+
+__all__ = (
+    "PROCESSORS_DIR",
+    "IcicleEngine",
+    "UberIcicleEngine",
+)

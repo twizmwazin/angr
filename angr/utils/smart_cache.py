@@ -19,3 +19,6 @@ class SmartLRUCache(LRUCache):
         if self._evict is not None:
             self._evict(key, val)
         return key, val
+
+
+__all__ = ("SmartLRUCache",)

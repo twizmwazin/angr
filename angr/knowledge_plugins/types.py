@@ -104,3 +104,9 @@ class TypesStore(KnowledgeBasePlugin, UserDict[str, TypeRef]):
 
 
 KnowledgeBasePlugin.register_default("types", TypesStore)
+
+
+__all__ = (
+    "FRUITS",
+    "TypesStore",
+)

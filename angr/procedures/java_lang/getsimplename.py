@@ -15,3 +15,6 @@ class GetSimpleName(JavaSimProcedure):
     def run(self, this):  # pylint: disable=arguments-differ
         class_simple_name = this.type.split(".")[-1]
         return SimSootValue_StringRef.new_string(self.state, claripy.StringV(class_simple_name))
+
+
+__all__ = ("GetSimpleName",)

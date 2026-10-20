@@ -103,3 +103,11 @@ def vvar_use_counts(graph) -> dict[int, int]:
     for block in graph.nodes:
         counter.walk(block)
     return counter.counts
+
+
+__all__ = (
+    "VVarUseCounter",
+    "extract_piece",
+    "multiword_vvars",
+    "vvar_use_counts",
+)

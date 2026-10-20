@@ -152,3 +152,6 @@ class SarToSignedDiv(PeepholeOptimizationExprBase):
                     ):
                         return eq1, right.value + 1, inner
         return None
+
+
+__all__ = ("SarToSignedDiv",)

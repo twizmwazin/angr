@@ -8,3 +8,6 @@ class setsockopt(angr.SimProcedure):
 
     def run(self, sockfd, level, optname, optval, optmain):
         return 0
+
+
+__all__ = ("setsockopt",)

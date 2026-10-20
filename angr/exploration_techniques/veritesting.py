@@ -36,3 +36,6 @@ class Veritesting(ExplorationTechnique):
             }
 
         return simgr.step_state(state, successor_func=successor_func, **kwargs)
+
+
+__all__ = ("Veritesting",)

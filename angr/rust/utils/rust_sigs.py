@@ -62,3 +62,10 @@ def get_default_sig_dir(arch_name: str = "x86_64", platform: str = "linux") -> s
     if os.path.isdir(sig_dir):
         return os.path.normpath(sig_dir)
     return None
+
+
+__all__ = (
+    "SENTINEL_FILENAME",
+    "TARBALL_URL",
+    "get_default_sig_dir",
+)

@@ -18,3 +18,6 @@ class fclose(angr.SimProcedure):
 
         # Call system close and return
         return self.inline_call(sys_close, fileno).ret_expr
+
+
+__all__ = ("fclose",)

@@ -137,3 +137,6 @@ class fstat(angr.SimProcedure):
         store(0x68, stat.st_ctime)
         store(0x70, stat.st_ctimensec)
         store(0x78, claripy.BVV(0, 64))
+
+
+__all__ = ("fstat",)

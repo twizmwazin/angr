@@ -137,3 +137,9 @@ class StringObfType3Rewriter(OptimizationPass):
 
 
 register_optimization_pass(StringObfType3Rewriter, presets=["fast", "full"])
+
+
+__all__ = (
+    "WIN64_REG_ARGS",
+    "StringObfType3Rewriter",
+)

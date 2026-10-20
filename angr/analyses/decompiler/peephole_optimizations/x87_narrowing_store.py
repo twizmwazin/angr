@@ -35,3 +35,6 @@ class X87NarrowingStore(PeepholeOptimizationStmtBase):
             **data.tags,
         )
         return Store(stmt.idx, stmt.addr, narrowed, stmt.size, stmt.endness, guard=stmt.guard, **stmt.tags)
+
+
+__all__ = ("X87NarrowingStore",)

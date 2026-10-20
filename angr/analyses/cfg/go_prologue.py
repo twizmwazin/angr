@@ -241,3 +241,9 @@ def find_go_stack_check_preambles(blob: bytes, arch_name: str, base: int = 0) ->
         target = preamble.branch_target(mo)
         if target > mo.end():
             yield mo.start(), mo.end(), target
+
+
+__all__ = (
+    "find_go_stack_check_preambles",
+    "go_preamble_supported",
+)

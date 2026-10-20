@@ -120,3 +120,9 @@ class InlinedMemcpySimplifierLate(InlinedMemcpySimplifier):
 
     STAGE = OptimizationPassStage.AFTER_SSA_LEVEL1_TRANSFORMATION
     NAME = "Simplify inlined memcpy (late)"
+
+
+__all__ = (
+    "InlinedMemcpySimplifier",
+    "InlinedMemcpySimplifierLate",
+)

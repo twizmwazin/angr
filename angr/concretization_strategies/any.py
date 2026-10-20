@@ -15,3 +15,6 @@ class SimConcretizationStrategyAny(SimConcretizationStrategy):
         if mn == mx:
             return [mn]
         return None
+
+
+__all__ = ("SimConcretizationStrategyAny",)

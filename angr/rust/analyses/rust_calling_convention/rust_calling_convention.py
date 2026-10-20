@@ -578,3 +578,6 @@ class RustCallingConventionAnalysis(Analysis):
 
 
 AnalysesHub.register_default("RustCallingConvention", RustCallingConventionAnalysis)
+
+
+__all__ = ("RustCallingConventionAnalysis",)

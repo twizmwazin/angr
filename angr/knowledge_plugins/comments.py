@@ -230,3 +230,10 @@ class Comments(KnowledgeBasePlugin, dict):
 
 
 KnowledgeBasePlugin.register_default("comments", Comments)
+
+
+__all__ = (
+    "Comment",
+    "CommentKind",
+    "Comments",
+)

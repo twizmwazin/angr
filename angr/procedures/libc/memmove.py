@@ -40,3 +40,6 @@ class __memmove_chk(memmove):
     # pylint:disable=arguments-differ, missing-class-docstring
     def run(self, dst_addr, src_addr, limit, _destlen):  # type:ignore[reportIncompatibleMethodOverride]
         return super().run(dst_addr, src_addr, limit)
+
+
+__all__ = ("memmove",)

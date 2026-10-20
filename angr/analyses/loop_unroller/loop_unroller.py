@@ -219,3 +219,6 @@ class LoopUnroller(Analysis):
 
 
 register_analysis(LoopUnroller, "LoopUnroller")
+
+
+__all__ = ("LoopUnroller",)

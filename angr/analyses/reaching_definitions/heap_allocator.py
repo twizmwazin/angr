@@ -68,3 +68,6 @@ class HeapAllocator:
         :return: The list of addresses that are currently allocated on the heap.
         """
         return self._allocated_addresses
+
+
+__all__ = ("HeapAllocator",)

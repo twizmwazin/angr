@@ -113,3 +113,6 @@ class RemoveRedundantShiftsAroundComparators(PeepholeOptimizationExprBase):
                 v1 >>= 1
                 shift_amount += 1
         return shift_amount
+
+
+__all__ = ("RemoveRedundantShiftsAroundComparators",)

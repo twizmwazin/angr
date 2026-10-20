@@ -232,3 +232,10 @@ class GoCheckRemover(OptimizationPass, CFGTransformationMixin):
             if not self.remove_block(block) or len(preds) != 1:
                 return
             block = preds[0]
+
+
+__all__ = (
+    "GoCheckRemover",
+    "is_go_check_panic_name",
+    "is_go_write_barrier_name",
+)

@@ -112,3 +112,9 @@ class GotoManager:
                 dst_blocks.add(dst_block)
 
         return goto_edges
+
+
+__all__ = (
+    "Goto",
+    "GotoManager",
+)

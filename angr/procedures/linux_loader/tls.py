@@ -39,3 +39,6 @@ class _dl_get_tls_static_info(angr.SimProcedure):
     def run(self, sizep, alignp):
         self.state.mem[sizep].size_t = 2048
         self.state.mem[alignp].size_t = 16
+
+
+__all__ = ("tlsdesc_resolver",)

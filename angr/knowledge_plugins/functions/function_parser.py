@@ -259,3 +259,9 @@ class FunctionParser:
         from angr.angrdb.v1 import AngrDbV1  # pylint:disable=import-outside-toplevel
 
         return AngrDbV1.parse_function(cmsg, obj, project, meta_only)
+
+
+__all__ = (
+    "CallingConventionSerializer",
+    "FunctionParser",
+)

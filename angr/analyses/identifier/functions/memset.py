@@ -36,3 +36,6 @@ class memset(Func):
 
     def pre_test(self, func, runner):
         return True
+
+
+__all__ = ("memset",)

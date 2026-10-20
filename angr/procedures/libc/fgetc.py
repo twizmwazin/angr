@@ -25,3 +25,11 @@ class fgetc(angr.SimProcedure):
 getc = fgetc
 fgetc_unlocked = fgetc
 getc_unlocked = fgetc
+
+
+__all__ = (
+    "fgetc",
+    "fgetc_unlocked",
+    "getc",
+    "getc_unlocked",
+)

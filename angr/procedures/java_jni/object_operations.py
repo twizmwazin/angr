@@ -94,3 +94,12 @@ class IsSameObject(JNISimProcedure):
         if ref1 == ref2:
             return self.JNI_TRUE
         return self.JNI_FALSE
+
+
+__all__ = (
+    "AllocObject",
+    "GetObjectClass",
+    "IsInstanceOf",
+    "IsSameObject",
+    "NewObject",
+)

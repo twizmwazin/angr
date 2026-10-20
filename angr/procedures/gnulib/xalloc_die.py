@@ -13,3 +13,6 @@ class xalloc_die(angr.SimProcedure):
     # pylint: disable=arguments-differ
     def run(self):
         self.exit(1)
+
+
+__all__ = ("xalloc_die",)

@@ -1429,3 +1429,9 @@ class Decompiler(Analysis):
 
 
 AnalysesHub.register_default("Decompiler", Decompiler)
+
+
+__all__ = (
+    "ConstantCollector",
+    "Decompiler",
+)

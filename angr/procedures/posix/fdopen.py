@@ -74,3 +74,10 @@ class fdopen(angr.SimProcedure):
             return file_struct_ptr
         null = claripy.BVV(0, self.state.arch.bits)
         return claripy.If(fd_int == fd_concr, file_struct_ptr, null)
+
+
+__all__ = (
+    "create_file",
+    "fdopen",
+    "mode_to_flag",
+)

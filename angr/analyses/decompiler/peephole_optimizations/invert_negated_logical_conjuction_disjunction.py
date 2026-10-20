@@ -45,3 +45,6 @@ class InvertNegatedLogicalConjunctionsAndDisjunctions(PeepholeOptimizationExprBa
                 )
 
         return None
+
+
+__all__ = ("InvertNegatedLogicalConjunctionsAndDisjunctions",)

@@ -16,3 +16,6 @@ class Write(JavaSimProcedure):
 
         v = (b % 256).get_byte(3)
         self.state.posix.stdout.write(None, v)
+
+
+__all__ = ("Write",)

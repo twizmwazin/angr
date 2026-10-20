@@ -45,3 +45,6 @@ class AMulConstDivShrConst(PeepholeOptimizationExprBase):
                 return BinaryOp(expr.idx, "Div", [mul, N1], False, **expr.tags)
 
         return None
+
+
+__all__ = ("AMulConstDivShrConst",)

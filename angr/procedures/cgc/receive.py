@@ -90,3 +90,9 @@ class receive(angr.SimProcedure):
             read_length = claripy.BVV(read_length, 32)
         self.state.memory.store(rx_bytes, read_length, condition=rx_bytes != 0, endness="Iend_LE")
         return 0
+
+
+__all__ = (
+    "fastpath_data_counter",
+    "receive",
+)

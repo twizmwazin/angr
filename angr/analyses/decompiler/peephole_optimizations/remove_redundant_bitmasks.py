@@ -181,3 +181,6 @@ class RemoveRedundantBitmasks(PeepholeOptimizationExprBase):
                         **expr.tags,
                     )
         return None
+
+
+__all__ = ("RemoveRedundantBitmasks",)

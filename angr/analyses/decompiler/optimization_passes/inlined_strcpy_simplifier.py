@@ -406,3 +406,11 @@ class InlinedStrcpySimplifierLate(InlinedStrcpySimplifier):
 
     STAGE = OptimizationPassStage.AFTER_SSA_LEVEL1_TRANSFORMATION
     NAME = "Simplify inlined strcpy (late)"
+
+
+__all__ = (
+    "ASCII_DIGITS",
+    "ASCII_PRINTABLES",
+    "InlinedStrcpySimplifier",
+    "InlinedStrcpySimplifierLate",
+)

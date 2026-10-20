@@ -30,3 +30,11 @@ def read_multiple_bytes(file_obj) -> int:
         b += read_short(file_obj)
         return b
     return read_word(file_obj)
+
+
+__all__ = (
+    "read_max_2_bytes",
+    "read_multiple_bytes",
+    "read_short",
+    "read_word",
+)

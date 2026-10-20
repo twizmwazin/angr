@@ -34,3 +34,6 @@ class GetProcessAffinityMask(angr.SimProcedure):
     def fill_concrete(self):
         self.paffinity_mask = claripy.BVV(3, 32)
         self.saffinity_mask = claripy.BVV(3, 32)
+
+
+__all__ = ("GetProcessAffinityMask",)

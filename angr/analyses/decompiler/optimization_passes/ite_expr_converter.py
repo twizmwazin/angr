@@ -222,3 +222,11 @@ class ITEExprConverter(OptimizationPass):
         except NodeFoundNotification:
             return locator.region
         return None  # not found
+
+
+__all__ = (
+    "BlockLocator",
+    "ExpressionReplacer",
+    "ITEExprConverter",
+    "NodeFoundNotification",
+)

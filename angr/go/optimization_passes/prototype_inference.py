@@ -1366,3 +1366,10 @@ def _field_at(struct: GoSimStruct, off: int) -> SimType | None:
             if inner is not None:
                 return inner
     return None
+
+
+__all__ = (
+    "RULE_HITS",
+    "GoPrototypeInference",
+    "Words",
+)

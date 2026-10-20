@@ -417,3 +417,10 @@ def _note_region(regions: dict, base: int, size: int, ty: SimType, pieces: dict[
         regions[base] = (size, ty, dict(pieces))
     elif old[0] == size and go_type_repr(old[1]) == go_type_repr(ty):
         old[2].update(pieces)
+
+
+__all__ = (
+    "GROUND_TRUTH_KEY",
+    "STACK_REGIONS_KEY",
+    "GoHeaderWordTypes",
+)

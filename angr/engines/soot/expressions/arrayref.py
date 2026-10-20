@@ -22,3 +22,6 @@ class SimSootExpr_ArrayRef(SimSootExpr):
             self.expr = self.state.memory.load(array_ref)
         else:
             l.warning("Trying to access a non existing array! (%r)", self.expr)
+
+
+__all__ = ("SimSootExpr_ArrayRef",)

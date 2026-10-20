@@ -204,3 +204,9 @@ class CASIntrinsics(PeepholeOptimizationMultiStmtBase):
                 if isinstance(stmt, Assignment) and stmt.dst.likes(expr):
                     return stmt.src
         return expr
+
+
+__all__ = (
+    "CASIntrinsics",
+    "cas_intrinsic_name",
+)

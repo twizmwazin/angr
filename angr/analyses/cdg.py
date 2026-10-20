@@ -184,3 +184,6 @@ class CDG(Analysis):
 
 
 AnalysesHub.register_default("CDG", CDG)
+
+
+__all__ = ("CDG",)

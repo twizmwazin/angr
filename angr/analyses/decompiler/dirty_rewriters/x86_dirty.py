@@ -234,3 +234,6 @@ class X86DirtyRewriter(DirtyRewriterBase):
                 return "dword"
             case _:
                 return f"_{bits}"
+
+
+__all__ = ("X86DirtyRewriter",)

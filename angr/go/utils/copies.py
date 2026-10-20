@@ -57,3 +57,6 @@ def copy_roots(graph: networkx.DiGraph) -> dict[int, VirtualVariable]:
             if root in vvars:
                 out[varid] = vvars[root]
     return out
+
+
+__all__ = ("copy_roots",)

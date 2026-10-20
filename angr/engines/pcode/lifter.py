@@ -1446,3 +1446,20 @@ class PcodeLifterEngineMixin(SimEngine):
         # rebuild block cache
         self._initialize_block_cache()
         super().__setstate__(ostate)
+
+
+__all__ = (
+    "IRSB",
+    "IRSB_MAX_INST",
+    "IRSB_MAX_SIZE",
+    "MAX_BYTES",
+    "MAX_INSTRUCTIONS",
+    "ExitStatement",
+    "Lifter",
+    "PcodeBasicBlockLifter",
+    "PcodeDisassemblerBlock",
+    "PcodeDisassemblerInsn",
+    "PcodeLifter",
+    "PcodeLifterEngineMixin",
+    "lift",
+)

@@ -110,3 +110,9 @@ class CleanupFunctionIdentification(Analysis):
 
 
 AnalysesHub.register_default("CleanupFunctionIdentification", CleanupFunctionIdentification)
+
+
+__all__ = (
+    "CLEANUP_FUNCTIONS",
+    "CleanupFunctionIdentification",
+)

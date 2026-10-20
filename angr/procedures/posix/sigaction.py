@@ -22,3 +22,6 @@ class sigaction(angr.SimProcedure):
                     oldact, self.state.solver.BVS("sigaction_oldact", 140 * 8, key=("api", "sigaction", "oldact"))
                 )
         return 0
+
+
+__all__ = ("sigaction",)

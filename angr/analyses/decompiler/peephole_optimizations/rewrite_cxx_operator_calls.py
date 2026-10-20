@@ -137,3 +137,6 @@ class RewriteCxxOperatorCalls(PeepholeOptimizationStmtBase):
         if isinstance(typeref.refs, SimCppClass) and typeref.refs.unique_name:
             return typeref.refs.unique_name
         return None
+
+
+__all__ = ("RewriteCxxOperatorCalls",)

@@ -42,3 +42,9 @@ class writev(angr.SimProcedure):
                 return tmpres
 
         return res
+
+
+__all__ = (
+    "readv",
+    "writev",
+)

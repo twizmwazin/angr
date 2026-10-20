@@ -760,3 +760,11 @@ class CFGENode(CFGNode):
             final_states=self.final_states[::],
             callstack_key=self.callstack_key,
         )
+
+
+__all__ = (
+    "AddressType",
+    "CFGENode",
+    "CFGNode",
+    "CFGNodeCreationFailure",
+)

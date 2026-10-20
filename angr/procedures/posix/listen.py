@@ -12,3 +12,6 @@ class listen(angr.SimProcedure):
 
     def run(self, sockfd, backlog):  # pylint:disable=unused-argument
         return self.state.solver.Unconstrained("listen", self.arch.sizeof["int"], key=("api", "listen"))
+
+
+__all__ = ("listen",)

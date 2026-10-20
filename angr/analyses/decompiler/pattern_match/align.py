@@ -578,3 +578,19 @@ def discover(
     alignments = refine_candidates(ids, candidates, score, params, checkpoint, segment)
     _l.debug("fuzzy patterns: %d alignments survived refinement", len(alignments))
     return cluster_alignments(alignments, params)
+
+
+__all__ = (
+    "AlignParams",
+    "Alignment",
+    "Interval",
+    "PatternCluster",
+    "ScoreModel",
+    "banded_sw",
+    "chain_seeds",
+    "cluster_alignments",
+    "discover",
+    "find_seeds",
+    "refine_candidates",
+    "select_disjoint",
+)

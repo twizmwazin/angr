@@ -194,3 +194,10 @@ class SpillingVariableInternalDict(collections.abc.MutableMapping):
         # defer the LMDB import to the first real access; the knowledge base may still be mid-unpickle here
         self._pending_import = dict(state["serialized"])
         self._spilled = set(self._pending_import)
+
+
+__all__ = (
+    "DECVARS_CACHE_LIMIT",
+    "USE_SPILLING_DVARS",
+    "SpillingVariableInternalDict",
+)

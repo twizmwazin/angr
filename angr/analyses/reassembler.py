@@ -2911,3 +2911,35 @@ class Reassembler(Analysis):
 
 
 AnalysesHub.register_default("Reassembler", Reassembler)
+
+
+__all__ = (
+    "CAPSTONE_OP_TYPE_MAP",
+    "CAPSTONE_REG_MAP",
+    "OP_TYPE_IMM",
+    "OP_TYPE_MAP",
+    "OP_TYPE_MEM",
+    "OP_TYPE_RAW",
+    "OP_TYPE_REG",
+    "BasicBlock",
+    "BinaryError",
+    "Data",
+    "DataLabel",
+    "FunctionLabel",
+    "Instruction",
+    "InstructionError",
+    "Label",
+    "NotypeLabel",
+    "ObjectLabel",
+    "Operand",
+    "Procedure",
+    "ProcedureChunk",
+    "Reassembler",
+    "ReassemblerFailureNotice",
+    "Relocation",
+    "SymbolManager",
+    "fill_reg_map",
+    "is_hex",
+    "split_operands",
+    "string_escape",
+)

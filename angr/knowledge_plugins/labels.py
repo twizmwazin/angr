@@ -102,3 +102,6 @@ class Labels(KnowledgeBasePlugin):
 
 
 KnowledgeBasePlugin.register_default("labels", Labels)
+
+
+__all__ = ("Labels",)

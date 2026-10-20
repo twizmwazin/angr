@@ -641,3 +641,9 @@ class SimProcedure:
     @return_type.setter
     def return_type(self, v):  # pylint: disable=unused-argument,no-self-use
         l.critical("SimProcedure.return_type is deprecated. specify the function signature in the prototype param")
+
+
+__all__ = (
+    "SimProcedure",
+    "symbolic_count",
+)

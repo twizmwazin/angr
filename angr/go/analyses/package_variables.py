@@ -386,3 +386,9 @@ def infer_package_variables(
 ) -> list[GoVariable]:
     """Package-level variables typed from the stores in the binary's initializers, named ``pkg.var_N``."""
     return _Scan(project).run(on_initializer=on_initializer)
+
+
+__all__ = (
+    "infer_package_variables",
+    "initializer_package",
+)

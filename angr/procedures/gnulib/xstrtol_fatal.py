@@ -13,3 +13,6 @@ class xstrtol_fatal(angr.SimProcedure):
     # pylint: disable=unused-argument,arguments-differ
     def run(self, err, opt_idx, c, long_options, arg):
         self.exit(1)
+
+
+__all__ = ("xstrtol_fatal",)

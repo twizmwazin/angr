@@ -749,3 +749,17 @@ def _const_bits(region: OutlinedRegion, const_idx: int) -> int:
 
 
 AnalysesHub.register_default("PatternDeduplicator", PatternDeduplicator)
+
+
+__all__ = (
+    "Address",
+    "DedupResult",
+    "MergeGroup",
+    "OutlinedRegion",
+    "PatternDeduplicator",
+    "callee_consts",
+    "callee_shape",
+    "canonical_arg_order",
+    "graph_problems",
+    "normalize_call_width",
+)

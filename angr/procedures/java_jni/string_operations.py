@@ -86,3 +86,11 @@ class GetStringUTFLength(JNISimProcedure):
         str_ref = self.state.jni_references.lookup(str_ref_)
         str_val = self.state.javavm_memory.load(str_ref)
         return StrLen(str_val)
+
+
+__all__ = (
+    "GetStringUTFChars",
+    "GetStringUTFLength",
+    "NewStringUTF",
+    "ReleaseStringUTFChars",
+)

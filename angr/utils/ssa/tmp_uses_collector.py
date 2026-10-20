@@ -40,3 +40,6 @@ class TmpUsesCollector(AILBlockViewer):
             # the def site itself, not a use
             return
         self.tmp_and_uselocs[(expr.tmp_idx, expr.bits)].add((expr, stmt_idx))
+
+
+__all__ = ("TmpUsesCollector",)

@@ -18,3 +18,6 @@ class strcat(angr.SimProcedure):
 class __strcat_chk(strcat):
     def run(self, dst, src, _destlen):  # type:ignore[reportIncompatibleMethodOverride]
         return super().run(dst, src)
+
+
+__all__ = ("strcat",)

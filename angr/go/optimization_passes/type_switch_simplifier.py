@@ -647,3 +647,6 @@ class _VVarUseCounter(AILBlockViewer):
         for _, vvar in expr.src_and_vvars:
             if vvar is not None:
                 self.counts[vvar.varid] += 1
+
+
+__all__ = ("GoTypeSwitchSimplifier",)

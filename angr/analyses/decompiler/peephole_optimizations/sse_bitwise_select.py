@@ -217,3 +217,6 @@ class SSEBitwiseSelect(PeepholeOptimizationExprBase):
             return BinaryOp(expr.idx, scalar_op, list(expr.operands), False, floating_point=True, **expr.tags)
 
         return None
+
+
+__all__ = ("SSEBitwiseSelect",)

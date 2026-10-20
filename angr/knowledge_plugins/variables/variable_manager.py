@@ -1805,3 +1805,12 @@ class DecompilationVariableManager(VariableManager):
 
 KnowledgeBasePlugin.register_default("variables", VariableManager)
 KnowledgeBasePlugin.register_default("dec_variables", DecompilationVariableManager)
+
+
+__all__ = (
+    "DecompilationVariableManager",
+    "LiveVariables",
+    "VariableManager",
+    "VariableManagerInternal",
+    "VariableType",
+)

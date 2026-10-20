@@ -379,3 +379,6 @@ class OptimizedDivisionSimplifier(PeepholeOptimizationExprBase):
             rounding_mode=conv.rounding_mode,
             **conv.tags,
         )
+
+
+__all__ = ("OptimizedDivisionSimplifier",)

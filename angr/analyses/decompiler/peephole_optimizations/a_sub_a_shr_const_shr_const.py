@@ -38,3 +38,6 @@ class ASubAShrConstShrConst(PeepholeOptimizationExprBase):
                     a0.idx, "Div", [a0, Const(self.manager.next_atom(), dividend, expr.bits)], True, **expr.tags
                 )
         return None
+
+
+__all__ = ("ASubAShrConstShrConst",)

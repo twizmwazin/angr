@@ -64,3 +64,6 @@ class UnderconstrainedMixin(MemoryMixin):
             if self.state.solver.solution(addr, mem_region):
                 self.state.add_constraints(addr == mem_region)
             l.debug("Under-constrained symbolic execution: assigned a new memory region @ %s to %s", mem_region, addr)
+
+
+__all__ = ("UnderconstrainedMixin",)

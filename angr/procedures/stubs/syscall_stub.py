@@ -23,3 +23,6 @@ class syscall(angr.SimProcedure):
         if "resolves" in self.kwargs:
             return "<Syscall stub ({})>".format(self.kwargs["resolves"])
         return "<Syscall stub>"
+
+
+__all__ = ("syscall",)

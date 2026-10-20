@@ -24,3 +24,6 @@ class strncat(angr.SimProcedure):
 class __strncat_chk(strncat):
     def run(self, dst, src, limit, _destlen):  # type:ignore[reportIncompatibleMethodOverride]
         return super().run(dst, src, limit)
+
+
+__all__ = ("strncat",)

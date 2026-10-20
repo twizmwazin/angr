@@ -70,3 +70,6 @@ class OrderedSet[T](collections.abc.MutableSet[T]):
 
     def __setstate__(self, state):
         self.__init__(state)
+
+
+__all__ = ("OrderedSet",)

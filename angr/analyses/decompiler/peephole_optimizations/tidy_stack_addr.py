@@ -143,3 +143,6 @@ class TidyStackAddr(PeepholeOptimizationExprBase):
             # e.g., sp-0x10 & 0xfffffff8
             return op0
         return None
+
+
+__all__ = ("TidyStackAddr",)

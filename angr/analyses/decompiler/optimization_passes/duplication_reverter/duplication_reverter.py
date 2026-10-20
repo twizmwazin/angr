@@ -1273,3 +1273,6 @@ class DuplicationReverter(StructuringOptimizationPass):
             node_level = set(next_level).difference(seen_nodes)
 
         return None
+
+
+__all__ = ("DuplicationReverter",)

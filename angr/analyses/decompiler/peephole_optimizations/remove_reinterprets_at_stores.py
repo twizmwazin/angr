@@ -28,3 +28,6 @@ class RemoveReinterpretsAtStores(PeepholeOptimizationStmtBase):
         ):
             return Store(stmt.idx, stmt.addr, data.operand, stmt.size, stmt.endness, guard=stmt.guard, **stmt.tags)
         return None
+
+
+__all__ = ("RemoveReinterpretsAtStores",)

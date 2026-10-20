@@ -168,3 +168,6 @@ class SimLightRegisters(SimStatePlugin):
 
         self.registers[name] = value
         return value
+
+
+__all__ = ("SimLightRegisters",)

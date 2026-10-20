@@ -370,3 +370,6 @@ class CongruencyCheck(Analysis):
 
 
 AnalysesHub.register_default("CongruencyCheck", CongruencyCheck)
+
+
+__all__ = ("CongruencyCheck",)

@@ -3451,3 +3451,10 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
 
 
 AnalysesHub.register_default("CFGEmulated", CFGEmulated)
+
+
+__all__ = (
+    "CFGEmulated",
+    "CFGJob",
+    "PendingJob",
+)

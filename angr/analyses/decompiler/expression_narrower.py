@@ -462,3 +462,10 @@ class ExpressionNarrower(AILBlockRewriter):
             return new_stmt
 
         return stmt
+
+
+__all__ = (
+    "EffectiveSizeExtractor",
+    "ExprNarrowingInfo",
+    "ExpressionNarrower",
+)

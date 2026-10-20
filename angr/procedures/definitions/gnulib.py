@@ -39,3 +39,6 @@ _gnulib_decls = {
     # pylint: disable=line-too-long
     "xalloc_die": SimTypeFunction([], SimTypeBottom(label="void")),
 }
+
+
+__all__ = ("gnulib",)

@@ -35,3 +35,6 @@ class DFS(ExplorationTechnique):
             simgr.stashes[stash].append(simgr.stashes[self.deferred_stash].pop())
 
         return simgr
+
+
+__all__ = ("DFS",)

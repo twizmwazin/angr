@@ -140,3 +140,6 @@ class PackingDetector(Analysis):
 
 
 AnalysesHub.register_default("PackingDetector", PackingDetector)
+
+
+__all__ = ("PackingDetector",)

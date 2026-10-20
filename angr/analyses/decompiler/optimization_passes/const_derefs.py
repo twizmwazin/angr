@@ -126,3 +126,9 @@ class ConstantDereferencesSimplifier(OptimizationPass):
 
     def _walk_block(self, block: Block) -> Block | None:
         return self._block_walker.walk(block)
+
+
+__all__ = (
+    "BlockWalker",
+    "ConstantDereferencesSimplifier",
+)

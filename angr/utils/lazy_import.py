@@ -12,3 +12,6 @@ def lazy_import(name):
     sys.modules[name] = module
     loader.exec_module(module)
     return module
+
+
+__all__ = ("lazy_import",)

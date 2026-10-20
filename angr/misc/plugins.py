@@ -287,3 +287,11 @@ class VendorPreset[P](PluginPreset[P]):
     """
     A specialized preset class for use with the PluginVendor.
     """
+
+
+__all__ = (
+    "PluginHub",
+    "PluginPreset",
+    "PluginVendor",
+    "VendorPreset",
+)

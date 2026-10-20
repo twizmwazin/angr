@@ -35,3 +35,6 @@ class PrivilegedPagingMixin(PagedMemoryMixin):
             raise SimSegfaultException(pageno * self.page_size, "unmapped")
 
         return super()._initialize_page(pageno, **kwargs)
+
+
+__all__ = ("PrivilegedPagingMixin",)

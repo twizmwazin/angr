@@ -235,3 +235,6 @@ class InsertExtractReverter(OptimizationPass):
             seen.add(expr.varid)
             expr = vvar_defs[expr.varid][2].src
         return expr
+
+
+__all__ = ("InsertExtractReverter",)

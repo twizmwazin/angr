@@ -164,3 +164,9 @@ class APIObfuscationType2Finder:
             self.project.kb.obfuscations.type2_deobfuscated_apis[result.resolved_func_ptr.addr] = (
                 result.resolved_func_name
             )
+
+
+__all__ = (
+    "APIObfuscationType2",
+    "APIObfuscationType2Finder",
+)

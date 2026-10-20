@@ -101,3 +101,11 @@ def func_edge_type_from_pb(pb):
         l.error("Unsupported protobuf jumpkind %s in func_edge_type_to_pb. Please report it on GitHub.", pb)
         return None
     return edge_type
+
+
+__all__ = (
+    "cfg_jumpkind_from_pb",
+    "cfg_jumpkind_to_pb",
+    "func_edge_type_from_pb",
+    "func_edge_type_to_pb",
+)

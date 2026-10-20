@@ -155,3 +155,6 @@ class SRDAMixin:
             if isinstance(def_.atom, atoms.VirtualVariable) and def_.atom.varid == vvar.varid:
                 return def_
         return None
+
+
+__all__ = ("SRDAMixin",)

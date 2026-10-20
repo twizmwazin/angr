@@ -92,3 +92,6 @@ class SimUCManager(SimStatePlugin):
 
 
 SimState.register_default("uc_manager", SimUCManager)
+
+
+__all__ = ("SimUCManager",)

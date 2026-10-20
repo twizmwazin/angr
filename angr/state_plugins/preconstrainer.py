@@ -190,3 +190,6 @@ class SimStatePreconstrainer(SimStatePlugin):
 
 
 SimState.register_default("preconstrainer", SimStatePreconstrainer)
+
+
+__all__ = ("SimStatePreconstrainer",)

@@ -217,3 +217,10 @@ class ConditionConstantPropagation(OptimizationPass):
                         stmt.false_target_idx,  # type: ignore
                     )
                     cconds.append(ccond)
+
+
+__all__ = (
+    "CCondPropBlockWalker",
+    "ConditionConstantPropagation",
+    "ConstantCondition",
+)

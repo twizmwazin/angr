@@ -520,3 +520,11 @@ class Director(ExplorationTechnique):
         """
 
         return goal.check_state(state)
+
+
+__all__ = (
+    "BaseGoal",
+    "CallFunctionGoal",
+    "Director",
+    "ExecuteAddressGoal",
+)

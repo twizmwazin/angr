@@ -287,3 +287,9 @@ class XRefsAnalysis(ForwardAnalysis, Analysis):  # pylint:disable=abstract-metho
 
 
 register_analysis(XRefsAnalysis, "XRefs")
+
+
+__all__ = (
+    "SimEngineXRefsVEX",
+    "XRefsAnalysis",
+)

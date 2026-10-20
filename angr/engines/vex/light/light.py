@@ -552,3 +552,6 @@ class VEXMixin(SimEngine):
 
     def _perform_vex_defaultexit(self, expr, jumpkind):
         pass
+
+
+__all__ = ("VEXMixin",)

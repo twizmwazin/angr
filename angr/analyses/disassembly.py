@@ -1345,3 +1345,32 @@ class Disassembly(Analysis):
 
 
 AnalysesHub.register_default("Disassembly", Disassembly)
+
+
+__all__ = (
+    "BlockStart",
+    "Comment",
+    "ConstantOperand",
+    "Disassembly",
+    "DisassemblyPiece",
+    "FuncComment",
+    "FunctionStart",
+    "Hook",
+    "IROp",
+    "IROpObjType",
+    "IRSBType",
+    "Instruction",
+    "Label",
+    "MemoryOperand",
+    "Opcode",
+    "Operand",
+    "OperandPiece",
+    "Register",
+    "RegisterOperand",
+    "SootExpression",
+    "SootExpressionInvoke",
+    "SootExpressionStaticFieldRef",
+    "SootExpressionTarget",
+    "SootStatement",
+    "Value",
+)

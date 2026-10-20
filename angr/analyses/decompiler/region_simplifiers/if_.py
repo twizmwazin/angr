@@ -132,3 +132,6 @@ class IfSimplifier(SequenceWalker):
             ):
                 # We can safely remove this statement
                 block.statements = block.statements[:-1]
+
+
+__all__ = ("IfSimplifier",)

@@ -1347,3 +1347,10 @@ class AILBlockRewriter(AILBlockWalker[Expression, Statement, Block]):
             expr.args = new_args
             return expr
         return expr
+
+
+__all__ = (
+    "AILBlockRewriter",
+    "AILBlockViewer",
+    "AILBlockWalker",
+)

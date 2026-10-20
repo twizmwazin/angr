@@ -1671,3 +1671,15 @@ class DDG(Analysis):
 
 
 AnalysesHub.register_default("DDG", DDG)
+
+
+__all__ = (
+    "AST",
+    "DDG",
+    "DDGJob",
+    "DDGView",
+    "DDGViewInstruction",
+    "DDGViewItem",
+    "LiveDefinitions",
+    "ProgramVariable",
+)

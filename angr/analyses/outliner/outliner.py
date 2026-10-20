@@ -568,3 +568,6 @@ class Outliner(Analysis):
 
 
 AnalysesHub.register_default("Outliner", Outliner)
+
+
+__all__ = ("Outliner",)

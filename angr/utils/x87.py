@@ -321,3 +321,11 @@ class X87StackModel:
                     entry[succ.addr] = None
                     worklist.append(succ)
         return ret_vals, incoming_depth
+
+
+__all__ = (
+    "MAX_FUNCTION_BLOCKS",
+    "MAX_INTERPROCEDURAL_DEPTH",
+    "X87StackModel",
+    "X87Tracker",
+)

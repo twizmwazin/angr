@@ -141,3 +141,6 @@ class VEXIRSBScanner(SimEngineLightVEX[None, None, None, None]):
             tmp_src = operand.tmp
             if tmp_src in self.tmps_with_64bit_regs:
                 self.tmps_converted_to_32bit.add(tmp_src)
+
+
+__all__ = ("VEXIRSBScanner",)

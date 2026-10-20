@@ -125,3 +125,13 @@ def function_summary(kb: KnowledgeBase, func_addr: int) -> dict[str, Any]:
         "flavors": sorted(kb.decompilations.available_flavors(func_addr)),
         "has_variables": kb.dec_variables.has_function_manager(func_addr),
     }
+
+
+__all__ = (
+    "function_summary",
+    "get_cache",
+    "invalidate",
+    "require_cache",
+    "restore_user_edits",
+    "snapshot_user_edits",
+)

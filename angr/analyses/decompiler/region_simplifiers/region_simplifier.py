@@ -284,3 +284,6 @@ class RegionSimplifier(Analysis):
 
 
 AnalysesHub.register_default("RegionSimplifier", RegionSimplifier)
+
+
+__all__ = ("RegionSimplifier",)

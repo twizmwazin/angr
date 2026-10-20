@@ -87,3 +87,6 @@ class X86GccGetPcSimplifier(OptimizationPass):
                         (key, len(block.statements) - 1, call_func.info["get_pc"], block.addr + block.original_size),
                     )
         return results
+
+
+__all__ = ("X86GccGetPcSimplifier",)

@@ -10,3 +10,6 @@ class getsockopt(angr.SimProcedure):
         # TODO: ...
 
         return 0
+
+
+__all__ = ("getsockopt",)

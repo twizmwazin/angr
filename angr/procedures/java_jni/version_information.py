@@ -11,3 +11,6 @@ class GetVersion(JNISimProcedure):
     def run(self, ptr_env):
         # return JNI version 1.8
         return 0x00010008
+
+
+__all__ = ("GetVersion",)

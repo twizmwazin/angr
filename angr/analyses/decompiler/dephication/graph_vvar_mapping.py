@@ -446,3 +446,6 @@ class GraphDephicationVVarMapping(Analysis):  # pylint:disable=abstract-method
 
 
 register_analysis(GraphDephicationVVarMapping, "GraphDephicationVVarMapping")
+
+
+__all__ = ("GraphDephicationVVarMapping",)

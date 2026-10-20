@@ -128,3 +128,6 @@ class RemoveRedundantReinterprets(PeepholeOptimizationExprBase):
         else:
             raise NotImplementedError
         return int_fmt, float_fmt
+
+
+__all__ = ("RemoveRedundantReinterprets",)

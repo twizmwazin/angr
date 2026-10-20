@@ -146,3 +146,15 @@ def dumps(pattern: KnownPattern | dsl.PatternNode, **json_kwargs) -> str:
 def loads(text: str) -> KnownPattern | dsl.PatternNode:
     data = json.loads(text)
     return node_from_dict(data) if "kind" in data else known_pattern_from_dict(data)
+
+
+__all__ = (
+    "NODE_CLASSES",
+    "NotSerializableError",
+    "dumps",
+    "known_pattern_from_dict",
+    "known_pattern_to_dict",
+    "loads",
+    "node_from_dict",
+    "node_to_dict",
+)

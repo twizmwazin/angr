@@ -86,3 +86,6 @@ class GoTypes(KnowledgeBasePlugin):
 
 
 KnowledgeBasePlugin.register_default("go_types", GoTypes)
+
+
+__all__ = ("GoTypes",)

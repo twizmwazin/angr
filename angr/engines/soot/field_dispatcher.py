@@ -44,3 +44,6 @@ def _class_contains_field(field_class, field_name, field_type):
     field = field_class.fields[field_name]
     # check type
     return field[1] == field_type
+
+
+__all__ = ("resolve_field",)

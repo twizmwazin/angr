@@ -52,3 +52,6 @@ class chroot(angr.SimProcedure):
 
         self.state.fs.chroot(path)
         return 0
+
+
+__all__ = ("chroot",)

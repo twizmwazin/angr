@@ -84,3 +84,9 @@ class UnknownSize:
 
 
 UNKNOWN_SIZE = UnknownSize()
+
+
+__all__ = (
+    "UNKNOWN_SIZE",
+    "UnknownSize",
+)

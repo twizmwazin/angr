@@ -46,3 +46,6 @@ class select(angr.SimProcedure):
             self.state.memory.store(readfds + offset * arch_bytes, long_array[offset], endness=self.arch.memory_endness)
 
         return claripy.BVV(0, 1).concat(claripy.BVS("select_ret", 31))
+
+
+__all__ = ("select",)

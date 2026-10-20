@@ -86,3 +86,6 @@ class HeavyResilienceMixin(VEXResilienceMixin, ClaripyDataMixin):
             "resilience", resilience_type="irstmt", stmt=type(stmt).__name__, message="errored IRStmt"
         )
         return None
+
+
+__all__ = ("HeavyResilienceMixin",)

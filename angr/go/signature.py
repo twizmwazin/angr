@@ -196,3 +196,13 @@ class GoSignatureSet:
             for name, ty in self.types.items()
         }
         return GoSignatureSet(self.go_version, goarch, self.functions, types, self.variables, self.runtime_types)
+
+
+__all__ = (
+    "GoFuncSignature",
+    "GoNamedType",
+    "GoParam",
+    "GoSignatureSet",
+    "GoStructField",
+    "GoVariable",
+)

@@ -46,3 +46,9 @@ class IteratorNext(JavaSimProcedure):
         this_ref.store_field(self.state, INDEX, "int", new_iterator_index)
 
         return self.state.javavm_memory.load_array_element(array_ref, iterator_index)
+
+
+__all__ = (
+    "IteratorHasNext",
+    "IteratorNext",
+)

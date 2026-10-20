@@ -253,3 +253,6 @@ class X87FpremLoopSimplifier(OptimizationPass):
         assert self.out_graph is not None
         if self.out_graph.has_edge(new_block, new_block):
             self.out_graph.remove_edge(new_block, new_block)
+
+
+__all__ = ("X87FpremLoopSimplifier",)

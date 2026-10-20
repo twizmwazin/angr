@@ -825,3 +825,14 @@ class StructuringOptimizationPass(OptimizationPass):
                             return False
 
         return True
+
+
+__all__ = (
+    "BaseOptimizationPass",
+    "BlockCache",
+    "MultipleBlocksException",
+    "OptimizationPass",
+    "OptimizationPassStage",
+    "SequenceOptimizationPass",
+    "StructuringOptimizationPass",
+)

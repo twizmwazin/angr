@@ -170,3 +170,6 @@ class ReachingDefinitionsModel:
             else ("exit", (node_addr, src_node_idx, stmt_idx), ObservationPointType.OP_AFTER)
         )
         return self.observed_results.get(key, None)
+
+
+__all__ = ("ReachingDefinitionsModel",)

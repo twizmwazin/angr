@@ -870,3 +870,27 @@ _GO_SIMTYPE_CLASSES = [
 ]
 for _cls in _GO_SIMTYPE_CLASSES:
     IDENT_TO_CLS[_cls._ident] = _cls
+
+
+__all__ = (
+    "PREDECLARED",
+    "WORD_SIZED_NAMES",
+    "GoSimStruct",
+    "GoSimType",
+    "GoSimTypeArray",
+    "GoSimTypeBool",
+    "GoSimTypeChan",
+    "GoSimTypeFloat",
+    "GoSimTypeFunc",
+    "GoSimTypeFunction",
+    "GoSimTypeInt",
+    "GoSimTypeInterface",
+    "GoSimTypeMap",
+    "GoSimTypePointer",
+    "GoSimTypeSlice",
+    "GoSimTypeString",
+    "GoSimTypeTuple",
+    "GoSimTypeUnsafePointer",
+    "go_int",
+    "go_type_repr",
+)

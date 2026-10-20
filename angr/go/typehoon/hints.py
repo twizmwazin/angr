@@ -111,3 +111,10 @@ def collect_closure_context_hints(project, function, graph, type_lifter) -> dict
     if isinstance(lifted, (BottomType, TopType)):
         return {}
     return {varid: lifted for varid in vvars}
+
+
+__all__ = (
+    "closure_context_vvars",
+    "collect_call_result_hints",
+    "collect_closure_context_hints",
+)

@@ -44,3 +44,6 @@ class X86PeIatResolver(IndirectJumpResolver):
         dest = self.project.hooked_by(target)
         l.debug("Resolved target to %s", dest.display_name)
         return True, [target]
+
+
+__all__ = ("X86PeIatResolver",)

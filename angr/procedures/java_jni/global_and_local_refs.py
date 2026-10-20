@@ -56,3 +56,11 @@ class DeleteLocalRef(JNISimProcedure):
 
     def run(self, ptr_env, obj_):
         self.state.jni_references.delete_reference(obj_)
+
+
+__all__ = (
+    "DeleteGlobalRef",
+    "DeleteLocalRef",
+    "NewGlobalRef",
+    "NewLocalRef",
+)

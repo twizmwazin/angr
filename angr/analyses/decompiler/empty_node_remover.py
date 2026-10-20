@@ -215,3 +215,6 @@ class EmptyNodeRemover:
         if not block.statements:
             return None
         return block
+
+
+__all__ = ("EmptyNodeRemover",)

@@ -83,3 +83,10 @@ def block_is_single_instruction(ins_addrs: InsAddrSeq, block_addr: int, block_si
     if getattr(arch, "vex_arch", None) is not None and max_inst_bytes:
         return block_addr + block_size - ins_addrs[0] <= max_inst_bytes
     return True
+
+
+__all__ = (
+    "block_branch_ins_addr",
+    "block_is_single_instruction",
+    "get_tmp_def_stmt",
+)

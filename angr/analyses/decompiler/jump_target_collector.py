@@ -35,3 +35,6 @@ class JumpTargetCollector:
                     self.jump_targets.add((stmt.true_target.value, stmt.true_target_idx))
                 if isinstance(stmt.false_target, ailment.Expr.Const):
                     self.jump_targets.add((stmt.false_target.value, stmt.false_target_idx))
+
+
+__all__ = ("JumpTargetCollector",)

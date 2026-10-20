@@ -288,3 +288,9 @@ class InitializationFinder(ForwardAnalysis, Analysis):  # pylint:disable=abstrac
 
 register_analysis(InitializationFinder, "InitializationFinder")
 register_analysis(InitializationFinder, "InitFinder")
+
+
+__all__ = (
+    "InitializationFinder",
+    "SimEngineInitFinderVEX",
+)

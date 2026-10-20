@@ -28,3 +28,6 @@ class uname(angr.SimProcedure):
     def _store(self, uname_buf, val, off):
         self.state.memory.store(uname_buf + off, val + (b"\0" * (65 - len(val))))
         return 65
+
+
+__all__ = ("uname",)

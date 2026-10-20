@@ -85,3 +85,6 @@ class ComboRegisterRewriter(OptimizationPass, SRDAMixin):
             rewriter.walk(block)
 
         self.out_graph = self._graph
+
+
+__all__ = ("ComboRegisterRewriter",)

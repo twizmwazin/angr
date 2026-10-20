@@ -18,3 +18,6 @@ class FlirtFunction:
         self.offset = offset
         self.local = local
         self.collision = collision
+
+
+__all__ = ("FlirtFunction",)

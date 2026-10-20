@@ -213,3 +213,20 @@ STD_VECTOR_CAPACITY_TEMPLATES = [
     _make_vector_div_template("capacity", vector_cap_offset, elt_name, elt_size)
     for elt_name, elt_size in _NAMED_ELEMENTS
 ] + [_make_vector_div_template("capacity", vector_cap_offset, f"T{n}", n) for n in STD_VECTOR_OPAQUE_SIZES]
+
+
+__all__ = (
+    "STD_VECTOR_CAPACITY_TEMPLATES",
+    "STD_VECTOR_EXACTDIV_SIZES",
+    "STD_VECTOR_INT",
+    "STD_VECTOR_INT_SIZE",
+    "STD_VECTOR_LONG_LONG_SIZE",
+    "STD_VECTOR_OPAQUE_SIZES",
+    "STD_VECTOR_SHORT_SIZE",
+    "STD_VECTOR_STACK_TEMPLATES",
+    "STD_VECTOR_STRUCT_SIZE_TEMPLATES",
+    "STD_VECTOR_UNIQUE_NAME_TMPL",
+    "exact_div_magic",
+    "make_std_vector_size_exactdiv_template",
+    "make_std_vector_size_template",
+)

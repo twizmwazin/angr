@@ -34,3 +34,11 @@ class GetIterator(JavaSimProcedure):
         iterator_ref.store_field(self.state, INDEX, "int", claripy.BVV(0, 32))
 
         return iterator_ref
+
+
+__all__ = (
+    "ELEMS",
+    "INDEX",
+    "SIZE",
+    "GetIterator",
+)

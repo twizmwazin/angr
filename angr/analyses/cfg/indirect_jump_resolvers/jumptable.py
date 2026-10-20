@@ -2915,3 +2915,30 @@ class JumpTableResolver(IndirectJumpResolver):
         if load_stmt_ids:
             return [load_stmt_ids[-1]]
         return []
+
+
+__all__ = (
+    "EXPECTED_COND_TYPES",
+    "AddressOperand",
+    "AddressSingleton",
+    "AddressTransformation",
+    "AddressTransformationTypes",
+    "BSSHook",
+    "JumpTableProcessor",
+    "JumpTableProcessorState",
+    "JumpTableResolver",
+    "JumpTargetBaseAddr",
+    "LoadHook",
+    "MIPSGPHook",
+    "NotAJumpTableNotification",
+    "PutHook",
+    "RegOffsetAnnotation",
+    "RegisterInitializerHook",
+    "ShrBoundsConstraintHook",
+    "StoreHook",
+    "Tmp",
+    "UninitReadMeta",
+    "binop_handler",
+    "has_niche_decoded_index",
+    "pcode",
+)

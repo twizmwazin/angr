@@ -51,3 +51,6 @@ class SimEngineSyscall(SuccessorsEngine, ProcedureMixin):
             sys_procedure = angr.SIM_PROCEDURES["stubs"]["syscall"](cc=cc)
 
         return self.process_procedure(state, successors, sys_procedure, **kwargs)
+
+
+__all__ = ("SimEngineSyscall",)

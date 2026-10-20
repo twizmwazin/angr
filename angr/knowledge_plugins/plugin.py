@@ -29,3 +29,9 @@ class KnowledgeBasePlugin:
         if name in default_plugins:
             raise Exception(f"{default_plugins[name]} is already set as the default for {name}")
         default_plugins[name] = cls
+
+
+__all__ = (
+    "KnowledgeBasePlugin",
+    "default_plugins",
+)

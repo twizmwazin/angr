@@ -73,3 +73,9 @@ class CFG(CFGFast):  # pylint: disable=abstract-method
 
 
 AnalysesHub.register_default("CFG", CFG)
+
+
+__all__ = (
+    "CFG",
+    "OutdatedError",
+)

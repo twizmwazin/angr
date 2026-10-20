@@ -659,3 +659,13 @@ class FunctionHandler:
     @staticmethod
     def stack_pointer_as_atom(state) -> Register:
         return Register(state.arch.sp_offset, state.arch.bytes)
+
+
+__all__ = (
+    "FunctionCallData",
+    "FunctionCallDataUnwrapped",
+    "FunctionCallRelationships",
+    "FunctionEffect",
+    "FunctionHandler",
+    "get_exit_livedefinitions",
+)

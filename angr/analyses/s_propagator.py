@@ -836,3 +836,11 @@ class SPropagatorAnalysis(Analysis, SPropagator):
 
 
 register_analysis(SPropagatorAnalysis, "SPropagator")
+
+
+__all__ = (
+    "SPropagator",
+    "SPropagatorAnalysis",
+    "SPropagatorModel",
+    "sprop_cache_scope",
+)

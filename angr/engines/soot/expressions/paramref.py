@@ -7,3 +7,6 @@ class SimSootExpr_ParamRef(SimSootExpr):
     def _execute(self):
         paramref = self._translate_value(self.expr)
         self.expr = self.state.memory.load(paramref, none_if_missing=True)
+
+
+__all__ = ("SimSootExpr_ParamRef",)

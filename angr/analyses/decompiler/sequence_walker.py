@@ -326,3 +326,6 @@ class SequenceWalker:
 
     def _handle_Noop(self, *args, **kwargs):  # pylint:disable=no-self-use
         return None
+
+
+__all__ = ("SequenceWalker",)

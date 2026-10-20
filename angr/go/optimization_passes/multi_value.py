@@ -343,3 +343,10 @@ class GoCallResultBinder(OptimizationPass):
         return SideEffectStatement(
             stmt.idx, stmt.expr, ComboRegister(self.manager.next_atom(), regs), stmt.fp_ret_expr, **stmt.tags
         )
+
+
+__all__ = (
+    "GoCallResultBinder",
+    "GoComboRegisterRewriter",
+    "GoRetExprRewriter",
+)

@@ -1466,3 +1466,10 @@ class SimEngineVRBase[VRStateType: VariableRecoveryStateBase, BlockType: BlockPr
             return True
         sec = self.project.loader.find_section_containing(offset)
         return sec is not None
+
+
+__all__ = (
+    "RichR",
+    "RichRT_co",
+    "SimEngineVRBase",
+)

@@ -13,3 +13,6 @@ class err(angr.SimProcedure):  # pylint:disable=redefined-builtin
         fprintf = angr.SIM_PROCEDURES["libc"]["fprintf"]
         self.inline_call(fprintf, fd, fmt)  # FIXME: This will not properly replace format strings
         self.exit(eval)
+
+
+__all__ = ("err",)

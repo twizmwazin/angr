@@ -8,3 +8,6 @@ class abort(angr.SimProcedure):
 
     def run(self):
         self.exit(1)
+
+
+__all__ = ("abort",)

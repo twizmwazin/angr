@@ -12,3 +12,6 @@ class recvfrom(angr.SimProcedure):
             return -1
 
         return simfd.read(dst, length)
+
+
+__all__ = ("recvfrom",)

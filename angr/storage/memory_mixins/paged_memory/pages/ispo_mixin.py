@@ -59,3 +59,9 @@ class ISPOMixin(MemoryMixin):
             raise Exception("memory kwarg must be passed to this stateless object") from ex
         else:
             return func(*args, **kwargs)
+
+
+__all__ = (
+    "ISPOMixin",
+    "MissingMemoryError",
+)

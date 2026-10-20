@@ -14,3 +14,6 @@ class XRefType:
             XRefType.Write: "write",
         }
         return s.get(ty, "unknown")
+
+
+__all__ = ("XRefType",)

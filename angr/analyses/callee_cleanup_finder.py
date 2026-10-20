@@ -71,3 +71,6 @@ class CalleeCleanupFinder(Analysis):
 
 
 AnalysesHub.register_default("CalleeCleanupFinder", CalleeCleanupFinder)
+
+
+__all__ = ("CalleeCleanupFinder",)

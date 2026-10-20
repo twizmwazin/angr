@@ -1390,3 +1390,9 @@ class ConditionProcessor:
 
     def create_jump_target_var(self, jumptable_head_addr: int):
         return claripy.BVS(f"jump_table_{jumptable_head_addr:x}", self.arch.bits, explicit_name=True)
+
+
+__all__ = (
+    "AILExprIdAnnotation",
+    "ConditionProcessor",
+)

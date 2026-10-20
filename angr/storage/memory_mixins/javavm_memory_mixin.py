@@ -383,3 +383,6 @@ class JavaVmMemoryMixin(MemoryMixin):
     # pylint: disable=no-self-use,unused-argument
     def _find(self, addr, what, max_search=None, max_symbolic_bytes=None, default=None):
         l.warning("Find is not implemented for JavaVM memory!")
+
+
+__all__ = ("JavaVmMemoryMixin",)

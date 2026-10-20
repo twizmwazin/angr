@@ -66,3 +66,6 @@ class CommentsSerializer:
                 comments.kinds[db_comment.addr] = CommentKind(db_comment.type - 1)
 
         return comments
+
+
+__all__ = ("CommentsSerializer",)

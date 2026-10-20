@@ -74,3 +74,13 @@ def is_lsb_overwrite(expr: ailment.expression.Expression) -> bool:
     if expr.endness == archinfo.Endness.LE:
         return expr.offset.value == 0
     return expr.offset.value * 8 + expr.value.bits == expr.bits
+
+
+__all__ = (
+    "GetBitsTypeParams",
+    "get_bits",
+    "is_lsb_extract",
+    "is_lsb_overwrite",
+    "is_none_or_likeable",
+    "is_none_or_matchable",
+)

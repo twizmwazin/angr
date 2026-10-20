@@ -46,3 +46,6 @@ class strchr(angr.SimProcedure):
         # self.state.add_constraints(claripy.ULT(a - s_addr, s_strlen.ret_expr))
         # self.max_chr_index = max(i)
         # return a
+
+
+__all__ = ("strchr",)

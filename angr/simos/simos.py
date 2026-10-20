@@ -443,3 +443,9 @@ class GlobalDescriptorTable:
         self.ss = ss_sel
         self.fs = fs_sel
         self.gs = gs_sel
+
+
+__all__ = (
+    "GlobalDescriptorTable",
+    "SimOS",
+)

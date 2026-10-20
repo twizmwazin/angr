@@ -42,3 +42,6 @@ class GoPinnedRegisterNamer(OptimizationPass):
                     v.name = "g"
                     v.renamed = True  # keep semantic naming from replacing it
             var_manager.set_variable_type(var, g_type)
+
+
+__all__ = ("GoPinnedRegisterNamer",)

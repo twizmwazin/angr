@@ -20,3 +20,6 @@ class SimConcretizationStrategyNonzeroRange(SimConcretizationStrategy):
                 child_constraints += tuple(extra_constraints)
             return self._eval(memory, addr, self._limit, extra_constraints=child_constraints, **kwargs)
         return None
+
+
+__all__ = ("SimConcretizationStrategyNonzeroRange",)

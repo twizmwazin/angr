@@ -17,3 +17,6 @@ class puts(angr.SimProcedure):
         out = stdout.write(string, length)
         stdout.write_data(claripy.BVV(b"\n"))
         return (out + 1)[31:0]
+
+
+__all__ = ("puts",)

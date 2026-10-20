@@ -259,3 +259,11 @@ class Ssailification(Analysis):  # pylint:disable=abstract-method
 
 
 register_analysis(Ssailification, "Ssailification")
+
+
+__all__ = (
+    "Def",
+    "Kind",
+    "Ssailification",
+    "UDef",
+)

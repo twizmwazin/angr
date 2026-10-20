@@ -61,3 +61,6 @@ class strtok_r(angr.SimProcedure):
 
         l.debug("... done")
         return new_start
+
+
+__all__ = ("strtok_r",)

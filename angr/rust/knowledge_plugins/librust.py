@@ -14,3 +14,6 @@ class Librust(KnowledgeBasePlugin, SimLibrary):
 
 
 KnowledgeBasePlugin.register_default("librust", Librust)
+
+
+__all__ = ("Librust",)

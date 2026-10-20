@@ -82,3 +82,9 @@ def calculate_iterated_dominace_frontier_set(frontiers: dict, blocks: set) -> se
         last_frontier = frontier
         blocks |= frontier
     return last_frontier
+
+
+__all__ = (
+    "DominanceFrontier",
+    "calculate_iterated_dominace_frontier_set",
+)

@@ -1674,3 +1674,15 @@ class FunctionManager[K: (int, SootMethodDescriptor)](KnowledgeBasePlugin, colle
 
 
 KnowledgeBasePlugin.register_default("functions", FunctionManager)
+
+
+__all__ = (
+    "ADDR_PATTERN",
+    "QUERY_PATTERN",
+    "USE_SPILLING_FUNCTION_DICT",
+    "FunctionDict",
+    "FunctionDictBase",
+    "FunctionManager",
+    "K",
+    "SpillingFunctionDict",
+)

@@ -141,3 +141,9 @@ class SizeConcretizationMixin(MemoryMixin):
             if conc_size == 0:
                 continue
             super().store(addr, data, size=conc_size, condition=condition & (size == conc_size), **kwargs)
+
+
+__all__ = (
+    "SizeConcretizationMixin",
+    "SizeNormalizationMixin",
+)

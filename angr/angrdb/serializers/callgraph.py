@@ -68,3 +68,6 @@ class CallGraphSerializer:
         for src, dst, key, data in d["edges"]:
             callgraph.add_edge(src, dst, key=key, **data)
         return callgraph
+
+
+__all__ = ("CallGraphSerializer",)

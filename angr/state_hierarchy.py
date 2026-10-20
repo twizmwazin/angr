@@ -262,3 +262,6 @@ class StateHierarchy:
 
             # didn't find any?
             return set(), None, states
+
+
+__all__ = ("StateHierarchy",)

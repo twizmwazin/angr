@@ -180,3 +180,9 @@ class GoWideZeroStoreSplitter(OptimizationPass):
             if isinstance(k, Const) and k.is_int:
                 return addr.operands[0].offset + k.value_int
         return None
+
+
+__all__ = (
+    "GoPinnedRegisterRewriter",
+    "GoWideZeroStoreSplitter",
+)

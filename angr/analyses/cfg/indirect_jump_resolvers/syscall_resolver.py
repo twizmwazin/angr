@@ -94,3 +94,6 @@ class SyscallResolver(IndirectJumpResolver):
             if state.history.jumpkind and state.history.jumpkind.startswith("Ijk_Sys"):
                 return state
         return None
+
+
+__all__ = ("SyscallResolver",)

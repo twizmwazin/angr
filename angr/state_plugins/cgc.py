@@ -151,3 +151,6 @@ class SimStateCGC(SimStatePlugin):
 
 
 SimState.register_default("cgc", SimStateCGC)
+
+
+__all__ = ("SimStateCGC",)

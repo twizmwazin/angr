@@ -268,3 +268,13 @@ def handle_scanf(
             _l.warning("Unimplemented scanf format string %s", fmt)
             continue
         data.depends(buf_atom, source_atoms, value=buf_data)
+
+
+__all__ = (
+    "LibcStdioHandlers",
+    "StdinAtom",
+    "StdoutAtom",
+    "handle_printf",
+    "handle_scanf",
+    "parse_format_string",
+)

@@ -85,3 +85,6 @@ class RustSymbolRecovery(Analysis):
 
 
 AnalysesHub.register_default("RustSymbolRecovery", RustSymbolRecovery)
+
+
+__all__ = ("RustSymbolRecovery",)

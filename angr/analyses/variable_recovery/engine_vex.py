@@ -622,3 +622,9 @@ class SimEngineVRVEX(
     def _handle_ExpCmpNE64(self, expr):
         _, _ = self._expr(expr.args[0]), self._expr(expr.args[1])
         return RichR(self.state.top(expr.result_size(self.tyenv)))
+
+
+__all__ = (
+    "SimEngineVRVEX",
+    "binop_handler",
+)

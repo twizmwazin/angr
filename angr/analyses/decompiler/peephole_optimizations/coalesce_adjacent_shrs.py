@@ -51,3 +51,6 @@ class CoalesceAdjacentShiftRights(PeepholeOptimizationExprBase):
                 return r
 
         return None
+
+
+__all__ = ("CoalesceAdjacentShiftRights",)

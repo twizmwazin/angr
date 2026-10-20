@@ -8,3 +8,6 @@ class manyargs(angr.SimProcedure):
 
     def run(self):
         pass
+
+
+__all__ = ("manyargs",)

@@ -70,3 +70,6 @@ class VecOutliner(OptimizationPass):
             walker.walk(block)
 
         self.out_graph = self._graph
+
+
+__all__ = ("VecOutliner",)

@@ -18,3 +18,6 @@ class SimSootStmt_If(SimSootStmt):
             target=None,  # if target is None, engine goes on linearly
             condition=(jmp_condition == claripy.false()),
         )
+
+
+__all__ = ("SimSootStmt_If",)

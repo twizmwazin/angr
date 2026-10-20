@@ -77,3 +77,6 @@ class StackAllocationMixin(PagedMemoryMixin):
             return super()._initialize_page(pageno, **kwargs)
 
         return self.allocate_stack_pages((pageno + 1) * self.page_size - 1, self.page_size)[0]
+
+
+__all__ = ("StackAllocationMixin",)

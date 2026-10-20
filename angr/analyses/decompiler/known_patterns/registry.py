@@ -133,3 +133,16 @@ def partition_templates(
         elif t.gate is not None and t.gate.requires_evidence:
             deferred.append(t)
     return enabled, deferred
+
+
+__all__ = (
+    "ALL_KNOWN_PATTERN_TEMPLATES",
+    "ALL_PATTERNS",
+    "TEMPLATE_BY_CALL_NAME",
+    "TEMPLATE_BY_NAME",
+    "UnknownPatternError",
+    "partition_templates",
+    "patterns_for",
+    "register_pattern_template",
+    "resolve_pattern_selection",
+)

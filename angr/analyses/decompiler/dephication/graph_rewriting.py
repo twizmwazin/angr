@@ -123,3 +123,6 @@ class GraphRewritingAnalysis(ForwardAnalysis[None, NodeType, object, object, obj
 
     def _post_analysis(self):
         pass
+
+
+__all__ = ("GraphRewritingAnalysis",)

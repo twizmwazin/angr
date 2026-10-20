@@ -50,3 +50,6 @@ class RefcountMixin(MemoryMixin):
         """
         with self.lock:
             self.refcount -= 1
+
+
+__all__ = ("RefcountMixin",)

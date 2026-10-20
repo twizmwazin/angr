@@ -325,3 +325,6 @@ class StackCanarySimplifier(OptimizationPass):
             ):
                 return stmt.src
         return None
+
+
+__all__ = ("StackCanarySimplifier",)

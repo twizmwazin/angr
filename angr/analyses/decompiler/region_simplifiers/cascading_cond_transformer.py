@@ -97,3 +97,6 @@ class CascadingConditionTransformer(SequenceWalker):
             raise AngrRuntimeError("Impossible happened")
 
         return CascadingConditionNode(cond_node.addr, cond_and_nodes, else_node=else_node)
+
+
+__all__ = ("CascadingConditionTransformer",)

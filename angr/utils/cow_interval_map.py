@@ -263,3 +263,9 @@ class IntervalMapCOW[V]:
 
     def __repr__(self) -> str:
         return "<IntervalMapCOW " + ", ".join(f"[{s}, {e}): {v!r}" for s, e, v in self.segments()) + ">"
+
+
+__all__ = (
+    "IntervalMapCOW",
+    "Segment",
+)

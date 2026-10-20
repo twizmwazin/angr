@@ -275,3 +275,17 @@ def get_session_manager() -> SessionManager:
     if _session_manager is None:
         _session_manager = SessionManager()
     return _session_manager
+
+
+__all__ = (
+    "AVAILABLE_FLAVORS",
+    "SUPPORTED_BACKENDS",
+    "ProjectSession",
+    "SessionManager",
+    "build_main_opts",
+    "get_session_manager",
+    "parse_address_option",
+    "parse_arch_option",
+    "parse_flavor",
+    "reject_dos_executable",
+)

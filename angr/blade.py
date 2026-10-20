@@ -438,3 +438,9 @@ class Blade:
                     self._backward_slice_recursive(
                         level - 1, pred, regs, stack_offsets, prev, data.get("stmt_idx", None)
                     )
+
+
+__all__ = (
+    "BadJumpkindNotification",
+    "Blade",
+)

@@ -247,3 +247,9 @@ class RegionLoopCounterNaming(RegionNamingBase):
                 new_name,
                 self._loop_info[loop_node]["nesting_depth"],
             )
+
+
+__all__ = (
+    "LOOP_COUNTER_NAMES",
+    "RegionLoopCounterNaming",
+)

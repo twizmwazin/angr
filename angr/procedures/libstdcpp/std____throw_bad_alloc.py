@@ -12,3 +12,6 @@ class std____throw_bad_cast(angr.SimProcedure):  # pylint:disable=redefined-buil
     def run(self):
         # FIXME: we need the concept of C++ exceptions to implement this right
         self.exit(1)
+
+
+__all__ = ("std____throw_bad_cast",)

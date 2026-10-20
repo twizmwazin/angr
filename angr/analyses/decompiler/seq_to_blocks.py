@@ -19,3 +19,6 @@ class SequenceToBlocks(SequenceWalker):
 
     def _handle_Block(self, node: Block, **kwargs):  # pylint:disable=unused-argument
         self.blocks.append(node)
+
+
+__all__ = ("SequenceToBlocks",)

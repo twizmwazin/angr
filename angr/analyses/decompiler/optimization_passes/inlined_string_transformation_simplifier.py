@@ -882,3 +882,13 @@ class InlinedStringTransformationSimplifier(OptimizationPass):
             else:
                 live_out_values.append((vvar, value.concrete_value, False))
         return live_out_values
+
+
+__all__ = (
+    "FasterMemory",
+    "InlineStringTransformationDescriptor",
+    "InlinedStringTransformationAILEngine",
+    "InlinedStringTransformationSimplifier",
+    "InlinedStringTransformationState",
+    "StackAccess",
+)

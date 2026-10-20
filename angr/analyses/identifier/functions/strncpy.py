@@ -58,3 +58,6 @@ class strncpy(Func):
         if not runner.test(func, test):
             self.forced_null = True
         return True
+
+
+__all__ = ("strncpy",)

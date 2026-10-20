@@ -115,3 +115,6 @@ class CrossJumpReverter(StructuringOptimizationPass):
                 self.out_graph.remove_node(goto_target)
 
         return updates
+
+
+__all__ = ("CrossJumpReverter",)

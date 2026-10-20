@@ -271,3 +271,13 @@ def materialize(
             if (succ.addr, succ.idx) not in member:
                 frontier.add((succ.addr, succ.idx))
     return src_loc, frontier
+
+
+__all__ = (
+    "Address",
+    "Region",
+    "fallback_idx_alloc",
+    "largest_single_entry_subrun",
+    "materialize",
+    "snap",
+)

@@ -74,3 +74,9 @@ class allocate(angr.SimProcedure):
         l.debug("Allocating [%#x, %#x]", chosen_conc, chosen_conc + aligned_length - 1)
         self.state.memory.map_region(chosen_conc, aligned_length, permissions)
         return r
+
+
+__all__ = (
+    "allocate",
+    "cgc_flag_page_start_addr",
+)

@@ -48,3 +48,6 @@ class RewritingState:
         if self.out_block is None:
             self.out_block = Block(self.loc.block_addr, self.original_block.original_size, idx=self.loc.block_idx)
         self.out_block.statements.append(stmt)
+
+
+__all__ = ("RewritingState",)

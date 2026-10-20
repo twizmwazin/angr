@@ -215,3 +215,17 @@ def make_ntstatus_severity_template(macro: str, severity: int):
 ALL_NTSTATUS_TEMPLATES = [make_ntstatus_severity_template(m, sev) for m, sev in NTSTATUS_SEVERITIES]
 
 ALL_WDK_TEMPLATES = [make_shared_user_data_template(f) for f in KUSER_SHARED_DATA_FIELDS] + ALL_NTSTATUS_TEMPLATES
+
+
+__all__ = (
+    "ALL_NTSTATUS_TEMPLATES",
+    "ALL_WDK_TEMPLATES",
+    "KI_USER_SHARED_DATA",
+    "KUSER_SHARED_DATA_FIELDS",
+    "NTSTATUS_SEVERITIES",
+    "NTSTATUS_SEVERITY_MASK",
+    "USER_SHARED_DATA_VA",
+    "KsudField",
+    "make_ntstatus_severity_template",
+    "make_shared_user_data_template",
+)

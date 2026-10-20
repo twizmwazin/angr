@@ -17,3 +17,9 @@ class rt_sigaction(angr.SimProcedure):
         if self.state.solver.is_true(signum == 33):
             return self.state.libc.ret_errno("EINVAL")
         return claripy.BVV(0, self.arch.sizeof["long"])
+
+
+__all__ = (
+    "rt_sigaction",
+    "sigaction",
+)

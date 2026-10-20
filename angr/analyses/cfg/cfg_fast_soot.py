@@ -670,3 +670,9 @@ class CFGFastSoot(CFGFast):
 
 
 register_analysis(CFGFastSoot, "CFGFastSoot")
+
+
+__all__ = (
+    "PYSOOT_INSTALLED",
+    "CFGFastSoot",
+)

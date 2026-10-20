@@ -58,3 +58,6 @@ class JobInfo[JobType, JobKey]:
         elif widened:
             job_type = "widened"
         self.jobs.append((job, job_type))
+
+
+__all__ = ("JobInfo",)

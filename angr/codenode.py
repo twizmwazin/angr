@@ -294,3 +294,14 @@ class SyscallNode[K: (int, SootMethodDescriptor)](HookNode[K]):
 
     def __repr__(self):
         return f"<SyscallNode {self.sim_procedure!r} at {self.addr:#x} (size {self.size})>"
+
+
+__all__ = (
+    "BlockNode",
+    "CodeNode",
+    "FuncNode",
+    "HookNode",
+    "SootBlockNode",
+    "SyscallNode",
+    "repr_addr",
+)

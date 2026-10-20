@@ -498,3 +498,6 @@ class CCallRewriterBase:
         zero = ailment.Expr.Const(self.ail_manager.next_atom(), 0, flags.bits)
         r = ailment.Expr.BinaryOp(ccall.idx, "CmpNE" if flag_set else "CmpEQ", (masked, zero), False, **ccall.tags)
         return ailment.Expr.Convert(self.ail_manager.next_atom(), r.bits, ccall.bits, False, r, **ccall.tags)
+
+
+__all__ = ("CCallRewriterBase",)

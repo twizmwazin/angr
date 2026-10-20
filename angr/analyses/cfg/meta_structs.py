@@ -234,3 +234,11 @@ def get_pointer_array_hints_pe(pe: PE) -> list[tuple[int, int]]:
         merged_array_hints = [hint for hint in merged_array_hints if hint[1] > 0]
 
     return merged_array_hints
+
+
+__all__ = (
+    "get_data_regions_from_meta_regions",
+    "get_function_hints_from_meta_regions",
+    "get_pointer_array_hints",
+    "get_pointer_array_hints_pe",
+)

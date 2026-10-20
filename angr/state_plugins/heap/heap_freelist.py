@@ -213,3 +213,9 @@ class SimHeapFreelist(SimHeapLibc):
         for ck in self.chunks():
             print("│ " + str(ck) + " │")
         print("|-------------------------------|")
+
+
+__all__ = (
+    "Chunk",
+    "SimHeapFreelist",
+)

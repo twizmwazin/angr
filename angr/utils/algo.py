@@ -36,3 +36,6 @@ def binary_insert(lst: list | deque, elem: Any, key: Callable, lo: int = 0, hi: 
             hi = mid
 
     lst.insert(lo, elem)
+
+
+__all__ = ("binary_insert",)

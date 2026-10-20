@@ -11,3 +11,6 @@ class fork(angr.SimProcedure):
             claripy.BVV(1338, self.arch.sizeof["int"]),
             claripy.BVV(0, self.arch.sizeof["int"]),
         )
+
+
+__all__ = ("fork",)

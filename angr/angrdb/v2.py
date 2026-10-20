@@ -65,3 +65,10 @@ class AngrDbV2:
             edge.stmt_idx = NO_STMT_IDX if stmt_idx is None else stmt_idx
             cmsg.edges.append(edge)
         return cmsg
+
+
+__all__ = (
+    "NO_INS_ADDR",
+    "NO_STMT_IDX",
+    "AngrDbV2",
+)

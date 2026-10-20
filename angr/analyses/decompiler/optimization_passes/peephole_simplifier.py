@@ -77,3 +77,9 @@ class PostStructuringPeepholeOptimizationPass(SequenceOptimizationPass):
             assert simp.result_block is not None
             new_block = simp.result_block
         return new_block if block != new_block else None
+
+
+__all__ = (
+    "ExpressionSequenceWalker",
+    "PostStructuringPeepholeOptimizationPass",
+)

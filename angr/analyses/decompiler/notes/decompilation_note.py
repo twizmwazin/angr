@@ -95,3 +95,9 @@ class DecompilationNote:
     @classmethod
     def from_json(cls, s: str) -> DecompilationNote:
         return cls.from_jsonable(json.loads(s))
+
+
+__all__ = (
+    "DecompilationNote",
+    "DecompilationNoteLevel",
+)

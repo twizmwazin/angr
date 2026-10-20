@@ -174,3 +174,6 @@ class ReturnMaker(AILGraphWalker):
         if result is block:
             return None
         return result
+
+
+__all__ = ("ReturnMaker",)

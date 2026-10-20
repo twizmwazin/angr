@@ -89,3 +89,6 @@ class ARMCmpF(PeepholeOptimizationExprBase):
         if isinstance(expr, UnaryOp):
             return expr.op == "IsNaN" or (expr.op == "Not" and ARMCmpF._is_fp_logic(expr.operand))
         return isinstance(expr, Const)
+
+
+__all__ = ("ARMCmpF",)

@@ -65,3 +65,9 @@ class random(angr.SimProcedure):
         self.state.memory.store(rnd_bytes, count, endness="Iend_LE", condition=rnd_bytes != 0)
 
         return r
+
+
+__all__ = (
+    "rand_count",
+    "random",
+)

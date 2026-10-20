@@ -85,3 +85,10 @@ def slice_function_graph(function_graph, cfg_slice_to_sink):
     function_graph.remove_nodes_from(nodes_to_remove)
 
     return function_graph
+
+
+__all__ = (
+    "slice_callgraph",
+    "slice_cfg_graph",
+    "slice_function_graph",
+)

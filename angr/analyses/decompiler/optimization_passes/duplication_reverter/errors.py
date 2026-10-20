@@ -14,3 +14,9 @@ class UnsupportedAILNodeError(SAILRSemanticError):
     These type of errors are raised when an AIL node is not supported by the current implementation.
     Most common with Switch heads.
     """
+
+
+__all__ = (
+    "SAILRSemanticError",
+    "UnsupportedAILNodeError",
+)

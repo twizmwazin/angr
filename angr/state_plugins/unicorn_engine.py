@@ -1948,3 +1948,28 @@ class Unicorn(SimStatePlugin):
 
 
 SimState.register_default("unicorn", Unicorn)
+
+
+__all__ = (
+    "HOOK_MEM_INVALID_CFUNC",
+    "MEM_PATCH",
+    "STOP",
+    "TRANSMIT_RECORD",
+    "AccessingZeroPageError",
+    "AggressiveConcretizationAnnotation",
+    "BlockDetails",
+    "FetchingZeroPageError",
+    "MemoryMappingError",
+    "MemoryValue",
+    "MixedPermissonsError",
+    "RegisterValue",
+    "SegfaultError",
+    "SimOSEnum",
+    "StopDetails",
+    "TaintEntityEnum",
+    "Unicorn",
+    "Uniwrapper",
+    "VEXStmtDetails",
+    "ffi",
+    "unicorn",
+)

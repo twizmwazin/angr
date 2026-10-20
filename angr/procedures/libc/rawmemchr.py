@@ -19,3 +19,6 @@ class rawmemchr(angr.SimProcedure):
         n = claripy.BVV(self.state.libc.max_str_len, self.state.arch.bits)
         memchr = self.inline_call(angr.SIM_PROCEDURES["libc"]["memchr"], s_addr, c_int, n)
         return memchr.ret_expr
+
+
+__all__ = ("rawmemchr",)

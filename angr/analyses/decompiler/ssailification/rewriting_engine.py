@@ -1029,3 +1029,6 @@ class SimEngineSSARewriting(
     _handle_unop_unpack = _unreachable
     _handle_unop_Sqrt = _unreachable
     _handle_unop_RSqrtEst = _unreachable
+
+
+__all__ = ("SimEngineSSARewriting",)

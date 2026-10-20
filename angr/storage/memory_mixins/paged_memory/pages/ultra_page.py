@@ -628,3 +628,9 @@ class UltraPage(MemoryObjectMixin, PageBase):
                 self._update_mappings(b, old.object, new.object, memory=memory)
 
         return new
+
+
+__all__ = (
+    "DEFAULT_PAGE_SIZE",
+    "UltraPage",
+)

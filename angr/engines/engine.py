@@ -24,3 +24,9 @@ class SimEngine[StateType, ResultType](metaclass=abc.ABCMeta):
 
     def __setstate__(self, state):
         self.project = state[0]
+
+
+__all__ = (
+    "DataType_co",
+    "SimEngine",
+)

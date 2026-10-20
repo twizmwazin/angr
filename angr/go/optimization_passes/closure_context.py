@@ -55,3 +55,9 @@ class GoClosureContextNamer(OptimizationPass):
                     v.renamed = True
             if ctx_type is not None:
                 var_manager.set_variable_type(var, ctx_type)
+
+
+__all__ = (
+    "CLOSURE_CONTEXT_NAME",
+    "GoClosureContextNamer",
+)

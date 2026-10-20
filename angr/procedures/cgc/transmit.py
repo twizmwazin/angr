@@ -63,3 +63,6 @@ class transmit(angr.SimProcedure):
 
         # TODO: transmit failure
         return claripy.BVV(0, self.state.arch.bits)
+
+
+__all__ = ("transmit",)

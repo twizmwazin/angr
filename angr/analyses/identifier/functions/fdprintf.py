@@ -114,3 +114,6 @@ class fdprintf(Func):
             return False
 
         return True
+
+
+__all__ = ("fdprintf",)

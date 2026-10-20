@@ -68,3 +68,9 @@ class fgets(angr.SimProcedure):
 
 
 fgets_unlocked = fgets
+
+
+__all__ = (
+    "fgets",
+    "fgets_unlocked",
+)

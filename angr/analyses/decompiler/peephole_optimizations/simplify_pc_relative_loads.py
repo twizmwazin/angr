@@ -50,3 +50,6 @@ class SimplifyPcRelativeLoads(PeepholeOptimizationExprBase):
                     return Const(self.manager.next_atom(), value, self.project.arch.bits, **expr.tags)
 
         return expr
+
+
+__all__ = ("SimplifyPcRelativeLoads",)

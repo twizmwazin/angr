@@ -128,3 +128,6 @@ class CmpFFlagTests(PeepholeOptimizationExprBase):
                 return int(not v) if e.bits == 1 else ~v & mask
             return ~v & mask
         raise _NoMatch
+
+
+__all__ = ("CmpFFlagTests",)

@@ -164,3 +164,11 @@ class Liveness:
         o.loc_to_killed_defs = self.loc_to_killed_defs.copy()
         o._node_max_stmt_id = self._node_max_stmt_id.copy()
         return o
+
+
+__all__ = (
+    "BlockAddrType",
+    "Liveness",
+    "LocationType",
+    "LocationWithPosType",
+)

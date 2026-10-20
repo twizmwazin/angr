@@ -90,3 +90,9 @@ class Oppologist(ExplorationTechnique):
         except Exception:  # pylint:disable=broad-except
             l.error("Original block hit an unsupported error", exc_info=True)
             raise
+
+
+__all__ = (
+    "Oppologist",
+    "exc_list",
+)

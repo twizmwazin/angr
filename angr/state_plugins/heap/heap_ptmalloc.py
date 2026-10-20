@@ -640,3 +640,12 @@ class SimHeapPTMalloc(SimHeapFreelist):
             self.free_head_chunk.set_fwd_chunk(self.free_head_chunk)
             self.free_head_chunk.set_bck_chunk(self.free_head_chunk)
             self._initialized = True
+
+
+__all__ = (
+    "CHUNK_FLAGS_MASK",
+    "CHUNK_P_MASK",
+    "PTChunk",
+    "PTChunkIterator",
+    "SimHeapPTMalloc",
+)

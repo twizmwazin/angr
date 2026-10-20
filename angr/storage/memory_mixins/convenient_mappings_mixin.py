@@ -254,3 +254,6 @@ class ConvenientMappingsMixin(MemoryMixin):
                 addrs &= set(self.addrs_for_name(v))
 
         self._replace_all(addrs, old, new)
+
+
+__all__ = ("ConvenientMappingsMixin",)

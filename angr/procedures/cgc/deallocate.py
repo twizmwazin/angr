@@ -63,3 +63,6 @@ class deallocate(angr.SimProcedure):
             self.state.memory.unmap_region(addr, allowed_length)
 
         return r
+
+
+__all__ = ("deallocate",)

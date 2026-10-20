@@ -15,3 +15,6 @@ class getline(getdelim):
     def run(self, line_ptrptr, len_ptr, file_ptr):
         delim = claripy.BVV(ord("\n"), self.arch.byte_width)
         return super().run(line_ptrptr, len_ptr, delim, file_ptr)
+
+
+__all__ = ("getline",)

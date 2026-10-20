@@ -125,3 +125,9 @@ class CleanupCodeRemover(OptimizationPass, CFGTransformationMixin, CFAMixin, SRD
         self._remove_cleanup_calls()
 
         self.out_graph = self._simplify_graph(self._graph)
+
+
+__all__ = (
+    "CLEANUP_FUNCTIONS",
+    "CleanupCodeRemover",
+)

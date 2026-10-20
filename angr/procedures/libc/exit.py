@@ -10,3 +10,6 @@ class exit(angr.SimProcedure):  # pylint:disable=redefined-builtin
 
     def run(self, exit_code):
         self.exit(exit_code)
+
+
+__all__ = ("exit",)

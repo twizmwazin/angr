@@ -1223,3 +1223,6 @@ class DreamStructurer(StructurerBase):
 
         seq.insert_node(pos, ConditionNode(seq_addr, None, node_0.reaching_condition, new_node_0, new_node_1))
         seq.nodes = [n for n in seq.nodes if n is not None]
+
+
+__all__ = ("DreamStructurer",)

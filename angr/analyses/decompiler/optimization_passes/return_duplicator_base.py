@@ -611,3 +611,9 @@ class ReturnDuplicatorBase:
     @staticmethod
     def unwrap_conv(expr):
         return ReturnDuplicatorBase.unwrap_conv(expr.operand) if isinstance(expr, ailment.expression.Convert) else expr
+
+
+__all__ = (
+    "FreshVirtualVariableRewriter",
+    "ReturnDuplicatorBase",
+)

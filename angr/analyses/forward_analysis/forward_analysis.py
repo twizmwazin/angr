@@ -614,3 +614,10 @@ class ForwardAnalysisForClinic[AnalysisState](ForwardAnalysisForDummies[Analysis
 
     def _step_node(self, node: ailment.Block, state: AnalysisState) -> tuple[bool | None, AnalysisState]:
         raise NotImplementedError
+
+
+__all__ = (
+    "ForwardAnalysis",
+    "ForwardAnalysisForClinic",
+    "ForwardAnalysisForDummies",
+)

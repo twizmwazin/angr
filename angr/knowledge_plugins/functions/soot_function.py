@@ -725,3 +725,6 @@ class SootFunction(Function):
 
     # compatibility
     _get_block = get_block
+
+
+__all__ = ("SootFunction",)

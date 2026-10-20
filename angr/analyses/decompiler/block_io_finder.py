@@ -304,3 +304,6 @@ class BlockIOFinder(AILBlockViewer):
                 SpOffset(self._project.arch.bits, expr.offset), expr.size * self._project.arch.byte_width
             )
         return expr
+
+
+__all__ = ("BlockIOFinder",)

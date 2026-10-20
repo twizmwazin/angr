@@ -21,3 +21,6 @@ class NodeAddressFinder(SequenceWalker):
 
     def _handle_Block(self, node: ailment.Block, **kwargs):
         self.addrs.add(node.addr)
+
+
+__all__ = ("NodeAddressFinder",)

@@ -90,3 +90,6 @@ class HooksMixin(SuccessorsEngine, ProcedureMixin):
             )
 
         return self.process_procedure(state, successors, procedure, **kwargs)
+
+
+__all__ = ("HooksMixin",)

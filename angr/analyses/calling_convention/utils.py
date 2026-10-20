@@ -179,3 +179,11 @@ def merge_overlapping_register_spans(arch: archinfo.Arch, spans: Iterable[tuple[
             # no register covers the reads; keep the widest read
             merged.append(max(group, key=lambda s: (s[1], -s[0])))
     return merged
+
+
+__all__ = (
+    "fold_fp_lane_reads",
+    "is_sane_register_variable",
+    "merge_overlapping_register_spans",
+    "reg_arg_from_span",
+)

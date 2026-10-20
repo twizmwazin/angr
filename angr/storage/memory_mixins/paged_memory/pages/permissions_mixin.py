@@ -34,3 +34,6 @@ class PermissionsMixin(MemoryMixin):
     @property
     def perm_exec(self):
         return self.permission_bits & 4
+
+
+__all__ = ("PermissionsMixin",)

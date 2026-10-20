@@ -205,3 +205,12 @@ class SimHeapBase(SimStatePlugin):
         except SimMemoryError:
             l.debug("Mapping base heap region")
             self._init_mapping()
+
+
+__all__ = (
+    "DEFAULT_HEAP_LOCATION",
+    "DEFAULT_HEAP_SIZE",
+    "HEAP_INITIAL_MAPPED_SIZE",
+    "HEAP_MAPPING_GROWTH_FACTOR",
+    "SimHeapBase",
+)

@@ -28,3 +28,10 @@ class HasCallExprWalker(AILBlockViewer):
 
     def _handle_FunctionLikeMacro(self, expr_idx, expr, stmt_idx, stmt, block):  # pylint:disable=unused-argument
         raise HasCallNotification
+
+
+__all__ = (
+    "PURE_INTRINSIC_CALLS",
+    "HasCallExprWalker",
+    "HasCallNotification",
+)

@@ -42,3 +42,11 @@ class IntegerValueOf(JavaSimProcedure):
         obj_ref = SimSootValue_ThisRef.new_object(self.state, "java.lang.Integer")
         obj_ref.store_field(self.state, "value", "int", int_val)
         return obj_ref
+
+
+__all__ = (
+    "IntToInteger",
+    "IntegerToInt",
+    "IntegerToString",
+    "IntegerValueOf",
+)

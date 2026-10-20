@@ -12,3 +12,6 @@ class perror(angr.SimProcedure):
 
         length = self.inline_call(strlen, string).ret_expr
         self.inline_call(write, 2, string, length)
+
+
+__all__ = ("perror",)

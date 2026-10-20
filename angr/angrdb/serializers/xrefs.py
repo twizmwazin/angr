@@ -47,3 +47,6 @@ class XRefsSerializer:
             return None
 
         return XRefManager.parse(db_xrefs.blob, cfg_model=cfg_model, kb=kb)
+
+
+__all__ = ("XRefsSerializer",)

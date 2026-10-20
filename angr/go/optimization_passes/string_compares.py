@@ -836,3 +836,10 @@ def _addr_and_offset(addr: Expression) -> tuple[Expression | None, int]:
         if isinstance(lhs, Const):
             return rhs, lhs.value_int
     return addr, 0
+
+
+__all__ = (
+    "LengthFacts",
+    "StringCompareFolder",
+    "StringSwitchFlattener",
+)

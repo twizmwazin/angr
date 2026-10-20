@@ -6404,3 +6404,13 @@ class Clinic(Analysis, Serializable):
 
 
 register_analysis(Clinic, "Clinic")
+
+
+__all__ = (
+    "BlockCache",
+    "Clinic",
+    "ClinicMode",
+    "ClinicStage",
+    "ComboRegReferenceWalker",
+    "DataRefDesc",
+)

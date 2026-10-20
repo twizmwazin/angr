@@ -63,3 +63,9 @@ class fdwait(angr.SimProcedure):
 
         # TODO: errors
         return claripy.BVV(0, self.state.arch.bits)
+
+
+__all__ = (
+    "fdcount",
+    "fdwait",
+)

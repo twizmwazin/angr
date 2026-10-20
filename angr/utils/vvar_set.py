@@ -168,3 +168,6 @@ class VVarSet:
 
     def __repr__(self) -> str:
         return f"VVarSet({sorted(self)})"
+
+
+__all__ = ("VVarSet",)

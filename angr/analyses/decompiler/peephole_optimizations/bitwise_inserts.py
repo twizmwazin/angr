@@ -86,3 +86,6 @@ class SimplifyBitwiseInserts(PeepholeOptimizationExprBase):
             result = Convert(self.manager.next_atom(), pb1.bits, expr.bits, False, pb1)
             result = BinaryOp(self.manager.next_atom(), expr.value.op, [result, pb2x])
         return result
+
+
+__all__ = ("SimplifyBitwiseInserts",)

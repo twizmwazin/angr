@@ -364,3 +364,6 @@ class CodeMotionOptimization(OptimizationPass):
             raise ValueError("Cannot maximize both up and down")
         if not up and not down:
             raise ValueError("Must maximize either up or down")
+
+
+__all__ = ("CodeMotionOptimization",)

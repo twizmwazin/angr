@@ -168,3 +168,9 @@ class LoopFinder(Analysis):
 
 
 AnalysesHub.register_default("LoopFinder", LoopFinder)
+
+
+__all__ = (
+    "Loop",
+    "LoopFinder",
+)

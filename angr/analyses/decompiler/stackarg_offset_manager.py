@@ -78,3 +78,6 @@ class StackArgOffsetManager:
                 "StackArgOffsetManager: all_stackarg_vvars is not populated. Call update_stackoff_vvars() first."
             )
         return vvar_id in self.all_stackarg_vvars
+
+
+__all__ = ("StackArgOffsetManager",)

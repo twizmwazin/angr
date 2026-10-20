@@ -94,3 +94,6 @@ class strncmp(Func):
         outval5 = s.solver.eval(s.regs.eax)
 
         return outval1 == 0 and outval2 != 0 and outval3 != 0 and outval4 == 0 and outval5 != 0
+
+
+__all__ = ("strncmp",)

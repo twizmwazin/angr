@@ -16,3 +16,6 @@ class iscntrl(angr.SimProcedure):
             claripy.BVV(1, int_size),
             claripy.BVV(0, int_size),
         )
+
+
+__all__ = ("iscntrl",)

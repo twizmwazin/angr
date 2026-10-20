@@ -78,3 +78,6 @@ class SimSootStmt:
     @property
     def has_invoke_target(self):
         return self.invoke_expr is not None
+
+
+__all__ = ("SimSootStmt",)

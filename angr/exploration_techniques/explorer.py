@@ -148,3 +148,6 @@ class Explorer(ExplorationTechnique):
 
     def complete(self, simgr):
         return len(simgr.stashes[self.find_stash]) >= self.num_find
+
+
+__all__ = ("Explorer",)

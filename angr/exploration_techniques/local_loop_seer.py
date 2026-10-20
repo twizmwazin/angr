@@ -62,3 +62,6 @@ class LocalLoopSeer(ExplorationTechnique):
                         # This state is going to be filtered by the self.filter function
                         self.cut_succs.append(succ_state)
         return succs
+
+
+__all__ = ("LocalLoopSeer",)

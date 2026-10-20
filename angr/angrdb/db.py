@@ -324,3 +324,6 @@ class AngrDB:
                         other_kbs[kb_name] = kb
 
             return proj
+
+
+__all__ = ("AngrDB",)

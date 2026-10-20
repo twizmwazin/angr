@@ -450,3 +450,15 @@ def tokenize(
         kb=kb,
         klass_of_shape=klass_of_shape,
     )
+
+
+__all__ = (
+    "AILCanonicalizer",
+    "Address",
+    "TokenLoc",
+    "TokenStream",
+    "is_dephi_copy",
+    "is_glue_shape",
+    "linearize",
+    "tokenize",
+)

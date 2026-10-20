@@ -11,3 +11,6 @@ class isdigit(angr.SimProcedure):
         int_size = self.arch.sizeof["int"]  # type: ignore[reportOptionalMemberAccess]
 
         return claripy.If(is_digit, claripy.BVV(1, int_size), claripy.BVV(0, int_size))
+
+
+__all__ = ("isdigit",)

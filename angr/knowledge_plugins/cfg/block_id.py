@@ -60,3 +60,6 @@ class BlockID:
         if self.callsite_tuples:
             return self.callsite_tuples[-1]
         return None
+
+
+__all__ = ("BlockID",)

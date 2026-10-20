@@ -24,3 +24,6 @@ def first_stmt_addr(statements: Sequence[CStatement] | Sequence[GoStatement]) ->
             addr = stmt.tags.get("ins_addr") if stmt.tags is not None else None
         return addr
     return None
+
+
+__all__ = ("first_stmt_addr",)

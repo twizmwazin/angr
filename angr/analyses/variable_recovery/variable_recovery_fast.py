@@ -867,3 +867,9 @@ class VariableRecoveryFast(ForwardAnalysis, VariableRecoveryBase):  # pylint:dis
 
 
 AnalysesHub.register_default("VariableRecoveryFast", VariableRecoveryFast)
+
+
+__all__ = (
+    "VariableRecoveryFast",
+    "VariableRecoveryFastState",
+)

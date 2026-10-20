@@ -65,3 +65,9 @@ class DetermineLoadSizes(OptimizationPass):
 
         if rewriter.changed:
             self.out_graph = self._graph
+
+
+__all__ = (
+    "DetermineLoadSizes",
+    "LoadSizeRewriter",
+)

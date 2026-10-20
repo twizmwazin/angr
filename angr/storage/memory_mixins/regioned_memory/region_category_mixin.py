@@ -7,3 +7,6 @@ class RegionCategoryMixin(MemoryMixin):
     @property
     def category(self):
         return "mem"
+
+
+__all__ = ("RegionCategoryMixin",)

@@ -590,3 +590,9 @@ class VariableRecovery(ForwardAnalysis, VariableRecoveryBase):  # pylint:disable
 
 
 AnalysesHub.register_default("VariableRecovery", VariableRecovery)
+
+
+__all__ = (
+    "VariableRecovery",
+    "VariableRecoveryState",
+)

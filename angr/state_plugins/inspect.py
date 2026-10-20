@@ -447,3 +447,20 @@ class SimInspector(SimStatePlugin):
 
 
 SimState.register_default("inspect", SimInspector)
+
+
+__all__ = (
+    "BP",
+    "BP_AFTER",
+    "BP_BEFORE",
+    "BP_BOTH",
+    "BP_IPDB",
+    "BP_IPYTHON",
+    "NO_OVERRIDE",
+    "Action",
+    "EventType",
+    "InspectAttrs",
+    "SimInspector",
+    "When",
+    "inspect_attributes",
+)

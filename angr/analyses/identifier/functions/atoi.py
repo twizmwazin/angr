@@ -67,3 +67,6 @@ class atoi(Func):
             self.allows_negative = False
 
         return True
+
+
+__all__ = ("atoi",)

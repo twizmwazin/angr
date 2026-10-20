@@ -12,3 +12,6 @@ class bind(angr.SimProcedure):
 
     def run(self, fd, addr_ptr, addr_len):  # pylint:disable=unused-argument
         return self.state.solver.Unconstrained("bind", self.arch.sizeof["int"], key=("api", "bind"))
+
+
+__all__ = ("bind",)

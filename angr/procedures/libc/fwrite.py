@@ -18,3 +18,9 @@ class fwrite(angr.SimProcedure):
 
 
 fwrite_unlocked = fwrite
+
+
+__all__ = (
+    "fwrite",
+    "fwrite_unlocked",
+)

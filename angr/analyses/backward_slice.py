@@ -683,3 +683,6 @@ class BackwardSlice(Analysis):
 
 
 AnalysesHub.register_default("BackwardSlice", BackwardSlice)
+
+
+__all__ = ("BackwardSlice",)

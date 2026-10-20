@@ -21,3 +21,6 @@ class sigprocmask(angr.SimProcedure):
             claripy.BVV(self.state.posix.EINVAL, self.arch.sizeof["int"]),
             0,
         )
+
+
+__all__ = ("sigprocmask",)

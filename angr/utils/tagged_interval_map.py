@@ -111,3 +111,6 @@ class TaggedIntervalMap:
             yield (start_addr, addr - start_addr, tags)
             tags = self._map[addr]
             start_addr = addr
+
+
+__all__ = ("TaggedIntervalMap",)

@@ -150,3 +150,6 @@ class SimSootValue_ThisRef(SimSootValue):
             state.memory.heap = simgr.deadended[0].memory.heap.copy()
             l.debug("<" * 15 + " Initialize object %r ... done " + "<" * 15, obj_ref)
         return obj_ref
+
+
+__all__ = ("SimSootValue_ThisRef",)

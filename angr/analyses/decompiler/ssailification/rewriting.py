@@ -548,3 +548,10 @@ class RewritingAnalysis:
             ):
                 return stmt.dst
         return None
+
+
+__all__ = (
+    "RewritingAnalysis",
+    "T",
+    "U",
+)

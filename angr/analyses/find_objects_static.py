@@ -203,3 +203,10 @@ class StaticObjectFinder(Analysis):
 
 
 AnalysesHub.register_default("StaticObjectFinder", StaticObjectFinder)
+
+
+__all__ = (
+    "NewFunctionHandler",
+    "PossibleObject",
+    "StaticObjectFinder",
+)

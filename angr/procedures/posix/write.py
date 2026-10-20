@@ -12,3 +12,6 @@ class write(angr.SimProcedure):
             return -1
 
         return simfd.write(src, length)
+
+
+__all__ = ("write",)

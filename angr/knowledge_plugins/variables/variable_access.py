@@ -119,3 +119,9 @@ class VariableAccess(Serializable):
             cmsg.offset if cmsg.HasField("offset") else None,
             atom_hash=cmsg.atom_hash if cmsg.HasField("atom_hash") else None,
         )
+
+
+__all__ = (
+    "VariableAccess",
+    "VariableAccessSort",
+)

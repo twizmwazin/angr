@@ -33,3 +33,6 @@ class RemoveCxxDestructorCalls(PeepholeOptimizationStmtBase):
                 # yes it is!
                 return ()
         return None
+
+
+__all__ = ("RemoveCxxDestructorCalls",)

@@ -126,3 +126,11 @@ def add_edge_to_buffer(
         handle_line(end, (chars["end_corner"] + chars["horizontal"] * (max_depth - len(ref[end])) + chars["end_cap"]))
         for i in range(abs_start + 1, abs_end):
             handle_line(i, chars["vertical"] + " " * (1 + max_depth - len(ref[i])))
+
+
+__all__ = (
+    "add_edge_to_buffer",
+    "ansi_color",
+    "ansi_color_enabled",
+    "setup_terminal",
+)

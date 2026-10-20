@@ -21,3 +21,6 @@ class Data(KnowledgeBasePlugin):
 
 
 KnowledgeBasePlugin.register_default("data", Data)
+
+
+__all__ = ("Data",)

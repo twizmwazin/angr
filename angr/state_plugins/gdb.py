@@ -150,3 +150,6 @@ class GDB(SimStatePlugin):
 
 
 SimState.register_default("gdb", GDB)
+
+
+__all__ = ("GDB",)

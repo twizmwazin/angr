@@ -158,3 +158,9 @@ class SemanticNamingOrchestrator:
                 var.name = f"{base}{n}"
                 var.clear_hash()
             varname_count[base] += 1
+
+
+__all__ = (
+    "NAMING_PATTERNS",
+    "SemanticNamingOrchestrator",
+)

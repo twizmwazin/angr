@@ -145,3 +145,6 @@ class SimSnimmucNxp(SimOS):
                 arch=self.project.arch,
             )
             self.project.loader.dynamic_load(blob)
+
+
+__all__ = ("SimSnimmucNxp",)

@@ -305,3 +305,10 @@ class ErrorsFolder:
                 blk.statements = blk.statements[:j] + blk.statements[j + 1 :]
             return True
         return False
+
+
+__all__ = (
+    "CALLEE_NAME_TAG",
+    "ERROR_STRING",
+    "ErrorsFolder",
+)

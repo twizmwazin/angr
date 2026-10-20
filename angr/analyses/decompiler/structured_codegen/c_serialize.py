@@ -1499,3 +1499,14 @@ def register_all() -> None:
     _register(CUnsupportedStatement, codegen_pb2.CCK_UNSUPPORTED_STATEMENT, _ser_cunsupported, _parse_cunsupported)
     _register(CDirtyExpression, codegen_pb2.CCK_DIRTY_EXPRESSION, _ser_cdirtyexpr, _parse_cdirtyexpr)
     _register(CVectorConvert, codegen_pb2.CCK_VECTOR_CONVERT, _ser_cvectorconvert, _parse_cvectorconvert)
+
+
+__all__ = (
+    "ParseContext",
+    "SerializeContext",
+    "parse_codegen",
+    "parse_subtree",
+    "register_all",
+    "serialize_codegen",
+    "serialize_subtree",
+)

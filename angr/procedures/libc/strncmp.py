@@ -177,3 +177,6 @@ class strncmp(angr.SimProcedure):
             self.state.add_constraints(claripy.Or(match_case, nomatch_case, l0_case, empty_case))
 
         return ret_expr
+
+
+__all__ = ("strncmp",)

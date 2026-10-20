@@ -49,3 +49,6 @@ class PatternsSerializer:
                 )
             )
         return patterns
+
+
+__all__ = ("PatternsSerializer",)

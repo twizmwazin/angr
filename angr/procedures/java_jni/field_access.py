@@ -173,3 +173,26 @@ class SetField(JNISimProcedure):
         value = self.state.project.simos.cast_primitive(state=self.state, value=value_, to_type=field_id.type)
         # store value in java memory
         self.state.javavm_memory.store(field_ref, value)
+
+
+__all__ = (
+    "GetBooleanField",
+    "GetByteField",
+    "GetCharField",
+    "GetField",
+    "GetFieldID",
+    "GetIntField",
+    "GetLongField",
+    "GetObjectField",
+    "GetShortField",
+    "GetStaticBooleanField",
+    "GetStaticByteField",
+    "GetStaticCharField",
+    "GetStaticField",
+    "GetStaticIntField",
+    "GetStaticLongField",
+    "GetStaticObjectField",
+    "GetStaticShortField",
+    "SetField",
+    "SetStaticField",
+)

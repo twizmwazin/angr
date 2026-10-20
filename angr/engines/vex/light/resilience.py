@@ -73,3 +73,9 @@ _make_wrapper(
     "_check_unsupported_op",
 )
 _make_wrapper("_handle_vex_stmt", errors.SimError, "_check_errored_stmt")
+
+
+__all__ = (
+    "VEXResilienceMixin",
+    "raiseme",
+)

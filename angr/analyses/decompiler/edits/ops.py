@@ -654,3 +654,16 @@ def set_global_type(
         refresh=Refresh(text_stale_all=True),
         detail={"global_address": hex(addr)},
     )
+
+
+__all__ = (
+    "global_variable_at",
+    "reflow_types",
+    "rename_function",
+    "rename_global",
+    "rename_variable",
+    "set_comment",
+    "set_function_prototype",
+    "set_global_type",
+    "set_variable_type",
+)

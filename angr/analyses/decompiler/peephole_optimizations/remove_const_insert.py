@@ -40,3 +40,6 @@ class RemoveConstInsert(PeepholeOptimizationExprBase):
             else value
         )
         return BinaryOp(expr.idx, "Or", [shifted, Const(self.manager.next_atom(), base, shifted.bits)], signed=False)
+
+
+__all__ = ("RemoveConstInsert",)

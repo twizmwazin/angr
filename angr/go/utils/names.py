@@ -122,3 +122,14 @@ def split_go_method_name(name: str) -> tuple[str, str, bool, str] | None:
     if not tname or tname[0] in "(*[" or (not ptr and "(" in tname.split("[", 1)[0]):
         return None
     return pkg, tname, ptr, method
+
+
+__all__ = (
+    "MORESTACK_FUNCTIONS",
+    "call_target_name",
+    "is_go_closure_name",
+    "is_go_morestack_call",
+    "is_go_morestack_name",
+    "split_go_func_name",
+    "split_go_method_name",
+)

@@ -104,3 +104,10 @@ class GetProcAddress(angr.SimProcedure):
             x = set()
             self.state.globals[self.KEY] = x
             return x
+
+
+__all__ = (
+    "GetProcAddress",
+    "LoadLibraryA",
+    "LoadLibraryExW",
+)

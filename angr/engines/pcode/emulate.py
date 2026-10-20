@@ -439,3 +439,6 @@ class PcodeEmulatorMixin(SimEngine):
 
     def _execute_new(self) -> None:  # pylint:disable=no-self-use
         raise AngrError("Cannot currently emulate new operator")
+
+
+__all__ = ("PcodeEmulatorMixin",)

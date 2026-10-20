@@ -58,3 +58,13 @@ def normalize(name, monopolize=True, concise=False, use_trait_name=False):
     if concise:
         demangled = demangled.split("::")[-1]
     return demangled
+
+
+__all__ = (
+    "GENERIC_TYPE_PATTERN",
+    "IMPL_XXX_AS_YYY_PATTERN",
+    "TRAILING_SUFFIX_PATTERN",
+    "XXX_AS_YYY_PATTERN",
+    "demangle",
+    "normalize",
+)

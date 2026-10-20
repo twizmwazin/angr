@@ -194,3 +194,9 @@ class PropValue:
         if isinstance(expr, ailment.Expr.Convert) and is_scalar_int_convert(expr):
             return ailment.Expr.Convert(None, expr.from_bits, bits + expr.to_bits, False, expr.operand, **expr.tags)
         return ailment.Expr.Convert(None, expr.bits, bits + expr.bits, False, expr, **expr.tags)
+
+
+__all__ = (
+    "Detail",
+    "PropValue",
+)

@@ -177,3 +177,6 @@ class Uses:
                 self._uses_by_location[k] = self._uses_by_location[k] | v
 
         return merge_occurred
+
+
+__all__ = ("Uses",)

@@ -47,3 +47,14 @@ class SimSootExpr_ClassConstant(SimSootExpr):
 class SimSootExpr_NullConstant(SimSootExpr):
     def _execute(self):
         self.expr = SootNullConstant()
+
+
+__all__ = (
+    "SimSootExpr_ClassConstant",
+    "SimSootExpr_DoubleConstant",
+    "SimSootExpr_FloatConstant",
+    "SimSootExpr_IntConstant",
+    "SimSootExpr_LongConstant",
+    "SimSootExpr_NullConstant",
+    "SimSootExpr_StringConstant",
+)

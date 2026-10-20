@@ -181,3 +181,16 @@ def correct_jump_targets(stmt, replacement_map: dict[int, int], new_stmt=True):
 
         return jump_stmt
     return stmt
+
+
+__all__ = (
+    "ail_block_from_stmts",
+    "bfs_list_blocks",
+    "copy_graph_and_nodes",
+    "correct_jump_targets",
+    "deepcopy_ail_anyjump",
+    "deepcopy_ail_condjump",
+    "deepcopy_ail_jump",
+    "find_block_in_successors_by_addr",
+    "replace_node_in_graph",
+)

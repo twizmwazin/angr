@@ -19,3 +19,6 @@ class scanf(ScanfFormatParser):
             return -1
 
         return fmt_str.interpret(self.va_arg, simfd=simfd)
+
+
+__all__ = ("scanf",)

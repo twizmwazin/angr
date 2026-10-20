@@ -60,3 +60,6 @@ class AbstractMergerMixin(MemoryMixin):
             a for a in v.annotations if not isinstance(a, StridedIntervalAnnotation | UninitializedAnnotation)
         ]
         return claripy.BVS("merged", len(v)).annotate(si_anno, *extra_annotations)
+
+
+__all__ = ("AbstractMergerMixin",)

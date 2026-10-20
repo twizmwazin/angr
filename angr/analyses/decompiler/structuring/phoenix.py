@@ -4303,3 +4303,10 @@ class PhoenixStructurer(StructurerBase):
                 case_node_successors |= {succ for succ in succs if succ.addr not in jump_table.jumptable_entries}
 
         return len(case_node_successors) <= 1
+
+
+__all__ = (
+    "GraphChangedNotification",
+    "MultiStmtExprMode",
+    "PhoenixStructurer",
+)

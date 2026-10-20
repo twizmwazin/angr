@@ -78,3 +78,11 @@ class Func:
         """
 
         return True
+
+
+__all__ = (
+    "Func",
+    "TestData",
+    "rand_bytes",
+    "rand_str",
+)

@@ -20,3 +20,9 @@ class feof(angr.SimProcedure):
 
 
 feof_unlocked = feof
+
+
+__all__ = (
+    "feof",
+    "feof_unlocked",
+)

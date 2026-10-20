@@ -637,3 +637,20 @@ def _jump_thunk_target(project: Project, md, addr: int) -> int | None:
         if not _is_straight_line(ins):
             return None
     return None
+
+
+__all__ = (
+    "GO_ASSERT_PANIC_NAMES",
+    "GO_CHECK_PANIC_NAMES",
+    "GO_NORETURN_NAMES",
+    "GO_RESUMING_NAMES",
+    "GO_STACK_GROWTH_NAMES",
+    "GoRuntimeFunctions",
+    "find_go_noreturn_functions",
+    "find_go_runtime_functions",
+    "has_go_hint",
+    "is_go_noreturn_name",
+    "is_go_resuming_name",
+    "is_go_stack_growth_name",
+    "normalize_go_func_name",
+)

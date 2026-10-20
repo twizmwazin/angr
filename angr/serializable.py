@@ -64,3 +64,6 @@ class Serializable:
         pb2_obj.ParseFromString(s)
 
         return cls.parse_from_cmessage(pb2_obj, **kwargs)
+
+
+__all__ = ("Serializable",)

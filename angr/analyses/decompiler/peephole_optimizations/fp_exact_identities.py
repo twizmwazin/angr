@@ -68,3 +68,6 @@ class FPExactIdentities(PeepholeOptimizationExprBase):
                 ):
                     return inner.operands[0]
         return None
+
+
+__all__ = ("FPExactIdentities",)

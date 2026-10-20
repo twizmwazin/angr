@@ -60,3 +60,6 @@ class PropagationManager(KnowledgeBasePlugin):
 
 
 KnowledgeBasePlugin.register_default("propagations", PropagationManager)
+
+
+__all__ = ("PropagationManager",)

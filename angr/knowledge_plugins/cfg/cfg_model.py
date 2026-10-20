@@ -1345,3 +1345,6 @@ class CFGModel(Serializable):
 
         for node in self.get_all_nodes_intersecting_region(addr, size):
             self.remove_node_and_graph_node(node)
+
+
+__all__ = ("CFGModel",)

@@ -33,3 +33,6 @@ class arch_prctl(angr.SimProcedure):
             # EINVAL is returned if code is not a valid subcommand.
             return 22
         return 0
+
+
+__all__ = ("arch_prctl",)

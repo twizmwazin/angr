@@ -13,3 +13,6 @@ class SimSootExpr_InstanceOf(SimSootExpr):
     def _execute(self):
         obj = self._translate_value(self.expr.value)
         self.expr = claripy.StringV(obj.type) == claripy.StringV(self.expr.check_type)
+
+
+__all__ = ("SimSootExpr_InstanceOf",)

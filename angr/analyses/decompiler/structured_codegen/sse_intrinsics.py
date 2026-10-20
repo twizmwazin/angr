@@ -332,3 +332,17 @@ class SSEVectorTyping:
                 var = self._variable_key(dst)
                 if var is not None and const_only[var]:
                     self._set(dst, "int")
+
+
+__all__ = (
+    "BITWISE_SUFFIX",
+    "VECTOR_BITS",
+    "LaneKind",
+    "SSEVectorTyping",
+    "concat_constant",
+    "is_vector_op",
+    "lane_of",
+    "match_shuffle_epi32",
+    "vector_op_intrinsic",
+    "vector_op_kind",
+)

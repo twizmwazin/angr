@@ -28,3 +28,6 @@ class accept(angr.SimProcedure):
         ident_counters[ident] = ident_counters.get(ident, 0) + 1
         self.state.globals["accept_idents"] = ident_counters
         return self.state.posix.open_socket(("accept", ident, ident_counters[ident]))
+
+
+__all__ = ("accept",)

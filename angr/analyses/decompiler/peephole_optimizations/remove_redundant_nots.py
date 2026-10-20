@@ -34,3 +34,6 @@ class RemoveRedundantNots(PeepholeOptimizationExprBase):
                 )
 
         return None
+
+
+__all__ = ("RemoveRedundantNots",)

@@ -44,3 +44,13 @@ def u2s(u, bits):
     if u < (1 << (bits - 1)):
         return u
     return (u & ((1 << bits) - 1)) - (1 << bits)
+
+
+__all__ = (
+    "ffs",
+    "s2u",
+    "sign_extend",
+    "truncate_bits",
+    "u2s",
+    "zeroextend_on_demand",
+)

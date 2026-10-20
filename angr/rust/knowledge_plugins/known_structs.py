@@ -88,3 +88,9 @@ class KnownStructs(KnowledgeBasePlugin):
 
 
 KnowledgeBasePlugin.register_default("known_structs", KnownStructs)
+
+
+__all__ = (
+    "KnownStructs",
+    "StructMatcher",
+)

@@ -50,3 +50,6 @@ class VEXSlicingMixin(VEXMixin):
             if self._whitelist is not None and stmt_idx not in self._whitelist:
                 return False
         return True
+
+
+__all__ = ("VEXSlicingMixin",)

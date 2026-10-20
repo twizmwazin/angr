@@ -253,3 +253,6 @@ class RDAStateInitializer:
             return tuple(x.caller_func_addr for x in subject.content.callsites)
         l.warning("Subject with unknown content-type")
         return None
+
+
+__all__ = ("RDAStateInitializer",)

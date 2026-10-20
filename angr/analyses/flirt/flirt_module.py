@@ -31,3 +31,6 @@ class FlirtModule:
             f"<FlirtModule: length={self.length}, crc_len={self.crc_len}, crc={self.crc}, "
             f"pub_funcs={self.pub_funcs}, ref_funcs={self.ref_funcs}, tail_bytes={self.tail_bytes}>"
         )
+
+
+__all__ = ("FlirtModule",)

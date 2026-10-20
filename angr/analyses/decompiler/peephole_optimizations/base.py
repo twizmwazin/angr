@@ -191,3 +191,10 @@ class PeepholeOptimizationExprBase:
         }:
             return True
         return bool(isinstance(ail_expr, UnaryOp) and ail_expr.op == "Not")
+
+
+__all__ = (
+    "PeepholeOptimizationExprBase",
+    "PeepholeOptimizationMultiStmtBase",
+    "PeepholeOptimizationStmtBase",
+)

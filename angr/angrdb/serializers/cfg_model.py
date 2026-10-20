@@ -40,3 +40,6 @@ class CFGModelSerializer:
             return None
 
         return CFGModel.parse(db_cfg.blob, cfg_manager=cfg_manager, loader=loader)
+
+
+__all__ = ("CFGModelSerializer",)

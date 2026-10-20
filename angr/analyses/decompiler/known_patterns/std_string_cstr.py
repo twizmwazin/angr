@@ -129,3 +129,6 @@ STD_STRING_CSTR = make_template(
     default_enabled=True,
     name="msvc_string_c_str",
 )
+
+
+__all__ = ("STD_STRING_CSTR",)

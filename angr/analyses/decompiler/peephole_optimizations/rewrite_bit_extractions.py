@@ -84,3 +84,6 @@ class RewriteBitExtractions(PeepholeOptimizationExprBase):
         if expr.bits == 1:
             return 0, expr
         return None
+
+
+__all__ = ("RewriteBitExtractions",)

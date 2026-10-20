@@ -136,3 +136,6 @@ class InsAddrList:
     def __reduce__(self):
         # Pickle as (base_addr, list_of_sizes) for readability and compatibility
         return (InsAddrList, (self._base_addr, list(self._ins_sizes)))
+
+
+__all__ = ("InsAddrList",)

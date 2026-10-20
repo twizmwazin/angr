@@ -42,3 +42,6 @@ class __sprintf_chk(FormatParser):
         )
 
         return out_str.size() // self.arch.byte_width
+
+
+__all__ = ("sprintf",)

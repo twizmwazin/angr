@@ -28,3 +28,6 @@ class SingleBitXor(PeepholeOptimizationExprBase):
                 return UnaryOp(self.manager.next_atom(), "Not", expr.operand.operands[0].operand)
 
         return expr
+
+
+__all__ = ("SingleBitXor",)

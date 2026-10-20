@@ -156,3 +156,6 @@ class BasePointerSaveSimplifier(OptimizationPass):
                     )
 
         return baseptr_restore_stmts
+
+
+__all__ = ("BasePointerSaveSimplifier",)

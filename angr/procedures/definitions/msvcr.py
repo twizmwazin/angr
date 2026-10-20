@@ -25,3 +25,6 @@ libc.set_non_returning("_exit", "abort", "exit", "_invoke_watson")
 libc.add_alias("_initterm", "_initterm_e")
 
 libc.set_default_cc("AMD64", SimCCMicrosoftAMD64)
+
+
+__all__ = ("libc",)

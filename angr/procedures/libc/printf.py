@@ -33,3 +33,6 @@ class __printf_chk(FormatParser):
 
         stdout.write_data(out_str, out_str.size() // 8)
         return out_str.size() // 8
+
+
+__all__ = ("printf",)

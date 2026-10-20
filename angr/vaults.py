@@ -366,3 +366,14 @@ class VaultDirShelf(VaultDict):
             else:
                 s.add(n[: n.rfind(".")])  # remove the suffix
         return s
+
+
+__all__ = (
+    "Vault",
+    "VaultDict",
+    "VaultDir",
+    "VaultDirShelf",
+    "VaultPickler",
+    "VaultShelf",
+    "VaultUnpickler",
+)

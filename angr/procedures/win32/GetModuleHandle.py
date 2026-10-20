@@ -29,3 +29,9 @@ class GetModuleHandleW(GetModuleHandleA):
         if self.state.solver.is_true(pointer == 0):
             return self.handle(None)
         return self.handle(self.state.mem[pointer].wstring.concrete)
+
+
+__all__ = (
+    "GetModuleHandleA",
+    "GetModuleHandleW",
+)

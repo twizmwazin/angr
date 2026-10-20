@@ -88,3 +88,10 @@ VEC_LENGTH_SQ = make_template("length_sq", _build_length_sq, arches=INTEL, defau
 VEC_DOT3 = make_template("dot3", _build_dot3, arches=INTEL, default_enabled=False)
 
 ALL_VECTOR_MATH_TEMPLATES = [VEC_LENGTH_SQ, VEC_DOT3]
+
+
+__all__ = (
+    "ALL_VECTOR_MATH_TEMPLATES",
+    "VEC_DOT3",
+    "VEC_LENGTH_SQ",
+)

@@ -7,3 +7,6 @@ from angr.sim_procedure import SimProcedure
 class ExFreePoolWithTag(SimProcedure):
     def run(self, P, Tag):  # pylint:disable=arguments-differ, unused-argument
         self.state.heap._free(P)
+
+
+__all__ = ("ExFreePoolWithTag",)

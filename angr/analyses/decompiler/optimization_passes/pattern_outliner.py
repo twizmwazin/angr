@@ -367,3 +367,6 @@ class PatternOutliner(OptimizationPass):
             ty = resolve_typeref(param.type, arch) if param is not None and param.type is not None else None
             args.append(ty if ty is not None else parse_type("void *").with_arch(arch))
         variable_map_of(self.manager).set_prototype(call, SimTypeFunction(args, returnty).with_arch(arch))
+
+
+__all__ = ("PatternOutliner",)

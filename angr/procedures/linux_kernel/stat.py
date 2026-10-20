@@ -22,3 +22,6 @@ class stat(fstat):
         self.state.posix.close(fd)
 
         return result
+
+
+__all__ = ("stat",)

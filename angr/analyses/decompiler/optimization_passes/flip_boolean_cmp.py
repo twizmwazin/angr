@@ -116,3 +116,9 @@ class FlipBooleanCmp(SequenceOptimizationPass):
         walker = FlipBooleanWalker(self._graph, self.manager, last_node=self.seq.nodes[-1], flip_size=self._flip_size)
         walker.walk(self.seq)
         self.out_seq = self.seq
+
+
+__all__ = (
+    "FlipBooleanCmp",
+    "FlipBooleanWalker",
+)

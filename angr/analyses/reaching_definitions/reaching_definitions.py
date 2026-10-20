@@ -586,3 +586,6 @@ class ReachingDefinitionsAnalysis(
         for info in self.function_calls.values():
             if info.target == func_addr:
                 yield info
+
+
+__all__ = ("ReachingDefinitionsAnalysis",)

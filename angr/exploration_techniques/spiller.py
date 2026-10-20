@@ -278,3 +278,11 @@ class Spiller(ExplorationTechnique):
     @staticmethod
     def state_priority(state):
         return id(state)
+
+
+__all__ = (
+    "PickledStatesBase",
+    "PickledStatesDb",
+    "PickledStatesList",
+    "Spiller",
+)

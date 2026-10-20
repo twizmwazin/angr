@@ -16,3 +16,6 @@ class vsnprintf(angr.SimProcedure):
         self.state.memory.store(str_ptr, b"\x00")
 
         return 1
+
+
+__all__ = ("vsnprintf",)

@@ -59,3 +59,9 @@ class readdir(angr.SimProcedure):
         storei(18, self.struct.d_type)
         stores(19, self.struct.d_name)
         stores(19 + 255, claripy.BVV(0, 8))
+
+
+__all__ = (
+    "Dirent",
+    "readdir",
+)

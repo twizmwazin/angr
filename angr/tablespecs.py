@@ -90,3 +90,6 @@ class StringTableSpec:
             state.memory.store(end_addr - zero_fill, claripy.BVV(0, self._byte_width * zero_fill))
 
         return start_addr
+
+
+__all__ = ("StringTableSpec",)

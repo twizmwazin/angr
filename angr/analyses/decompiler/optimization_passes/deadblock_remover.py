@@ -128,3 +128,6 @@ class DeadblockRemover(OptimizationPass):
             self._graph.remove_node(n)
 
         self.out_graph = self._graph
+
+
+__all__ = ("DeadblockRemover",)

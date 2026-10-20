@@ -47,3 +47,13 @@ class MessageBoxIndirectA(MessageBoxExA):
 
 class MessageBoxIndirectW(MessageBoxW, MessageBoxIndirectA):
     pass
+
+
+__all__ = (
+    "MessageBoxA",
+    "MessageBoxExA",
+    "MessageBoxExW",
+    "MessageBoxIndirectA",
+    "MessageBoxIndirectW",
+    "MessageBoxW",
+)

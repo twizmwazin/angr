@@ -169,3 +169,6 @@ class fstat64(angr.SimProcedure):
         store(0x50, stat.st_ctime)
         store(0x54, stat.st_ctimensec)
         store(0x58, stat.st_ino)
+
+
+__all__ = ("fstat64",)

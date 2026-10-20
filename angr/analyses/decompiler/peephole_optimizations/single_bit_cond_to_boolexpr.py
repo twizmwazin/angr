@@ -27,3 +27,6 @@ class SingleBitCondToBoolExpr(PeepholeOptimizationExprBase):
             return UnaryOp(self.manager.next_atom(), "Not", expr.operands[0], **expr.tags)
 
         return None
+
+
+__all__ = ("SingleBitCondToBoolExpr",)

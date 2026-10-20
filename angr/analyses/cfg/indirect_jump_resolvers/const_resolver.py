@@ -339,3 +339,9 @@ class ConstantResolver(IndirectJumpResolver):
             if isinstance(stmt, pyvex.IRStmt.WrTmp) and stmt.tmp == tmp:
                 stmt_idx = len(vex_block.statements) - idx - 1
         return None, None
+
+
+__all__ = (
+    "ConstantResolver",
+    "exists_in_replacements",
+)

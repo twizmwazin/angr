@@ -335,3 +335,19 @@ def make_type_reference(
     if t._arch is not None:
         ref_t = ref_t.with_arch(t._arch)
     return ref_t
+
+
+__all__ = (
+    "dereference_simtype",
+    "dereference_simtype_by_lib",
+    "find_type_refs",
+    "make_type_reference",
+    "relink_typerefs",
+    "replace_pointer_pts_to",
+    "squash_array_reference",
+    "type_collections_for_lib",
+    "unpack_array",
+    "unpack_pointer",
+    "unpack_pointer_and_array",
+    "unpack_typeref",
+)

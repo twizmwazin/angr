@@ -211,3 +211,12 @@ class LLMClient:
 
     def __repr__(self):
         return f"<LLMClient model={self.model!r}>"
+
+
+__all__ = (
+    "Agent",
+    "AgentKind",
+    "LLMClient",
+    "OpenAIChatModel",
+    "OpenAIProvider",
+)

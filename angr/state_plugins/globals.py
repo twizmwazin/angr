@@ -61,3 +61,6 @@ class SimStateGlobals(SimStatePlugin):
 
 
 SimState.register_default("globals", SimStateGlobals)
+
+
+__all__ = ("SimStateGlobals",)

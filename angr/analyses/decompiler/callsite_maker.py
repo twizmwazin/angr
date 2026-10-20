@@ -793,3 +793,6 @@ class CallSiteMaker:
 
     def _atom_idx(self) -> int:
         return self._ail_manager.next_atom()
+
+
+__all__ = ("CallSiteMaker",)

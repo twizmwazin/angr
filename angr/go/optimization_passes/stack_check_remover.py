@@ -74,3 +74,6 @@ class GoStackCheckRemover(OptimizationPass, CFGTransformationMixin):
                 removed = True
         if removed:
             self.out_graph = self._graph
+
+
+__all__ = ("GoStackCheckRemover",)

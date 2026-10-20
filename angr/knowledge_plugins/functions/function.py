@@ -2591,3 +2591,11 @@ class Function(Serializable):
         """
         assert self.project is not None
         print(self.project.analyses.Disassembly(self).render(**kwargs))
+
+
+__all__ = (
+    "Function",
+    "FunctionInfo",
+    "PrototypeSource",
+    "dirty_func",
+)

@@ -113,3 +113,9 @@ class IRegReplacer(OptimizationPass):
                 new_block = new_block.copy(statements=cleaned)
 
             self._update_block(block, new_block)
+
+
+__all__ = (
+    "IRegReplacer",
+    "IRegReplacerEngine",
+)

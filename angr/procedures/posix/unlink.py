@@ -10,3 +10,6 @@ class unlink(angr.SimProcedure):
         # TODO: do this the other way around
         unlink_sys = angr.SIM_PROCEDURES["linux_kernel"]["unlink"]
         return self.inline_call(unlink_sys, path).ret_expr
+
+
+__all__ = ("unlink",)

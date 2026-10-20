@@ -291,3 +291,15 @@ class FuzzyPatternFinder(Analysis):
 
 
 AnalysesHub.register_default("FuzzyPatternFinder", FuzzyPatternFinder)
+
+
+__all__ = (
+    "STATEMENTS_ANY",
+    "STATEMENTS_CONSECUTIVE",
+    "STATEMENTS_FOLLOW",
+    "STATEMENTS_MODES",
+    "Address",
+    "FuzzyPattern",
+    "FuzzyPatternFinder",
+    "PatternOccurrence",
+)

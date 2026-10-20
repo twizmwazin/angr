@@ -117,3 +117,6 @@ class RegionedAddressConcretizationMixin(MemoryMixin):
         self, region_id: str, relative_address: int, target_region: str | None = None
     ) -> AddressWrapper:
         return super()._normalize_address_core(region_id, relative_address, target_region)
+
+
+__all__ = ("RegionedAddressConcretizationMixin",)

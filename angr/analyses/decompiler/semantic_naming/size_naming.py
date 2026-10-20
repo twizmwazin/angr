@@ -137,3 +137,9 @@ class SizeNaming(ClinicNamingBase):
         else:
             # If already recorded, increment usage count
             self._var_usage_count[var] += 1
+
+
+__all__ = (
+    "SIZE_PARAM_FUNCTIONS",
+    "SizeNaming",
+)

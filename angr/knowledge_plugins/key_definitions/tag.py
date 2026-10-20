@@ -76,3 +76,15 @@ class UnknownSizeTag(Tag):
     """
     A tag for a definition of an initial value
     """
+
+
+__all__ = (
+    "FunctionTag",
+    "InitialValueTag",
+    "LocalVariableTag",
+    "ParameterTag",
+    "ReturnValueTag",
+    "SideEffectTag",
+    "Tag",
+    "UnknownSizeTag",
+)

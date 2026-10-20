@@ -17,3 +17,6 @@ class open(angr.SimProcedure):  # pylint:disable=W0622
         if fd is None:
             return -1
         return fd
+
+
+__all__ = ("open",)

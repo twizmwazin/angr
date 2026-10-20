@@ -134,3 +134,6 @@ class KnowledgeBaseSerializer:
                         cfg_model.insn_addr_to_memory_data[xref.ins_addr] = xref.memory_data
 
         return kb
+
+
+__all__ = ("KnowledgeBaseSerializer",)

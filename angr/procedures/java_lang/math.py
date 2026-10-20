@@ -14,3 +14,6 @@ class Random(JavaSimProcedure):
     def run(self):
         log.debug("Called SimProcedure java.lang.Math.random with args")
         return claripy.FPS("rand_int", claripy.FSORT_DOUBLE)
+
+
+__all__ = ("Random",)

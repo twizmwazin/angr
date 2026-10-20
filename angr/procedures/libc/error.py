@@ -58,3 +58,6 @@ class error(angr.SimProcedure):
         if not args[0].concrete:
             return None
         return state.solver.eval(args[0]) == 0
+
+
+__all__ = ("error",)

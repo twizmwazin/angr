@@ -50,3 +50,6 @@ class StaticHooker(Analysis):
 
 
 AnalysesHub.register_default("StaticHooker", StaticHooker)
+
+
+__all__ = ("StaticHooker",)

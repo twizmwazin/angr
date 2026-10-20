@@ -8,3 +8,6 @@ class UnresolvableJumpTarget(angr.SimProcedure):
 
     def run(self):  # pylint: disable=arguments-differ
         return
+
+
+__all__ = ("UnresolvableJumpTarget",)

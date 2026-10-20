@@ -21,3 +21,6 @@ class send(angr.SimProcedure):
             self.state.add_constraints(claripy.Or(retval == send_succeeded, retval == send_failed))
             return retval
         return send_succeeded
+
+
+__all__ = ("send",)

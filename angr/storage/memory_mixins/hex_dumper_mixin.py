@@ -81,3 +81,6 @@ class HexDumperMixin(MemoryMixin):
             i += line_size
             dump_str += dump + "\n"
         return dump_str
+
+
+__all__ = ("HexDumperMixin",)

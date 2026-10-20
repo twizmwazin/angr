@@ -168,3 +168,6 @@ class RolRorRewriter(PeepholeOptimizationStmtBase):
                 )
 
         return None
+
+
+__all__ = ("RolRorRewriter",)

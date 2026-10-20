@@ -23,3 +23,9 @@ class getrlimit(angr.SimProcedure):
 
 class ugetrlimit(getrlimit):
     pass
+
+
+__all__ = (
+    "getrlimit",
+    "ugetrlimit",
+)

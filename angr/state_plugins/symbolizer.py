@@ -290,3 +290,9 @@ class SimSymbolizer(SimStatePlugin):  # pylint:disable=abstract-method
 
 
 SimState.register_default("symbolizer", SimSymbolizer)
+
+
+__all__ = (
+    "PAGE_SIZE",
+    "SimSymbolizer",
+)

@@ -25,3 +25,6 @@ class strncpy(angr.SimProcedure):
 class __strncpy_chk(strncpy):
     def run(self, dst_addr, src_addr, limit, _destlen):  # type:ignore[reportIncompatibleMethodOverride]
         return super().run(dst_addr, src_addr, limit)
+
+
+__all__ = ("strncpy",)

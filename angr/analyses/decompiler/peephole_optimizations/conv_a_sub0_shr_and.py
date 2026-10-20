@@ -68,3 +68,6 @@ class ConvASub0ShrAnd(PeepholeOptimizationExprBase):
                 )
 
         return None
+
+
+__all__ = ("ConvASub0ShrAnd",)

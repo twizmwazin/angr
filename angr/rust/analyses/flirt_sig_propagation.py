@@ -55,3 +55,6 @@ class FlirtSigPropagation(Analysis):
 
 
 AnalysesHub.register_default("FlirtSigPropagation", FlirtSigPropagation)
+
+
+__all__ = ("FlirtSigPropagation",)

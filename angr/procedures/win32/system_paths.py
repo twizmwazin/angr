@@ -34,3 +34,9 @@ class GetWindowsDirectoryA(angr.SimProcedure):
             lpBuffer, self.RESULT[self.RESULT.length - 1 : self.RESULT.length - copy_len * 8].concat(claripy.BVV(0, 8))
         )
         return self.RESULT.length // 8
+
+
+__all__ = (
+    "GetTempPathA",
+    "GetWindowsDirectoryA",
+)

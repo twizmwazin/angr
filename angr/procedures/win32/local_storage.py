@@ -86,3 +86,17 @@ class FlsSetValue(TlsSetValue):
 class FlsFree(TlsFree):
     KEY = "win32_fls"
     SETTER = FlsSetValue
+
+
+__all__ = (
+    "FlsAlloc",
+    "FlsFree",
+    "FlsGetValue",
+    "FlsSetValue",
+    "TlsAlloc",
+    "TlsFree",
+    "TlsGetValue",
+    "TlsSetValue",
+    "has_index",
+    "mutate_dict",
+)

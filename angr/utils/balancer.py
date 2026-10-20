@@ -858,3 +858,12 @@ def constraint_to_si(expr: Bool) -> tuple[bool, list[tuple[BV, BV]]]:
     """
 
     return Balancer(expr).compat_ret
+
+
+__all__ = (
+    "Balancer",
+    "BalancerError",
+    "BalancerUnsatError",
+    "commutative_operations",
+    "constraint_to_si",
+)

@@ -45,3 +45,9 @@ class PicklableRLock(PicklableLock):
 
     def locked(self):
         return False  # ummmmmmmmmmmmmmmm
+
+
+__all__ = (
+    "PicklableLock",
+    "PicklableRLock",
+)

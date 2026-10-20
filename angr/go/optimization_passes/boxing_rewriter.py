@@ -1154,3 +1154,6 @@ class _BoxingRewriter:
                 )
             return expr
         return expr
+
+
+__all__ = ("GoBoxingRewriter",)

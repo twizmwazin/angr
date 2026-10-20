@@ -116,3 +116,6 @@ class Slicecutor(ExplorationTechnique):
         kwargs["whitelist"] = self._annotated_cfg.get_whitelisted_statements(state.addr)
         kwargs["last_stmt"] = self._annotated_cfg.get_last_statement_index(state.addr)
         return simgr.successors(state, **kwargs)
+
+
+__all__ = ("Slicecutor",)

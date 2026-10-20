@@ -53,3 +53,6 @@ class SimSootExpr_NewArray(SimSootExpr):
             state.solver.add(max_array_size.UGE(array_size))
 
         return array_size
+
+
+__all__ = ("SimSootExpr_NewArray",)

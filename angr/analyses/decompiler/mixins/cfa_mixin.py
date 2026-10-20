@@ -84,3 +84,6 @@ class CFAMixin:
             if name in expected:
                 return name
         return None
+
+
+__all__ = ("CFAMixin",)

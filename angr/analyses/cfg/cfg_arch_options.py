@@ -93,3 +93,6 @@ class CFGArchOptions:
 
     def __contains__(self, option_name: str) -> bool:
         return option_name in self._options
+
+
+__all__ = ("CFGArchOptions",)

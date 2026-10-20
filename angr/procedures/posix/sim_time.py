@@ -46,3 +46,9 @@ class clock_gettime(angr.SimProcedure):
 
         self.state.mem[timespec_ptr].struct.timespec = result
         return 0
+
+
+__all__ = (
+    "clock_gettime",
+    "gettimeofday",
+)

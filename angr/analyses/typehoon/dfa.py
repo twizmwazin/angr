@@ -156,3 +156,11 @@ class DFAConstraintSolver:
                 stack.append([dst, 0, child_lhs, child_forgets, kind == "recall"])
 
         return constraints
+
+
+__all__ = (
+    "END_STATE",
+    "START_STATE",
+    "DFAConstraintSolver",
+    "EmptyEpsilonNFAError",
+)

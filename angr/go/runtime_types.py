@@ -38,3 +38,10 @@ def go_g_struct(arch) -> SimStruct:
         name="runtime.g",
     )
     return cast(SimStruct, g.with_arch(arch))
+
+
+__all__ = (
+    "CONTEXT_REGISTERS",
+    "G_REGISTERS",
+    "go_g_struct",
+)

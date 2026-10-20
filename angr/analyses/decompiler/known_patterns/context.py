@@ -221,3 +221,17 @@ class PatternContext:
     @property
     def language(self) -> str:
         return CPP if self.is_cpp else C
+
+
+__all__ = (
+    "CPP",
+    "INTEL",
+    "LIBSTDCXX",
+    "MSVC",
+    "C",
+    "PatternContext",
+    "detect_cxx_runtime",
+    "detect_linux_kernel_object",
+    "detect_windows_kernel_driver",
+    "size_t_typename",
+)

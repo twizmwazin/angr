@@ -12,3 +12,6 @@ class putchar(angr.SimProcedure):
             return -1
         stdout.write_data(string[7:0])
         return string & 0xFF
+
+
+__all__ = ("putchar",)

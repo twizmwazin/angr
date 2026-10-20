@@ -104,3 +104,9 @@ def _render(kind: str, args: list, node, tags) -> Iterator[tuple[str, object]]:
                 yield ", ", None
             yield from _chunks(arg)
         yield ")", node
+
+
+__all__ = (
+    "RENDER_KINDS",
+    "render_builtin_call",
+)

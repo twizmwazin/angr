@@ -35,3 +35,6 @@ class SimConcretizationStrategyLogging(SimConcretizationStrategy):
                     ", ".join([hex(answer) for answer in answers]),
                 )
         return answers
+
+
+__all__ = ("SimConcretizationStrategyLogging",)

@@ -232,3 +232,10 @@ class InlinedStringCopySimplifierBase(OptimizationPass):
         else:
             tags.pop("extra_defs", None)
         return tags
+
+
+__all__ = (
+    "InlinedStringCopySimplifierBase",
+    "MemoryAccessFinder",
+    "VVarValueUseCounter",
+)

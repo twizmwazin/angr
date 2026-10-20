@@ -29,3 +29,6 @@ class strcmp(angr.SimProcedure):
             ignore_case=ignore_case,
         )
         return strncmp.ret_expr
+
+
+__all__ = ("strcmp",)

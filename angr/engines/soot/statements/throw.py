@@ -15,3 +15,6 @@ class SimSootStmt_Throw(SimSootStmt):
     def _execute(self):
         # TODO: implement simprocedure to throw exception
         self._add_jmp_target(target=SootAddressTerminator(), condition=claripy.true())
+
+
+__all__ = ("SimSootStmt_Throw",)

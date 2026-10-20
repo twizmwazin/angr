@@ -243,3 +243,11 @@ class Definition[A: Atom, CodeLoc: CodeLocation | AILCodeLocation]:
 
         """
         return DefinitionMatchPredicate.construct(**kwargs).matches(self)
+
+
+__all__ = (
+    "A",
+    "CodeLoc",
+    "Definition",
+    "DefinitionMatchPredicate",
+)

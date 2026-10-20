@@ -110,3 +110,6 @@ class malloc(Func):
                 return False
 
         return returned_locs != returned_locs2
+
+
+__all__ = ("malloc",)

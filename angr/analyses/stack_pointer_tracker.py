@@ -1048,3 +1048,20 @@ class StackPointerTracker(Analysis, ForwardAnalysis):
 
 
 AnalysesHub.register_default("StackPointerTracker", StackPointerTracker)
+
+
+__all__ = (
+    "BOTTOM",
+    "IROP_CONVERT_REGEX",
+    "MAX_MEMORY_ENTRIES",
+    "TOP",
+    "BottomType",
+    "Constant",
+    "CouldNotResolveException",
+    "Eq",
+    "FrozenStackPointerTrackerState",
+    "OffsetVal",
+    "Register",
+    "StackPointerTracker",
+    "StackPointerTrackerState",
+)

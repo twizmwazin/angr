@@ -12,3 +12,6 @@ class CallReturn(angr.SimProcedure):
 
     def run(self):
         l.info("A factory.call_state-created path returned!")
+
+
+__all__ = ("CallReturn",)

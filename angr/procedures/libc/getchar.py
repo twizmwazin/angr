@@ -12,3 +12,9 @@ class getchar(angr.SimProcedure):
 
 
 getchar_unlocked = getchar
+
+
+__all__ = (
+    "getchar",
+    "getchar_unlocked",
+)

@@ -35,3 +35,6 @@ class SimSootExpr_Condition(SimSootExpr):
         "lt": claripy.SLT,
         # TODO others...
     }
+
+
+__all__ = ("SimSootExpr_Condition",)

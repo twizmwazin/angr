@@ -66,3 +66,6 @@ class gets(angr.SimProcedure):
         self.state.memory.store(end_address, b"\0")
 
         return dst
+
+
+__all__ = ("gets",)

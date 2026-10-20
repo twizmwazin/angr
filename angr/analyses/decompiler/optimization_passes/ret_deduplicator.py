@@ -226,3 +226,6 @@ class ReturnDeduplicator(OptimizationPass):
                 if_ret_regions.append(corrected_region)
 
         return if_ret_regions
+
+
+__all__ = ("ReturnDeduplicator",)

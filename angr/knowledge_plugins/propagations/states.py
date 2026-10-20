@@ -542,3 +542,13 @@ class Equivalence:
 
     def __hash__(self):
         return hash((Equivalence, self.codeloc, self.atom0, self.atom1, self.is_weakassignment))
+
+
+__all__ = (
+    "CallExprFinder",
+    "Equivalence",
+    "PropagatorState",
+    "PropagatorVEXState",
+    "RegisterAnnotation",
+    "RegisterComparisonAnnotation",
+)

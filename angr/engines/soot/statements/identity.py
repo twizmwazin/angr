@@ -14,3 +14,6 @@ class SimSootStmt_Identity(SimSootStmt):
         src_val = src_expr.expr
         l.debug("Identity %s := %s", dst, src_val)
         self.state.memory.store(dst, src_val)
+
+
+__all__ = ("SimSootStmt_Identity",)

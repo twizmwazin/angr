@@ -24,3 +24,6 @@ class FindExtraDefs(AILBlockViewer):
                 AILCodeLocation(block.addr, block.idx, stmt_idx, stmt.tags.get("ins_addr", None)),
             )
         super()._handle_UnaryOp(expr_idx, expr, stmt_idx, stmt, block)
+
+
+__all__ = ("FindExtraDefs",)

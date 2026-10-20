@@ -108,3 +108,6 @@ class sprintf(Func):
 
         self._runner = runner
         return True
+
+
+__all__ = ("sprintf",)

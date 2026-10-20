@@ -17,3 +17,6 @@ class SimSootValue_Local(SimSootValue):
     @classmethod
     def from_sootvalue(cls, soot_value, state):
         return cls(soot_value.name, soot_value.type)
+
+
+__all__ = ("SimSootValue_Local",)

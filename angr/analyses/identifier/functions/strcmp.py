@@ -102,3 +102,6 @@ class strcmp(Func):
         outval4 = s.solver.eval(s.regs.eax)
 
         return outval1, outval2, outval3, outval4
+
+
+__all__ = ("strcmp",)

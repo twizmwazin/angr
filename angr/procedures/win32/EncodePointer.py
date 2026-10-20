@@ -6,3 +6,6 @@ import angr
 class EncodePointer(angr.SimProcedure):
     def run(self, ptr):
         return ptr
+
+
+__all__ = ("EncodePointer",)

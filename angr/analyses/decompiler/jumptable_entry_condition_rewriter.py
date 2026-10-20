@@ -66,3 +66,6 @@ class JumpTableEntryConditionRewriter(SequenceWalker):
         if changed:
             return new_node
         return None
+
+
+__all__ = ("JumpTableEntryConditionRewriter",)

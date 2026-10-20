@@ -23,3 +23,9 @@ class fread(angr.SimProcedure):
 
 
 fread_unlocked = fread
+
+
+__all__ = (
+    "fread",
+    "fread_unlocked",
+)

@@ -45,3 +45,6 @@ class SimHeapLibc(SimHeapBase):
                      allocation was made
         """
         raise NotImplementedError(f"{self.realloc.__func__.__name__} not implemented for {self.__class__.__name__}")
+
+
+__all__ = ("SimHeapLibc",)

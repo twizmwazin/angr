@@ -29,3 +29,6 @@ class CallGraphVisitor(GraphVisitor):
             sorted_nodes = [n for n in sorted_nodes if n in set(nodes)]
 
         return sorted_nodes
+
+
+__all__ = ("CallGraphVisitor",)

@@ -12,3 +12,6 @@ class std__terminate(angr.SimProcedure):  # pylint:disable=redefined-builtin
     def run(self):
         # FIXME: Call terminate handlers
         self.exit(1)
+
+
+__all__ = ("std__terminate",)

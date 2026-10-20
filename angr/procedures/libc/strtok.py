@@ -29,3 +29,6 @@ class strtok(angr.SimProcedure):
 
         save_ptr = self.state.globals[self.KEY]  # type: ignore[reportIndexIssue]
         return self.inline_call(strtok_r, s, delim, save_ptr).ret_expr
+
+
+__all__ = ("strtok",)

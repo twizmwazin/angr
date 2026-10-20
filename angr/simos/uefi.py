@@ -12,3 +12,6 @@ class SimUefi(SimOS):
 
     def __init__(self, project):
         super().__init__(project, name="UEFI")
+
+
+__all__ = ("SimUefi",)

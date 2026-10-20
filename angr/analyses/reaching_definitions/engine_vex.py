@@ -1128,3 +1128,10 @@ class SimEngineRDVEX(
         tag = ParameterTag(function=func_addr, metadata={"tagged_by": "SimEngineRDVEX._handle_function_cc"})
         for definition in definitions:
             definition.tags |= {tag}
+
+
+__all__ = (
+    "SimEngineRDVEX",
+    "binop_handler",
+    "unop_handler",
+)

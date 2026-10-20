@@ -13,3 +13,6 @@ class SimplificationMixin(MemoryMixin):
         else:
             real_data = data
         super().store(addr, real_data, size, **kwargs)
+
+
+__all__ = ("SimplificationMixin",)

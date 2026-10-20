@@ -59,3 +59,9 @@ def apply_call_info_to_graph(graph: networkx.DiGraph, manager: Manager, project:
                     variable_map.set_prototype(expr, prototype)
                     count += 1
     return count
+
+
+__all__ = (
+    "apply_call_info_to_graph",
+    "prototype_for_call",
+)

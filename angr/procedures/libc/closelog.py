@@ -9,3 +9,6 @@ class closelog(angr.SimProcedure):
     def run(self):
         # A stub for closelog that does not do anything yet.
         return
+
+
+__all__ = ("closelog",)

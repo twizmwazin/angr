@@ -37,3 +37,6 @@ class SingleNodeGraphVisitor(GraphVisitor):
         if nodes:
             return nodes
         return [self.node]
+
+
+__all__ = ("SingleNodeGraphVisitor",)

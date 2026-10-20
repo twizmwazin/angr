@@ -21,3 +21,6 @@ class unlink(angr.SimProcedure):  # pylint:disable=W0622
         if self.state.fs.delete(str_val):
             return 0
         return -1
+
+
+__all__ = ("unlink",)

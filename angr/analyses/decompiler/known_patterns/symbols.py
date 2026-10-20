@@ -25,3 +25,9 @@ def symbol_addr(loader: Loader, name: str) -> int | None:
     """Where ``name`` lives in this binary, or None if it has no such symbol."""
     sym = loader.find_symbol(name)
     return sym.rebased_addr if sym is not None else None
+
+
+__all__ = (
+    "symbol_addr",
+    "symbol_name_at",
+)

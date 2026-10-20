@@ -70,3 +70,9 @@ def _commented_call_chunks(call, comment: str) -> Iterator:
             yield from go_codegen.GoExpression._try_c_repr_chunks(item)
     yield f" /* {comment} */", None
     yield ")", paren
+
+
+__all__ = (
+    "call_tag",
+    "render_builtin_call_value",
+)

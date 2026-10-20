@@ -716,3 +716,10 @@ class GoAtomicCasFolder(OptimizationPass):
             variable_map_of(self.manager).set_prototype(call, proto)
         except Exception:  # pylint:disable=broad-exception-caught
             l.debug("Could not type %s", call, exc_info=True)
+
+
+__all__ = (
+    "CAS_OLD",
+    "GoAtomicCasFolder",
+    "GoAtomicRewriter",
+)

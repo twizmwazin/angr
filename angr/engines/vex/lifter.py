@@ -421,3 +421,10 @@ class VEXLifter(SimEngine):
         # rebuild block cache
         self._initialize_block_cache()
         super().__setstate__(ostate)
+
+
+__all__ = (
+    "VEX_IRSB_MAX_INST",
+    "VEX_IRSB_MAX_SIZE",
+    "VEXLifter",
+)

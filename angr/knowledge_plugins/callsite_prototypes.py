@@ -156,3 +156,9 @@ class CallsitePrototypes(KnowledgeBasePlugin):
 
 
 KnowledgeBasePlugin.register_default("callsite_prototypes", CallsitePrototypes)
+
+
+__all__ = (
+    "CallsitePrototypeKind",
+    "CallsitePrototypes",
+)

@@ -86,3 +86,9 @@ class Bookmarks(KnowledgeBasePlugin, list):
 
 
 KnowledgeBasePlugin.register_default("bookmarks", Bookmarks)
+
+
+__all__ = (
+    "Bookmark",
+    "Bookmarks",
+)

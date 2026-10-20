@@ -742,3 +742,12 @@ class ScanfFormatParser(FormatParser):
         b"ll": sim_type.SimTypeDouble(),  # 'long double',
         b"L": sim_type.SimTypeDouble(),  # 'long double',
     }
+
+
+__all__ = (
+    "FormatParser",
+    "FormatSpecifier",
+    "FormatString",
+    "ScanfFormatParser",
+    "ascii_digits",
+)

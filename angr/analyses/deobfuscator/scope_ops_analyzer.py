@@ -66,3 +66,9 @@ class ScopeOpsAnalyzer(Analysis):
 
     def crypto_scopes(self, min_count=20):
         return self.filter_scopes({"Xor", "Ror", "Rol", "Shl", "Shr"}, min_count)
+
+
+__all__ = (
+    "ScopeOpsAnalyzer",
+    "ScopeOpsWalker",
+)
