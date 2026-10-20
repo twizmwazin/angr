@@ -11,3 +11,11 @@ CCALL_REWRITERS = {
     "ARMHF": ARMCCallRewriter,
     "ARMCortexM": ARMCCallRewriter,
 }
+
+
+__all__ = (
+    "CCALL_REWRITERS",
+    "AMD64CCallRewriter",
+    "ARMCCallRewriter",
+    "X86CCallRewriter",
+)

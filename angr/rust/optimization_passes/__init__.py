@@ -52,3 +52,29 @@ def get_rust_optimization_passes():
         PatternMatchSimplifier,
         ErrorPropagationSimplifier,
     ]
+
+
+__all__ = (
+    "CleanupCodeRemover",
+    "ComboRegisterRewriter",
+    "DerefCoercionSimplifier",
+    "DerefCoercionSimplifierUninlined",
+    "ErrorPropagationSimplifier",
+    "FormatMacroSimplifier",
+    "FunctionPrototypeInference",
+    "PatternMatchSimplifier",
+    "PrePatternMatchSimplifier",
+    "RedundantBlockRemover",
+    "RetExprRewriter",
+    "RustCallingConvention",
+    "SecurityCheckRemover",
+    "StrArgumentSimplifier",
+    "StringCmpOutliner",
+    "StringLiteralOutliner",
+    "StringOutliner",
+    "StructInstantiationSimplifier",
+    "StructReturnSimplifier",
+    "UnwrapOutliner",
+    "VecOutliner",
+    "get_rust_optimization_passes",
+)

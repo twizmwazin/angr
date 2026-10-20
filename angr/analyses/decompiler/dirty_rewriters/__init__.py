@@ -7,3 +7,10 @@ DIRTY_REWRITERS = {
     "AMD64": AMD64DirtyRewriter,
     "X86": X86DirtyRewriter,
 }
+
+
+__all__ = (
+    "DIRTY_REWRITERS",
+    "AMD64DirtyRewriter",
+    "X86DirtyRewriter",
+)
