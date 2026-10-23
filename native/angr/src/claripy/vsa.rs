@@ -1,7 +1,9 @@
 use clarirs_vsa::StridedInterval;
+use clarirs_vsa::multi_value::MultiValue;
 use clarirs_vsa::reduce::Reduce;
 use clarirs_vsa::strided_interval::ComparisonResult;
 use num_bigint::{BigInt, BigUint};
+use pyo3::types::PyTuple;
 
 use crate::claripy::prelude::*;
 
@@ -185,6 +187,70 @@ pub fn simplify<'py>(
     reduce(py, expr)
 }
 
+/// The single value `value` stands for, or `None`.
+#[pyfunction]
+pub fn mv_eval_one<'py>(
+    py: Python<'py>,
+    value: Bound<'py, BV>,
+) -> Result<Option<Bound<'py, BV>>, ClaripyError> {
+    value
+        .get()
+        .inner
+        .mv_eval_one()?
+        .map(|v| BV::new(py, &v))
+        .transpose()
+}
+
+/// The alternatives of a value that is a single piece, or `None` for a value
+/// made of several independently tracked pieces.
+#[pyfunction]
+pub fn mv_eval<'py>(
+    py: Python<'py>,
+    value: Bound<'py, BV>,
+) -> Result<Option<Bound<'py, PyTuple>>, ClaripyError> {
+    value
+        .get()
+        .inner
+        .mv_eval()?
+        .map(|values| {
+            Ok(PyTuple::new(
+                py,
+                values
+                    .iter()
+                    .map(|v| BV::new(py, v))
+                    .collect::<Result<Vec<_>, _>>()?,
+            )?)
+        })
+        .transpose()
+}
+
+/// The pieces of a value as `(byte offset, alternatives)` pairs, ordered by
+/// offset. Adjacent single-valued pieces are joined into one.
+#[pyfunction]
+pub fn mv_segments<'py>(
+    py: Python<'py>,
+    value: Bound<'py, BV>,
+) -> Result<Vec<(u32, Bound<'py, PyTuple>)>, ClaripyError> {
+    value
+        .get()
+        .inner
+        .mv_segments()?
+        .into_iter()
+        .map(|(offset, values)| {
+            Ok((
+                offset,
+                PyTuple::new(
+                    py,
+                    values
+                        .iter()
+                        .map(|v| BV::new(py, v))
+                        .collect::<Result<Vec<_>, _>>()?,
+                )?,
+            ))
+        })
+        .collect()
+}
+
 pub(crate) fn import(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     add_pyfunctions!(
         m,
@@ -199,6 +265,9 @@ pub(crate) fn import(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
         eval,
         cardinality,
         identical,
+        mv_eval_one,
+        mv_eval,
+        mv_segments,
     );
     Ok(())
 }
