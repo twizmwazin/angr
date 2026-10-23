@@ -15,6 +15,7 @@ from angr.analyses.reaching_definitions.function_handler_library import LibcHand
 from angr.analyses.reaching_definitions.rd_state import ReachingDefinitionsState
 from angr.analyses.reaching_definitions.subject import Subject
 from angr.block import Block
+from angr.claripy.vsa import mv_eval_one
 from angr.code_location import CodeLocation, ExternalCodeLocation
 from angr.codenode import FuncNode
 from angr.engines.light import SpOffset
@@ -300,7 +301,7 @@ class TestReachingDefinitions(TestCase):
         )
         live_defs = rda.observed_results[("node", func.addr, OP_BEFORE)]
         rtoc_offset, rtoc_size = project.arch.registers["rtoc"]
-        v = live_defs.registers.load(rtoc_offset, size=rtoc_size).one_value()
+        v = mv_eval_one(live_defs.registers.load(rtoc_offset, size=rtoc_size))
         assert v is not None and v.concrete_value == rtoc_value
 
     def test_reaching_definition_analysis_exposes_its_subject(self):
@@ -476,7 +477,7 @@ class TestReachingDefinitions(TestCase):
             size=4,
             endness=project.arch.register_endness,
         )
-        assert claripy.is_true(mv.one_value() == claripy.BVV(1, 32))
+        assert claripy.is_true(mv_eval_one(mv) == claripy.BVV(1, 32))
 
     def test_conditional_return(self):
         bin_path = _binary_path("check_dap", arch="armel")

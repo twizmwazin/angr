@@ -4,8 +4,9 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from typing import Any
 
+from angr import claripy
+from angr.claripy.vsa import mv_eval, mv_eval_one
 from angr.storage.memory_mixins.memory_mixin import MemoryMixin
-from angr.storage.memory_mixins.paged_memory.pages.multi_values import MultiValues
 
 
 class MultiValueMergerMixin(MemoryMixin):
@@ -32,22 +33,15 @@ class MultiValueMergerMixin(MemoryMixin):
     def store(self, addr, data, size=None, **kwargs):
         # Apply the element limit on the store path too. Merging only happens at control-flow joins, so a
         # straight-line chain of ITEs (e.g., cmovs) would otherwise grow value sets exponentially.
-        if isinstance(data, MultiValues):
+        if isinstance(data, claripy.ast.Base) and mv_eval_one(data) is None:
             data = self._limit_values(data)
         super().store(addr, data, size=size, **kwargs)
 
-    def _limit_values(self, data: MultiValues) -> MultiValues:
-        offset_to_values: dict[int, set[Any]] = {}
-        collapsed = False
-        for offset, values_set in data.items():
-            if len(values_set) > self._element_limit:
-                merged_size = max(len(v) for v in values_set) // self.state.arch.byte_width
-                values_set = self._collapse_values(values_set, merged_size)
-                collapsed = True
-            offset_to_values[offset] = set(values_set)
-        if not collapsed:
+    def _limit_values(self, data: claripy.ast.BV) -> claripy.ast.BV:
+        values = mv_eval(data)
+        if values is None or len(set(values)) <= self._element_limit:
             return data
-        return MultiValues(offset_to_values)
+        return claripy.union(*self._collapse_values(set(values), len(data) // self.state.arch.byte_width))
 
     def _merge_values(self, values: Iterable[tuple[Any, Any]], merged_size: int, **kwargs):
         values_set = {v for v, _ in values}

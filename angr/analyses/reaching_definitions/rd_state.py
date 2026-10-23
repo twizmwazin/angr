@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Self, overload
 import archinfo
 
 from angr import claripy
+from angr.claripy.vsa import mv_eval
 from angr.code_location import CodeLocation
 from angr.engines.light import SpOffset
 from angr.knowledge_plugins.key_definitions import Definition, DerefSize, LiveDefinitions
@@ -16,7 +17,6 @@ from angr.knowledge_plugins.key_definitions.environment import Environment
 from angr.knowledge_plugins.key_definitions.heap_address import HeapAddress
 from angr.knowledge_plugins.key_definitions.tag import Tag
 from angr.storage.memory_mixins import MultiValuedMemory
-from angr.storage.memory_mixins.paged_memory.pages.multi_values import MultiValues
 
 from .heap_allocator import HeapAllocator
 from .rd_initializer import RDAStateInitializer
@@ -185,17 +185,12 @@ class ReachingDefinitionsState:
 
     def annotate_with_def(self, symvar: claripy.ast.BV, definition: Definition[Any, Any]) -> claripy.ast.BV:
         """
-
-        :param symvar:
-        :param definition:
-        :return:
+        Annotate a value, or every alternative of it, with a definition.
         """
         return self.live_definitions.annotate_with_def(symvar, definition)
 
-    def annotate_mv_with_def(self, mv: MultiValues, definition: Definition[A, CodeLoc]) -> MultiValues:
-        return MultiValues(
-            {offset: {self.annotate_with_def(value, definition) for value in values} for offset, values in mv.items()}
-        )
+    def annotate_mv_with_def(self, mv: claripy.ast.BV, definition: Definition[A, CodeLoc]) -> claripy.ast.BV:
+        return self.annotate_with_def(mv, definition)
 
     def extract_defs(self, symvar: claripy.ast.Base) -> Iterator[Definition[Any, Any]]:
         yield from self.live_definitions.extract_defs(symvar)
@@ -245,7 +240,7 @@ class ReachingDefinitionsState:
         return self.live_definitions.memory_uses
 
     @property
-    def others(self) -> dict[Atom, MultiValues]:
+    def others(self) -> dict[Atom, claripy.ast.BV]:
         return self.live_definitions.others
 
     @property
@@ -352,14 +347,14 @@ class ReachingDefinitionsState:
     def kill_and_add_definition(
         self,
         atom: Atom,
-        data: MultiValues,
+        data: claripy.ast.BV,
         dummy=False,
         tags: set[Tag] | None = None,
         endness=None,  # XXX destroy
         annotated: bool = False,
         uses: set[Definition[A, CodeLoc]] | None = None,
         override_codeloc: CodeLocation | None = None,
-    ) -> tuple[MultiValues | None, set[Definition[A, CodeLoc]]]:
+    ) -> tuple[claripy.ast.BV | None, set[Definition[A, CodeLoc]]]:
         codeloc = override_codeloc or self.codeloc
         existing_defs = self.live_definitions.get_definitions(atom)
         mv = self.live_definitions.kill_and_add_definition(
@@ -376,10 +371,7 @@ class ReachingDefinitionsState:
                 sp_offset = self.arch.sp_offset
                 bp_offset = self.arch.bp_offset
 
-                values = set()
-                for vs in mv.values():
-                    for v in vs:
-                        values.add(v)
+                values = set(mv_eval(mv) or ())
 
                 if uses is None:
                     uses = self.codeloc_uses
@@ -493,11 +485,13 @@ class ReachingDefinitionsState:
 
     def get_definitions(
         self,
-        atom: Atom | Definition[Atom, CodeLoc] | Iterable[Atom] | Iterable[Definition[Atom, CodeLoc]] | MultiValues,
+        atom: (
+            Atom | Definition[Atom, CodeLoc] | Iterable[Atom] | Iterable[Definition[Atom, CodeLoc]] | claripy.ast.BV
+        ),
     ) -> set[Definition[Atom, CodeLoc]]:
         return self.live_definitions.get_definitions(atom)
 
-    def get_values(self, spec: A | Definition[A, CodeLoc] | Iterable[A]) -> MultiValues | None:
+    def get_values(self, spec: A | Definition[A, CodeLoc] | Iterable[A]) -> claripy.ast.BV | None:
         return self.live_definitions.get_values(spec)
 
     def get_one_value(
@@ -555,7 +549,7 @@ class ReachingDefinitionsState:
     @overload
     def deref(
         self,
-        pointer: MultiValues | A | Definition | Iterable[A] | Iterable[Definition[A, CodeLoc]],
+        pointer: A | Definition | Iterable[A] | Iterable[Definition[A, CodeLoc]],
         size: int | DerefSize,
         endness: archinfo.Endness = ...,
     ) -> set[MemoryLocation]: ...
@@ -563,8 +557,7 @@ class ReachingDefinitionsState:
     def deref(
         self,
         pointer: (
-            MultiValues
-            | Atom
+            Atom
             | Definition[Atom, CodeLoc]
             | Iterable[Atom]
             | Iterable[Definition[Atom, CodeLoc]]

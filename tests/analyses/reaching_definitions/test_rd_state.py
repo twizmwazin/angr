@@ -12,6 +12,7 @@ import archinfo
 from angr.analyses.reaching_definitions.heap_allocator import HeapAllocator
 from angr.analyses.reaching_definitions.rd_state import ReachingDefinitionsState
 from angr.analyses.reaching_definitions.subject import SubjectType
+from angr.claripy.vsa import mv_eval_one
 from angr.code_location import CodeLocation
 from angr.knowledge_plugins.key_definitions.live_definitions import LiveDefinitions
 from tests.common import bin_location
@@ -53,8 +54,8 @@ class TestReachingDefinitionsState(TestCase):
         rtoc_offset = arch.registers["rtoc"][0]
         rtoc_definition_value = state.registers.load(rtoc_offset, size=8)
 
-        self.assertIsNotNone(rtoc_definition_value.one_value())
-        v = rtoc_definition_value.one_value()
+        self.assertIsNotNone(mv_eval_one(rtoc_definition_value))
+        v = mv_eval_one(rtoc_definition_value)
         self.assertFalse(v.symbolic)
         self.assertEqual(v.concrete_value, rtoc_value)
 
