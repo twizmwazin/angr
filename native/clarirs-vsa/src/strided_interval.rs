@@ -483,7 +483,10 @@ impl StridedInterval {
                 if s_stride.is_zero() {
                     s_lb == o_lb && o_stride.is_zero()
                 } else {
-                    o_stride % s_stride == BigUint::zero()
+                    // other's values must lie on self's grid: same step, and a
+                    // lower bound a whole number of strides from self's
+                    (o_stride % s_stride).is_zero()
+                        && (modular_sub(o_lb, s_lb, self.bits()) % s_stride).is_zero()
                 }
             }
             _ => false,
@@ -988,38 +991,37 @@ impl StridedInterval {
         let new_lower = min(self_min, other_min);
         let new_upper = max(self_max, other_max);
 
-        // For union, handle special cases to avoid GCD(0,0) and division by zero
+        // Every member of either operand must stay on the result's grid, so the
+        // stride divides both strides and the distance of each operand's lower
+        // bound from the new lower bound. Zero terms (constants, or a lower
+        // bound equal to the new one) add no constraint.
         let new_stride = match (self, other) {
             (
                 StridedInterval::Normal {
                     stride: s_stride,
                     lower_bound: s_lb,
-                    upper_bound: s_ub,
                     ..
                 },
                 StridedInterval::Normal {
                     stride: o_stride,
                     lower_bound: o_lb,
-                    upper_bound: o_ub,
                     ..
                 },
-            ) => {
-                if s_stride.is_zero() && o_stride.is_zero() {
-                    if s_lb == o_lb && s_ub == o_ub {
-                        BigUint::zero()
-                    } else if s_lb > o_lb {
-                        s_lb - o_lb
-                    } else {
-                        o_lb - s_lb
-                    }
-                } else if s_stride.is_zero() {
-                    o_stride.clone()
-                } else if o_stride.is_zero() {
-                    s_stride.clone()
+            ) => [
+                s_stride.clone(),
+                o_stride.clone(),
+                s_lb - &new_lower,
+                o_lb - &new_lower,
+            ]
+            .iter()
+            .filter(|t| !t.is_zero())
+            .fold(BigUint::zero(), |acc, t| {
+                if acc.is_zero() {
+                    t.clone()
                 } else {
-                    gcd(s_stride, o_stride)
+                    gcd(&acc, t)
                 }
-            }
+            }),
             _ => BigUint::one(),
         };
 
@@ -3389,6 +3391,31 @@ mod si_set_op_tests {
         let b = StridedInterval::range(32, 30u32, 40u32);
         let result = a.union(&b);
         assert_eq!(result, StridedInterval::range(32, 10u32, 40u32));
+    }
+
+    #[test]
+    fn test_union_keeps_every_member_on_the_grid() {
+        // a constant off the other interval's grid
+        let a = StridedInterval::new(32, 3u32, 4u32, 10u32);
+        let result = a.union(&StridedInterval::constant(32, 6u32));
+        assert_eq!(result, StridedInterval::new(32, 1u32, 4u32, 10u32));
+
+        // two constants
+        let result =
+            StridedInterval::constant(32, 10u32).union(&StridedInterval::constant(32, 7u32));
+        assert_eq!(result, StridedInterval::new(32, 3u32, 7u32, 10u32));
+
+        // equal strides, offset grids
+        let a = StridedInterval::new(32, 4u32, 0u32, 8u32);
+        let b = StridedInterval::new(32, 4u32, 2u32, 10u32);
+        assert_eq!(a.union(&b), StridedInterval::new(32, 2u32, 0u32, 10u32));
+
+        // the union of points is the same in any order
+        let points = [10u32, 7, 4, 6, 11, 9, 5, 8];
+        let folded = points.iter().fold(StridedInterval::empty(32), |acc, p| {
+            acc.union(&StridedInterval::constant(32, *p))
+        });
+        assert_eq!(folded, StridedInterval::new(32, 1u32, 4u32, 11u32));
     }
 
     #[test]
