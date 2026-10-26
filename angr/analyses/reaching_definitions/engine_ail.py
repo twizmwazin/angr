@@ -610,38 +610,45 @@ class SimEngineRDAIL(SimEngineNostmtAIL[ReachingDefinitionsState, MultiValues, N
         top = self.state.top(len(iftrue))
         return MultiValues(top)
 
+    def _slice_bounds(self, expr: ailment.expression.Extract | ailment.expression.Insert, size: int) -> int | None:
+        """
+        The byte offset, counted from the most significant end, of the ``size`` bytes an Extract reads or an Insert
+        overwrites, or None if the offset is unknown or the slice does not fit in the base.
+
+        ``offset`` counts bytes from the least significant end with Iend_LE, and from the most significant end with
+        Iend_BE.
+        """
+        one_offset = self._expr(expr.offset).one_value()
+        if one_offset is None or not one_offset.concrete:
+            return None
+        base_size = expr.base.bits // self.arch.byte_width
+        offset = one_offset.concrete_value
+        if expr.endness != archinfo.Endness.BE:
+            offset = base_size - offset - size
+        if offset < 0 or offset + size > base_size:
+            return None
+        return offset
+
     def _handle_expr_Extract(self, expr: ailment.expression.Extract) -> MultiValues:
         base = self._expr(expr.base)
-        offset = self._expr(expr.offset)
-        one_offset = offset.one_value()
-        if one_offset is None:
+        size = expr.bits // self.arch.byte_width
+        offset = self._slice_bounds(expr, size)
+        if offset is None:
             return self._top(expr.bits)
-        conc_offset = one_offset.concrete_value
-        if conc_offset is None:
-            return self._top(expr.bits)
-
-        return base.extract(conc_offset, expr.offset.size, archinfo.Endness.BE)
+        return base.extract(offset, size, archinfo.Endness.BE)
 
     def _handle_expr_Insert(self, expr: ailment.expression.Insert):
         base = self._expr(expr.base)
-        offset = self._expr(expr.offset)
         value = self._expr(expr.value)
-
-        one_offset = offset.one_value()
-        if one_offset is None:
+        size = expr.value.bits // self.arch.byte_width
+        offset = self._slice_bounds(expr, size)
+        if offset is None:
             return self._top(expr.bits)
-        conc_offset = one_offset.concrete_value
-        if conc_offset is None:
-            return self._top(expr.bits)
-
+        base_size = expr.bits // self.arch.byte_width
         return (
-            base.extract(0, conc_offset, archinfo.Endness.BE)
+            base.extract(0, offset, archinfo.Endness.BE)
             .concat(value)
-            .concat(
-                base.extract(
-                    conc_offset + expr.offset.size, len(base) // 8 - conc_offset - expr.offset.size, archinfo.Endness.BE
-                )
-            )
+            .concat(base.extract(offset + size, base_size - offset - size, archinfo.Endness.BE))
         )
 
     def _handle_unop_Not(self, expr) -> MultiValues:
