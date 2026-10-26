@@ -26,9 +26,9 @@ angr_modules = [
     "z3",
 ]
 native_modules = {
-    "angr": lambda: angr.state_plugins.unicorn_engine._UC_NATIVE,  # pylint: disable=undefined-variable
-    "pyvex": lambda: pyvex.pvc,  # pylint: disable=undefined-variable
-    "unicorn": lambda: unicorn.unicorn._uc,  # pylint: disable=undefined-variable
+    "angr": lambda: importlib.import_module("angr.state_plugins.unicorn_engine")._UC_NATIVE,
+    "pyvex": lambda: importlib.import_module("pyvex").pvc,
+    "unicorn": lambda: importlib.import_module("unicorn.unicorn")._uc,
 }
 python_packages = {"z3": "z3-solver"}
 

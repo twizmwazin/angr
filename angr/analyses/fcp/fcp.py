@@ -114,7 +114,7 @@ dirty_handler = SimEngineNostmtVEX[FCPState, claripy.ast.BV, FCPState].dirty_han
 
 class SimEngineFCPVEX(
     SimEngineNostmtVEX[FCPState, SpOffset | RegisterOffset | int, None],
-    SimEngineLight[type[FCPState], SpOffset | RegisterOffset | int, Block, None],
+    SimEngineLight[FCPState, SpOffset | RegisterOffset | int, Block, None],
 ):
     """
     THe engine for FastConstantPropagation.
@@ -142,7 +142,7 @@ class SimEngineFCPVEX(
     def _is_top(self, expr: Any) -> bool:
         raise NotImplementedError
 
-    def _handle_conversion(self, from_size: int, to_size: int, signed: bool, operand: pyvex.IRExpr) -> Any:
+    def _handle_conversion(self, from_size: int, to_size: int, signed: bool, operand: pyvex.expr.IRExpr) -> Any:
         return None
 
     def _handle_stmt_Put(self, stmt):

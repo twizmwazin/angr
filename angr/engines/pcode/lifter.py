@@ -15,11 +15,12 @@ import cle
 import pypcode
 from archinfo import ArchARM, ArchPcode
 from cachetools import LRUCache
+from pyvex.const import U8, U16, U32, U64
 
 # FIXME: Reusing these errors from pyvex for compatibility. Eventually these
 # should be refactored to use common error classes.
 from pyvex.errors import LiftingException, PyVEXError, SkipStatementsError
-from pyvex.expr import U8, U16, U32, U64, Const, IRExpr
+from pyvex.expr import Const, IRExpr
 
 from angr import sim_options as o
 from angr.block import DisassemblerBlock, DisassemblerInsn

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from collections.abc import Iterable
-from typing import Any, Literal, overload
+from typing import Any, Literal, Self, overload
 
 import cffi
 
@@ -608,7 +608,7 @@ class PagedMemoryMixin[PageType: PageBase](
         return changes
 
     def _replace_all(self, addrs: Iterable[int], old: claripy.ast.BV, new: claripy.ast.BV):
-        page_offsets: dict[set[int]] = defaultdict(set)
+        page_offsets: dict[int, set[int]] = defaultdict(set)
         for addr in addrs:
             page_no, page_offset = self._divide_addr(addr)
             page_offsets[page_no].add(page_offset)
@@ -725,7 +725,7 @@ class MVListPagesMixin(PagedMemoryMixin, SupportsSubsumes):
         self.skip_missing_values_during_merging = skip_missing_values_during_merging
 
     @MemoryMixin.memo
-    def copy(self, memo) -> MVListPagesMixin:
+    def copy(self, memo) -> Self:
         r = super().copy(memo)
         r.skip_missing_values_during_merging = self.skip_missing_values_during_merging
         return r

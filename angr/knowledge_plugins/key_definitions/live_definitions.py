@@ -11,7 +11,7 @@ import archinfo
 
 from angr import claripy
 from angr.claripy.annotation import Annotation
-from angr.code_location import CodeLocation, ExternalCodeLocation
+from angr.code_location import AILCodeLocation, CodeLocation, ExternalCodeLocation
 from angr.engines.light import SpOffset
 from angr.errors import SimMemoryError, SimMemoryMissingError
 from angr.knowledge_plugins.key_definitions.definition import A
@@ -673,8 +673,13 @@ class LiveDefinitions:
             self.other_uses.add_use(definition, code_loc, expr)
 
     def get_definitions(
-        self, thing: Atom | Definition[Atom] | Iterable[Atom] | Iterable[Definition[Atom]] | MultiValues
-    ) -> set[Definition[Atom]]:
+        self,
+        thing: Atom
+        | Definition[Atom, CodeLocation | AILCodeLocation]
+        | Iterable[Atom]
+        | Iterable[Definition[Atom, CodeLocation | AILCodeLocation]]
+        | MultiValues,
+    ) -> set[Definition[Atom, CodeLocation | AILCodeLocation]]:
         if isinstance(thing, MultiValues):
             defs = set()
             for vs in thing.values():
@@ -761,7 +766,12 @@ class LiveDefinitions:
         return LiveDefinitions.extract_defs_from_annotations(annotations)
 
     def get_values(
-        self, spec: A | Definition[A] | Iterable[A] | Iterable[Definition[A]], endness: archinfo.Endness | None = None
+        self,
+        spec: A
+        | Definition[A, CodeLocation | AILCodeLocation]
+        | Iterable[A]
+        | Iterable[Definition[A, CodeLocation | AILCodeLocation]],
+        endness: archinfo.Endness | None = None,
     ) -> MultiValues | None:
         if isinstance(spec, Definition):
             atom = spec.atom
@@ -819,7 +829,10 @@ class LiveDefinitions:
 
     def get_one_value(
         self,
-        spec: A | Definition[A] | Iterable[A] | Iterable[Definition[A]],
+        spec: A
+        | Definition[A, CodeLocation | AILCodeLocation]
+        | Iterable[A]
+        | Iterable[Definition[A, CodeLocation | AILCodeLocation]],
         strip_annotations: bool = False,
     ) -> claripy.ast.bv.BV | None:
         r = self.get_values(spec)
@@ -829,17 +842,30 @@ class LiveDefinitions:
 
     @overload
     def get_concrete_value(
-        self, spec: A | Definition[A] | Iterable[A] | Iterable[Definition[A]], cast_to: type[int]
+        self,
+        spec: A
+        | Definition[A, CodeLocation | AILCodeLocation]
+        | Iterable[A]
+        | Iterable[Definition[A, CodeLocation | AILCodeLocation]],
+        cast_to: type[int],
     ) -> int | None: ...
 
     @overload
     def get_concrete_value(
-        self, spec: A | Definition[A] | Iterable[A] | Iterable[Definition[A]], cast_to: type[bytes]
+        self,
+        spec: A
+        | Definition[A, CodeLocation | AILCodeLocation]
+        | Iterable[A]
+        | Iterable[Definition[A, CodeLocation | AILCodeLocation]],
+        cast_to: type[bytes],
     ) -> bytes | None: ...
 
     def get_concrete_value(
         self,
-        spec: A | Definition[A] | Iterable[A] | Iterable[Definition[A]],
+        spec: A
+        | Definition[A, CodeLocation | AILCodeLocation]
+        | Iterable[A]
+        | Iterable[Definition[A, CodeLocation | AILCodeLocation]],
         cast_to: type[int | bytes] = int,
     ) -> int | bytes | None:
         r = self.get_one_value(spec, strip_annotations=True)
@@ -926,7 +952,11 @@ class LiveDefinitions:
     @overload
     def deref(
         self,
-        pointer: MultiValues | Atom | Definition[Atom] | Iterable[Atom] | Iterable[Definition[Atom]],
+        pointer: MultiValues
+        | Atom
+        | Definition[Atom, CodeLocation | AILCodeLocation]
+        | Iterable[Atom]
+        | Iterable[Definition[Atom, CodeLocation | AILCodeLocation]],
         size: int | DerefSize,
         endness: archinfo.Endness = ...,
     ) -> set[MemoryLocation]: ...

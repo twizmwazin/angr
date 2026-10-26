@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Self, overload
 import archinfo
 
 from angr import claripy
-from angr.code_location import CodeLocation
+from angr.code_location import AILCodeLocation, CodeLocation
 from angr.engines.light import SpOffset
 from angr.knowledge_plugins.key_definitions import Definition, DerefSize, LiveDefinitions
 from angr.knowledge_plugins.key_definitions.atoms import Atom, ConstantSrc, GuardUse, MemoryLocation, Register
@@ -493,8 +493,14 @@ class ReachingDefinitionsState:
 
     def get_definitions(
         self,
-        atom: Atom | Definition[Atom, CodeLoc] | Iterable[Atom] | Iterable[Definition[Atom, CodeLoc]] | MultiValues,
-    ) -> set[Definition[Atom, CodeLoc]]:
+        atom: (
+            Atom
+            | Definition[Atom, CodeLocation | AILCodeLocation]
+            | Iterable[Atom]
+            | Iterable[Definition[Atom, CodeLocation | AILCodeLocation]]
+            | MultiValues
+        ),
+    ) -> set[Definition[Atom, CodeLocation | AILCodeLocation]]:
         return self.live_definitions.get_definitions(atom)
 
     def get_values(self, spec: A | Definition[A, CodeLoc] | Iterable[A]) -> MultiValues | None:

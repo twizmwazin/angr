@@ -1,7 +1,7 @@
 # pylint:disable=protected-access
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from typing import Any
 
 import networkx
@@ -62,6 +62,12 @@ class TransitionGraph(networkx.DiGraph):
     All copying operations will convert this TransitionGraph into a plain networkx.DiGraph instance, in which
     case the original Function owner no longer keeps the copied instance in sync.
     """
+
+    # networkx.DiGraph internals that the mirror maintenance below writes to; the networkx stubs do not declare them
+    _succ: dict[Any, dict[Any, ReadOnlyAttrDict]]
+    _pred: dict[Any, dict[Any, ReadOnlyAttrDict]]
+    _node: dict[Any, ReadOnlyAttrDict]
+    adjlist_inner_dict_factory: Callable[[], dict[Any, Any]]
 
     frozen = True
     node_attr_dict_factory = ReadOnlyAttrDict

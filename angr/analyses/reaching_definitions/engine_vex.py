@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import pyvex
 
 from angr import claripy
-from angr.code_location import CodeLocation, ExternalCodeLocation
+from angr.code_location import AILCodeLocation, CodeLocation, ExternalCodeLocation
 from angr.engines.light import SimEngineNostmtVEX, SpOffset
 from angr.engines.vex.claripy.datalayer import value_bv as claripy_value_bv
 from angr.errors import SimEngineError, SimMemoryMissingError
@@ -394,7 +394,7 @@ class SimEngineRDVEX(
                 )
             values = self.state.registers.load(expr.offset, size=size)
 
-        current_defs: Iterable[Definition[Atom]] | None = None
+        current_defs: Iterable[Definition[Atom, CodeLocation | AILCodeLocation]] | None = None
         for vs in values.values():
             for v in vs:
                 if current_defs is None:

@@ -5,7 +5,7 @@ import itertools
 import logging
 import weakref
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from archinfo import Arch
 from archinfo.arch_soot import SootAddressDescriptor
@@ -25,17 +25,24 @@ if TYPE_CHECKING:
     from angr.simos.javavm import SimJavaVM
 
     from .state_plugins.callstack import CallStack
+    from .state_plugins.cgc import SimStateCGC
     from .state_plugins.filesystem import SimFilesystem
+    from .state_plugins.globals import SimStateGlobals
     from .state_plugins.heap.heap_base import SimHeapBase
     from .state_plugins.history import SimStateHistory
     from .state_plugins.inspect import SimInspector
+    from .state_plugins.javavm_classloader import SimJavaVmClassloader
     from .state_plugins.jni_references import SimStateJNIReferences
     from .state_plugins.libc import SimStateLibc
     from .state_plugins.posix import SimSystemPosix
+    from .state_plugins.preconstrainer import SimStatePreconstrainer
     from .state_plugins.scratch import SimStateScratch
     from .state_plugins.solver import SimSolver
+    from .state_plugins.uc_manager import SimUCManager
+    from .state_plugins.unicorn_engine import Unicorn
     from .state_plugins.view import SimMemView, SimRegNameView
     from .storage import DefaultMemory
+    from .storage.memory_mixins import JavaVmMemory
 
 
 l = logging.getLogger(name=__name__)
@@ -94,6 +101,12 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
     jni_references: SimStateJNIReferences
     scratch: SimStateScratch
     heap: SimHeapBase
+    globals: SimStateGlobals
+    cgc: SimStateCGC
+    unicorn: Unicorn
+    uc_manager: SimUCManager
+    preconstrainer: SimStatePreconstrainer
+    javavm_classloader: SimJavaVmClassloader
 
     def __init__(
         self,
@@ -422,7 +435,7 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
         if self.supports_inspect:
             self.inspect.action(*args, **kwargs)
 
-    def _inspect_getattr[T](self, attr: str, default_value: T):
+    def _inspect_getattr[T](self, attr: str, default_value: T) -> T:
         if self.supports_inspect:
             return getattr(self.inspect.attrs, attr)
         return default_value
@@ -457,7 +470,7 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
     #
 
     @property
-    def javavm_memory(self):
+    def javavm_memory(self) -> JavaVmMemory:
         """
         In case of an JavaVM with JNI support, a state can store the memory
         plugin twice; one for the native and one for the java view of the state.
@@ -465,8 +478,8 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
         :return: The JavaVM view of the memory plugin.
         """
         if self._is_java_jni_project:
-            return self.get_plugin("memory_soot")
-        return self.get_plugin("memory")
+            return cast("JavaVmMemory", self.get_plugin("memory_soot"))
+        return cast("JavaVmMemory", self.get_plugin("memory"))
 
     @property
     def javavm_registers(self):

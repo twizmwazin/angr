@@ -7,7 +7,6 @@ from typing import Any
 
 from sortedcontainers import SortedDict
 
-import angr
 from angr import claripy
 from angr.errors import SimMemoryError
 
@@ -438,15 +437,11 @@ class UltraPage(MemoryObjectMixin, PageBase):
 
     def concrete_load(self, addr, size, writing=False, with_bitmap=False, **kwargs):  # pylint: disable=arguments-differ
         assert self.symbolic_bitmap is not None
+        # imported here: page_backer_mixins imports the pages package that this module belongs to
+        from angr.storage.memory_mixins.paged_memory.page_backer_mixins import NotMemoryview
+
         concrete_data = self._concrete()
-        mv_data = (
-            concrete_data
-            if isinstance(
-                concrete_data,
-                (memoryview, angr.storage.memory_mixins.paged_memory.page_backer_mixins.NotMemoryview),
-            )
-            else memoryview(concrete_data)
-        )
+        mv_data = concrete_data if isinstance(concrete_data, (memoryview, NotMemoryview)) else memoryview(concrete_data)
         data = mv_data[addr : addr + size]
         if not with_bitmap:
             return data

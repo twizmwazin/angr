@@ -4,7 +4,7 @@ from collections import defaultdict
 from typing import cast
 
 import pyvex
-from cle.loader import MetaELF
+from cle import MetaELF
 
 from angr import claripy
 from angr.analyses.analysis import register_analysis

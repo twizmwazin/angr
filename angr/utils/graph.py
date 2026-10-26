@@ -1393,7 +1393,7 @@ class DirectedGraphHelper[T]:
     def get_node_order(self) -> dict[T, int]:
         return self._current_node_order()
 
-    def to_acyclic_by_order(self, graph: RegionOverlayGraph[T]) -> networkx.DiGraph[T]:
+    def to_acyclic_by_order(self, graph: RegionOverlayGraph[T]) -> RegionOverlayGraph[T]:
         return graph.to_acyclic_by_order(self.get_node_order())
 
     def sort_nodes_by_order(self, nodes: list[T]) -> list[T]:

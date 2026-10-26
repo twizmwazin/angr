@@ -1578,7 +1578,7 @@ class PhoenixStructurer(StructurerBase):
 
         return any_matches
 
-    def _match_acyclic_schemas(self, graph: networkx.DiGraph, full_graph: networkx.DiGraph, head) -> bool:
+    def _match_acyclic_schemas(self, graph: RegionOverlayGraph, full_graph: RegionOverlayGraph, head) -> bool:
         # traverse the graph in reverse topological order
         any_matches = False
 
@@ -1621,7 +1621,7 @@ class PhoenixStructurer(StructurerBase):
 
     # switch cases
 
-    def _match_acyclic_switch_cases(self, graph: networkx.DiGraph, full_graph: networkx.DiGraph, node) -> bool:
+    def _match_acyclic_switch_cases(self, graph: RegionOverlayGraph, full_graph: RegionOverlayGraph, node) -> bool:
         if isinstance(node, SwitchCaseNode):
             return False
 
@@ -1647,7 +1647,7 @@ class PhoenixStructurer(StructurerBase):
         return self._match_acyclic_incomplete_switch_cases(node, graph, full_graph)
 
     def _match_acyclic_switch_cases_incomplete_switch_head(
-        self, node, graph_raw: networkx.DiGraph, full_graph_raw: networkx.DiGraph
+        self, node, graph_raw: RegionOverlayGraph, full_graph_raw: RegionOverlayGraph
     ) -> bool:
         try:
             last_stmts = self.cond_proc.get_last_statements(node)
@@ -2219,7 +2219,7 @@ class PhoenixStructurer(StructurerBase):
         return True
 
     def _match_acyclic_switch_cases_address_computed(
-        self, node, graph_raw: networkx.DiGraph, full_graph_raw: networkx.DiGraph
+        self, node, graph_raw: RegionOverlayGraph, full_graph_raw: RegionOverlayGraph
     ) -> bool:
         # the dispatch block may already be merged into a sequence or a MultiNode; key on its last block
         last_block = last_node(node)
@@ -2290,7 +2290,7 @@ class PhoenixStructurer(StructurerBase):
         )[0]
 
     def _match_acyclic_incomplete_switch_cases(
-        self, node, graph_raw: networkx.DiGraph, full_graph_raw: networkx.DiGraph
+        self, node, graph_raw: RegionOverlayGraph, full_graph_raw: RegionOverlayGraph
     ) -> bool:
         # sanity checks
         if node.addr not in self.jump_tables:
@@ -2353,7 +2353,7 @@ class PhoenixStructurer(StructurerBase):
         head_node,
         node_a: BaseNode,
         node_b_addr: int | None,
-        graph_raw: networkx.DiGraph,
+        graph_raw: RegionOverlayGraph,
         node_b_idx: int | EllipsisType = ...,
     ) -> tuple[OrderedDict, Any, set[Any]]:
         cases: OrderedDict[int | tuple[int, ...], SequenceNode] = OrderedDict()
@@ -3219,7 +3219,7 @@ class PhoenixStructurer(StructurerBase):
         return False
 
     def _match_acyclic_short_circuit_conditions(
-        self, graph_raw: networkx.DiGraph, full_graph_raw: networkx.DiGraph, start_node, graph_head
+        self, graph_raw: RegionOverlayGraph, full_graph_raw: RegionOverlayGraph, start_node, graph_head
     ) -> bool:
         """
         Check if start_node is the beginning of an If-Then-Else region with cascading short-circuit expressions as the
@@ -3691,7 +3691,7 @@ class PhoenixStructurer(StructurerBase):
             and isinstance(node.statements[-1], IncompleteSwitchCaseHeadStatement)
         )
 
-    def _last_resort_refinement(self, head, graph_raw: networkx.DiGraph, full_graph_raw: networkx.DiGraph) -> bool:
+    def _last_resort_refinement(self, head, graph_raw: RegionOverlayGraph, full_graph_raw: RegionOverlayGraph) -> bool:
         if self._improve_algorithm:
             while self._edge_virtualization_hints:
                 src, dst = self._edge_virtualization_hints.pop(0)

@@ -16,14 +16,6 @@ if TYPE_CHECKING:
 l = logging.getLogger(name=__name__)
 
 
-class _CopyFunc[S_co](Protocol):
-    """
-    Function wrapping copy method for memo tracking.
-    """
-
-    def __call__(self, _self: Any, memo: dict[int, Any] | None = None) -> S_co: ...
-
-
 @runtime_checkable
 class SupportsMerge(Protocol):
     """
@@ -98,13 +90,16 @@ class SimStatePlugin:
         return d
 
     @staticmethod
-    def memo[S_co](f: Callable[[Any, dict[int, Any]], S_co]) -> _CopyFunc[S_co]:
+    def memo[F: Callable[[Any, dict[int, Any]], Any]](f: F) -> F:
         """
-        A decorator function you should apply to ``copy``
+        A decorator function you should apply to ``copy``.
+
+        The wrapper accepts an omitted or ``None`` memo at runtime; it is typed as the wrapped function itself so
+        that ``copy`` stays an ordinary method for type checkers and subclasses can override it as one.
         """
 
         @wraps(f)
-        def inner(self: Any, memo: dict[int, Any] | None = None) -> S_co:
+        def inner(self: Any, memo: dict[int, Any] | None = None) -> Any:
             if memo is None:
                 memo = {}
             if id(self) in memo:
@@ -113,10 +108,10 @@ class SimStatePlugin:
             memo[id(self)] = c
             return c
 
-        return cast(_CopyFunc[S_co], inner)
+        return cast(F, inner)
 
     @memo
-    def copy(self, _memo: dict[int, Any]) -> SimStatePlugin:
+    def copy(self, _memo: dict[int, Any]) -> Self:
         """
         Should return a copy of the plugin without any state attached. Should check the memo first, and add itself to
         memo if it ends up making a new copy.

@@ -75,6 +75,7 @@ from . import (
     exploration_techniques,
     knowledge_plugins,
     sim_options,
+    storage,
 )
 from . import sim_manager as manager
 from . import sim_type as types
@@ -398,5 +399,6 @@ __all__ = (
     "rust_analyses",
     "rust_knowledge_plugins",
     "sim_options",
+    "storage",
     "types",
 )

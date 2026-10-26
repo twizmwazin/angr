@@ -20,6 +20,7 @@ from .region_data import AddressWrapper, RegionMap
 
 if TYPE_CHECKING:
     from angr.sim_state import SimState
+    from angr.storage.memory_mixins import RegionedMemory
 
 
 _l = logging.getLogger(name=__name__)
@@ -59,7 +60,7 @@ class RegionedMemoryMixin(MemoryMixin):
             regioned_memory_cls = angr.storage.memory_mixins.RegionedMemory
 
         self._regioned_memory_cls = regioned_memory_cls
-        self._regions: dict[str, regioned_memory_cls] = {}
+        self._regions: dict[str, RegionedMemory] = {}
 
         self._cle_memory_backer = cle_memory_backer
         self._dict_memory_backer = dict_memory_backer

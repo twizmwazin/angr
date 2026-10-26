@@ -11,7 +11,7 @@ import networkx
 from cle.loader import Loader
 
 from angr import claripy
-from angr.code_location import CodeLocation, ExternalCodeLocation
+from angr.code_location import AILCodeLocation, CodeLocation, ExternalCodeLocation
 from angr.knowledge_plugins.cfg import CFGModel
 from angr.knowledge_plugins.key_definitions.atoms import (
     Atom,
@@ -78,7 +78,9 @@ class DepGraph:
         """
         return self._graph.predecessors(node)
 
-    def transitive_closure(self, definition: Definition[Atom]) -> networkx.DiGraph[Definition[Atom]]:
+    def transitive_closure(
+        self, definition: Definition[Atom, CodeLocation | AILCodeLocation]
+    ) -> networkx.DiGraph[Definition[Atom, CodeLocation | AILCodeLocation]]:
         """
         Compute the "transitive closure" of a given definition.
         Obtained by transitively aggregating the ancestors of this definition in the graph.
@@ -90,10 +92,10 @@ class DepGraph:
         """
 
         def _transitive_closure(
-            def_: Definition[Atom],
-            graph: networkx.DiGraph[Definition[Atom]],
-            result: networkx.DiGraph[Definition[Atom]],
-            visited: set[Definition[Atom]] | None = None,
+            def_: Definition[Atom, CodeLocation | AILCodeLocation],
+            graph: networkx.DiGraph[Definition[Atom, CodeLocation | AILCodeLocation]],
+            result: networkx.DiGraph[Definition[Atom, CodeLocation | AILCodeLocation]],
+            visited: set[Definition[Atom, CodeLocation | AILCodeLocation]] | None = None,
         ):
             """
             Returns a joint graph that comprises the transitive closure of all defs that `def_` depends on and the
@@ -199,7 +201,7 @@ class DepGraph:
         *,
         kind: type[A],
         **kwargs: Any,
-    ) -> list[Definition[A]]: ...
+    ) -> list[Definition[A, CodeLocation | AILCodeLocation]]: ...
 
     @overload
     def find_definitions(
@@ -271,16 +273,18 @@ class DepGraph:
     @overload
     def find_all_predecessors(
         self,
-        starts: Definition[Atom] | Iterable[Definition[Atom]],
+        starts: Definition[Atom, CodeLocation | AILCodeLocation]
+        | Iterable[Definition[Atom, CodeLocation | AILCodeLocation]],
         *,
         kind: type[A],
         **kwargs: Any,
-    ) -> list[Definition[A]]: ...
+    ) -> list[Definition[A, CodeLocation | AILCodeLocation]]: ...
 
     @overload
     def find_all_predecessors(
         self,
-        starts: Definition[Atom] | Iterable[Definition[Atom]],
+        starts: Definition[Atom, CodeLocation | AILCodeLocation]
+        | Iterable[Definition[Atom, CodeLocation | AILCodeLocation]],
         *,
         kind: Literal[AtomKind.REGISTER] = AtomKind.REGISTER,
         **kwargs: Any,
@@ -289,7 +293,8 @@ class DepGraph:
     @overload
     def find_all_predecessors(
         self,
-        starts: Definition[Atom] | Iterable[Definition[Atom]],
+        starts: Definition[Atom, CodeLocation | AILCodeLocation]
+        | Iterable[Definition[Atom, CodeLocation | AILCodeLocation]],
         *,
         kind: Literal[AtomKind.MEMORY] = AtomKind.MEMORY,
         **kwargs: Any,
@@ -298,7 +303,8 @@ class DepGraph:
     @overload
     def find_all_predecessors(
         self,
-        starts: Definition[Atom] | Iterable[Definition[Atom]],
+        starts: Definition[Atom, CodeLocation | AILCodeLocation]
+        | Iterable[Definition[Atom, CodeLocation | AILCodeLocation]],
         *,
         kind: Literal[AtomKind.TMP] = AtomKind.TMP,
         **kwargs: Any,
@@ -307,7 +313,8 @@ class DepGraph:
     @overload
     def find_all_predecessors(
         self,
-        starts: Definition[Atom] | Iterable[Definition[Atom]],
+        starts: Definition[Atom, CodeLocation | AILCodeLocation]
+        | Iterable[Definition[Atom, CodeLocation | AILCodeLocation]],
         *,
         kind: Literal[AtomKind.CONSTANT] = AtomKind.CONSTANT,
         **kwargs: Any,
@@ -316,7 +323,8 @@ class DepGraph:
     @overload
     def find_all_predecessors(
         self,
-        starts: Definition[Atom] | Iterable[Definition[Atom]],
+        starts: Definition[Atom, CodeLocation | AILCodeLocation]
+        | Iterable[Definition[Atom, CodeLocation | AILCodeLocation]],
         *,
         kind: Literal[AtomKind.GUARD] = AtomKind.GUARD,
         **kwargs: Any,
@@ -325,7 +333,8 @@ class DepGraph:
     @overload
     def find_all_predecessors(
         self,
-        starts: Definition[Atom] | Iterable[Definition[Atom]],
+        starts: Definition[Atom, CodeLocation | AILCodeLocation]
+        | Iterable[Definition[Atom, CodeLocation | AILCodeLocation]],
         *,
         reg_name: int | str = ...,
         **kwargs: Any,
@@ -333,12 +342,22 @@ class DepGraph:
 
     @overload
     def find_all_predecessors(
-        self, starts: Definition[Atom] | Iterable[Definition[Atom]], *, stack_offset: int = ..., **kwargs: Any
+        self,
+        starts: Definition[Atom, CodeLocation | AILCodeLocation]
+        | Iterable[Definition[Atom, CodeLocation | AILCodeLocation]],
+        *,
+        stack_offset: int = ...,
+        **kwargs: Any,
     ) -> list[Definition[MemoryLocation]]: ...
 
     @overload
     def find_all_predecessors(
-        self, starts: Definition[Atom] | Iterable[Definition[Atom]], *, const_val: int = ..., **kwargs: Any
+        self,
+        starts: Definition[Atom, CodeLocation | AILCodeLocation]
+        | Iterable[Definition[Atom, CodeLocation | AILCodeLocation]],
+        *,
+        const_val: int = ...,
+        **kwargs: Any,
     ) -> list[Definition[ConstantSrc]]: ...
 
     def find_all_predecessors(self, starts, **kwargs):
