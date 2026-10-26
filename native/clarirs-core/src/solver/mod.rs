@@ -120,27 +120,28 @@ pub trait Solver<'c>: Clone + HasContext<'c> {
 ///
 /// Unsat cores are optional: a backend that has none (VSA, the concrete
 /// solver) simply does not implement this trait, and a wrapper implements it
-/// only when the solver it wraps does. A core is reported as indices into
-/// [`Solver::constraints`], so a wrapper that changes what it is given before
-/// storing it (simplifying it, regrouping it into child solvers) must map the
-/// indices of the solver that found the core back to its own constraints.
+/// only when the solver it wraps does. A core is a subset of the constraints
+/// themselves, as [`Solver::constraints`] holds them, so a wrapper that
+/// regroups constraints into other solvers (the composite) can pass the core
+/// of whichever solver found it straight through.
 pub trait UnsatCoreSolver<'c>: Solver<'c> {
     /// The unsat core of the current constraints: a subset of
-    /// [`Solver::constraints`], as indices into it, that is unsatisfiable on
-    /// its own.
+    /// [`Solver::constraints`] that is unsatisfiable on its own.
     ///
     /// Backends return an error when the constraints are satisfiable or when
     /// core tracking is disabled.
-    fn unsat_core(&mut self) -> Result<Vec<usize>, ClarirsError>;
+    fn unsat_core(&mut self) -> Result<Vec<AstRef<'c>>, ClarirsError>;
 
-    /// The unsat core with `extra` constraints temporarily added, as indices
-    /// into [`Solver::constraints`] followed by `extra`.
+    /// The unsat core with `extra` constraints temporarily added: a subset of
+    /// [`Solver::constraints`] and `extra` that is unsatisfiable on its own.
     ///
-    /// The default clones the solver and adds the constraints, which indexes
-    /// correctly only when `add` appends every constraint it is given to
-    /// `constraints()` unchanged. A wrapper that drops, rewrites or regroups
-    /// constraints must override this and map the indices back.
-    fn unsat_core_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<Vec<usize>, ClarirsError> {
+    /// The default clones the solver and adds the constraints. A wrapper that
+    /// rewrites what it is given before storing it (the simplification mixin)
+    /// overrides this so the core names the extras as the caller passed them.
+    fn unsat_core_with_extra(
+        &mut self,
+        extra: &[AstRef<'c>],
+    ) -> Result<Vec<AstRef<'c>>, ClarirsError> {
         if extra.is_empty() {
             return self.unsat_core();
         }

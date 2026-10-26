@@ -107,13 +107,12 @@ impl<'c> Z3Solver<'c> {
 }
 
 impl<'c> UnsatCoreSolver<'c> for Z3Solver<'c> {
-    /// The core of the last unsatisfiable check, as indices into
-    /// `constraints()`.
+    /// The core of the last unsatisfiable check: the asserted constraints
+    /// whose tracking variables z3 names.
     ///
     /// Only works if the solver was created with unsat_core enabled and the
-    /// constraints are unsatisfiable. The default `unsat_core_with_extra`
-    /// applies: `add` appends every constraint as given.
-    fn unsat_core(&mut self) -> Result<Vec<usize>, ClarirsError> {
+    /// constraints are unsatisfiable.
+    fn unsat_core(&mut self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
         if !self.unsat_core {
             return Err(ClarirsError::UnsupportedOperation(
                 "Unsat core tracking is not enabled. Use new_with_options with unsat_core=true"
@@ -132,7 +131,7 @@ impl<'c> UnsatCoreSolver<'c> for Z3Solver<'c> {
             let core_vector = z3_solver.get_unsat_core()?;
             let core_size = core_vector.size();
 
-            let mut core_indices = Vec::new();
+            let mut core = Vec::new();
 
             // Build a reverse map from tracking variable to index
             let mut track_to_idx: HashMap<String, usize> = HashMap::new();
@@ -150,11 +149,11 @@ impl<'c> UnsatCoreSolver<'c> for Z3Solver<'c> {
                 if let Some(vars) = bool_ast.variables().iter().next()
                     && let Some(idx) = track_to_idx.get(&vars.to_string())
                 {
-                    core_indices.push(*idx);
+                    core.push(self.assertions[*idx].clone());
                 }
             }
 
-            Ok(core_indices)
+            Ok(core)
         })
     }
 }
@@ -1517,13 +1516,11 @@ mod tests {
         // Should be unsat
         assert!(!solver.satisfiable()?);
 
-        // Get unsat core
+        // The core should contain c0 and c1, but not necessarily c2
         let core = solver.unsat_core()?;
-
-        // The core should contain constraints 0 and 1, but not necessarily 2
-        assert!(!core.is_empty());
-        assert!(core.contains(&0));
-        assert!(core.contains(&1));
+        assert!(core.contains(&c0));
+        assert!(core.contains(&c1));
+        assert!(core.len() <= 3);
 
         Ok(())
     }
@@ -1573,6 +1570,31 @@ mod tests {
         ))
     }
 
+    /// Assert that `core` holds exactly `expected`, in any order.
+    fn assert_core<'c>(core: &[AstRef<'c>], expected: &[AstRef<'c>]) {
+        assert_eq!(core.len(), expected.len(), "core: {core:?}");
+        for constraint in expected {
+            assert!(core.contains(constraint), "{constraint:?} not in {core:?}");
+        }
+    }
+
+    #[test]
+    fn test_unsat_core_names_constraints() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let mut solver = Z3Solver::new_with_options(&ctx, None, true);
+        let (gt, lt) = contradiction(&ctx)?;
+        let x = ctx.bvs("x", 8)?;
+        let positive = ctx.ugt(&x, &ctx.bvv(BitVec::from((0, 8)))?)?;
+
+        solver.add(&gt)?;
+        solver.add(&positive)?;
+        solver.add(&lt)?;
+        assert!(!solver.satisfiable()?);
+
+        assert_core(&solver.unsat_core()?, &[gt, lt]);
+        Ok(())
+    }
+
     #[test]
     fn test_unsat_core_with_extra() -> Result<(), ClarirsError> {
         let ctx = Context::new();
@@ -1582,19 +1604,18 @@ mod tests {
         solver.add(&gt)?;
         assert!(solver.satisfiable()?);
 
-        // The core indexes the constraints followed by the extras, and the
-        // extras leave the solver as it was.
-        let mut core = solver.unsat_core_with_extra(&[lt])?;
-        core.sort_unstable();
-        assert_eq!(core, vec![0, 1]);
+        // The core names the extra, and the extras leave the solver as it was.
+        assert_core(
+            &solver.unsat_core_with_extra(std::slice::from_ref(&lt))?,
+            &[gt, lt],
+        );
         assert_eq!(solver.constraints()?.len(), 1);
         assert!(solver.satisfiable()?);
 
         Ok(())
     }
 
-    /// angr's default solver stack, which forwards the core unchanged since
-    /// each layer reports the constraints of the one below.
+    /// angr's default solver stack, which forwards the core unchanged.
     #[test]
     fn test_unsat_core_through_mixins() -> Result<(), ClarirsError> {
         let ctx = Context::new();
@@ -1607,27 +1628,26 @@ mod tests {
         solver.add(&lt)?;
         assert!(!solver.satisfiable()?);
 
-        let mut core = solver.unsat_core()?;
-        core.sort_unstable();
-        assert_eq!(core, vec![0, 1]);
-
+        assert_core(&solver.unsat_core()?, &[gt, lt]);
         Ok(())
     }
 
-    /// The simplification mixin drops extras that simplify to `true`, so the
-    /// backend sees fewer extras than the caller passed; the core still
-    /// indexes the caller's list.
+    /// The simplification mixin drops extras that simplify to `true` and
+    /// hands the backend simplified forms; the core still names the extras
+    /// as the caller passed them.
     #[test]
-    fn test_unsat_core_with_extra_skips_dropped_extras() -> Result<(), ClarirsError> {
+    fn test_unsat_core_with_extra_names_extras_as_passed() -> Result<(), ClarirsError> {
         let ctx = Context::new();
         let mut solver = SimplificationMixin::new(Z3Solver::new_with_options(&ctx, None, true));
         let (gt, lt) = contradiction(&ctx)?;
 
         solver.add(&gt)?;
 
-        let mut core = solver.unsat_core_with_extra(&[ctx.true_()?, lt])?;
-        core.sort_unstable();
-        assert_eq!(core, vec![0, 2]);
+        // `lt` wrapped in a double negation simplifies to `lt`.
+        let wrapped = ctx.not(&ctx.not(&lt)?)?;
+        assert_ne!(wrapped, lt);
+        let core = solver.unsat_core_with_extra(&[ctx.true_()?, wrapped.clone()])?;
+        assert_core(&core, &[gt, wrapped]);
 
         Ok(())
     }
@@ -1646,36 +1666,27 @@ mod tests {
         solver.add(&lt)?;
         assert!(!solver.satisfiable()?);
 
-        let mut core = solver.unsat_core()?;
-        core.sort_unstable();
-        assert_eq!(core, vec![0, 1]);
-
+        assert_core(&solver.unsat_core()?, &[gt, lt]);
         Ok(())
     }
 
-    /// A composite solver splits independent constraints into child solvers.
-    /// Its core must index the composite's own `constraints()`, not the
-    /// conflicting child's.
+    /// A composite solver splits independent constraints into child solvers;
+    /// its core is the conflicting child's, named by constraint.
     #[test]
-    fn test_composite_unsat_core_indexes_composite_constraints() -> Result<(), ClarirsError> {
+    fn test_composite_unsat_core() -> Result<(), ClarirsError> {
         let ctx = Context::new();
         let mut solver = CompositeSolver::new(&ctx, Z3Solver::new_with_options(&ctx, None, true));
         let (gt, lt) = contradiction(&ctx)?;
         let y = ctx.bvs("y", 8)?;
         let y_is_3 = ctx.eq_(&y, &ctx.bvv(BitVec::from((3, 8)))?)?;
 
-        // y's child comes first, so the conflicting x child's own indices (0
-        // and 1) are not the composite's (1 and 2).
         solver.add(&y_is_3)?;
         solver.add(&gt)?;
         solver.add(&lt)?;
-        assert_eq!(solver.constraints()?, vec![y_is_3, gt, lt]);
+        assert_eq!(solver.constraints()?, vec![y_is_3, gt.clone(), lt.clone()]);
         assert!(!solver.satisfiable()?);
 
-        let mut core = solver.unsat_core()?;
-        core.sort_unstable();
-        assert_eq!(core, vec![1, 2]);
-
+        assert_core(&solver.unsat_core()?, &[gt, lt]);
         Ok(())
     }
 
@@ -1687,18 +1698,21 @@ mod tests {
 
         solver.add(&gt)?;
         assert!(solver.unsat_core()?.is_empty());
-        assert!(solver.unsat_core_with_extra(&[gt])?.is_empty());
+        assert!(
+            solver
+                .unsat_core_with_extra(std::slice::from_ref(&gt))?
+                .is_empty()
+        );
 
         // The extra makes it unsat; the core names the extra.
-        let mut core = solver.unsat_core_with_extra(&[lt])?;
-        core.sort_unstable();
-        assert_eq!(core, vec![0, 1]);
-
+        assert_core(
+            &solver.unsat_core_with_extra(std::slice::from_ref(&lt))?,
+            &[gt, lt],
+        );
         Ok(())
     }
 
-    /// With extra constraints the core indexes `constraints()` followed by
-    /// the extras, even when an extra merges children.
+    /// An extra that merges children for the query.
     #[test]
     fn test_composite_unsat_core_with_extra_spanning_children() -> Result<(), ClarirsError> {
         let ctx = Context::new();
@@ -1713,9 +1727,10 @@ mod tests {
 
         // Spans x and y, so the two children are merged for the query.
         let extra = ctx.and2(&lt, &y_is_3)?;
-        let mut core = solver.unsat_core_with_extra(&[extra])?;
-        core.sort_unstable();
-        assert_eq!(core, vec![1, 2]);
+        assert_core(
+            &solver.unsat_core_with_extra(std::slice::from_ref(&extra))?,
+            &[gt, extra],
+        );
 
         // The query left the composite as it was.
         assert_eq!(solver.constraints()?.len(), 2);
@@ -1738,27 +1753,24 @@ mod tests {
         solver.add(&y_is_3)?;
         solver.add(&gt)?;
 
-        // An extra on a fresh variable that contradicts another extra: the
-        // core is among the extras.
+        // Extras on a fresh variable that contradict each other: the core is
+        // among the extras.
         let z = ctx.bvs("z", 8)?;
         let z_is_1 = ctx.eq_(&z, &ctx.bvv(BitVec::from((1, 8)))?)?;
         let z_is_2 = ctx.eq_(&z, &ctx.bvv(BitVec::from((2, 8)))?)?;
-        let mut core = solver.unsat_core_with_extra(&[z_is_1, z_is_2])?;
-        core.sort_unstable();
-        assert_eq!(core, vec![2, 3]);
+        let core = solver.unsat_core_with_extra(&[z_is_1.clone(), z_is_2.clone()])?;
+        assert_core(&core, &[z_is_1, z_is_2]);
 
         // A concretely false extra is a core on its own.
+        let f = ctx.false_()?;
         assert_eq!(
-            solver.unsat_core_with_extra(&[ctx.true_()?, ctx.false_()?])?,
-            vec![3]
+            solver.unsat_core_with_extra(&[ctx.true_()?, f.clone()])?,
+            vec![f]
         );
 
         // A child the extras do not touch is unsatisfiable: its core wins.
         solver.add(&lt)?;
-        assert_eq!(solver.constraints()?, vec![y_is_3, gt, lt]);
-        let mut core = solver.unsat_core_with_extra(&[y_is_4])?;
-        core.sort_unstable();
-        assert_eq!(core, vec![1, 2]);
+        assert_core(&solver.unsat_core_with_extra(&[y_is_4])?, &[gt, lt]);
 
         Ok(())
     }

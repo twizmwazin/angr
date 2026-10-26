@@ -171,13 +171,15 @@ impl<'c, S: Solver<'c>> Solver<'c> for ConcreteEarlyResolutionMixin<'c, S> {
 }
 
 impl<'c, S: UnsatCoreSolver<'c>> UnsatCoreSolver<'c> for ConcreteEarlyResolutionMixin<'c, S> {
-    fn unsat_core(&mut self) -> Result<Vec<usize>, ClarirsError> {
-        // `add` and `constraints()` forward unchanged, so the inner solver's
-        // indices are ours.
+    fn unsat_core(&mut self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+        // `add` and `constraints()` forward unchanged.
         self.inner.unsat_core()
     }
 
-    fn unsat_core_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<Vec<usize>, ClarirsError> {
+    fn unsat_core_with_extra(
+        &mut self,
+        extra: &[AstRef<'c>],
+    ) -> Result<Vec<AstRef<'c>>, ClarirsError> {
         self.inner.unsat_core_with_extra(extra)
     }
 }

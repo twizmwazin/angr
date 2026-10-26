@@ -52,10 +52,9 @@ impl HasContext<'static> for DynSolver {
 }
 
 /// Dispatch an [`UnsatCoreSolver`] method to the solvers that implement it:
-/// those built on Z3, whose wrappers forward the core and map its indices to
-/// their own `constraints()`. The replacement solver reports the constraints
-/// as given but hands its backend the replaced forms, which it may drop, so
-/// no index mapping exists for it.
+/// those built on Z3, whose wrappers forward the core. The replacement solver
+/// reports the constraints as given but hands its backend the replaced forms,
+/// so a core from it would not name its own constraints.
 macro_rules! dispatch_unsat_core {
     ($self:expr, $method:ident $(, $arg:expr)*) => {
         match $self {
@@ -74,14 +73,14 @@ macro_rules! dispatch_unsat_core {
 }
 
 impl UnsatCoreSolver<'static> for DynSolver {
-    fn unsat_core(&mut self) -> Result<Vec<usize>, ClarirsError> {
+    fn unsat_core(&mut self) -> Result<Vec<AstRef<'static>>, ClarirsError> {
         dispatch_unsat_core!(self, unsat_core)
     }
 
     fn unsat_core_with_extra(
         &mut self,
         extra: &[AstRef<'static>],
-    ) -> Result<Vec<usize>, ClarirsError> {
+    ) -> Result<Vec<AstRef<'static>>, ClarirsError> {
         dispatch_unsat_core!(self, unsat_core_with_extra, extra)
     }
 }

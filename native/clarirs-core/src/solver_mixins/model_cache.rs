@@ -379,13 +379,16 @@ impl<'c, S: Solver<'c>> Solver<'c> for ModelCacheMixin<'c, S> {
 }
 
 impl<'c, S: UnsatCoreSolver<'c>> UnsatCoreSolver<'c> for ModelCacheMixin<'c, S> {
-    fn unsat_core(&mut self) -> Result<Vec<usize>, ClarirsError> {
-        // The cache only short-circuits queries; the constraints and their
-        // order are the inner solver's, so its indices are ours.
+    fn unsat_core(&mut self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+        // The cache only short-circuits queries; the constraints are the
+        // inner solver's.
         self.inner.unsat_core()
     }
 
-    fn unsat_core_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<Vec<usize>, ClarirsError> {
+    fn unsat_core_with_extra(
+        &mut self,
+        extra: &[AstRef<'c>],
+    ) -> Result<Vec<AstRef<'c>>, ClarirsError> {
         self.inner.unsat_core_with_extra(extra)
     }
 }

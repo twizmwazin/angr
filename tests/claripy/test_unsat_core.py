@@ -6,6 +6,10 @@ from angr import claripy
 
 
 class TestUnsatCore(unittest.TestCase):
+    def assertCore(self, core, expected):
+        """``core`` holds exactly the ``expected`` constraints, in any order."""
+        self.assertEqual(sorted(hash(c) for c in core), sorted(hash(c) for c in expected), (core, expected))
+
     def test_unsat_core_simple(self):
         """Test basic unsat core functionality"""
         # Create a solver with unsat_core enabled
@@ -14,21 +18,18 @@ class TestUnsatCore(unittest.TestCase):
         x = claripy.BVS("x", 8)
 
         # Add contradictory constraints
-        s.add(x > 10)  # constraint 0
-        s.add(x < 5)  # constraint 1
-        s.add(x > 0)  # constraint 2 (not part of unsat core)
+        gt = x > 10
+        lt = x < 5
+        positive = x > 0  # not part of unsat core
+        s.add(gt)
+        s.add(lt)
+        s.add(positive)
 
         # Should be unsat
         self.assertFalse(s.satisfiable())
 
-        # Get unsat core
-        core = s.unsat_core()
-
-        # Core should contain the contradictory constraints
-        self.assertGreater(len(core), 0)
-        self.assertIn(0, core)
-        self.assertIn(1, core)
-        # constraint 2 should not be necessary for unsat
+        # The core is the contradictory constraints
+        self.assertCore(s.unsat_core(), [gt, lt])
 
     def test_unsat_core_bool(self):
         """Test unsat core with boolean constraints"""
@@ -38,16 +39,18 @@ class TestUnsatCore(unittest.TestCase):
         b = claripy.BoolS("b")
 
         # Add contradictory constraints
-        s.add(a == b)  # constraint 0
-        s.add(a)  # constraint 1: a is true
-        s.add(claripy.Not(b))  # constraint 2: b is false
+        s.add(a == b)
+        s.add(a)
+        s.add(claripy.Not(b))
 
         # Should be unsat
         self.assertFalse(s.satisfiable())
 
         # Get unsat core - all three constraints are necessary
         core = s.unsat_core()
-        self.assertGreater(len(core), 0)
+        self.assertEqual(len(core), 3)
+        for c in core:
+            self.assertIsInstance(c, claripy.ast.Bool)
 
     def test_unsat_core_not_enabled(self):
         """Test that unsat_core raises error when not enabled"""
@@ -85,22 +88,56 @@ class TestUnsatCore(unittest.TestCase):
         y = claripy.BVS("y", 32)
 
         # Add various constraints
-        s.add(x + y == 100)  # constraint 0
-        s.add(x > 60)  # constraint 1
-        s.add(y > 50)  # constraint 2 - makes it unsat with 0 and 1
-        s.add(x < 200)  # constraint 3 - not relevant
-        s.add(y < 200)  # constraint 4 - not relevant
+        total = x + y == 100
+        x_big = x > 60
+        y_big = y > 50  # makes it unsat with the two above
+        s.add(total)
+        s.add(x_big)
+        s.add(y_big)
+        s.add(x < 200)  # not relevant
+        s.add(y < 200)  # not relevant
 
         # Should be unsat (x > 60 and y > 50 means x + y > 110)
         self.assertFalse(s.satisfiable())
 
-        # Get unsat core
-        core = s.unsat_core()
-        self.assertGreater(len(core), 0)
-        # Core should contain 0, 1, and 2
-        self.assertIn(0, core)
-        self.assertIn(1, core)
-        self.assertIn(2, core)
+        # The core holds the three (z3 does not promise a minimal core)
+        core = {hash(c) for c in s.unsat_core()}
+        self.assertTrue({hash(total), hash(x_big), hash(y_big)} <= core)
+
+    def test_unsat_core_with_extra_constraints(self):
+        """The core names the extra constraints that take part, which do not
+        change the solver."""
+        s = claripy.Solver(track=True)
+        x = claripy.BVS("x", 8)
+        gt = x > 10
+        lt = x < 5
+        s.add(gt)
+        self.assertTrue(s.satisfiable())
+
+        self.assertCore(s.unsat_core(extra_constraints=[x > 0, lt]), [gt, lt])
+        self.assertEqual(len(s.constraints), 1)
+        self.assertTrue(s.satisfiable())
+
+    def test_unsat_core_with_extra_constraints_as_passed(self):
+        """An extra constraint that simplifies to true never reaches the
+        backend, and one the backend sees in simplified form is still named as
+        it was passed."""
+        s = claripy.Solver(track=True)
+        x = claripy.BVS("x", 8)
+        gt = x > 10
+        s.add(gt)
+        wrapped = claripy.Not(claripy.Not(x < 5))
+        self.assertCore(s.unsat_core(extra_constraints=[claripy.true(), wrapped]), [gt, wrapped])
+
+    def test_unsat_core_hybrid(self):
+        s = claripy.SolverHybrid(track=True)
+        x = claripy.BVS("x", 8)
+        gt = x > 10
+        lt = x < 5
+        s.add(gt)
+        s.add(lt)
+        self.assertFalse(s.satisfiable())
+        self.assertCore(s.unsat_core(), [gt, lt])
 
     def test_unsat_core_composite(self):
         """SolverComposite returns the core of whichever independent child is unsat."""
@@ -109,20 +146,17 @@ class TestUnsatCore(unittest.TestCase):
         x = claripy.BVS("x", 8)
         y = claripy.BVS("y", 8)
 
-        # Contradictory group on x (constraints 0, 1) plus an independent,
-        # satisfiable group on y (constraint 2).
-        s.add(x > 10)
-        s.add(x < 5)
+        # Contradictory group on x plus an independent, satisfiable group on y.
+        gt = x > 10
+        lt = x < 5
         s.add(y == 3)
+        s.add(gt)
+        s.add(lt)
 
         self.assertFalse(s.satisfiable())
 
-        core = s.unsat_core()
-        self.assertGreater(len(core), 0)
-        self.assertIn(0, core)
-        self.assertIn(1, core)
         # The independent, satisfiable constraint is not part of the core.
-        self.assertNotIn(2, core)
+        self.assertCore(s.unsat_core(), [gt, lt])
 
     def test_unsat_core_composite_on_sat(self):
         """A satisfiable composite solver has an empty unsat core."""
@@ -134,62 +168,17 @@ class TestUnsatCore(unittest.TestCase):
         self.assertTrue(s.satisfiable())
         self.assertEqual(s.unsat_core(), [])
 
-    def test_unsat_core_with_extra_constraints(self):
-        """The core indexes ``constraints`` followed by the extra constraints,
-        which do not change the solver."""
-        s = claripy.Solver(track=True)
-        x = claripy.BVS("x", 8)
-        s.add(x > 10)
-        self.assertTrue(s.satisfiable())
-
-        core = s.unsat_core(extra_constraints=[x > 0, x < 5])
-        self.assertIn(0, core)
-        self.assertIn(2, core)
-        self.assertNotIn(1, core)
-        self.assertEqual(len(s.constraints), 1)
-        self.assertTrue(s.satisfiable())
-
-    def test_unsat_core_with_extra_constraints_simplified_away(self):
-        """An extra constraint that simplifies to true never reaches the
-        backend, but the core still indexes the list as passed."""
-        s = claripy.Solver(track=True)
-        x = claripy.BVS("x", 8)
-        s.add(x > 10)
-        core = s.unsat_core(extra_constraints=[claripy.true(), x < 5])
-        self.assertEqual(sorted(core), [0, 2])
-
-    def test_unsat_core_hybrid(self):
-        s = claripy.SolverHybrid(track=True)
-        x = claripy.BVS("x", 8)
-        s.add(x > 10)
-        s.add(x < 5)
-        self.assertFalse(s.satisfiable())
-        self.assertEqual(sorted(s.unsat_core()), [0, 1])
-
-    def test_unsat_core_composite_indexes_its_own_constraints(self):
-        """A composite solver splits independent constraints into child solvers.
-        Its core must index the composite's own ``constraints``, not the
-        conflicting child's."""
-        x = claripy.BVS("x", 32)
-        y = claripy.BVS("y", 32)
-        s = claripy.SolverComposite(track=True)
-        # y's child comes first, so the conflicting x child's own indices
-        # (0 and 1) are not the composite's (1 and 2)
-        s.add([y == 3, x > 10, x < 5])
-        self.assertFalse(s.satisfiable())
-        self.assertEqual(sorted(s.unsat_core()), [1, 2])
-
     def test_unsat_core_composite_with_extra_constraints(self):
-        """With extra constraints the core indexes ``constraints`` followed by
-        the extras, even when an extra merges children."""
+        """The core names an extra constraint even when it merges children."""
         x = claripy.BVS("x", 32)
         y = claripy.BVS("y", 32)
         s = claripy.SolverComposite(track=True)
-        s.add([y == 3, x > 10])
+        gt = x > 10
+        s.add([y == 3, gt])
         self.assertTrue(s.satisfiable())
         # spans x and y, so it merges both children in the query
         extra = claripy.And(x < 5, y == 3)
-        self.assertEqual(sorted(s.unsat_core(extra_constraints=[extra])), [1, 2])
+        self.assertCore(s.unsat_core(extra_constraints=[extra]), [gt, extra])
         # the query left the solver as it was
         self.assertEqual(len(s.constraints), 2)
         self.assertTrue(s.satisfiable())

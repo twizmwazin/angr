@@ -650,7 +650,8 @@ class SimSolver(SimStatePlugin):
         This function returns the unsat core from the backend solver.
 
         :param extra_constraints:   Extra constraints (as ASTs) to add to the solver for this solve.
-        :return: The unsat core, as indices into ``self.constraints`` followed by ``extra_constraints``.
+        :return: The unsat core: the constraints among ``self.constraints`` and ``extra_constraints`` that are
+                 unsatisfiable together.
         """
         if o.CONSTRAINT_TRACKING_IN_SOLVER not in self.state.options:
             raise SimSolverOptionError("CONSTRAINT_TRACKING_IN_SOLVER must be enabled before calling unsat_core().")

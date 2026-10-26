@@ -317,66 +317,26 @@ impl<'c, S: Solver<'c>> Solver<'c> for CompositeSolver<'c, S> {
     }
 }
 
-impl<'c, S: UnsatCoreSolver<'c>> CompositeSolver<'c, S> {
-    /// The position in `constraints()` of each child's first constraint, by
-    /// child id.
-    fn child_offsets(&self) -> Result<HashMap<usize, usize>, ClarirsError> {
-        let mut offsets = HashMap::with_capacity(self.children.len());
-        let mut offset = 0;
-        for (id, child) in &self.children {
-            offsets.insert(*id, offset);
-            offset += child.constraints()?.len();
-        }
-        Ok(offsets)
-    }
-
-    /// Map a core found by a solver holding the constraints at `positions`
-    /// (in `constraints()`) followed by the `extra` constraints at the given
-    /// indices into the caller's extras, which `total` constraints precede.
-    fn map_core(
-        core: Vec<usize>,
-        positions: &[usize],
-        total: usize,
-        extra: &[usize],
-    ) -> Result<Vec<usize>, ClarirsError> {
-        core.into_iter()
-            .map(|i| {
-                positions
-                    .get(i)
-                    .copied()
-                    .or_else(|| extra.get(i - positions.len()).map(|k| total + k))
-                    .ok_or_else(|| {
-                        ClarirsError::InvalidArguments(format!(
-                            "unsat core index {i} names no constraint of the composite solver"
-                        ))
-                    })
-            })
-            .collect()
-    }
-}
-
 /// The core is that of the first unsatisfiable child (claripy's
-/// CompositeFrontend reports a child's core the same way), mapped to the
-/// composite's `constraints()`. Unlike a backend, a satisfiable composite
-/// reports an empty core rather than an error, as does one whose only
-/// contradiction is a concrete `false`, which `constraints()` does not hold.
+/// CompositeFrontend reports a child's core the same way); the children hold
+/// the composite's constraints, so it is passed straight through. Unlike a
+/// backend, a satisfiable composite reports an empty core rather than an
+/// error, as does one whose only contradiction is a concrete `false`, which
+/// `constraints()` does not hold.
 impl<'c, S: UnsatCoreSolver<'c>> UnsatCoreSolver<'c> for CompositeSolver<'c, S> {
-    fn unsat_core(&mut self) -> Result<Vec<usize>, ClarirsError> {
-        let mut offset = 0;
+    fn unsat_core(&mut self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
         for child in self.children.values_mut() {
             if !child.satisfiable()? {
-                return Ok(child
-                    .unsat_core()?
-                    .into_iter()
-                    .map(|i| i + offset)
-                    .collect());
+                return child.unsat_core();
             }
-            offset += child.constraints()?.len();
         }
         Ok(Vec::new())
     }
 
-    fn unsat_core_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<Vec<usize>, ClarirsError> {
+    fn unsat_core_with_extra(
+        &mut self,
+        extra: &[AstRef<'c>],
+    ) -> Result<Vec<AstRef<'c>>, ClarirsError> {
         if extra.is_empty() {
             return self.unsat_core();
         }
@@ -387,33 +347,25 @@ impl<'c, S: UnsatCoreSolver<'c>> UnsatCoreSolver<'c> for CompositeSolver<'c, S> 
         // Route the extras as `satisfiable_with_extra` does: a concretely
         // false one is a core by itself, a concretely true one is in none,
         // and the symbolic ones go to the children that share their
-        // variables. `symbolic` keeps each one's position in `extra`.
-        let total = self.constraints()?.len();
-        let mut symbolic: Vec<usize> = Vec::new();
+        // variables.
+        let mut symbolic: Vec<AstRef<'c>> = Vec::new();
         let mut vars: BTreeSet<InternedString> = BTreeSet::new();
-        for (k, constraint) in extra.iter().enumerate() {
+        for constraint in extra {
             if constraint.variables().is_empty() {
                 if constraint.is_false() {
-                    return Ok(vec![total + k]);
+                    return Ok(vec![constraint.clone()]);
                 }
                 continue;
             }
             vars.extend(constraint.variables().iter().cloned());
-            symbolic.push(k);
+            symbolic.push(constraint.clone());
         }
-        let asts: Vec<AstRef<'c>> = symbolic.iter().map(|&k| extra[k].clone()).collect();
 
         // A child the extras do not touch is unsatisfiable on its own.
         let ids = self.child_ids_for_vars(&vars);
-        let offsets = self.child_offsets()?;
         for (id, child) in self.children.iter_mut() {
             if !ids.contains(id) && !child.satisfiable()? {
-                let offset = offsets[id];
-                return Ok(child
-                    .unsat_core()?
-                    .into_iter()
-                    .map(|i| i + offset)
-                    .collect());
+                return child.unsat_core();
             }
         }
 
@@ -421,50 +373,33 @@ impl<'c, S: UnsatCoreSolver<'c>> UnsatCoreSolver<'c> for CompositeSolver<'c, S> 
             0 => {
                 // The extras are independent of every constraint.
                 let mut solver = self.template.clone();
-                if solver.satisfiable_with_extra(&asts)? {
+                if solver.satisfiable_with_extra(&symbolic)? {
                     return Ok(Vec::new());
                 }
-                let core = solver.unsat_core_with_extra(&asts)?;
-                Self::map_core(core, &[], total, &symbolic)
+                solver.unsat_core_with_extra(&symbolic)
             }
             1 => {
-                let id = ids[0];
                 let child = self
                     .children
-                    .get_mut(&id)
+                    .get_mut(&ids[0])
                     .expect("child id from child_ids_for_vars");
-                let positions: Vec<usize> = (0..child.constraints()?.len())
-                    .map(|j| offsets[&id] + j)
-                    .collect();
-                if child.satisfiable_with_extra(&asts)? {
+                if child.satisfiable_with_extra(&symbolic)? {
                     return Ok(Vec::new());
                 }
-                let core = child.unsat_core_with_extra(&asts)?;
-                Self::map_core(core, &positions, total, &symbolic)
+                child.unsat_core_with_extra(&symbolic)
             }
             _ => {
-                // The extras span several children: merge them temporarily,
-                // recording where each merged constraint sits in
-                // `constraints()`.
+                // The extras span several children: merge them temporarily.
                 let mut merged = self.template.clone();
-                let mut positions = Vec::new();
                 for &id in &ids {
-                    for (j, constraint) in self.children[&id].constraints()?.iter().enumerate() {
-                        merged.add(constraint)?;
-                        positions.push(offsets[&id] + j);
+                    for constraint in self.children[&id].constraints()? {
+                        merged.add(&constraint)?;
                     }
                 }
-                if merged.constraints()?.len() != positions.len() {
-                    return Err(ClarirsError::InvalidArguments(
-                        "merged child solver does not hold its children's constraints as given"
-                            .to_string(),
-                    ));
-                }
-                if merged.satisfiable_with_extra(&asts)? {
+                if merged.satisfiable_with_extra(&symbolic)? {
                     return Ok(Vec::new());
                 }
-                let core = merged.unsat_core_with_extra(&asts)?;
-                Self::map_core(core, &positions, total, &symbolic)
+                merged.unsat_core_with_extra(&symbolic)
             }
         }
     }

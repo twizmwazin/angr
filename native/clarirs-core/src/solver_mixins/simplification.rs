@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::prelude::*;
 
 /// A mixin that simplifies expressions before passing them to the underlying solver.
@@ -109,40 +111,32 @@ impl<'c, S: Solver<'c>> Solver<'c> for SimplificationMixin<'c, S> {
 }
 
 impl<'c, S: UnsatCoreSolver<'c>> UnsatCoreSolver<'c> for SimplificationMixin<'c, S> {
-    fn unsat_core(&mut self) -> Result<Vec<usize>, ClarirsError> {
-        // `constraints()` is the inner solver's, so its indices are ours.
+    fn unsat_core(&mut self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+        // `constraints()` is the inner solver's.
         self.inner.unsat_core()
     }
 
-    fn unsat_core_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<Vec<usize>, ClarirsError> {
-        // Simplify the extras as `add` would, and skip the ones `add` would
-        // drop; the inner solver then indexes `constraints()` followed by the
-        // extras it was given, which `kept` maps back to positions in `extra`.
+    fn unsat_core_with_extra(
+        &mut self,
+        extra: &[AstRef<'c>],
+    ) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+        // Simplify the extras as `add` would, skipping the ones `add` would
+        // drop, then name each extra in the core as the caller passed it.
         let mut simplified = Vec::with_capacity(extra.len());
-        let mut kept = Vec::with_capacity(extra.len());
-        for (k, constraint) in extra.iter().enumerate() {
-            let constraint = constraint.simplify()?;
-            if !constraint.is_true() {
-                simplified.push(constraint);
-                kept.push(k);
+        let mut originals: HashMap<u64, &AstRef<'c>> = HashMap::new();
+        for constraint in extra {
+            let s = constraint.simplify()?;
+            if !s.is_true() {
+                originals.entry(s.hash()).or_insert(constraint);
+                simplified.push(s);
             }
         }
-        let n = self.inner.constraints()?.len();
-        self.inner
+        Ok(self
+            .inner
             .unsat_core_with_extra(&simplified)?
             .into_iter()
-            .map(|i| {
-                if i < n {
-                    Ok(i)
-                } else {
-                    kept.get(i - n).map(|k| n + k).ok_or_else(|| {
-                        ClarirsError::InvalidArguments(format!(
-                            "unsat core index {i} names no constraint of the solver"
-                        ))
-                    })
-                }
-            })
-            .collect()
+            .map(|c| originals.get(&c.hash()).map_or(c, |&o| o.clone()))
+            .collect())
     }
 }
 
