@@ -254,6 +254,17 @@ impl<'c, A: Solver<'c>, E: Solver<'c>> Solver<'c> for HybridSolver<'c, A, E> {
     }
 }
 
+impl<'c, A: Solver<'c>, E: UnsatCoreSolver<'c>> UnsatCoreSolver<'c> for HybridSolver<'c, A, E> {
+    fn unsat_core(&mut self) -> Result<Vec<usize>, ClarirsError> {
+        // `constraints()` is the exact backend's, so its indices are ours.
+        self.exact.unsat_core()
+    }
+
+    fn unsat_core_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<Vec<usize>, ClarirsError> {
+        self.exact.unsat_core_with_extra(extra)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::ast::AstFactory;

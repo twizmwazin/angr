@@ -51,45 +51,42 @@ impl HasContext<'static> for DynSolver {
     }
 }
 
-impl DynSolver {
-    /// Get unsat core (only supported for Z3 solver)
-    pub(crate) fn unsat_core(&mut self) -> Result<Vec<usize>, ClarirsError> {
-        match self {
-            DynSolver::Z3(wrapped_solver) => {
-                // Access through the mixin layers
-                // SimplificationMixin -> ConcreteEarlyResolutionMixin -> ModelCacheMixin -> Z3Solver
-                let z3_solver = wrapped_solver.inner_mut().inner_mut().inner_mut();
-                z3_solver.unsat_core()
+/// Dispatch an [`UnsatCoreSolver`] method to the solvers that implement it:
+/// those built on Z3, whose wrappers forward the core and map its indices to
+/// their own `constraints()`. The replacement solver reports the constraints
+/// as given but hands its backend the replaced forms, which it may drop, so
+/// no index mapping exists for it.
+macro_rules! dispatch_unsat_core {
+    ($self:expr, $method:ident $(, $arg:expr)*) => {
+        match $self {
+            DynSolver::Z3(solver) => solver.$method($($arg),*),
+            DynSolver::Z3Cacheless(solver) => solver.$method($($arg),*),
+            DynSolver::Hybrid(solver) => solver.$method($($arg),*),
+            DynSolver::Composite(solver) => solver.$method($($arg),*),
+            DynSolver::Concrete(_) | DynSolver::Vsa(_) | DynSolver::Replacement(_) => {
+                Err(ClarirsError::UnsupportedOperation(
+                    "unsat_core is only supported for the Z3, cacheless, hybrid and composite solvers"
+                        .to_string(),
+                ))
             }
-            DynSolver::Z3Cacheless(wrapped_solver) => {
-                // SimplificationMixin -> ConcreteEarlyResolutionMixin -> Z3Solver
-                let z3_solver = wrapped_solver.inner_mut().inner_mut();
-                z3_solver.unsat_core()
-            }
-            DynSolver::Hybrid(wrapped_solver) => {
-                // Access through mixin layers to the HybridSolver, then to its exact (Z3) solver
-                let hybrid = wrapped_solver.inner_mut().inner_mut();
-                let z3_solver = hybrid.exact_mut().inner_mut().inner_mut().inner_mut();
-                z3_solver.unsat_core()
-            }
-            DynSolver::Composite(composite) => {
-                // The composite's core is the core of whichever independent
-                // child is unsat (claripy's CompositeFrontend does the same).
-                for child in composite.children_mut() {
-                    if !child.satisfiable()? {
-                        // SimplificationMixin -> ConcreteEarlyResolutionMixin -> ModelCacheMixin -> Z3Solver
-                        let z3_solver = child.inner_mut().inner_mut().inner_mut();
-                        return z3_solver.unsat_core();
-                    }
-                }
-                Ok(vec![])
-            }
-            _ => Err(ClarirsError::UnsupportedOperation(
-                "unsat_core is only supported for Z3 and Hybrid solvers".to_string(),
-            )),
         }
+    };
+}
+
+impl UnsatCoreSolver<'static> for DynSolver {
+    fn unsat_core(&mut self) -> Result<Vec<usize>, ClarirsError> {
+        dispatch_unsat_core!(self, unsat_core)
     }
 
+    fn unsat_core_with_extra(
+        &mut self,
+        extra: &[AstRef<'static>],
+    ) -> Result<Vec<usize>, ClarirsError> {
+        dispatch_unsat_core!(self, unsat_core_with_extra, extra)
+    }
+}
+
+impl DynSolver {
     /// Add a replacement (only supported for Replacement solver)
     pub(crate) fn add_replacement(
         &mut self,

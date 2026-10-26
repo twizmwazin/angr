@@ -409,12 +409,19 @@ impl PySolver {
         self.with_extra_constraints(extra_constraints, exact, |solver| Ok(solver.satisfiable()?))
     }
 
+    /// The unsat core as indices into `constraints` followed by
+    /// `extra_constraints`.
     #[pyo3(signature = (extra_constraints = None))]
     fn unsat_core<'py>(
         &mut self,
         extra_constraints: Option<Vec<CoerceBool<'py>>>,
     ) -> Result<Vec<usize>, ClaripyError> {
-        self.with_extra_constraints(extra_constraints, None, |solver| Ok(solver.unsat_core()?))
+        let extra: Vec<AstRef<'static>> = extra_constraints
+            .into_iter()
+            .flatten()
+            .map(|c| c.0.get().inner.clone())
+            .collect();
+        Ok(self.inner.unsat_core_with_extra(&extra)?)
     }
 
     #[pyo3(signature = (expr, n, extra_constraints = None, exact = None))]

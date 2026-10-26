@@ -378,6 +378,18 @@ impl<'c, S: Solver<'c>> Solver<'c> for ModelCacheMixin<'c, S> {
     }
 }
 
+impl<'c, S: UnsatCoreSolver<'c>> UnsatCoreSolver<'c> for ModelCacheMixin<'c, S> {
+    fn unsat_core(&mut self) -> Result<Vec<usize>, ClarirsError> {
+        // The cache only short-circuits queries; the constraints and their
+        // order are the inner solver's, so its indices are ours.
+        self.inner.unsat_core()
+    }
+
+    fn unsat_core_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<Vec<usize>, ClarirsError> {
+        self.inner.unsat_core_with_extra(extra)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

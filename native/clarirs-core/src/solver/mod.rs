@@ -114,3 +114,40 @@ pub trait Solver<'c>: Clone + HasContext<'c> {
     /// sort as the input expression.
     fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError>;
 }
+
+/// Extension trait for solvers that can explain why their constraints are
+/// unsatisfiable.
+///
+/// Unsat cores are optional: a backend that has none (VSA, the concrete
+/// solver) simply does not implement this trait, and a wrapper implements it
+/// only when the solver it wraps does. A core is reported as indices into
+/// [`Solver::constraints`], so a wrapper that changes what it is given before
+/// storing it (simplifying it, regrouping it into child solvers) must map the
+/// indices of the solver that found the core back to its own constraints.
+pub trait UnsatCoreSolver<'c>: Solver<'c> {
+    /// The unsat core of the current constraints: a subset of
+    /// [`Solver::constraints`], as indices into it, that is unsatisfiable on
+    /// its own.
+    ///
+    /// Backends return an error when the constraints are satisfiable or when
+    /// core tracking is disabled.
+    fn unsat_core(&mut self) -> Result<Vec<usize>, ClarirsError>;
+
+    /// The unsat core with `extra` constraints temporarily added, as indices
+    /// into [`Solver::constraints`] followed by `extra`.
+    ///
+    /// The default clones the solver and adds the constraints, which indexes
+    /// correctly only when `add` appends every constraint it is given to
+    /// `constraints()` unchanged. A wrapper that drops, rewrites or regroups
+    /// constraints must override this and map the indices back.
+    fn unsat_core_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<Vec<usize>, ClarirsError> {
+        if extra.is_empty() {
+            return self.unsat_core();
+        }
+        let mut solver = self.clone();
+        for constraint in extra {
+            solver.add(constraint)?;
+        }
+        solver.unsat_core()
+    }
+}
