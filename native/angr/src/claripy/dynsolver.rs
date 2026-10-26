@@ -51,10 +51,8 @@ impl HasContext<'static> for DynSolver {
     }
 }
 
-/// Dispatch an [`UnsatCoreSolver`] method to the solvers that implement it:
-/// those built on Z3, whose wrappers forward the core. The replacement solver
-/// reports the constraints as given but hands its backend the replaced forms,
-/// so a core from it would not name its own constraints.
+/// The replacement solver's backend holds replaced constraints, so its core
+/// would not name the solver's own.
 macro_rules! dispatch_unsat_core {
     ($self:expr, $method:ident $(, $arg:expr)*) => {
         match $self {

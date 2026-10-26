@@ -107,11 +107,7 @@ impl<'c> Z3Solver<'c> {
 }
 
 impl<'c> UnsatCoreSolver<'c> for Z3Solver<'c> {
-    /// The core of the last unsatisfiable check: the asserted constraints
-    /// whose tracking variables z3 names.
-    ///
-    /// Only works if the solver was created with unsat_core enabled and the
-    /// constraints are unsatisfiable.
+    /// Requires `unsat_core` tracking and unsatisfiable constraints.
     fn unsat_core(&mut self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
         if !self.unsat_core {
             return Err(ClarirsError::UnsupportedOperation(
@@ -1516,7 +1512,6 @@ mod tests {
         // Should be unsat
         assert!(!solver.satisfiable()?);
 
-        // The core should contain c0 and c1, but not necessarily c2
         let core = solver.unsat_core()?;
         assert!(core.contains(&c0));
         assert!(core.contains(&c1));
@@ -1561,7 +1556,7 @@ mod tests {
         Ok(())
     }
 
-    /// x > 10 and x < 5, which no value satisfies.
+    /// `x > 10` and `x < 5`.
     fn contradiction<'c>(ctx: &'c Context<'c>) -> Result<(AstRef<'c>, AstRef<'c>), ClarirsError> {
         let x = ctx.bvs("x", 8)?;
         Ok((
@@ -1570,7 +1565,6 @@ mod tests {
         ))
     }
 
-    /// Assert that `core` holds exactly `expected`, in any order.
     fn assert_core<'c>(core: &[AstRef<'c>], expected: &[AstRef<'c>]) {
         assert_eq!(core.len(), expected.len(), "core: {core:?}");
         for constraint in expected {
@@ -1604,7 +1598,6 @@ mod tests {
         solver.add(&gt)?;
         assert!(solver.satisfiable()?);
 
-        // The core names the extra, and the extras leave the solver as it was.
         assert_core(
             &solver.unsat_core_with_extra(std::slice::from_ref(&lt))?,
             &[gt, lt],
@@ -1615,7 +1608,6 @@ mod tests {
         Ok(())
     }
 
-    /// angr's default solver stack, which forwards the core unchanged.
     #[test]
     fn test_unsat_core_through_mixins() -> Result<(), ClarirsError> {
         let ctx = Context::new();
@@ -1632,9 +1624,6 @@ mod tests {
         Ok(())
     }
 
-    /// The simplification mixin drops extras that simplify to `true` and
-    /// hands the backend simplified forms; the core still names the extras
-    /// as the caller passed them.
     #[test]
     fn test_unsat_core_with_extra_names_extras_as_passed() -> Result<(), ClarirsError> {
         let ctx = Context::new();
@@ -1643,7 +1632,6 @@ mod tests {
 
         solver.add(&gt)?;
 
-        // `lt` wrapped in a double negation simplifies to `lt`.
         let wrapped = ctx.not(&ctx.not(&lt)?)?;
         assert_ne!(wrapped, lt);
         let core = solver.unsat_core_with_extra(&[ctx.true_()?, wrapped.clone()])?;
@@ -1670,8 +1658,6 @@ mod tests {
         Ok(())
     }
 
-    /// A composite solver splits independent constraints into child solvers;
-    /// its core is the conflicting child's, named by constraint.
     #[test]
     fn test_composite_unsat_core() -> Result<(), ClarirsError> {
         let ctx = Context::new();
@@ -1704,7 +1690,6 @@ mod tests {
                 .is_empty()
         );
 
-        // The extra makes it unsat; the core names the extra.
         assert_core(
             &solver.unsat_core_with_extra(std::slice::from_ref(&lt))?,
             &[gt, lt],
@@ -1712,7 +1697,6 @@ mod tests {
         Ok(())
     }
 
-    /// An extra that merges children for the query.
     #[test]
     fn test_composite_unsat_core_with_extra_spanning_children() -> Result<(), ClarirsError> {
         let ctx = Context::new();
@@ -1725,22 +1709,18 @@ mod tests {
         solver.add(&gt)?;
         assert!(solver.satisfiable()?);
 
-        // Spans x and y, so the two children are merged for the query.
         let extra = ctx.and2(&lt, &y_is_3)?;
         assert_core(
             &solver.unsat_core_with_extra(std::slice::from_ref(&extra))?,
             &[gt, extra],
         );
 
-        // The query left the composite as it was.
         assert_eq!(solver.constraints()?.len(), 2);
         assert!(solver.satisfiable()?);
 
         Ok(())
     }
 
-    /// Extras that do not touch the unsatisfiable child, and extras that are
-    /// contradictions on their own.
     #[test]
     fn test_composite_unsat_core_with_extra_elsewhere() -> Result<(), ClarirsError> {
         let ctx = Context::new();
@@ -1753,22 +1733,18 @@ mod tests {
         solver.add(&y_is_3)?;
         solver.add(&gt)?;
 
-        // Extras on a fresh variable that contradict each other: the core is
-        // among the extras.
         let z = ctx.bvs("z", 8)?;
         let z_is_1 = ctx.eq_(&z, &ctx.bvv(BitVec::from((1, 8)))?)?;
         let z_is_2 = ctx.eq_(&z, &ctx.bvv(BitVec::from((2, 8)))?)?;
         let core = solver.unsat_core_with_extra(&[z_is_1.clone(), z_is_2.clone()])?;
         assert_core(&core, &[z_is_1, z_is_2]);
 
-        // A concretely false extra is a core on its own.
         let f = ctx.false_()?;
         assert_eq!(
             solver.unsat_core_with_extra(&[ctx.true_()?, f.clone()])?,
             vec![f]
         );
 
-        // A child the extras do not touch is unsatisfiable: its core wins.
         solver.add(&lt)?;
         assert_core(&solver.unsat_core_with_extra(&[y_is_4])?, &[gt, lt]);
 

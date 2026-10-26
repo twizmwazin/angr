@@ -380,8 +380,6 @@ impl<'c, S: Solver<'c>> Solver<'c> for ModelCacheMixin<'c, S> {
 
 impl<'c, S: UnsatCoreSolver<'c>> UnsatCoreSolver<'c> for ModelCacheMixin<'c, S> {
     fn unsat_core(&mut self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        // The cache only short-circuits queries; the constraints are the
-        // inner solver's.
         self.inner.unsat_core()
     }
 

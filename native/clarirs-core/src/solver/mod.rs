@@ -115,29 +115,14 @@ pub trait Solver<'c>: Clone + HasContext<'c> {
     fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError>;
 }
 
-/// Extension trait for solvers that can explain why their constraints are
-/// unsatisfiable.
-///
-/// Unsat cores are optional: a backend that has none (VSA, the concrete
-/// solver) simply does not implement this trait, and a wrapper implements it
-/// only when the solver it wraps does. A core is a subset of the constraints
-/// themselves, as [`Solver::constraints`] holds them, so a wrapper that
-/// regroups constraints into other solvers (the composite) can pass the core
-/// of whichever solver found it straight through.
+/// Optional extension for solvers that can report an unsat core: a subset of
+/// [`Solver::constraints`] that is unsatisfiable on its own.
 pub trait UnsatCoreSolver<'c>: Solver<'c> {
-    /// The unsat core of the current constraints: a subset of
-    /// [`Solver::constraints`] that is unsatisfiable on its own.
-    ///
-    /// Backends return an error when the constraints are satisfiable or when
-    /// core tracking is disabled.
+    /// Errors if the constraints are satisfiable or core tracking is disabled.
     fn unsat_core(&mut self) -> Result<Vec<AstRef<'c>>, ClarirsError>;
 
-    /// The unsat core with `extra` constraints temporarily added: a subset of
-    /// [`Solver::constraints`] and `extra` that is unsatisfiable on its own.
-    ///
-    /// The default clones the solver and adds the constraints. A wrapper that
-    /// rewrites what it is given before storing it (the simplification mixin)
-    /// overrides this so the core names the extras as the caller passed them.
+    /// The unsat core with `extra` temporarily added; the core names the
+    /// extras as passed.
     fn unsat_core_with_extra(
         &mut self,
         extra: &[AstRef<'c>],

@@ -172,7 +172,6 @@ impl<'c, S: Solver<'c>> Solver<'c> for ConcreteEarlyResolutionMixin<'c, S> {
 
 impl<'c, S: UnsatCoreSolver<'c>> UnsatCoreSolver<'c> for ConcreteEarlyResolutionMixin<'c, S> {
     fn unsat_core(&mut self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        // `add` and `constraints()` forward unchanged.
         self.inner.unsat_core()
     }
 

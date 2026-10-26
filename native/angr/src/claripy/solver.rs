@@ -409,8 +409,6 @@ impl PySolver {
         self.with_extra_constraints(extra_constraints, exact, |solver| Ok(solver.satisfiable()?))
     }
 
-    /// The unsat core: the constraints among `constraints` and
-    /// `extra_constraints` that are unsatisfiable together.
     #[pyo3(signature = (extra_constraints = None))]
     fn unsat_core<'py>(
         &mut self,

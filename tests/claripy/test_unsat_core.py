@@ -7,7 +7,6 @@ from angr import claripy
 
 class TestUnsatCore(unittest.TestCase):
     def assertCore(self, core, expected):
-        """``core`` holds exactly the ``expected`` constraints, in any order."""
         self.assertEqual(sorted(hash(c) for c in core), sorted(hash(c) for c in expected), (core, expected))
 
     def test_unsat_core_simple(self):
@@ -17,18 +16,13 @@ class TestUnsatCore(unittest.TestCase):
 
         x = claripy.BVS("x", 8)
 
-        # Add contradictory constraints
         gt = x > 10
         lt = x < 5
-        positive = x > 0  # not part of unsat core
         s.add(gt)
         s.add(lt)
-        s.add(positive)
+        s.add(x > 0)
 
-        # Should be unsat
         self.assertFalse(s.satisfiable())
-
-        # The core is the contradictory constraints
         self.assertCore(s.unsat_core(), [gt, lt])
 
     def test_unsat_core_bool(self):
@@ -100,13 +94,11 @@ class TestUnsatCore(unittest.TestCase):
         # Should be unsat (x > 60 and y > 50 means x + y > 110)
         self.assertFalse(s.satisfiable())
 
-        # The core holds the three (z3 does not promise a minimal core)
+        # z3 does not promise a minimal core
         core = {hash(c) for c in s.unsat_core()}
         self.assertTrue({hash(total), hash(x_big), hash(y_big)} <= core)
 
     def test_unsat_core_with_extra_constraints(self):
-        """The core names the extra constraints that take part, which do not
-        change the solver."""
         s = claripy.Solver(track=True)
         x = claripy.BVS("x", 8)
         gt = x > 10
@@ -119,9 +111,7 @@ class TestUnsatCore(unittest.TestCase):
         self.assertTrue(s.satisfiable())
 
     def test_unsat_core_with_extra_constraints_as_passed(self):
-        """An extra constraint that simplifies to true never reaches the
-        backend, and one the backend sees in simplified form is still named as
-        it was passed."""
+        """Extras are named as passed, even when the backend sees them simplified."""
         s = claripy.Solver(track=True)
         x = claripy.BVS("x", 8)
         gt = x > 10
@@ -146,7 +136,6 @@ class TestUnsatCore(unittest.TestCase):
         x = claripy.BVS("x", 8)
         y = claripy.BVS("y", 8)
 
-        # Contradictory group on x plus an independent, satisfiable group on y.
         gt = x > 10
         lt = x < 5
         s.add(y == 3)
@@ -154,8 +143,6 @@ class TestUnsatCore(unittest.TestCase):
         s.add(lt)
 
         self.assertFalse(s.satisfiable())
-
-        # The independent, satisfiable constraint is not part of the core.
         self.assertCore(s.unsat_core(), [gt, lt])
 
     def test_unsat_core_composite_on_sat(self):
@@ -169,17 +156,14 @@ class TestUnsatCore(unittest.TestCase):
         self.assertEqual(s.unsat_core(), [])
 
     def test_unsat_core_composite_with_extra_constraints(self):
-        """The core names an extra constraint even when it merges children."""
         x = claripy.BVS("x", 32)
         y = claripy.BVS("y", 32)
         s = claripy.SolverComposite(track=True)
         gt = x > 10
         s.add([y == 3, gt])
         self.assertTrue(s.satisfiable())
-        # spans x and y, so it merges both children in the query
-        extra = claripy.And(x < 5, y == 3)
+        extra = claripy.And(x < 5, y == 3)  # spans both children
         self.assertCore(s.unsat_core(extra_constraints=[extra]), [gt, extra])
-        # the query left the solver as it was
         self.assertEqual(len(s.constraints), 2)
         self.assertTrue(s.satisfiable())
 

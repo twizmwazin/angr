@@ -256,7 +256,6 @@ impl<'c, A: Solver<'c>, E: Solver<'c>> Solver<'c> for HybridSolver<'c, A, E> {
 
 impl<'c, A: Solver<'c>, E: UnsatCoreSolver<'c>> UnsatCoreSolver<'c> for HybridSolver<'c, A, E> {
     fn unsat_core(&mut self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        // `constraints()` is the exact backend's.
         self.exact.unsat_core()
     }
 

@@ -112,7 +112,6 @@ impl<'c, S: Solver<'c>> Solver<'c> for SimplificationMixin<'c, S> {
 
 impl<'c, S: UnsatCoreSolver<'c>> UnsatCoreSolver<'c> for SimplificationMixin<'c, S> {
     fn unsat_core(&mut self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        // `constraints()` is the inner solver's.
         self.inner.unsat_core()
     }
 
@@ -120,8 +119,7 @@ impl<'c, S: UnsatCoreSolver<'c>> UnsatCoreSolver<'c> for SimplificationMixin<'c,
         &mut self,
         extra: &[AstRef<'c>],
     ) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        // Simplify the extras as `add` would, skipping the ones `add` would
-        // drop, then name each extra in the core as the caller passed it.
+        // Simplify as `add` does, then map the simplified extras back.
         let mut simplified = Vec::with_capacity(extra.len());
         let mut originals: HashMap<u64, &AstRef<'c>> = HashMap::new();
         for constraint in extra {

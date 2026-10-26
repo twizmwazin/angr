@@ -15,8 +15,7 @@ use crate::prelude::*;
 pub struct CompositeSolver<'c, S: Solver<'c>> {
     ctx: &'c Context<'c>,
     template: S,
-    /// By id, which is creation order. A `BTreeMap` so that `constraints`
-    /// and every walk over the children are in the same order in every run.
+    /// By id (creation order), so `constraints` is stable across runs.
     children: BTreeMap<usize, S>,
     var_to_child: HashMap<InternedString, usize>,
     next_id: usize,
@@ -317,12 +316,8 @@ impl<'c, S: Solver<'c>> Solver<'c> for CompositeSolver<'c, S> {
     }
 }
 
-/// The core is that of the first unsatisfiable child (claripy's
-/// CompositeFrontend reports a child's core the same way); the children hold
-/// the composite's constraints, so it is passed straight through. Unlike a
-/// backend, a satisfiable composite reports an empty core rather than an
-/// error, as does one whose only contradiction is a concrete `false`, which
-/// `constraints()` does not hold.
+/// The core of the first unsatisfiable child, or empty when satisfiable (as
+/// in claripy's CompositeFrontend).
 impl<'c, S: UnsatCoreSolver<'c>> UnsatCoreSolver<'c> for CompositeSolver<'c, S> {
     fn unsat_core(&mut self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
         for child in self.children.values_mut() {
@@ -344,10 +339,6 @@ impl<'c, S: UnsatCoreSolver<'c>> UnsatCoreSolver<'c> for CompositeSolver<'c, S> 
             return Ok(Vec::new());
         }
 
-        // Route the extras as `satisfiable_with_extra` does: a concretely
-        // false one is a core by itself, a concretely true one is in none,
-        // and the symbolic ones go to the children that share their
-        // variables.
         let mut symbolic: Vec<AstRef<'c>> = Vec::new();
         let mut vars: BTreeSet<InternedString> = BTreeSet::new();
         for constraint in extra {
@@ -361,7 +352,6 @@ impl<'c, S: UnsatCoreSolver<'c>> UnsatCoreSolver<'c> for CompositeSolver<'c, S> 
             symbolic.push(constraint.clone());
         }
 
-        // A child the extras do not touch is unsatisfiable on its own.
         let ids = self.child_ids_for_vars(&vars);
         for (id, child) in self.children.iter_mut() {
             if !ids.contains(id) && !child.satisfiable()? {
@@ -371,7 +361,6 @@ impl<'c, S: UnsatCoreSolver<'c>> UnsatCoreSolver<'c> for CompositeSolver<'c, S> 
 
         match ids.len() {
             0 => {
-                // The extras are independent of every constraint.
                 let mut solver = self.template.clone();
                 if solver.satisfiable_with_extra(&symbolic)? {
                     return Ok(Vec::new());
@@ -389,7 +378,6 @@ impl<'c, S: UnsatCoreSolver<'c>> UnsatCoreSolver<'c> for CompositeSolver<'c, S> 
                 child.unsat_core_with_extra(&symbolic)
             }
             _ => {
-                // The extras span several children: merge them temporarily.
                 let mut merged = self.template.clone();
                 for &id in &ids {
                     for constraint in self.children[&id].constraints()? {
