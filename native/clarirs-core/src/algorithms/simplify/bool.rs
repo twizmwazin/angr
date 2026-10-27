@@ -938,18 +938,10 @@ fn simplify_unsigned_cmp<'c>(
             }
             _ => None,
         },
-        // CMP(Add(ZeroExt(n, inner), BVV(k)), BVV(c)) where k fits in inner's width.
-        // inner < 2^w and k < 2^w, so the wide (w + n bit) sum never wraps and equals
-        // inner + k as an integer. The constant can therefore be folded onto the other side:
-        //   inner + k REL c  <=>  inner REL (c - k)   if c >= k
-        //   inner + k  >  c  always                   if c <  k
-        // The rewrite stays in the wide width: narrowing to `inner + extract(k)` would be
-        // unsound, since the narrow sum can wrap while the wide one does not
-        // (e.g. inner = 0xFF, k = 1: 0x100 in the wide width, 0x00 in the narrow one).
-        //
-        // No analogous rule exists for Sub: `ZeroExt(inner) - k` wraps in the wide width
-        // whenever inner < k, so CMP(Sub(ZeroExt(n, inner), BVV(k)), BVV(c)) is a range
-        // check on inner (e.g. `k <= inner < c + k` for ULT) rather than a single comparison.
+        // CMP(Add(ZeroExt(n, inner), BVV(k)), BVV(c)) where k fits in inner's width:
+        // the wide sum cannot wrap, so fold k onto the other side (or concretize if c < k).
+        // Narrowing to `inner + extract(k)` is unsound since the narrow sum can wrap.
+        // Sub has no such rule: ZeroExt(inner) - k wraps whenever inner < k.
         AstOp::Add(add_args) if add_args.len() == 2 => {
             let ze_idx = add_args
                 .iter()
