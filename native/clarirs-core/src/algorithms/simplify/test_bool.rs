@@ -831,3 +831,118 @@ fn test_zero_ext_cmp_unequal_inner_widths_not_rewritten() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_zero_ext_add_cmp_folds_constant_in_wide_width() -> Result<()> {
+    let ctx = Context::new();
+    let x = ctx.bvs("x", 8)?;
+    let wide = |v: u64| ctx.bvv(BitVec::from((v, 64)));
+    let narrow = |v: u64| ctx.bvv(BitVec::from((v, 8)));
+    let sum = ctx.add(ctx.zero_ext(&x, 56)?, wide(1)?)?;
+
+    // ZeroExt(x) + 1 < 5  <=>  ZeroExt(x) < 4  <=>  x < 4 (never `x + 1 < 5`, which
+    // wraps at x = 0xFF).
+    assert_eq!(
+        ctx.ult(&sum, wide(5)?)?.simplify()?,
+        ctx.ult(&x, narrow(4)?)?
+    );
+    assert_eq!(
+        ctx.ule(&sum, wide(5)?)?.simplify()?,
+        ctx.ule(&x, narrow(4)?)?
+    );
+    assert_eq!(
+        ctx.ugt(&sum, wide(5)?)?.simplify()?,
+        ctx.ugt(&x, narrow(4)?)?
+    );
+    assert_eq!(
+        ctx.uge(&sum, wide(5)?)?.simplify()?,
+        ctx.uge(&x, narrow(4)?)?
+    );
+    // Constant on the left keeps its side.
+    assert_eq!(
+        ctx.ugt(wide(5)?, &sum)?.simplify()?,
+        ctx.ugt(narrow(4)?, &x)?
+    );
+
+    // Folding may push the constant past the inner width, which then concretizes.
+    assert_eq!(
+        ctx.ult(&sum, wide(0x100)?)?.simplify()?,
+        ctx.ult(&x, narrow(0xFF)?)?
+    );
+    assert_eq!(ctx.ult(&sum, wide(0x101)?)?.simplify()?, ctx.true_()?);
+
+    // c < k: the sum is always greater than c.
+    let sum5 = ctx.add(ctx.zero_ext(&x, 56)?, wide(5)?)?;
+    assert_eq!(ctx.ult(&sum5, wide(3)?)?.simplify()?, ctx.false_()?);
+    assert_eq!(ctx.ule(&sum5, wide(3)?)?.simplify()?, ctx.false_()?);
+    assert_eq!(ctx.ugt(&sum5, wide(3)?)?.simplify()?, ctx.true_()?);
+    assert_eq!(ctx.uge(&sum5, wide(3)?)?.simplify()?, ctx.true_()?);
+    assert_eq!(ctx.ule(wide(3)?, &sum5)?.simplify()?, ctx.true_()?);
+
+    Ok(())
+}
+
+#[test]
+fn test_zero_ext_sub_cmp_not_narrowed() -> Result<()> {
+    let ctx = Context::new();
+    let x = ctx.bvs("x", 8)?;
+    let wide = |v: u64| ctx.bvv(BitVec::from((v, 64)));
+    let diff = ctx.sub(ctx.zero_ext(&x, 56)?, wide(1)?)?;
+
+    // ZeroExt(x) - 1 wraps to 2^64 - 1 at x = 0, so this is not `x - 1 <= 0xFF`
+    // (which would be true for every x) and must not be rewritten into one.
+    let cmp = ctx.ule(&diff, wide(0xFF)?)?;
+    let simplified = cmp.simplify()?;
+    assert_eq!(simplified, ctx.ule(diff.simplify()?, wide(0xFF)?)?);
+    assert_eq!(
+        simplified
+            .replace(&x, &ctx.bvv(BitVec::from((0u64, 8)))?)?
+            .simplify()?,
+        ctx.false_()?
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_zero_ext_add_sub_cmp_sound_for_all_inputs() -> Result<()> {
+    let ctx = Context::new();
+    let x = ctx.bvs("x", 8)?;
+    let wide = |v: u64| ctx.bvv(BitVec::from((v, 64)));
+    let ze = ctx.zero_ext(&x, 56)?;
+
+    let ks = [0u64, 1, 5, 0xFF];
+    let cs = [0u64, 1, 4, 5, 0xFF, 0x100, 0x104, u64::MAX];
+
+    for kind in 0..4 {
+        for k in ks {
+            for c in cs {
+                let add = ctx.add(&ze, wide(k)?)?;
+                let sub = ctx.sub(&ze, wide(k)?)?;
+                for arith in [add, sub] {
+                    for (lhs, rhs) in [(&arith, &wide(c)?), (&wide(c)?, &arith)] {
+                        let expr = match kind {
+                            0 => ctx.ult(lhs, rhs)?,
+                            1 => ctx.ule(lhs, rhs)?,
+                            2 => ctx.ugt(lhs, rhs)?,
+                            _ => ctx.uge(lhs, rhs)?,
+                        };
+                        let simplified = expr.simplify()?;
+                        for xv in 0..=0xFFu64 {
+                            let xv = ctx.bvv(BitVec::from((xv, 8)))?;
+                            let expected = expr.replace(&x, &xv)?.simplify()?;
+                            let actual = simplified.replace(&x, &xv)?.simplify()?;
+                            assert!(matches!(expected.op(), AstOp::BoolV(_)));
+                            assert_eq!(
+                                actual, expected,
+                                "{expr:?} simplified to {simplified:?}, which disagrees at x = {xv:?}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}

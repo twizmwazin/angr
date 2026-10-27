@@ -938,25 +938,19 @@ fn simplify_unsigned_cmp<'c>(
             }
             _ => None,
         },
-        // CMP(Sub(ZeroExt(n, inner), BVV(k)), BVV(c)) where k and c fit in inner's size
-        // => CMP(Sub(inner, extract(k)), extract(c))
-        AstOp::Sub(lhs_sub, rhs_sub) => {
-            if let AstOp::ZeroExt(inner, ext_size) = lhs_sub.op()
-                && let AstOp::BVV(k) = rhs_sub.op()
-                && c.leading_zeros() as u32 >= *ext_size
-                && k.leading_zeros() as u32 >= *ext_size
-            {
-                let inner_size = inner.size();
-                Some((
-                    ctx.sub(inner, &ctx.extract(rhs_sub, inner_size - 1, 0)?)?,
-                    ctx.bvv(c.extract(0, inner_size - 1)?)?,
-                ))
-            } else {
-                None
-            }
-        }
-        // CMP(Add(ZeroExt(n, inner), BVV(k)), BVV(c)) where k and c fit in inner's size
-        AstOp::Add(add_args) => {
+        // CMP(Add(ZeroExt(n, inner), BVV(k)), BVV(c)) where k fits in inner's width.
+        // inner < 2^w and k < 2^w, so the wide (w + n bit) sum never wraps and equals
+        // inner + k as an integer. The constant can therefore be folded onto the other side:
+        //   inner + k REL c  <=>  inner REL (c - k)   if c >= k
+        //   inner + k  >  c  always                   if c <  k
+        // The rewrite stays in the wide width: narrowing to `inner + extract(k)` would be
+        // unsound, since the narrow sum can wrap while the wide one does not
+        // (e.g. inner = 0xFF, k = 1: 0x100 in the wide width, 0x00 in the narrow one).
+        //
+        // No analogous rule exists for Sub: `ZeroExt(inner) - k` wraps in the wide width
+        // whenever inner < k, so CMP(Sub(ZeroExt(n, inner), BVV(k)), BVV(c)) is a range
+        // check on inner (e.g. `k <= inner < c + k` for ULT) rather than a single comparison.
+        AstOp::Add(add_args) if add_args.len() == 2 => {
             let ze_idx = add_args
                 .iter()
                 .position(|a| matches!(a.op(), AstOp::ZeroExt(..)));
@@ -964,17 +958,15 @@ fn simplify_unsigned_cmp<'c>(
                 .iter()
                 .position(|a| matches!(a.op(), AstOp::BVV(..)));
             if let (Some(ze_i), Some(bvv_i)) = (ze_idx, bvv_idx)
-                && add_args.len() == 2
-                && let AstOp::ZeroExt(inner, ext_size) = add_args[ze_i].op()
+                && let AstOp::ZeroExt(_, ext_size) = add_args[ze_i].op()
                 && let AstOp::BVV(k) = add_args[bvv_i].op()
-                && c.leading_zeros() as u32 >= *ext_size
+                && *ext_size > 0
                 && k.leading_zeros() as u32 >= *ext_size
             {
-                let inner_size = inner.size();
-                Some((
-                    ctx.add(inner, &ctx.extract(&add_args[bvv_i], inner_size - 1, 0)?)?,
-                    ctx.bvv(c.extract(0, inner_size - 1)?)?,
-                ))
+                if c < k {
+                    return Ok(ctx.boolv(matches!(rel, UCmp::Ugt | UCmp::Uge))?);
+                }
+                Some((add_args[ze_i].clone(), ctx.bvv((c.clone() - k.clone())?)?))
             } else {
                 None
             }
