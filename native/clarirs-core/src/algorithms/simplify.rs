@@ -108,6 +108,38 @@ impl<'c> SimplifyState<'c> {
     }
 }
 
+/// Zero extension has no canonical node of its own: `ZeroExt(n, x)` simplifies
+/// to `Concat(BVV(0, n), x)`. Given the pieces of a simplified `Concat`, returns
+/// the number of leading zero bits `n` when the Concat has that shape.
+fn leading_zero_bits(args: &[AstRef<'_>]) -> Option<u32> {
+    match args {
+        [first, _, ..] => match first.op() {
+            AstOp::BVV(v) if v.is_zero() => Some(first.size()),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Whether both Concats are zero extensions by the same number of bits.
+fn equal_leading_zero_bits(lhs: &[AstRef<'_>], rhs: &[AstRef<'_>]) -> bool {
+    matches!(
+        (leading_zero_bits(lhs), leading_zero_bits(rhs)),
+        (Some(a), Some(b)) if a == b
+    )
+}
+
+/// Re-concatenates the pieces of a `Concat`, returning a single piece as-is.
+fn concat_pieces<'c>(
+    ctx: &'c Context<'c>,
+    pieces: &[AstRef<'c>],
+) -> Result<AstRef<'c>, ClarirsError> {
+    match pieces {
+        [only] => Ok(only.clone()),
+        _ => ctx.concat(pieces.iter().cloned()),
+    }
+}
+
 fn simplify<'c>(
     ast: &AstRef<'c>,
     respect_annotations: bool,

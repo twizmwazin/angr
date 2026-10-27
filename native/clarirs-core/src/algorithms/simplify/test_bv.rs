@@ -1291,3 +1291,139 @@ fn test_extract_distributes_over_union() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_zero_ext_canonicalizes_to_concat() -> Result<()> {
+    let ctx = Context::new();
+    let x = ctx.bvs("x", 8)?;
+    let zeros = |n: u32| ctx.bvv(BitVec::zeros(n));
+
+    // ZeroExt(n, x) -> Concat(0#n, x), and Concat(0#n, x) stays as written.
+    let canonical = ctx.concat2(zeros(24)?, &x)?;
+    assert_eq!(ctx.zero_ext(&x, 24)?.simplify()?, canonical);
+    assert_eq!(canonical.simplify()?, canonical);
+
+    // Extending by zero bits is the identity.
+    assert_eq!(ctx.zero_ext(&x, 0)?.simplify()?, x);
+
+    // Nested extensions merge into one run of zeros.
+    let nested = ctx.zero_ext(&ctx.zero_ext(&x, 8)?, 16)?;
+    assert_eq!(nested.simplify()?, canonical);
+    let mixed = ctx.zero_ext(&ctx.concat2(zeros(8)?, &x)?, 16)?;
+    assert_eq!(mixed.simplify()?, canonical);
+
+    // Constants fold.
+    let c = ctx.bvv(BitVec::from((0xABu64, 8)))?;
+    assert_eq!(
+        ctx.zero_ext(&c, 24)?.simplify()?,
+        ctx.bvv(BitVec::from((0xABu64, 32)))?
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_zero_ext_propagates_over_ite() -> Result<()> {
+    let ctx = Context::new();
+    let cond = ctx.bools("c")?;
+    let one = ctx.bvv(BitVec::from((1u64, 8)))?;
+    let zero = ctx.bvv(BitVec::from((0u64, 8)))?;
+    let ite = ctx.ite(&cond, &one, &zero)?;
+
+    let expected = ctx.ite(
+        &cond,
+        ctx.bvv(BitVec::from((1u64, 32)))?,
+        ctx.bvv(BitVec::from((0u64, 32)))?,
+    )?;
+    assert_eq!(ctx.zero_ext(&ite, 24)?.simplify()?, expected);
+    assert_eq!(
+        ctx.concat2(ctx.bvv(BitVec::zeros(24))?, &ite)?.simplify()?,
+        expected
+    );
+
+    // Symbolic branches are extended in place, too.
+    let a = ctx.bvs("a", 8)?;
+    let b = ctx.bvs("b", 8)?;
+    let zeros = ctx.bvv(BitVec::zeros(24))?;
+    assert_eq!(
+        ctx.zero_ext(&ctx.ite(&cond, &a, &b)?, 24)?.simplify()?,
+        ctx.ite(&cond, ctx.concat2(&zeros, &a)?, ctx.concat2(&zeros, &b)?)?
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_extract_of_zero_ext_in_concat_form() -> Result<()> {
+    let ctx = Context::new();
+    let x = ctx.bvs("x", 8)?;
+    let zx = ctx.zero_ext(&x, 24)?;
+
+    // Entirely within the extended value
+    assert_eq!(ctx.extract(&zx, 7, 0)?.simplify()?, x);
+    assert_eq!(ctx.extract(&zx, 3, 0)?.simplify()?, ctx.extract(&x, 3, 0)?);
+    // Entirely within the zero bits
+    assert_eq!(
+        ctx.extract(&zx, 31, 8)?.simplify()?,
+        ctx.bvv(BitVec::zeros(24))?
+    );
+    // Spanning both
+    assert_eq!(
+        ctx.extract(&zx, 11, 4)?.simplify()?,
+        ctx.concat2(ctx.bvv(BitVec::zeros(4))?, ctx.extract(&x, 7, 4)?)?
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_shl_of_zero_ext_past_the_zero_bits() -> Result<()> {
+    let ctx = Context::new();
+    let x = ctx.bvs("x", 8)?;
+    let zx = ctx.zero_ext(&x, 24)?;
+    let shift = |n: u64| ctx.bvv(BitVec::from((n, 32)));
+
+    // Shifting out exactly the zero bits moves x to the top.
+    assert_eq!(
+        ctx.shl(&zx, shift(24)?)?.simplify()?,
+        ctx.concat2(&x, ctx.bvv(BitVec::zeros(24))?)?
+    );
+    // Shifting further also shifts x itself.
+    assert_eq!(
+        ctx.shl(&zx, shift(26)?)?.simplify()?,
+        ctx.concat2(
+            ctx.shl(&x, ctx.bvv(BitVec::from((2u64, 8)))?)?,
+            ctx.bvv(BitVec::zeros(24))?
+        )?
+    );
+    // Shifting everything out leaves zero.
+    assert_eq!(
+        ctx.shl(&zx, shift(32)?)?.simplify()?,
+        ctx.bvv(BitVec::zeros(32))?
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_and_mask_over_zero_ext() -> Result<()> {
+    let ctx = Context::new();
+    let x = ctx.bvs("x", 8)?;
+    let zx = ctx.zero_ext(&x, 24)?;
+
+    // The mask covers x exactly, so the And disappears.
+    let mask = ctx.bvv(BitVec::from((0xFFu64, 32)))?;
+    assert_eq!(ctx.and2(&zx, &mask)?.simplify()?, zx.simplify()?);
+
+    // A narrower mask lands on x alone.
+    let mask = ctx.bvv(BitVec::from((0x0Fu64, 32)))?;
+    assert_eq!(
+        ctx.and2(&zx, &mask)?.simplify()?,
+        ctx.concat2(
+            ctx.bvv(BitVec::zeros(24))?,
+            ctx.and2(&x, ctx.bvv(BitVec::from((0x0Fu64, 8)))?)?
+        )?
+    );
+
+    Ok(())
+}

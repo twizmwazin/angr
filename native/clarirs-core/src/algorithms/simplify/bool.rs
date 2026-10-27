@@ -346,22 +346,26 @@ pub(crate) fn simplify_bool<'c>(
                         }
                     }
 
-                    // If one side is a = ZeroExt and the other side is a BVV with those bits set to zero,
-                    // we can extract the relevant bits and compare directly
-                    (AstOp::ZeroExt(innner, ext_size), AstOp::BVV(outer))
-                        if outer.leading_zeros() as u32 >= *ext_size =>
+                    // If one side is a zero extension, Concat(0#n, x), and the other side is a
+                    // BVV whose top n bits are zero, we can drop those bits and compare x directly
+                    (AstOp::Concat(args), AstOp::BVV(outer))
+                        if super::leading_zero_bits(args)
+                            .is_some_and(|n| outer.leading_zeros() as u32 >= n) =>
                     {
-                        state.rerun(ctx.eq_(
-                            innner.clone(),
-                            ctx.extract(ctx.bvv(outer.clone())?, innner.size() - 1, 0)?,
-                        )?)
+                        let inner = super::concat_pieces(ctx, &args[1..])?;
+                        let low = ctx.bvv(outer.extract(0, inner.size() - 1)?)?;
+                        state.rerun(ctx.eq_(inner, low)?)
                     }
 
-                    // If both sides are ZeroExt of the same inner width, we can compare the inner values directly
-                    (AstOp::ZeroExt(inner_lhs, _), AstOp::ZeroExt(inner_rhs, _))
-                        if inner_lhs.size() == inner_rhs.size() =>
+                    // If both sides are zero extensions by the same number of bits, we can
+                    // compare the extended values directly (their widths agree)
+                    (AstOp::Concat(lhs_args), AstOp::Concat(rhs_args))
+                        if super::equal_leading_zero_bits(lhs_args, rhs_args) =>
                     {
-                        state.rerun(ctx.eq_(inner_lhs.clone(), inner_rhs.clone())?)
+                        state.rerun(ctx.eq_(
+                            super::concat_pieces(ctx, &lhs_args[1..])?,
+                            super::concat_pieces(ctx, &rhs_args[1..])?,
+                        )?)
                     }
 
                     // (ite cond 1 0) == 0  ==>  !cond
@@ -521,22 +525,26 @@ pub(crate) fn simplify_bool<'c>(
                         }
                     }
 
-                    // If one side is a = ZeroExt and the other side is a BVV with those bits set to zero,
-                    // we can extract the relevant bits and compare directly
-                    (AstOp::ZeroExt(innner, ext_size), AstOp::BVV(outer))
-                        if outer.leading_zeros() as u32 >= *ext_size =>
+                    // If one side is a zero extension, Concat(0#n, x), and the other side is a
+                    // BVV whose top n bits are zero, we can drop those bits and compare x directly
+                    (AstOp::Concat(args), AstOp::BVV(outer))
+                        if super::leading_zero_bits(args)
+                            .is_some_and(|n| outer.leading_zeros() as u32 >= n) =>
                     {
-                        state.rerun(ctx.neq(
-                            innner.clone(),
-                            ctx.extract(ctx.bvv(outer.clone())?, innner.size() - 1, 0)?,
-                        )?)
+                        let inner = super::concat_pieces(ctx, &args[1..])?;
+                        let low = ctx.bvv(outer.extract(0, inner.size() - 1)?)?;
+                        state.rerun(ctx.neq(inner, low)?)
                     }
 
-                    // If both sides are ZeroExt of the same inner width, we can compare the inner values directly
-                    (AstOp::ZeroExt(inner_lhs, _), AstOp::ZeroExt(inner_rhs, _))
-                        if inner_lhs.size() == inner_rhs.size() =>
+                    // If both sides are zero extensions by the same number of bits, we can
+                    // compare the extended values directly (their widths agree)
+                    (AstOp::Concat(lhs_args), AstOp::Concat(rhs_args))
+                        if super::equal_leading_zero_bits(lhs_args, rhs_args) =>
                     {
-                        state.rerun(ctx.neq(inner_lhs.clone(), inner_rhs.clone())?)
+                        state.rerun(ctx.neq(
+                            super::concat_pieces(ctx, &lhs_args[1..])?,
+                            super::concat_pieces(ctx, &rhs_args[1..])?,
+                        )?)
                     }
 
                     // (ite cond 1 0) != 0  ==>  cond
@@ -894,9 +902,14 @@ fn simplify_unsigned_cmp<'c>(
     // Rules below see the constant on the right; a constant on the left flips the relation.
     let (x, c, rel) = match (lhs.op(), rhs.op()) {
         (AstOp::BVV(a), AstOp::BVV(b)) => return Ok(ctx.boolv(kind.fold(a, b))?),
-        // If both sides are ZeroExt of the same inner width, we can compare the inner values directly
-        (AstOp::ZeroExt(a, _), AstOp::ZeroExt(b, _)) if a.size() == b.size() => {
-            return state.rerun(kind.build(ctx, a.clone(), b.clone())?);
+        // If both sides are zero extensions by the same number of bits, we can compare the
+        // extended values directly (their widths agree)
+        (AstOp::Concat(a), AstOp::Concat(b)) if super::equal_leading_zero_bits(a, b) => {
+            return state.rerun(kind.build(
+                ctx,
+                super::concat_pieces(ctx, &a[1..])?,
+                super::concat_pieces(ctx, &b[1..])?,
+            )?);
         }
         (AstOp::BVV(c), _) => (&rhs, c, kind.flip()),
         (_, AstOp::BVV(c)) => (&lhs, c, kind),
@@ -913,17 +926,17 @@ fn simplify_unsigned_cmp<'c>(
             )),
             None => None,
         },
-        // If one side is a ZeroExt, and the other side is a BVV with a value larger than
-        // what can be represented in the inner bits, we can concretize the comparison
-        AstOp::ZeroExt(inner, _) if c.bits() > inner.size() as usize => {
-            return Ok(ctx.boolv(matches!(rel, UCmp::Ult | UCmp::Ule))?);
+        // CMP(Concat(BVV(0, n), rest...), BVV(c)): a zero extension of rest
+        AstOp::Concat(args) if super::leading_zero_bits(args).is_some() => {
+            let inner = super::concat_pieces(ctx, &args[1..])?;
+            if c.bits() > inner.size() as usize {
+                // c is larger than anything rest can hold, so the comparison is decided
+                return Ok(ctx.boolv(matches!(rel, UCmp::Ult | UCmp::Ule))?);
+            }
+            // c's top n bits are zero, so drop them from both sides
+            let low = ctx.bvv(c.extract(0, inner.size() - 1)?)?;
+            Some((inner, low))
         }
-        // If one side is a ZeroExt and the other side is a BVV with those bits set to zero,
-        // we can extract the relevant bits and compare directly
-        AstOp::ZeroExt(inner, ext_size) if c.leading_zeros() as u32 >= *ext_size => Some((
-            inner.clone(),
-            ctx.extract(ctx.bvv(c.clone())?, inner.size() - 1, 0)?,
-        )),
         // CMP(Concat(rest..., BVV(0, n)), BVV(c)) where c has n trailing zeros
         AstOp::Concat(args) => match args.as_slice() {
             [high_parts @ .., low]
@@ -938,41 +951,45 @@ fn simplify_unsigned_cmp<'c>(
             }
             _ => None,
         },
-        // CMP(Sub(ZeroExt(n, inner), BVV(k)), BVV(c)) where k and c fit in inner's size
+        // CMP(Sub(Concat(0#n, inner), BVV(k)), BVV(c)) where k and c fit in inner's size
         // => CMP(Sub(inner, extract(k)), extract(c))
         AstOp::Sub(lhs_sub, rhs_sub) => {
-            if let AstOp::ZeroExt(inner, ext_size) = lhs_sub.op()
+            if let AstOp::Concat(args) = lhs_sub.op()
+                && let Some(ext_size) = super::leading_zero_bits(args)
                 && let AstOp::BVV(k) = rhs_sub.op()
-                && c.leading_zeros() as u32 >= *ext_size
-                && k.leading_zeros() as u32 >= *ext_size
+                && c.leading_zeros() as u32 >= ext_size
+                && k.leading_zeros() as u32 >= ext_size
             {
+                let inner = super::concat_pieces(ctx, &args[1..])?;
                 let inner_size = inner.size();
                 Some((
-                    ctx.sub(inner, &ctx.extract(rhs_sub, inner_size - 1, 0)?)?,
+                    ctx.sub(&inner, &ctx.extract(rhs_sub, inner_size - 1, 0)?)?,
                     ctx.bvv(c.extract(0, inner_size - 1)?)?,
                 ))
             } else {
                 None
             }
         }
-        // CMP(Add(ZeroExt(n, inner), BVV(k)), BVV(c)) where k and c fit in inner's size
+        // CMP(Add(Concat(0#n, inner), BVV(k)), BVV(c)) where k and c fit in inner's size
         AstOp::Add(add_args) => {
-            let ze_idx = add_args
-                .iter()
-                .position(|a| matches!(a.op(), AstOp::ZeroExt(..)));
+            let ze_idx = add_args.iter().position(|a| {
+                matches!(a.op(), AstOp::Concat(args) if super::leading_zero_bits(args).is_some())
+            });
             let bvv_idx = add_args
                 .iter()
                 .position(|a| matches!(a.op(), AstOp::BVV(..)));
             if let (Some(ze_i), Some(bvv_i)) = (ze_idx, bvv_idx)
                 && add_args.len() == 2
-                && let AstOp::ZeroExt(inner, ext_size) = add_args[ze_i].op()
+                && let AstOp::Concat(args) = add_args[ze_i].op()
+                && let Some(ext_size) = super::leading_zero_bits(args)
                 && let AstOp::BVV(k) = add_args[bvv_i].op()
-                && c.leading_zeros() as u32 >= *ext_size
-                && k.leading_zeros() as u32 >= *ext_size
+                && c.leading_zeros() as u32 >= ext_size
+                && k.leading_zeros() as u32 >= ext_size
             {
+                let inner = super::concat_pieces(ctx, &args[1..])?;
                 let inner_size = inner.size();
                 Some((
-                    ctx.add(inner, &ctx.extract(&add_args[bvv_i], inner_size - 1, 0)?)?,
+                    ctx.add(&inner, &ctx.extract(&add_args[bvv_i], inner_size - 1, 0)?)?,
                     ctx.bvv(c.extract(0, inner_size - 1)?)?,
                 ))
             } else {

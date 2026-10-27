@@ -503,14 +503,25 @@ class TestZeroExtComparison(unittest.TestCase):
                 expr = op(claripy.ZeroExt(56, p), claripy.ZeroExt(56, q))
                 self.assertEqual(tuple(expr.args), (p, q))
 
+    def test_zero_ext_is_normalised_to_concat(self):
+        # Concat is the canonical form of a zero extension: ZeroExt(n, v) simplifies to
+        # Concat(BVV(0, n), v), and a Concat written that way is left as it is.
+        self.assertEqual(self.a.op, "Concat")
+        self.assertEqual(tuple(self.a.args), (claripy.BVV(0, 56), self.x))
+        self.assertIs(self.a, claripy.Concat(claripy.BVV(0, 56), self.x))
+        self.assertIs(self.b, claripy.Concat(claripy.BVV(0, 32), self.y))
+
     def test_concat_written_zero_extension_is_the_same_case(self):
-        # Concat(BVV(0, n), v) is normalised to ZeroExt, so it is the same case.
         a = claripy.Concat(claripy.BVV(0, 56), self.x)
         b = claripy.Concat(claripy.BVV(0, 32), self.y)
-        self.assertEqual((a.op, b.op), ("ZeroExt", "ZeroExt"))
         for name, op in self.cmps:
             with self.subTest(op=name):
                 self.assertEqual(tuple(op(a, b).args), (a, b))
+        p, q = claripy.BVS("p", 8), claripy.BVS("q", 8)
+        for name, op in self.cmps:
+            with self.subTest(op=name):
+                expr = op(claripy.Concat(claripy.BVV(0, 56), p), claripy.Concat(claripy.BVV(0, 56), q))
+                self.assertEqual(tuple(expr.args), (p, q))
 
     def test_unequal_inner_widths_solve_correctly(self):
         solver = claripy.SolverZ3()

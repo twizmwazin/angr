@@ -122,16 +122,6 @@ pub(crate) fn simplify_bv<'c>(
                             state.rerun(ctx.concat(parts)?)
                         }
 
-                        // Distribute AND over zero-extend when one operand is constant
-                        (AstOp::BVV(const_val), AstOp::ZeroExt(inner, ext_size))
-                        | (AstOp::ZeroExt(inner, ext_size), AstOp::BVV(const_val)) => {
-                            let inner_size = inner.size();
-                            let const_inner = const_val.extract(0, inner_size - 1)?;
-                            let inner_and = ctx.and2(&ctx.bvv(const_inner)?, inner)?;
-                            let zero_extended = ctx.zero_ext(&inner_and, *ext_size)?;
-                            state.rerun(zero_extended)
-                        }
-
                         // rotate_shift_mask: ((A << a) | (A >> (N - a))) & mask
                         (AstOp::Or(or_args), AstOp::BVV(mask_val))
                         | (AstOp::BVV(mask_val), AstOp::Or(or_args))
@@ -749,16 +739,16 @@ pub(crate) fn simplify_bv<'c>(
                 // Shift by zero
                 (_, AstOp::BVV(v)) if v.is_zero() => Ok(arc.clone()),
 
-                // Simplify shift left of zero-extended value when shift amount is >= extension size
-                // (shl (zero_extend n x) m) where m >= n
-                // The n zero-extended MSBs are shifted out, inner is shifted left by (m-n),
-                // and m zero bits appear at the LSB side.
-                // Result: concat(shl(inner, m-n), BVV(0, m)) truncated to total_size
-                // Which is: concat(extract(inner_size-1-(m-n), 0, inner), BVV(0, m))
-                // Simplified: concat(shl(inner, m-n), BVV(0, ext_size))
-                (AstOp::ZeroExt(inner, ext_size), AstOp::BVV(shift_amt))
-                    if { shift_amt.to_u64().unwrap_or(0) as u32 >= *ext_size } =>
+                // Simplify shift left of a zero-extended value when the shift amount is >= the
+                // extension size: (shl (concat 0#n x) m) where m >= n.
+                // The n zero MSBs are shifted out, x is shifted left by (m-n), and m zero bits
+                // appear at the LSB side. Result: concat(shl(x, m-n), BVV(0, n)).
+                (AstOp::Concat(args), AstOp::BVV(shift_amt))
+                    if super::leading_zero_bits(args)
+                        .is_some_and(|n| shift_amt.to_u64().unwrap_or(0) as u32 >= n) =>
                 {
+                    let ext_size = args[0].size();
+                    let inner = super::concat_pieces(ctx, &args[1..])?;
                     let shift_val = shift_amt.to_u64().unwrap_or(0) as u32;
                     let total_size = inner.size() + ext_size;
 
@@ -771,15 +761,13 @@ pub(crate) fn simplify_bv<'c>(
                         // Shift the inner value left by (m - ext_size), then concatenate
                         // with ext_size zero bits at the bottom (LSB side)
                         let shifted_inner = if inner_shift == 0 {
-                            inner.clone()
+                            inner
                         } else {
-                            ctx.shl(
-                                inner,
-                                &ctx.bvv(BitVec::from((inner_shift as u64, inner.size())))?,
-                            )?
+                            let amount = BitVec::from((inner_shift as u64, inner.size()));
+                            ctx.shl(&inner, &ctx.bvv(amount)?)?
                         };
                         // Zeros go at the bottom (LSB), shifted_inner goes at the top (MSB)
-                        let zero_bottom = ctx.bvv(BitVec::zeros(*ext_size))?;
+                        let zero_bottom = ctx.bvv(BitVec::zeros(ext_size))?;
                         state.rerun(ctx.concat(vec![shifted_inner, zero_bottom])?)
                     }
                 }
@@ -832,7 +820,8 @@ pub(crate) fn simplify_bv<'c>(
                             let extracted =
                                 ctx.extract(inner, size - 1 - shl_u32, shr_u32 - shl_u32)?;
                             if extracted.size() < size {
-                                state.rerun(ctx.zero_ext(&extracted, size - extracted.size())?)
+                                let high_zeros = ctx.bvv(BitVec::zeros(size - extracted.size()))?;
+                                state.rerun(ctx.concat(vec![high_zeros, extracted])?)
                             } else {
                                 Ok(extracted)
                             }
@@ -840,10 +829,10 @@ pub(crate) fn simplify_bv<'c>(
                             // shr < shl: bits x[size-1-shl : 0] land at positions
                             // [size-1-shr : shl-shr], i.e.
                             // concat(0[shr], x[size-1-shl : 0], 0[shl-shr])
+                            let high_zeros = ctx.bvv(BitVec::zeros(shr_u32))?;
                             let extracted = ctx.extract(inner, size - 1 - shl_u32, 0)?;
                             let low_zeros = ctx.bvv(BitVec::zeros(shl_u32 - shr_u32))?;
-                            let shifted = ctx.concat(vec![extracted, low_zeros])?;
-                            state.rerun(ctx.zero_ext(&shifted, shr_u32)?)
+                            state.rerun(ctx.concat(vec![high_zeros, extracted, low_zeros])?)
                         }
                     } else {
                         Ok(ctx.lshr(arc, arc1)?)
@@ -1005,25 +994,15 @@ pub(crate) fn simplify_bv<'c>(
         }
         AstOp::ZeroExt(_, num_bits) => {
             let arc = state.get_child_simplified(0)?;
-            match (arc.op(), num_bits) {
-                // Zero extension
-                (_, 0) => Ok(arc.clone()),
-                // Concrete BVV case
-                (AstOp::BVV(value), _) => Ok(ctx.bvv(value.zero_extend(*num_bits)?)?),
-                // Nested ZeroExt - combine extensions
-                (AstOp::ZeroExt(inner, inner_num_bits), _) => {
-                    let total_ext = inner_num_bits + num_bits;
-                    state.rerun(ctx.zero_ext(inner, total_ext)?)
-                }
-                // Propogate over ITE when the children are BVVs
-                (AstOp::ITE(cond, then_bv, else_bv), _) => {
-                    let then_ext = ctx.zero_ext(then_bv, *num_bits)?;
-                    let else_ext = ctx.zero_ext(else_bv, *num_bits)?;
-                    state.rerun(ctx.ite(cond, &then_ext, &else_ext)?)
-                }
-                // Symbolic case
-                (_, _) => Ok(ctx.zero_ext(arc, *num_bits)?),
+            if *num_bits == 0 {
+                return Ok(arc);
             }
+            // ZeroExt(n, x) -> Concat(BVV(0, n), x)
+            // Concat is the canonical form of a zero extension, so every rule that
+            // reasons about one (constant folding, nested extensions, ITE
+            // propagation, Extract, comparisons, ...) only has to know Concat.
+            let high_zeros = ctx.bvv(BitVec::zeros(*num_bits))?;
+            state.rerun(ctx.concat(vec![high_zeros, arc])?)
         }
         AstOp::SignExt(_, num_bits) => {
             let arc = state.get_child_simplified(0)?;
@@ -1125,24 +1104,6 @@ pub(crate) fn simplify_bv<'c>(
                     state.rerun(ctx.ite(cond, &then_extracted, &else_extracted)?)
                 }
 
-                // ZeroExt cases
-                // If extracting from the original bits (not the extended zero bits)
-                AstOp::ZeroExt(inner, _) if *high < inner.size() => {
-                    state.rerun(ctx.extract(inner, *high, *low)?)
-                }
-                // If extracting only from the extended zero bits
-                AstOp::ZeroExt(inner, _) if *low >= inner.size() => {
-                    Ok(ctx.bvv(BitVec::zeros(*high - *low + 1))?)
-                }
-                // If extracting bits that span original and extended parts
-                AstOp::ZeroExt(inner, _) => {
-                    let inner_size = inner.size();
-                    // Extract what we can from the original bits
-                    let extracted = ctx.extract(inner, inner_size - 1, *low)?;
-                    // Zero-extend to the final size
-                    state.rerun(ctx.zero_ext(&extracted, *high - inner_size + 1)?)
-                }
-
                 // SignExt cases
                 // If extracting from the original bits (not the extended sign bits)
                 AstOp::SignExt(inner, _) if *high < inner.size() => {
@@ -1239,28 +1200,34 @@ pub(crate) fn simplify_bv<'c>(
 
             // Concat(If(c, a0, b0), If(c, a1, b1), ...)
             //   -> If(c, Concat(a0, a1, ...), Concat(b0, b1, ...))
-            // when every piece is an ITE guarded by the same condition. This
-            // recombines values computed lane-by-lane (e.g. a word updated
-            // byte-wise in memory) back into a single conditional, which is what
-            // lets the surrounding arithmetic collapse.
+            // when every piece is an ITE guarded by the same condition, or a
+            // constant. This recombines values computed lane-by-lane (e.g. a word
+            // updated byte-wise in memory) back into a single conditional, which
+            // is what lets the surrounding arithmetic collapse. Letting constants
+            // ride along also covers a zero-extended conditional,
+            // Concat(0#n, If(c, a, b)) -> If(c, 0#n .. a, 0#n .. b).
             if flattened.len() >= 2
-                && let AstOp::ITE(cond0, _, _) = flattened[0].op()
+                && let Some(cond) = flattened.iter().find_map(|a| match a.op() {
+                    AstOp::ITE(c, _, _) => Some(c.clone()),
+                    _ => None,
+                })
             {
-                let cond_hash = cond0.hash();
-                let all_same_cond = flattened
-                    .iter()
-                    .all(|a| matches!(a.op(), AstOp::ITE(c, _, _) if c.hash() == cond_hash));
+                let cond_hash = cond.hash();
+                let all_same_cond = flattened.iter().all(|a| match a.op() {
+                    AstOp::ITE(c, _, _) => c.hash() == cond_hash,
+                    AstOp::BVV(_) => true,
+                    _ => false,
+                });
                 if all_same_cond {
-                    let cond = match flattened[0].op() {
-                        AstOp::ITE(c, _, _) => c.clone(),
-                        _ => unreachable!(),
-                    };
                     let mut thens: Vec<AstRef<'c>> = Vec::with_capacity(flattened.len());
                     let mut elses: Vec<AstRef<'c>> = Vec::with_capacity(flattened.len());
                     for a in &flattened {
                         if let AstOp::ITE(_, t, e) = a.op() {
                             thens.push(t.clone());
                             elses.push(e.clone());
+                        } else {
+                            thens.push(a.clone());
+                            elses.push(a.clone());
                         }
                     }
                     let then_concat = ctx.concat(thens)?;
@@ -1301,20 +1268,6 @@ pub(crate) fn simplify_bv<'c>(
                     continue;
                 }
                 merged.push(arg);
-            }
-
-            // Concat(BVV(0, N), rest...) -> ZeroExt(N, Concat(rest...))
-            if merged.len() >= 2
-                && matches!(merged[0].op(), AstOp::BVV(high_val) if high_val.is_zero())
-            {
-                let ext_size = merged[0].size();
-                let rest: Vec<AstRef<'c>> = merged[1..].to_vec();
-                let inner = if rest.len() == 1 {
-                    rest.into_iter().next().unwrap()
-                } else {
-                    ctx.concat(rest)?
-                };
-                return state.rerun(ctx.zero_ext(&inner, ext_size)?);
             }
 
             // Handle result based on merged length

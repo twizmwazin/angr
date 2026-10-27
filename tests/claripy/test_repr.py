@@ -71,7 +71,8 @@ class TestRepr(unittest.TestCase):
         assert repr(claripy.Not(claripy.And(self.b, self.c))) == f"<Bool !(BoolS({self.bn}) && BoolS({self.cn}))>"
         assert repr(~(x + y)) == f"<BV32 ~({xn} + {yn})>"
         assert repr(claripy.Extract(15, 8, x)) == f"<BV8 {xn}[15:8]>"
-        assert repr(claripy.ZeroExt(32, x)) == f"<BV64 0#32 .. {xn}>"
+        # A zero extension simplifies to a Concat with a zero constant on top.
+        assert repr(claripy.ZeroExt(32, x)) == f"<BV64 0x0 .. {xn}>"
         assert repr(claripy.SignExt(32, x)) == f"<BV64 SignExt(32, {xn})>"
         assert repr(claripy.Concat(x, y)) == f"<BV64 {xn} .. {yn}>"
         assert repr(x.reversed) == f"<BV32 Reverse({xn})>"

@@ -817,9 +817,11 @@ fn test_zero_ext_cmp_unequal_inner_widths_not_rewritten() -> Result<()> {
     let ctx = Context::new();
     let x = ctx.bvs("x", 8)?;
     let y = ctx.bvs("y", 32)?;
-    // Both operands are 64 bits, so every comparison below is well-formed.
-    let a = ctx.zero_ext(&x, 56)?;
-    let b = ctx.zero_ext(&y, 32)?;
+    // Both operands are 64 bits, so every comparison below is well-formed. They are
+    // written in the canonical form a zero extension simplifies to, so the comparison
+    // survives simplification unchanged if the rule leaves it alone.
+    let a = ctx.concat2(ctx.bvv(BitVec::zeros(56))?, x)?;
+    let b = ctx.concat2(ctx.bvv(BitVec::zeros(32))?, y)?;
 
     // Comparing the inner values would build an 8-bit against a 32-bit operand.
     assert_eq!(ctx.eq_(&a, &b)?.simplify()?, ctx.eq_(&a, &b)?);
@@ -828,6 +830,50 @@ fn test_zero_ext_cmp_unequal_inner_widths_not_rewritten() -> Result<()> {
     assert_eq!(ctx.ule(&a, &b)?.simplify()?, ctx.ule(&a, &b)?);
     assert_eq!(ctx.ugt(&a, &b)?.simplify()?, ctx.ugt(&a, &b)?);
     assert_eq!(ctx.uge(&a, &b)?.simplify()?, ctx.uge(&a, &b)?);
+
+    Ok(())
+}
+
+#[test]
+fn test_zero_ext_cmp_constant_drops_the_zero_bits() -> Result<()> {
+    let ctx = Context::new();
+    let x = ctx.bvs("x", 8)?;
+    let zx = ctx.zero_ext(&x, 56)?;
+    let c = ctx.bvv(BitVec::from((0x41u64, 64)))?;
+    let x_c = ctx.bvv(BitVec::from((0x41u64, 8)))?;
+
+    assert_eq!(ctx.eq_(&zx, &c)?.simplify()?, ctx.eq_(&x, &x_c)?);
+    assert_eq!(ctx.eq_(&c, &zx)?.simplify()?, ctx.eq_(&x, &x_c)?);
+    assert_eq!(ctx.neq(&zx, &c)?.simplify()?, ctx.neq(&x, &x_c)?);
+    assert_eq!(ctx.ult(&zx, &c)?.simplify()?, ctx.ult(&x, &x_c)?);
+    assert_eq!(ctx.ugt(&c, &zx)?.simplify()?, ctx.ugt(&x_c, &x)?);
+
+    // A constant that does not fit in x's width decides the comparison outright.
+    let big = ctx.bvv(BitVec::from((0x100u64, 64)))?;
+    assert_eq!(ctx.ult(&zx, &big)?.simplify()?, ctx.true_()?);
+    assert_eq!(ctx.ule(&zx, &big)?.simplify()?, ctx.true_()?);
+    assert_eq!(ctx.ugt(&zx, &big)?.simplify()?, ctx.false_()?);
+    assert_eq!(ctx.uge(&zx, &big)?.simplify()?, ctx.false_()?);
+    assert_eq!(ctx.ugt(&big, &zx)?.simplify()?, ctx.true_()?);
+
+    Ok(())
+}
+
+#[test]
+fn test_zero_ext_cmp_written_as_concat_is_the_same_case() -> Result<()> {
+    let ctx = Context::new();
+    let x = ctx.bvs("x", 8)?;
+    let y = ctx.bvs("y", 8)?;
+    let a = ctx.concat2(ctx.bvv(BitVec::zeros(56))?, &x)?;
+    let b = ctx.concat2(ctx.bvv(BitVec::zeros(56))?, &y)?;
+    let c = ctx.bvv(BitVec::from((7u64, 64)))?;
+
+    assert_eq!(ctx.eq_(&a, &b)?.simplify()?, ctx.eq_(&x, &y)?);
+    assert_eq!(ctx.ule(&a, &b)?.simplify()?, ctx.ule(&x, &y)?);
+    assert_eq!(
+        ctx.ult(&a, &c)?.simplify()?,
+        ctx.ult(&x, ctx.bvv(BitVec::from((7u64, 8)))?)?
+    );
 
     Ok(())
 }

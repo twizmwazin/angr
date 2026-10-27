@@ -2966,6 +2966,14 @@ impl StridedInterval {
                     return Self::constant(bits1 + bits2, new_value);
                 }
 
+                // A zero high part is a zero extension of the low part. This is
+                // the canonical form `ZeroExt(n, x)` simplifies to, and
+                // `zero_extend` keeps a wrapping low part sound where the
+                // corner-combination below would not.
+                if lb1 == ub1 && lb1.is_zero() {
+                    return other.zero_extend(*bits1);
+                }
+
                 // Improved stride computation
                 let new_stride = if stride1.is_zero() && stride2.is_zero() {
                     BigUint::zero()
@@ -3804,5 +3812,32 @@ mod si_bitvector_ext_op_tests {
         assert!(result.contains_value(&BigUint::from(0x0Fu32)));
         assert!(result.contains_value(&BigUint::from(0x2Fu32)));
         assert!(result.contains_value(&BigUint::from(0x4Fu32)));
+    }
+
+    #[test]
+    fn test_concat_with_zero_high_part_is_zero_extension() {
+        // Concat(0#n, x) is how a zero extension reaches VSA, so it must match
+        // zero_extend, including for a wrapping x: [0xF0, 0x10] over 8 bits is
+        // {0xF0..0xFF} ∪ {0x00..0x10}.
+        let zeros = StridedInterval::constant(24, 0u32);
+        let wrapped = StridedInterval::range(8, 0xF0u32, 0x10u32);
+        let result = zeros.concat(&wrapped);
+
+        assert_eq!(result.bits(), 32);
+        assert_eq!(result, wrapped.zero_extend(24));
+        for v in [0x00u32, 0x10, 0xF0, 0xFF] {
+            assert!(result.contains_value(&BigUint::from(v)), "missing {v:#x}");
+        }
+        assert!(!result.contains_value(&BigUint::from(0x11u32)));
+        assert!(!result.contains_value(&BigUint::from(0xEFu32)));
+
+        // A non-wrapping x with a stride is extended with its stride intact.
+        let strided = StridedInterval::new(
+            8,
+            BigUint::from(4u32),
+            BigUint::from(4u32),
+            BigUint::from(0x80u32),
+        );
+        assert_eq!(zeros.concat(&strided), strided.zero_extend(24));
     }
 }
