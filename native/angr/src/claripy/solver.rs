@@ -119,6 +119,22 @@ impl PySolver {
         exact.and_then(|e| e.extract::<bool>().ok())
     }
 
+    /// Up to `n` distinct solutions for `expr` under the extra constraints, as
+    /// concrete ASTs.
+    fn solutions(
+        &mut self,
+        expr: &Bound<'_, Base>,
+        n: u32,
+        extra_constraints: Option<Vec<CoerceBool>>,
+        exact: Option<Bound<'_, PyAny>>,
+    ) -> Result<Vec<AstRef<'static>>, ClaripyError> {
+        let exact = Self::extract_exact(exact);
+        let ast = expr.get().ast();
+        self.with_extra_constraints(extra_constraints, exact, |solver| {
+            Ok(solver.eval_n(&ast, n)?)
+        })
+    }
+
     /// Calls `f` with a mutable reference to a solver that includes the given
     /// extra constraints. When no extra constraints are provided, `f` receives
     /// `&mut self.inner` directly, avoiding a clone.
@@ -457,15 +473,10 @@ impl PySolver {
         extra_constraints: Option<Vec<CoerceBool>>,
         exact: Option<Bound<'py, PyAny>>,
     ) -> Result<Vec<Bound<'py, Base>>, ClaripyError> {
-        let exact = Self::extract_exact(exact);
-        let ast = expr.get().ast();
-        self.with_extra_constraints(extra_constraints, exact, |solver| {
-            solver
-                .eval_n(&ast, n)?
-                .into_iter()
-                .map(|sol| Base::from_ast(py, sol))
-                .collect()
-        })
+        self.solutions(&expr, n, extra_constraints, exact)?
+            .into_iter()
+            .map(|sol| Base::from_ast(py, sol))
+            .collect()
     }
 
     #[pyo3(signature = (expr, n, extra_constraints = None, exact = None))]
@@ -477,42 +488,11 @@ impl PySolver {
         extra_constraints: Option<Vec<CoerceBool>>,
         exact: Option<Bound<'py, PyAny>>,
     ) -> PyResult<Vec<Bound<'py, PyAny>>> {
-        match self.eval_to_ast(py, expr, n, extra_constraints, exact) {
-            Ok(results) => results
-                .into_iter()
-                .filter_map(|r| {
-                    if let Ok(bv_value) = r.cast::<BV>() {
-                        if let AstOp::BVV(bv) = bv_value.get().inner.op() {
-                            Some(bv.to_biguint().into_bound_py_any(py))
-                        } else {
-                            None
-                        }
-                    } else if let Ok(bool_value) = r.cast::<Bool>() {
-                        if let AstOp::BoolV(b) = bool_value.get().inner.op() {
-                            Some(b.into_bound_py_any(py))
-                        } else {
-                            None
-                        }
-                    } else if let Ok(fp_value) = r.cast::<FP>() {
-                        if let AstOp::FPV(fp) = fp_value.get().inner.op() {
-                            fp.to_f64().map(|f| f.into_bound_py_any(py))
-                        } else {
-                            None
-                        }
-                    } else if let Ok(string_value) = r.cast::<PyAstString>() {
-                        if let AstOp::StringV(s) = string_value.get().inner.op() {
-                            Some(s.into_bound_py_any(py))
-                        } else {
-                            None
-                        }
-                    } else {
-                        Some(Err(ClaripyError::UnsupportedOperation(
-                            "eval: Unsupported type".to_string(),
-                        )
-                        .into()))
-                    }
-                })
-                .collect::<Result<Vec<Bound<PyAny>>, pyo3::PyErr>>(),
+        match self.solutions(&expr, n, extra_constraints, exact) {
+            Ok(solutions) => solutions
+                .iter()
+                .filter_map(|sol| concrete_py_value(py, sol).transpose())
+                .collect(),
             Err(e) => {
                 if e.to_string().contains("UNSAT") {
                     Ok(vec![]) // Return empty list on UNSAT
@@ -578,24 +558,11 @@ impl PySolver {
             .map_err(PyErr::from)?;
 
         let to_py = |ast: &AstRef<'static>| -> PyResult<Bound<'py, PyAny>> {
-            Ok(match ast.op() {
-                AstOp::BVV(bv) => bv.to_biguint().into_bound_py_any(py)?,
-                AstOp::BoolV(b) => b.into_bound_py_any(py)?,
-                AstOp::FPV(fp) => fp
-                    .to_f64()
-                    .ok_or_else(|| {
-                        ClaripyError::UnsupportedOperation(
-                            "batch_eval: non-finite float solution".to_string(),
-                        )
-                    })?
-                    .into_bound_py_any(py)?,
-                AstOp::StringV(s) => s.into_bound_py_any(py)?,
-                _ => {
-                    return Err(ClaripyError::UnsupportedOperation(
-                        "batch_eval: solver returned a non-constant solution".to_string(),
-                    )
-                    .into());
-                }
+            concrete_py_value(py, ast)?.ok_or_else(|| {
+                ClaripyError::UnsupportedOperation(
+                    "batch_eval: solver returned a non-constant solution".to_string(),
+                )
+                .into()
             })
         };
 

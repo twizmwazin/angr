@@ -29,3 +29,19 @@ impl From<&str> for NameString {
         NameString(val.to_string())
     }
 }
+
+/// The Python value of a concrete leaf: `BVV` -> int, `BoolV` -> bool,
+/// `FPV` -> float, `StringV` -> str. `None` for anything else, including an
+/// `FPV` whose sort has no `f64` form.
+pub fn concrete_py_value<'py>(
+    py: Python<'py>,
+    ast: &AstRef<'static>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    Ok(match ast.op() {
+        AstOp::BVV(bv) => Some(bv.to_biguint().into_bound_py_any(py)?),
+        AstOp::BoolV(b) => Some(b.into_bound_py_any(py)?),
+        AstOp::FPV(fp) => fp.to_f64().map(|f| f.into_bound_py_any(py)).transpose()?,
+        AstOp::StringV(s) => Some(s.into_bound_py_any(py)?),
+        _ => None,
+    })
+}
