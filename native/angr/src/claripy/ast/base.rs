@@ -17,6 +17,13 @@ use crate::claripy::prelude::*;
 pub trait AstWrapper: pyo3::PyClass<Frozen = pyo3::pyclass::boolean_struct::True> + Sync {
     /// The wrapped AST.
     fn inner(&self) -> &AstRef<'static>;
+
+    /// Simplify a freshly built `ast` the way this class's results are
+    /// simplified, then wrap it.
+    fn wrap_simplified<'py>(
+        py: Python<'py>,
+        ast: AstRef<'static>,
+    ) -> Result<Bound<'py, Self>, ClaripyError>;
 }
 
 type Reduced<'py> = (
@@ -48,6 +55,17 @@ pub struct Base {
 impl AstWrapper for Base {
     fn inner(&self) -> &AstRef<'static> {
         &self.inner
+    }
+
+    fn wrap_simplified<'py>(
+        py: Python<'py>,
+        ast: AstRef<'static>,
+    ) -> Result<Bound<'py, Self>, ClaripyError> {
+        let ast = match ast.ast_type() {
+            AstType::BitVec(_) => ast.simplify_ext(true, true)?,
+            _ => ast.simplify()?,
+        };
+        Base::from_ast(py, ast)
     }
 }
 

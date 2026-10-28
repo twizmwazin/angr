@@ -23,6 +23,13 @@ impl AstWrapper for Bool {
     fn inner(&self) -> &AstRef<'static> {
         &self.inner
     }
+
+    fn wrap_simplified<'py>(
+        py: Python<'py>,
+        ast: AstRef<'static>,
+    ) -> Result<Bound<'py, Self>, ClaripyError> {
+        Bool::new(py, &ast.simplify()?)
+    }
 }
 
 ast_wrapper!(Bool, PY_BOOL_CACHE, |base, inner| {

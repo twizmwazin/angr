@@ -170,6 +170,13 @@ impl AstWrapper for FP {
     fn inner(&self) -> &AstRef<'static> {
         &self.inner
     }
+
+    fn wrap_simplified<'py>(
+        py: Python<'py>,
+        ast: AstRef<'static>,
+    ) -> Result<Bound<'py, Self>, ClaripyError> {
+        FP::new(py, &ast.simplify()?)
+    }
 }
 
 ast_wrapper!(FP, PY_FP_CACHE, |base, inner| {
@@ -177,6 +184,24 @@ ast_wrapper!(FP, PY_FP_CACHE, |base, inner| {
         .add_subclass(Bits::new())
         .add_subclass(FP { inner })
 });
+
+impl FP {
+    /// `op(self, other)` with `other` coerced to this FP's sort, simplified
+    /// and wrapped as `T`: an FP for arithmetic, a Bool for comparisons.
+    fn binop<'py, T: AstWrapper>(
+        &self,
+        py: Python<'py>,
+        other: CoerceFP,
+        op: impl FnOnce(
+            &'static Context<'static>,
+            AstRef<'static>,
+            AstRef<'static>,
+        ) -> Result<AstRef<'static>, ClarirsError>,
+    ) -> Result<Bound<'py, T>, ClaripyError> {
+        let other = other.unpack_like(&self.inner)?;
+        T::wrap_simplified(py, op(&GLOBAL_CONTEXT, self.inner.clone(), other)?)
+    }
+}
 
 #[pymethods]
 impl FP {
@@ -343,12 +368,7 @@ impl FP {
         py: Python<'py>,
         other: CoerceFP,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .fp_eq(&self.inner, &other.unpack_like(&self.inner)?)?
-                .simplify()?,
-        )
+        self.binop(py, other, Context::fp_eq)
     }
 
     pub fn __ne__<'py>(
@@ -356,12 +376,7 @@ impl FP {
         py: Python<'py>,
         other: CoerceFP,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .fp_neq(&self.inner, &other.unpack_like(&self.inner)?)?
-                .simplify()?,
-        )
+        self.binop(py, other, Context::fp_neq)
     }
 
     // `Base` defines `__hash__`, but Python makes a class unhashable if it
@@ -375,12 +390,7 @@ impl FP {
         py: Python<'py>,
         other: CoerceFP,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .fp_lt(&self.inner, &other.unpack_like(&self.inner)?)?
-                .simplify()?,
-        )
+        self.binop(py, other, Context::fp_lt)
     }
 
     pub fn __le__<'py>(
@@ -388,12 +398,7 @@ impl FP {
         py: Python<'py>,
         other: CoerceFP,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .fp_leq(&self.inner, &other.unpack_like(&self.inner)?)?
-                .simplify()?,
-        )
+        self.binop(py, other, Context::fp_leq)
     }
 
     pub fn __gt__<'py>(
@@ -401,12 +406,7 @@ impl FP {
         py: Python<'py>,
         other: CoerceFP,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .fp_gt(&self.inner, &other.unpack_like(&self.inner)?)?
-                .simplify()?,
-        )
+        self.binop(py, other, Context::fp_gt)
     }
 
     pub fn __ge__<'py>(
@@ -414,12 +414,7 @@ impl FP {
         py: Python<'py>,
         other: CoerceFP,
     ) -> Result<Bound<'py, Bool>, ClaripyError> {
-        Bool::new(
-            py,
-            &GLOBAL_CONTEXT
-                .fp_geq(&self.inner, &other.unpack_like(&self.inner)?)?
-                .simplify()?,
-        )
+        self.binop(py, other, Context::fp_geq)
     }
 
     pub fn __abs__<'py>(&self, py: Python<'py>) -> Result<Bound<'py, FP>, ClaripyError> {
@@ -435,16 +430,7 @@ impl FP {
         py: Python<'py>,
         other: CoerceFP,
     ) -> Result<Bound<'py, FP>, ClaripyError> {
-        FP::new(
-            py,
-            &GLOBAL_CONTEXT
-                .fp_add(
-                    &self.inner,
-                    &other.unpack_like(&self.inner)?,
-                    PyRM::default(),
-                )?
-                .simplify()?,
-        )
+        self.binop(py, other, |ctx, a, b| ctx.fp_add(a, b, PyRM::default()))
     }
 
     pub fn __sub__<'py>(
@@ -452,16 +438,7 @@ impl FP {
         py: Python<'py>,
         other: CoerceFP,
     ) -> Result<Bound<'py, FP>, ClaripyError> {
-        FP::new(
-            py,
-            &GLOBAL_CONTEXT
-                .fp_sub(
-                    &self.inner,
-                    &other.unpack_like(&self.inner)?,
-                    PyRM::default(),
-                )?
-                .simplify()?,
-        )
+        self.binop(py, other, |ctx, a, b| ctx.fp_sub(a, b, PyRM::default()))
     }
 
     pub fn __mul__<'py>(
@@ -469,16 +446,7 @@ impl FP {
         py: Python<'py>,
         other: CoerceFP,
     ) -> Result<Bound<'py, FP>, ClaripyError> {
-        FP::new(
-            py,
-            &GLOBAL_CONTEXT
-                .fp_mul(
-                    &self.inner,
-                    &other.unpack_like(&self.inner)?,
-                    PyRM::default(),
-                )?
-                .simplify()?,
-        )
+        self.binop(py, other, |ctx, a, b| ctx.fp_mul(a, b, PyRM::default()))
     }
 
     pub fn __truediv__<'py>(
@@ -486,16 +454,7 @@ impl FP {
         py: Python<'py>,
         other: CoerceFP,
     ) -> Result<Bound<'py, FP>, ClaripyError> {
-        FP::new(
-            py,
-            &GLOBAL_CONTEXT
-                .fp_div(
-                    &self.inner,
-                    &other.unpack_like(&self.inner)?,
-                    PyRM::default(),
-                )?
-                .simplify()?,
-        )
+        self.binop(py, other, |ctx, a, b| ctx.fp_div(a, b, PyRM::default()))
     }
 
     #[getter]

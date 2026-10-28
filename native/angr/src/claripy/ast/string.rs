@@ -15,6 +15,13 @@ impl AstWrapper for PyAstString {
     fn inner(&self) -> &AstRef<'static> {
         &self.inner
     }
+
+    fn wrap_simplified<'py>(
+        py: Python<'py>,
+        ast: AstRef<'static>,
+    ) -> Result<Bound<'py, Self>, ClaripyError> {
+        PyAstString::new(py, &ast.simplify()?)
+    }
 }
 
 ast_wrapper!(PyAstString, PY_STRING_CACHE, |base, inner| {
