@@ -13,8 +13,8 @@ pub mod pyslicemethodsext;
 pub mod solver;
 pub mod vsa;
 
-use num_bigint::BigInt;
 use prelude::*;
+use pyo3::types::PyFloat;
 
 /// Register `module` in `sys.modules` under `full_name`, so that
 /// `import <full_name>` and pickle lookups find it.
@@ -96,53 +96,38 @@ fn py_minimize_boolean<'py>(
     Base::from_ast(py, expr.get().inner.minimize_boolean(max_predicates)?)
 }
 
-#[pyfunction]
-fn is_true(expr: Bound<'_, PyAny>) -> Result<bool, ClaripyError> {
+/// The truth value `expr` provably has: `Some` when it coerces to a Bool
+/// that simplifies to a constant (Bool ASTs, Python bools and ints, BVs that
+/// resolve to a constant) or is a Python float; `None` for anything symbolic
+/// or of another sort. Anything we cannot prove is neither true nor false.
+/// This matches claripy, whose concrete backend raises BackendError for
+/// non-AST inputs, which is_true/is_false treat as False; falling back to
+/// Python truthiness would instead report every foreign object as true.
+fn concrete_truth(expr: &Bound<'_, PyAny>) -> Result<Option<bool>, ClaripyError> {
     if let Ok(bool_expr) = expr.extract::<CoerceBool>() {
-        Ok(bool_expr.0.simplify()?.is_true())
-    } else if let Ok(bv_expr) = expr.extract::<CoerceBV>() {
-        match bv_expr {
-            CoerceBV::BV(bv_expr) => Ok(bv_expr.simplify()?.is_true()),
-            CoerceBV::Int(int_expr) => Ok(int_expr != BigInt::ZERO),
-            CoerceBV::Bool(bool_expr) => Ok(bool_expr.simplify()?.is_true()),
-        }
-    } else if let Ok(fp_expr) = expr.extract::<CoerceFP>() {
-        match fp_expr {
-            CoerceFP::FP(fp_expr) => Ok(fp_expr.simplify()?.is_true()),
-            CoerceFP::Py(float) => Ok(float != 0.0),
-        }
-    } else if let Ok(string_expr) = expr.extract::<CoerceString>() {
-        Ok(string_expr.0.simplify()?.is_true())
+        let simplified = bool_expr.0.simplify()?;
+        Ok(if simplified.is_true() {
+            Some(true)
+        } else if simplified.is_false() {
+            Some(false)
+        } else {
+            None
+        })
+    } else if let Ok(float) = expr.cast::<PyFloat>() {
+        Ok(Some(float.extract::<f64>()? != 0.0))
     } else {
-        // Anything we cannot prove true is not true. This matches claripy
-        // (whose concrete backend raises BackendError for non-AST inputs,
-        // which is_true treats as False); falling back to Python truthiness
-        // would instead report every foreign object as true.
-        Ok(false)
+        Ok(None)
     }
 }
 
 #[pyfunction]
+fn is_true(expr: Bound<'_, PyAny>) -> Result<bool, ClaripyError> {
+    Ok(concrete_truth(&expr)? == Some(true))
+}
+
+#[pyfunction]
 fn is_false(expr: Bound<'_, PyAny>) -> Result<bool, ClaripyError> {
-    if let Ok(bool_expr) = expr.extract::<CoerceBool>() {
-        Ok(bool_expr.0.simplify()?.is_false())
-    } else if let Ok(bv_expr) = expr.extract::<CoerceBV>() {
-        match bv_expr {
-            CoerceBV::BV(bv_expr) => Ok(bv_expr.simplify()?.is_false()),
-            CoerceBV::Int(int_expr) => Ok(int_expr == BigInt::ZERO),
-            CoerceBV::Bool(bool_expr) => Ok(bool_expr.simplify()?.is_false()),
-        }
-    } else if let Ok(fp_expr) = expr.extract::<CoerceFP>() {
-        match fp_expr {
-            CoerceFP::FP(fp_expr) => Ok(fp_expr.simplify()?.is_false()),
-            CoerceFP::Py(float) => Ok(float == 0.0),
-        }
-    } else if let Ok(string_expr) = expr.extract::<CoerceString>() {
-        Ok(string_expr.0.simplify()?.is_false())
-    } else {
-        // See is_true: claripy returns False for anything it cannot prove.
-        Ok(false)
-    }
+    Ok(concrete_truth(&expr)? == Some(false))
 }
 
 /// Populate the `claripy` module. Its canonical home is

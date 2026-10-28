@@ -158,6 +158,53 @@ impl PySolver {
             f(&mut self.inner)
         }
     }
+
+    /// Shared body of `is_true` (`want` = true) and `is_false` (`want` =
+    /// false): whether `expr` provably has that truth value under the solver's
+    /// constraints. A Bool is tested directly; a BV counts as false when it is
+    /// zero and true otherwise.
+    fn has_truth_value(
+        &mut self,
+        expr: Bound<'_, PyAny>,
+        extra_constraints: Option<Vec<CoerceBool>>,
+        exact: Option<Bound<'_, PyAny>>,
+        want: bool,
+    ) -> Result<bool, ClaripyError> {
+        let exact = Self::extract_exact(exact);
+
+        // Python literals need no solver.
+        if let Ok(py_bool) = expr.extract::<bool>() {
+            return Ok(py_bool == want);
+        } else if let Ok(py_int) = expr.extract::<i64>() {
+            return Ok((py_int != 0) == want);
+        }
+
+        self.with_extra_constraints(extra_constraints, exact, |solver| {
+            if let Ok(bool_expr) = expr.cast::<Bool>() {
+                let ast = &bool_expr.get().inner;
+                Ok(match ast.op() {
+                    AstOp::BoolV(b) => *b == want,
+                    _ if want => solver.is_true(ast)?,
+                    _ => solver.is_false(ast)?,
+                })
+            } else if let Ok(bv_expr) = expr.cast::<BV>() {
+                let ast = &bv_expr.get().inner;
+                let is_zero = match ast.op() {
+                    AstOp::BVV(bv) => bv.is_zero(),
+                    _ => {
+                        let zero = solver.context().bvv(BitVec::from((0, ast.size())))?;
+                        solver.is_true(&solver.context().eq_(ast, &zero)?)?
+                    }
+                };
+                Ok(is_zero != want)
+            } else {
+                Err(ClaripyError::TypeError(format!(
+                    "{}: expression must be a boolean, integer, or bitvector",
+                    if want { "is_true" } else { "is_false" }
+                )))
+            }
+        })
+    }
 }
 
 #[pymethods]
@@ -666,41 +713,7 @@ impl PySolver {
         extra_constraints: Option<Vec<CoerceBool>>,
         exact: Option<Bound<'py, PyAny>>,
     ) -> Result<bool, ClaripyError> {
-        let exact = Self::extract_exact(exact);
-
-        // Check for Python primitive types first
-        if let Ok(py_bool) = expr.extract::<bool>() {
-            return Ok(py_bool);
-        } else if let Ok(py_int) = expr.extract::<i64>() {
-            return Ok(py_int != 0);
-        }
-
-        self.with_extra_constraints(extra_constraints, exact, |solver| {
-            // Handle different expression types
-            if let Ok(bool_expr) = expr.cast::<Bool>() {
-                match bool_expr.get().inner.op() {
-                    AstOp::BoolV(b) => Ok(*b),
-                    _ => Ok(solver.is_true(&bool_expr.get().inner)?),
-                }
-            } else if let Ok(bv_expr) = expr.cast::<BV>() {
-                // For bitvectors, check if it's concrete and non-zero
-                if let AstOp::BVV(bv) = bv_expr.get().inner.op() {
-                    Ok(!bv.is_zero())
-                } else {
-                    // For symbolic BVs, check if it can be non-zero
-                    let zero = solver
-                        .context()
-                        .bvv(BitVec::from((0, bv_expr.get().inner.size())))?;
-                    let eq_zero = solver.context().eq_(&bv_expr.get().inner, &zero)?;
-                    let is_zero = solver.is_true(&eq_zero)?;
-                    Ok(!is_zero)
-                }
-            } else {
-                Err(ClaripyError::TypeError(
-                    "is_true: expression must be a boolean, integer, or bitvector".to_string(),
-                ))
-            }
-        })
+        self.has_truth_value(expr, extra_constraints, exact, true)
     }
 
     #[pyo3(signature = (expr, extra_constraints = None, exact = None))]
@@ -710,37 +723,7 @@ impl PySolver {
         extra_constraints: Option<Vec<CoerceBool>>,
         exact: Option<Bound<'py, PyAny>>,
     ) -> Result<bool, ClaripyError> {
-        let exact = Self::extract_exact(exact);
-
-        // Check for Python primitive types first
-        if let Ok(py_bool) = expr.extract::<bool>() {
-            return Ok(!py_bool);
-        } else if let Ok(py_int) = expr.extract::<i64>() {
-            return Ok(py_int == 0);
-        }
-
-        self.with_extra_constraints(extra_constraints, exact, |solver| {
-            // Handle different expression types
-            if let Ok(bool_expr) = expr.cast::<Bool>() {
-                Ok(solver.is_false(&bool_expr.get().inner)?)
-            } else if let Ok(bv_expr) = expr.cast::<BV>() {
-                // For bitvectors, check if it's concrete and zero
-                if let AstOp::BVV(bv) = bv_expr.get().inner.op() {
-                    Ok(bv.is_zero())
-                } else {
-                    // For symbolic BVs, check if it must be zero
-                    let zero = solver
-                        .context()
-                        .bvv(BitVec::from((0, bv_expr.get().inner.size())))?;
-                    let eq_zero = solver.context().eq_(&bv_expr.get().inner, &zero)?;
-                    Ok(solver.is_true(&eq_zero)?)
-                }
-            } else {
-                Err(ClaripyError::TypeError(
-                    "is_false: expression must be a boolean, integer, or bitvector".to_string(),
-                ))
-            }
-        })
+        self.has_truth_value(expr, extra_constraints, exact, false)
     }
 
     #[pyo3(signature = (expr, extra_constraints = None, exact = None))]
