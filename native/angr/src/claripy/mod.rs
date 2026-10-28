@@ -145,6 +145,37 @@ fn is_false(expr: Bound<'_, PyAny>) -> Result<bool, ClaripyError> {
     }
 }
 
+/// Expose the claripy exception classes on `m`.
+fn add_exceptions(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add("ClaripyError", py.get_type::<py_err::ClaripyError>())?;
+    m.add(
+        "ClaripyTypeError",
+        py.get_type::<py_err::ClaripyTypeError>(),
+    )?;
+    m.add("UnsatError", py.get_type::<py_err::UnsatError>())?;
+    m.add(
+        "ClaripyFrontendError",
+        py.get_type::<py_err::ClaripyFrontendError>(),
+    )?;
+    m.add(
+        "ClaripySolverInterruptError",
+        py.get_type::<py_err::ClaripySolverInterruptError>(),
+    )?;
+    m.add(
+        "ClaripyOperationError",
+        py.get_type::<py_err::ClaripyOperationError>(),
+    )?;
+    m.add(
+        "ClaripyZeroDivisionError",
+        py.get_type::<py_err::ClaripyZeroDivisionError>(),
+    )?;
+    m.add(
+        "InvalidExtractBounds",
+        py.get_type::<py_err::InvalidExtractBoundsError>(),
+    )?;
+    Ok(())
+}
+
 /// Populate the `claripy` module. Its canonical home is
 /// `angr.rustylib.claripy` (pickled objects reference these paths);
 /// `angr/__init__.py` additionally aliases it as `angr.claripy`. There is
@@ -259,47 +290,17 @@ pub fn claripy(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ast::fp::FP>()?;
     m.add_class::<ast::string::PyAstString>()?;
 
-    m.add("Annotation", annotation.getattr("Annotation")?)?;
-    m.add(
+    for name in [
+        "Annotation",
         "SimplificationAvoidanceAnnotation",
-        annotation.getattr("SimplificationAvoidanceAnnotation")?,
-    )?;
-    m.add(
         "StridedIntervalAnnotation",
-        annotation.getattr("StridedIntervalAnnotation")?,
-    )?;
-    m.add("RegionAnnotation", annotation.getattr("RegionAnnotation")?)?;
-    m.add(
+        "RegionAnnotation",
         "UninitializedAnnotation",
-        annotation.getattr("UninitializedAnnotation")?,
-    )?;
+    ] {
+        m.add(name, annotation.getattr(name)?)?;
+    }
 
-    m.add("ClaripyError", py.get_type::<py_err::ClaripyError>())?;
-    m.add(
-        "ClaripyTypeError",
-        py.get_type::<py_err::ClaripyTypeError>(),
-    )?;
-    m.add("UnsatError", py.get_type::<py_err::UnsatError>())?;
-    m.add(
-        "ClaripyFrontendError",
-        py.get_type::<py_err::ClaripyFrontendError>(),
-    )?;
-    m.add(
-        "ClaripySolverInterruptError",
-        py.get_type::<py_err::ClaripySolverInterruptError>(),
-    )?;
-    m.add(
-        "ClaripyOperationError",
-        py.get_type::<py_err::ClaripyOperationError>(),
-    )?;
-    m.add(
-        "ClaripyZeroDivisionError",
-        py.get_type::<py_err::ClaripyZeroDivisionError>(),
-    )?;
-    m.add(
-        "InvalidExtractBounds",
-        py.get_type::<py_err::InvalidExtractBoundsError>(),
-    )?;
+    add_exceptions(py, m)?;
 
     m.add("FSORT_FLOAT", ast::fp::fsort_float())?;
     m.add("FSORT_DOUBLE", ast::fp::fsort_double())?;
@@ -335,33 +336,7 @@ pub fn claripy(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // errors
     import_submodule(py, m, "angr.rustylib.claripy", "errors", |py, errors| {
-        errors.add("ClaripyError", py.get_type::<py_err::ClaripyError>())?;
-        errors.add(
-            "ClaripyTypeError",
-            py.get_type::<py_err::ClaripyTypeError>(),
-        )?;
-        errors.add("UnsatError", py.get_type::<py_err::UnsatError>())?;
-        errors.add(
-            "ClaripyFrontendError",
-            py.get_type::<py_err::ClaripyFrontendError>(),
-        )?;
-        errors.add(
-            "ClaripySolverInterruptError",
-            py.get_type::<py_err::ClaripySolverInterruptError>(),
-        )?;
-        errors.add(
-            "ClaripyOperationError",
-            py.get_type::<py_err::ClaripyOperationError>(),
-        )?;
-        errors.add(
-            "ClaripyZeroDivisionError",
-            py.get_type::<py_err::ClaripyZeroDivisionError>(),
-        )?;
-        errors.add(
-            "InvalidExtractBounds",
-            py.get_type::<py_err::InvalidExtractBoundsError>(),
-        )?;
-        Ok(())
+        add_exceptions(py, errors)
     })?;
 
     Ok(())
