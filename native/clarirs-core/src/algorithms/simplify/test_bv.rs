@@ -1318,5 +1318,71 @@ fn test_shared_subterms_simplify_once_per_call() -> Result<()> {
             "differs at x = {value:#x}"
         );
     }
+
+    Ok(())
+}
+
+#[test]
+fn test_add_sub_term_cancellation() -> Result<()> {
+    let ctx = Context::new();
+    let c = ctx.bvs("c", 64)?;
+    let y = ctx.bvs("y", 64)?;
+    let z = ctx.bvs("z", 64)?;
+    let bvv = |v: u64| ctx.bvv(BitVec::from((v, 64)));
+
+    // (c + y) - y => c
+    let expr = ctx.sub(ctx.add(&c, &y)?, &y)?;
+    assert_eq!(expr.simplify()?, c);
+
+    // (c - y) + y => c
+    let expr = ctx.add(ctx.sub(&c, &y)?, &y)?;
+    assert_eq!(expr.simplify()?, c);
+
+    // y - (c + y) => -c
+    let expr = ctx.sub(&y, ctx.add(&c, &y)?)?;
+    assert_eq!(expr.simplify()?, ctx.neg(&c)?);
+
+    // 5 - (7 + y) + y + 7 => 5
+    let expr = ctx.add(
+        ctx.add(ctx.sub(bvv(5)?, ctx.add(bvv(7)?, &y)?)?, &y)?,
+        bvv(7)?,
+    )?;
+    assert_eq!(expr.simplify()?, bvv(5)?);
+
+    // (c + y + 3) - (y + z + 1) => c + (-z) + 2
+    let expr = ctx.sub(
+        ctx.add_many([c.clone(), y.clone(), bvv(3)?])?,
+        ctx.add_many([y.clone(), z.clone(), bvv(1)?])?,
+    )?;
+    assert_eq!(
+        expr.simplify()?,
+        ctx.add_many([c.clone(), ctx.neg(&z)?, bvv(2)?])?
+    );
+
+    // c + (-c) => 0, and c - c + c => c (multiplicity is tracked)
+    let expr = ctx.add(&c, ctx.neg(&c)?)?;
+    assert_eq!(expr.simplify()?, bvv(0)?);
+    let expr = ctx.add(ctx.sub(&c, &c)?, &c)?;
+    assert_eq!(expr.simplify()?, c);
+
+    // (c + c) - c => c
+    let expr = ctx.sub(ctx.add(&c, &c)?, &c)?;
+    assert_eq!(expr.simplify()?, c);
+
+    // ((c - y) - z) - c => (-y) + (-z): nested subtractions flatten too
+    let expr = ctx.sub(ctx.sub(ctx.sub(&c, &y)?, &z)?, &c)?;
+    assert_eq!(expr.simplify()?, ctx.add(ctx.neg(&y)?, ctx.neg(&z)?)?);
+
+    // Nothing to cancel: the subtraction is still rewritten as an n-ary add.
+    let expr = ctx.sub(ctx.add(&c, &y)?, &z)?;
+    assert_eq!(
+        expr.simplify()?,
+        ctx.add_many([c.clone(), y.clone(), ctx.neg(&z)?])?
+    );
+
+    // A plain subtraction of two terms keeps its shape.
+    let expr = ctx.sub(&c, &y)?;
+    assert_eq!(expr.simplify()?, expr);
+
     Ok(())
 }
