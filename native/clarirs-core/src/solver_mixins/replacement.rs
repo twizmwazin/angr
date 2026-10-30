@@ -199,9 +199,16 @@ impl<'c, S: Solver<'c>> Solver<'c> for ReplacementSolver<'c, S> {
         self.inner.max_signed(&replaced)
     }
 
-    fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.eval_n(&replaced, n)
+    fn batch_eval_n(
+        &mut self,
+        exprs: &[AstRef<'c>],
+        n: u32,
+    ) -> Result<Vec<Vec<AstRef<'c>>>, ClarirsError> {
+        let replaced = exprs
+            .iter()
+            .map(|expr| self.apply_replacements(expr))
+            .collect::<Result<Vec<_>, _>>()?;
+        self.inner.batch_eval_n(&replaced, n)
     }
 }
 

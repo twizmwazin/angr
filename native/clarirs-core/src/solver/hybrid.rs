@@ -21,7 +21,7 @@ pub struct HybridSolver<'c, A: Solver<'c>, E: Solver<'c>> {
     approximate: A,
     exact: E,
     ctx: &'c Context<'c>,
-    /// When true, `eval_n` for more than two solutions asks the approximate
+    /// When true, evaluation for more than two solutions asks the approximate
     /// backend first and only consults the exact backend when the
     /// approximation is inexact (claripy's `approximate_first`).
     approximate_first: bool,
@@ -34,7 +34,7 @@ impl<'c, A: Solver<'c>, E: Solver<'c>> HybridSolver<'c, A, E> {
     }
 
     /// Create a new hybrid solver, optionally preferring approximate results
-    /// for multi-solution `eval_n` queries.
+    /// for multi-solution evaluation queries.
     pub fn new_with_options(
         ctx: &'c Context<'c>,
         approximate: A,
@@ -50,30 +50,30 @@ impl<'c, A: Solver<'c>, E: Solver<'c>> HybridSolver<'c, A, E> {
     }
 
     /// Whether this solver prefers approximate results for multi-solution
-    /// `eval_n` queries.
+    /// evaluation queries.
     pub fn approximate_first(&self) -> bool {
         self.approximate_first
     }
 
-    /// claripy's approximate-first heuristic: draw n + 1 solutions from the
-    /// approximate backend; the extra solution tells us whether the
-    /// approximation is exhaustive. If it is (<= n solutions), or no
-    /// constraint mentions the expression's variables (so the approximation
-    /// cannot be refined by solving), use it. Otherwise ask the exact backend
-    /// too and use whichever found fewer solutions.
-    fn eval_n_approximate_first(
+    /// claripy's approximate-first heuristic: draw n + 1 rows from the
+    /// approximate backend; the extra row tells us whether the approximation
+    /// is exhaustive. If it is (<= n rows), or no constraint mentions the
+    /// expressions' variables (so the approximation cannot be refined by
+    /// solving), use it. Otherwise ask the exact backend too and use whichever
+    /// found fewer rows.
+    fn batch_eval_n_approximate_first(
         &mut self,
-        expr: &AstRef<'c>,
+        exprs: &[AstRef<'c>],
         n: u32,
-    ) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        let mut approx = match self.approximate.eval_n(expr, n + 1) {
+    ) -> Result<Vec<Vec<AstRef<'c>>>, ClarirsError> {
+        let mut approx = match self.approximate.batch_eval_n(exprs, n + 1) {
             Ok(approx) if !approx.is_empty() => approx,
-            _ => return self.exact.eval_n(expr, n),
+            _ => return self.exact.batch_eval_n(exprs, n),
         };
 
         if approx.len() > n as usize
-            && self.constraints_mention(expr)?
-            && let Ok(exact) = self.exact.eval_n(expr, n + 1)
+            && self.constraints_mention(exprs)?
+            && let Ok(exact) = self.exact.batch_eval_n(exprs, n + 1)
             && exact.len() < approx.len()
         {
             approx = exact;
@@ -83,14 +83,13 @@ impl<'c, A: Solver<'c>, E: Solver<'c>> HybridSolver<'c, A, E> {
         Ok(approx)
     }
 
-    /// Whether any asserted constraint shares a variable with `expr`.
-    fn constraints_mention(&self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        let expr_vars = expr.variables();
-        Ok(self
-            .exact
-            .constraints()?
-            .iter()
-            .any(|c| c.variables().iter().any(|v| expr_vars.contains(v))))
+    /// Whether any asserted constraint shares a variable with any of `exprs`.
+    fn constraints_mention(&self, exprs: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
+        Ok(self.exact.constraints()?.iter().any(|c| {
+            c.variables()
+                .iter()
+                .any(|v| exprs.iter().any(|expr| expr.variables().contains(v)))
+        }))
     }
 
     /// Get a reference to the approximate solver.
@@ -226,30 +225,36 @@ impl<'c, A: Solver<'c>, E: Solver<'c>> Solver<'c> for HybridSolver<'c, A, E> {
         self.exact.max_signed(expr)
     }
 
-    fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+    fn batch_eval_n(
+        &mut self,
+        exprs: &[AstRef<'c>],
+        n: u32,
+    ) -> Result<Vec<Vec<AstRef<'c>>>, ClarirsError> {
         if n == 0 {
             return Ok(Vec::new());
         }
         if self.approximate_first && n > 2 {
-            return self.eval_n_approximate_first(expr, n);
+            return self.batch_eval_n_approximate_first(exprs, n);
         }
         // Try the approximate solver first; verify symbolic results against
         // the exact solver, and fall back to it whenever the approximate
         // solver fails or produces nothing.
-        if !expr.symbolic() {
-            if let Ok(result) = self.approximate.eval_n(expr, n)
+        if exprs.iter().all(|expr| !expr.symbolic()) {
+            if let Ok(result) = self.approximate.batch_eval_n(exprs, n)
                 && !result.is_empty()
             {
                 return Ok(result);
             }
-            return self.exact.eval_n(expr, n);
+            return self.exact.batch_eval_n(exprs, n);
         }
-        match self.approximate.eval_n(expr, n) {
-            Ok(approx_results) if !approx_results.is_empty() => match self.exact.eval_n(expr, n) {
-                Ok(exact) => Ok(exact),
-                Err(_) => Ok(approx_results),
-            },
-            _ => self.exact.eval_n(expr, n),
+        match self.approximate.batch_eval_n(exprs, n) {
+            Ok(approx_results) if !approx_results.is_empty() => {
+                match self.exact.batch_eval_n(exprs, n) {
+                    Ok(exact) => Ok(exact),
+                    Err(_) => Ok(approx_results),
+                }
+            }
+            _ => self.exact.batch_eval_n(exprs, n),
         }
     }
 }
@@ -349,8 +354,12 @@ mod tests {
             Ok(expr.clone())
         }
 
-        fn eval_n(&mut self, expr: &AstRef<'c>, _: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-            Ok(vec![expr.clone()])
+        fn batch_eval_n(
+            &mut self,
+            exprs: &[AstRef<'c>],
+            _: u32,
+        ) -> Result<Vec<Vec<AstRef<'c>>>, ClarirsError> {
+            Ok(vec![exprs.to_vec()])
         }
     }
 

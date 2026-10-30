@@ -229,6 +229,12 @@ impl Solver<'static> for DynSolver {
         dispatch!(self, max_signed, expr)
     }
 
+    // Forward every evaluation entry point rather than relying on the trait
+    // defaults, so any cheaper path a wrapped stack overrides is kept.
+    fn eval(&mut self, expr: &AstRef<'static>) -> Result<AstRef<'static>, ClarirsError> {
+        dispatch!(self, eval, expr)
+    }
+
     fn eval_n(
         &mut self,
         expr: &AstRef<'static>,
@@ -242,5 +248,13 @@ impl Solver<'static> for DynSolver {
         exprs: &[AstRef<'static>],
     ) -> Result<Vec<AstRef<'static>>, ClarirsError> {
         dispatch!(self, batch_eval, exprs)
+    }
+
+    fn batch_eval_n(
+        &mut self,
+        exprs: &[AstRef<'static>],
+        n: u32,
+    ) -> Result<Vec<Vec<AstRef<'static>>>, ClarirsError> {
+        dispatch!(self, batch_eval_n, exprs, n)
     }
 }

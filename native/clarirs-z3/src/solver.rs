@@ -324,24 +324,6 @@ impl<'c> Z3Solver<'c> {
             z3_solver.model()
         })
     }
-
-    /// Evaluate `expr` against a single model. More efficient than the generic
-    /// `eval_n(_, 1)` path, which rebuilds the solver and adds an exclusion
-    /// constraint; used to back the `Solver::eval` override below.
-    fn eval_in_model(&self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        let expr = expr.simplify()?.simplify_z3()?;
-
-        // If the expression is concrete, we can return it directly
-        if expr.concrete() {
-            return Ok(expr);
-        }
-
-        // Expression is not concrete, we need to get a model from Z3 and
-        // replace the variables with the values from the model
-        let model = self.make_model()?;
-
-        AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?)
-    }
 }
 
 /// Whether `expr` contains an `fp.to_ieee_bv` node anywhere in its tree.
@@ -421,29 +403,6 @@ impl<'c> Solver<'c> for Z3Solver<'c> {
                 _ => Err(ClarirsError::SolverUnknown(z3_solver.reason_unknown())),
             },
         )
-    }
-
-    fn eval(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.eval_in_model(expr)
-    }
-
-    fn batch_eval(&mut self, exprs: &[AstRef<'c>]) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        if exprs.is_empty() {
-            return Ok(Vec::new());
-        }
-        // Draw every value from one model so the results are mutually
-        // consistent (a usable model), unlike eval() called in a loop.
-        let model = self.make_model()?;
-        exprs
-            .iter()
-            .map(|expr| {
-                let expr = expr.simplify()?.simplify_z3()?;
-                if expr.concrete() {
-                    return Ok(expr);
-                }
-                AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?)
-            })
-            .collect()
     }
 
     fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
@@ -572,16 +531,36 @@ impl<'c> Solver<'c> for Z3Solver<'c> {
             .ok_or(ClarirsError::TypeError("Expected AstRef".to_string()))
     }
 
-    fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        let mut results = Vec::new();
+    fn batch_eval_n(
+        &mut self,
+        exprs: &[AstRef<'c>],
+        n: u32,
+    ) -> Result<Vec<Vec<AstRef<'c>>>, ClarirsError> {
+        if n == 0 {
+            return Ok(Vec::new());
+        }
+        let ctx = self.context();
 
-        // Simplify and check if concrete
-        let expr = expr.simplify_z3()?;
-        if expr.concrete() {
-            return Ok(vec![expr]);
+        // With nothing to evaluate the only possible row is the empty one,
+        // which exists exactly when the constraints are satisfiable.
+        if exprs.is_empty() {
+            return Ok(if self.satisfiable()? {
+                vec![Vec::new()]
+            } else {
+                Vec::new()
+            });
         }
 
-        let ctx = self.context();
+        let exprs: Vec<AstRef<'c>> = exprs
+            .iter()
+            .map(|expr| expr.simplify_z3())
+            .collect::<Result<_, _>>()?;
+
+        // Concrete expressions have a single value, so an all-concrete batch
+        // has exactly one row and needs no solving.
+        if exprs.iter().all(|expr| expr.concrete()) {
+            return Ok(vec![exprs]);
+        }
 
         // Most expressions are read straight out of the model. `Z3_model_eval`
         // is called with model completion, so bits left unconstrained by the
@@ -597,51 +576,105 @@ impl<'c> Solver<'c> for Z3Solver<'c> {
         // converted back afterwards. Binding to an auxiliary variable does pull
         // otherwise-free bits into the model with arbitrary values, so it is
         // used only when direct evaluation cannot produce a constant.
-        let fp_sort = match expr.ast_type() {
-            AstType::Float(fsort) => Some(fsort),
-            _ => None,
-        };
-        let needs_aux = fp_sort.is_some() || contains_fp_to_ieeebv(&expr);
-
-        let aux = if needs_aux {
-            let aux_name = format!("__eval_{:x}", expr.hash());
-            let (aux, link) = match &fp_sort {
-                Some(fsort) => {
-                    let aux = ctx.bvs(&aux_name, fsort.size())?;
-                    let link = ctx.eq_(&aux, &ctx.fp_to_ieeebv(&expr)?)?;
-                    (aux, link)
-                }
-                None => {
-                    let aux = ctx.bvs(&aux_name, expr.size())?;
-                    let link = ctx.eq_(&aux, &expr)?;
-                    (aux, link)
-                }
-            };
-            Some((aux, link))
-        } else {
-            None
-        };
-
-        // The expression whose model value we read and exclude between
-        // iterations: the auxiliary variable when one is used, else `expr`.
-        let eval_target = match &aux {
-            Some((aux, _)) => aux.clone(),
-            None => expr.clone(),
-        };
-        let z3_eval_target = eval_target.to_z3()?;
-
-        // Create and fill the Z3 solver once, applying this solver's params
-        // (timeout in particular) so eval cannot run unbounded.
-        let mut z3_solver = self.new_z3_solver()?;
-
-        for assertion in &self.assertions {
-            let converted = assertion.to_z3()?;
-            z3_solver.assert(&converted)?;
+        //
+        // Per expression: the term whose model value is read (and excluded
+        // between rows) -- the auxiliary variable when one is used, else the
+        // expression itself -- plus the float sort to convert back to, if any.
+        // Concrete expressions have no target.
+        struct Column<'c> {
+            target: Option<AstRef<'c>>,
+            fp_sort: Option<FSort>,
         }
-        if let Some((_, link)) = &aux {
+        let mut columns = Vec::with_capacity(exprs.len());
+        let mut links = Vec::new();
+        for expr in &exprs {
+            if expr.concrete() {
+                columns.push(Column {
+                    target: None,
+                    fp_sort: None,
+                });
+                continue;
+            }
+            let fp_sort = match expr.ast_type() {
+                AstType::Float(fsort) => Some(fsort),
+                _ => None,
+            };
+            let needs_aux = fp_sort.is_some() || contains_fp_to_ieeebv(expr);
+            let target = if needs_aux {
+                let aux_name = format!("__eval_{:x}", expr.hash());
+                let (aux, link) = match &fp_sort {
+                    Some(fsort) => {
+                        let aux = ctx.bvs(&aux_name, fsort.size())?;
+                        let link = ctx.eq_(&aux, &ctx.fp_to_ieeebv(expr)?)?;
+                        (aux, link)
+                    }
+                    None => {
+                        let aux = ctx.bvs(&aux_name, expr.size())?;
+                        let link = ctx.eq_(&aux, expr)?;
+                        (aux, link)
+                    }
+                };
+                links.push(link);
+                aux
+            } else {
+                expr.clone()
+            };
+            columns.push(Column {
+                target: Some(target),
+                fp_sort,
+            });
+        }
+
+        // Read one row out of `model`: concrete expressions are their own
+        // value; the rest come from their target, which is also what the
+        // blocking disequality (if any) is built on.
+        let read_row = |model: &RcModel,
+                        disequalities: Option<&mut Vec<AstRef<'c>>>|
+         -> Result<Vec<AstRef<'c>>, ClarirsError> {
+            let mut disequalities = disequalities;
+            let mut row = Vec::with_capacity(exprs.len());
+            for (expr, column) in exprs.iter().zip(&columns) {
+                let Some(target) = &column.target else {
+                    row.push(expr.clone());
+                    continue;
+                };
+                let solution = AstRef::from_z3(ctx, model.eval(&target.to_z3()?)?)?;
+                if let Some(disequalities) = disequalities.as_deref_mut() {
+                    disequalities.push(ctx.neq(target, &solution)?);
+                }
+                // Convert the IEEE bit pattern back to a float constant. The
+                // bitvector width (32 or 64) selects the format.
+                let solution = match (&column.fp_sort, solution.op()) {
+                    (Some(_), AstOp::BVV(bv)) => ctx.fpv(Float::try_from_ieee_bits(bv)?)?,
+                    _ => solution,
+                };
+                row.push(solution);
+            }
+            Ok(row)
+        };
+
+        // A single row needs no exclusion constraints, so when no auxiliary
+        // bindings are required it can be read from the persistent incremental
+        // solver's model instead of a solver built from scratch.
+        if n == 1 && links.is_empty() {
+            return match self.make_model() {
+                Ok(model) => Ok(vec![read_row(&model, None)?]),
+                Err(ClarirsError::Unsat) => Ok(Vec::new()),
+                Err(e) => Err(e),
+            };
+        }
+
+        // Create and fill a Z3 solver once, applying this solver's params
+        // (timeout in particular) so evaluation cannot run unbounded.
+        let mut z3_solver = self.new_z3_solver()?;
+        for assertion in &self.assertions {
+            z3_solver.assert(&assertion.to_z3()?)?;
+        }
+        for link in &links {
             z3_solver.assert(&link.to_z3()?)?;
         }
 
+        let mut rows = Vec::new();
         for _ in 0..n {
             match z3_solver.check()? {
                 Z3_L_TRUE => {}
@@ -650,25 +683,17 @@ impl<'c> Solver<'c> for Z3Solver<'c> {
             }
 
             let model = z3_solver.model()?;
-            let eval_result = model.eval(&z3_eval_target)?;
+            let mut disequalities = Vec::new();
+            let row = read_row(&model, Some(&mut disequalities))?;
 
-            let solution = AstRef::from_z3(ctx, eval_result)?;
-
-            // Add constraint to exclude this solution
-            let neq_constraint = ctx.neq(&eval_target, &solution)?;
-            let z3_neq = neq_constraint.to_z3()?;
-            z3_solver.assert(&z3_neq)?;
-
-            // Convert the IEEE bit pattern back to a float constant. The
-            // bitvector width (32 or 64) selects the format.
-            let solution = match (&fp_sort, solution.op()) {
-                (Some(_), AstOp::BVV(bv)) => ctx.fpv(Float::try_from_ieee_bits(bv)?)?,
-                _ => solution,
-            };
-            results.push(solution);
+            // Exclude this whole assignment: the next row must differ on at
+            // least one expression.
+            let blocker = ctx.or(disequalities)?;
+            z3_solver.assert(&blocker.to_z3()?)?;
+            rows.push(row);
         }
 
-        Ok(results)
+        Ok(rows)
     }
 }
 
@@ -773,6 +798,103 @@ mod tests {
             .add(&x_val, &ctx.bvv(BitVec::from((1, 8)))?)?
             .simplify()?;
         assert_eq!(y_val, expected_y);
+        Ok(())
+    }
+
+    #[test]
+    fn test_batch_eval_n_enumerates_distinct_consistent_rows() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let mut solver = Z3Solver::new(&ctx);
+        let k = |v: u64| ctx.bvv(BitVec::from((v, 8)));
+
+        let x = ctx.bvs("x", 8)?;
+        let y = ctx.bvs("y", 8)?;
+        // x < 3 and y == x + 1: exactly three (x, y) rows exist.
+        solver.add(&ctx.ult(&x, &k(3)?)?)?;
+        solver.add(&ctx.eq_(&y, &ctx.add(&x, &k(1)?)?)?)?;
+
+        let rows = solver.batch_eval_n(&[x.clone(), y.clone()], 10)?;
+        assert_eq!(rows.len(), 3);
+        let mut seen = std::collections::HashSet::new();
+        for row in &rows {
+            assert_eq!(row.len(), 2);
+            // Every row is one model, so y == x + 1 holds within it.
+            let expected_y = ctx.add(&row[0], &k(1)?)?.simplify()?;
+            assert_eq!(row[1], expected_y);
+            // Rows are distinct as tuples.
+            assert!(seen.insert((row[0].hash(), row[1].hash())));
+        }
+
+        // Asking for fewer rows truncates; the single-expression entry points
+        // agree with the batch.
+        assert_eq!(solver.batch_eval_n(&[x.clone(), y.clone()], 2)?.len(), 2);
+        let xs = solver.eval_n(&x, 10)?;
+        assert_eq!(xs.len(), 3);
+        assert!(xs.iter().all(|v| v.concrete()));
+        assert_eq!(solver.batch_eval(&[x.clone(), y.clone()])?.len(), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn test_batch_eval_n_concrete_columns_and_unsat() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let mut solver = Z3Solver::new(&ctx);
+        let k = |v: u64| ctx.bvv(BitVec::from((v, 8)));
+
+        let x = ctx.bvs("x", 8)?;
+        solver.add(&ctx.eq_(&x, &k(5)?)?)?;
+
+        // A concrete column is its own value, and pins the row count to the
+        // symbolic columns' solutions.
+        let rows = solver.batch_eval_n(&[k(9)?, x.clone()], 5)?;
+        assert_eq!(rows, vec![vec![k(9)?, k(5)?]]);
+        // An all-concrete batch has exactly one row.
+        assert_eq!(
+            solver.batch_eval_n(&[k(9)?, k(2)?], 5)?,
+            vec![vec![k(9)?, k(2)?]]
+        );
+        // No expressions: the single empty row, while satisfiable.
+        let rows = solver.batch_eval_n(&[], 5)?;
+        assert_eq!(rows.len(), 1);
+        assert!(rows[0].is_empty());
+        // Zero rows requested.
+        assert!(solver.batch_eval_n(std::slice::from_ref(&x), 0)?.is_empty());
+
+        // Unsatisfiable: no rows, and the single-model entry points report it.
+        solver.add(&ctx.eq_(&x, &k(6)?)?)?;
+        assert!(solver.batch_eval_n(&[x.clone(), k(9)?], 3)?.is_empty());
+        assert!(solver.batch_eval_n(&[], 3)?.is_empty());
+        assert!(solver.eval_n(&x, 3)?.is_empty());
+        assert!(matches!(
+            solver.batch_eval(std::slice::from_ref(&x)),
+            Err(ClarirsError::Unsat)
+        ));
+        assert!(matches!(solver.eval(&x), Err(ClarirsError::Unsat)));
+        Ok(())
+    }
+
+    #[test]
+    fn test_batch_eval_n_float_rows() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let mut solver = Z3Solver::new(&ctx);
+
+        // Floats are bound through an auxiliary bitvector; several rows must
+        // still come back as float constants, distinct and consistent.
+        let f = ctx.fps("f", FSort::f64())?;
+        let b = ctx.bools("b")?;
+        let one = ctx.fpv(Float::from(1.0f64))?;
+        let two = ctx.fpv(Float::from(2.0f64))?;
+        solver.add(&ctx.eq_(&f, &ctx.ite(&b, &one, &two)?)?)?;
+
+        let rows = solver.batch_eval_n(&[f.clone(), b.clone()], 5)?;
+        assert_eq!(rows.len(), 2);
+        for row in &rows {
+            match (row[0].op(), row[1].op()) {
+                (AstOp::FPV(fv), AstOp::BoolV(true)) => assert_eq!(fv.to_f64(), Some(1.0)),
+                (AstOp::FPV(fv), AstOp::BoolV(false)) => assert_eq!(fv.to_f64(), Some(2.0)),
+                _ => panic!("unexpected row {row:?}"),
+            }
+        }
         Ok(())
     }
 
