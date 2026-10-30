@@ -159,6 +159,9 @@ impl PyAnnotation {
                 AnnotationType::Unknown {
                     name: format!("{module_name}:{class_name}"),
                     value: pickled.into(),
+                    // Keep the object itself alongside the bytes, so reading
+                    // the annotation back does not have to unpickle it.
+                    object: HostObject::new(slf.clone().unbind()).into(),
                     obj_hash,
                 },
                 eliminatable,
@@ -188,7 +191,10 @@ impl PyAnnotation {
         }
 
         match annotation.type_() {
-            AnnotationType::Unknown { value, .. } => {
+            AnnotationType::Unknown { value, object, .. } => {
+                if let Some(obj) = object.0.get::<Py<PyAnnotation>>() {
+                    return Ok(obj.bind(py).clone());
+                }
                 let pickle_loads = py.import("pickle")?.getattr("loads")?;
                 Ok(pickle_loads
                     .call1((value.0.clone(),))?

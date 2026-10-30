@@ -1,6 +1,6 @@
 pub use crate::ast::node::IntoOwned;
 pub use crate::ast::op::{AstOp, AstType};
-pub use crate::ast::{Annotation, AnnotationType, AstFactory, AstNode, AstRef};
+pub use crate::ast::{Annotation, AnnotationType, AstFactory, AstNode, AstRef, HostObject};
 pub use crate::context::{Context, HasContext, InternedString};
 pub use crate::error::ClarirsError;
 pub use crate::solver::{CompositeSolver, ConcreteSolver, HybridSolver, Solver};
