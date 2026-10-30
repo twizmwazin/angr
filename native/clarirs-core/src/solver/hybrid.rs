@@ -161,6 +161,39 @@ impl<'c, A: Solver<'c>, E: Solver<'c>> Solver<'c> for HybridSolver<'c, A, E> {
         self.exact.satisfiable_with_extra(extra)
     }
 
+    fn batch_eval_n(
+        &mut self,
+        exprs: &[AstRef<'c>],
+        n: u32,
+    ) -> Result<Vec<Vec<AstRef<'c>>>, ClarirsError> {
+        if n == 0 {
+            return Ok(Vec::new());
+        }
+        if self.approximate_first && n > 2 {
+            return self.batch_eval_n_approximate_first(exprs, n);
+        }
+        // Try the approximate solver first; verify symbolic results against
+        // the exact solver, and fall back to it whenever the approximate
+        // solver fails or produces nothing.
+        if exprs.iter().all(|expr| !expr.symbolic()) {
+            if let Ok(result) = self.approximate.batch_eval_n(exprs, n)
+                && !result.is_empty()
+            {
+                return Ok(result);
+            }
+            return self.exact.batch_eval_n(exprs, n);
+        }
+        match self.approximate.batch_eval_n(exprs, n) {
+            Ok(approx_results) if !approx_results.is_empty() => {
+                match self.exact.batch_eval_n(exprs, n) {
+                    Ok(exact) => Ok(exact),
+                    Err(_) => Ok(approx_results),
+                }
+            }
+            _ => self.exact.batch_eval_n(exprs, n),
+        }
+    }
+
     fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
         if !expr.symbolic() {
             return self.approximate.is_true(expr);
@@ -223,39 +256,6 @@ impl<'c, A: Solver<'c>, E: Solver<'c>> Solver<'c> for HybridSolver<'c, A, E> {
             return self.approximate.max_signed(expr);
         }
         self.exact.max_signed(expr)
-    }
-
-    fn batch_eval_n(
-        &mut self,
-        exprs: &[AstRef<'c>],
-        n: u32,
-    ) -> Result<Vec<Vec<AstRef<'c>>>, ClarirsError> {
-        if n == 0 {
-            return Ok(Vec::new());
-        }
-        if self.approximate_first && n > 2 {
-            return self.batch_eval_n_approximate_first(exprs, n);
-        }
-        // Try the approximate solver first; verify symbolic results against
-        // the exact solver, and fall back to it whenever the approximate
-        // solver fails or produces nothing.
-        if exprs.iter().all(|expr| !expr.symbolic()) {
-            if let Ok(result) = self.approximate.batch_eval_n(exprs, n)
-                && !result.is_empty()
-            {
-                return Ok(result);
-            }
-            return self.exact.batch_eval_n(exprs, n);
-        }
-        match self.approximate.batch_eval_n(exprs, n) {
-            Ok(approx_results) if !approx_results.is_empty() => {
-                match self.exact.batch_eval_n(exprs, n) {
-                    Ok(exact) => Ok(exact),
-                    Err(_) => Ok(approx_results),
-                }
-            }
-            _ => self.exact.batch_eval_n(exprs, n),
-        }
     }
 }
 
@@ -322,6 +322,14 @@ mod tests {
             Ok(true)
         }
 
+        fn batch_eval_n(
+            &mut self,
+            exprs: &[AstRef<'c>],
+            _: u32,
+        ) -> Result<Vec<Vec<AstRef<'c>>>, ClarirsError> {
+            Ok(vec![exprs.to_vec()])
+        }
+
         fn is_true(&mut self, _: &AstRef<'c>) -> Result<bool, ClarirsError> {
             Ok(self.answer)
         }
@@ -352,14 +360,6 @@ mod tests {
 
         fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
             Ok(expr.clone())
-        }
-
-        fn batch_eval_n(
-            &mut self,
-            exprs: &[AstRef<'c>],
-            _: u32,
-        ) -> Result<Vec<Vec<AstRef<'c>>>, ClarirsError> {
-            Ok(vec![exprs.to_vec()])
         }
     }
 

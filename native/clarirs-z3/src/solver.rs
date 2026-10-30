@@ -405,132 +405,6 @@ impl<'c> Solver<'c> for Z3Solver<'c> {
         )
     }
 
-    fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        let expr = expr.simplify_z3()?;
-        Ok(expr.concrete() && expr.is_true())
-    }
-
-    fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        let expr = expr.simplify_z3()?;
-        Ok(expr.concrete() && expr.is_false())
-    }
-
-    fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        let mut solver = self.clone();
-        solver.add(expr)?;
-        solver.satisfiable()
-    }
-
-    fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        let mut solver = self.clone();
-        solver.add(&self.context().not(expr)?)?;
-        solver.satisfiable()
-    }
-
-    fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        let mut optimize = self.mk_filled_optimize()?;
-        optimize.minimize(&expr.to_z3()?)?;
-        match optimize.check()? {
-            Z3_L_TRUE => {}
-            Z3_L_FALSE => return Err(ClarirsError::Unsat),
-            _ => return Err(ClarirsError::SolverUnknown(optimize.reason_unknown())),
-        }
-
-        let model = optimize.get_model()?;
-        AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?)?
-            .into_bitvec()
-            .ok_or(ClarirsError::TypeError("Expected AstRef".to_string()))
-    }
-
-    fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        let mut optimize = self.mk_filled_optimize()?;
-        optimize.maximize(&expr.to_z3()?)?;
-        match optimize.check()? {
-            Z3_L_TRUE => {}
-            Z3_L_FALSE => return Err(ClarirsError::Unsat),
-            _ => return Err(ClarirsError::SolverUnknown(optimize.reason_unknown())),
-        }
-
-        let model = optimize.get_model()?;
-        AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?)?
-            .into_bitvec()
-            .ok_or(ClarirsError::TypeError("Expected AstRef".to_string()))
-    }
-
-    fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        let mut optimize = self.mk_filled_optimize()?;
-        // Get the size of the bitvector
-        let size = expr.size();
-
-        // For signed minimization, the sign bit should be 1 (for negative numbers)
-        // Extract the sign bit
-        let sign_bit = self.ctx.extract(expr, size - 1, size - 1)?;
-        let one_bit = self.ctx.bvv(BitVec::from((1, 1)))?;
-
-        // Create a target variable equal to the expression
-        let target_name = format!("min_signed_target_{size}");
-        let target = self.ctx.bvs(&target_name, size)?;
-        let equality = self.ctx.eq_(&target, expr)?;
-        optimize.assert(&equality.to_z3()?)?;
-
-        // First, maximize the sign bit with a high weight
-        // This will prefer negative numbers (sign bit = 1) over positive ones
-        let sign_equality = self.ctx.eq_(&sign_bit, &one_bit)?;
-        optimize.assert_soft(&sign_equality.to_z3()?, 1000000)?;
-
-        // Then minimize the target value (with lower weight)
-        // This will find the smallest value among those with the preferred sign bit
-        optimize.minimize(&target.to_z3()?)?;
-
-        match optimize.check()? {
-            Z3_L_TRUE => {}
-            Z3_L_FALSE => return Err(ClarirsError::Unsat),
-            _ => return Err(ClarirsError::SolverUnknown(optimize.reason_unknown())),
-        }
-
-        let model = optimize.get_model()?;
-        AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?)?
-            .into_bitvec()
-            .ok_or(ClarirsError::TypeError("Expected AstRef".to_string()))
-    }
-
-    fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        let mut optimize = self.mk_filled_optimize()?;
-        // Get the size of the bitvector
-        let size = expr.size();
-
-        // For signed maximization, the sign bit should be 0 (for positive numbers)
-        // Extract the sign bit
-        let sign_bit = self.ctx.extract(expr, size - 1, size - 1)?;
-        let zero_bit = self.ctx.bvv(BitVec::from((0, 1)))?;
-
-        // Create a target variable equal to the expression
-        let target_name = format!("max_signed_target_{size}");
-        let target = self.ctx.bvs(&target_name, size)?;
-        let equality = self.ctx.eq_(&target, expr)?;
-        optimize.assert(&equality.to_z3()?)?;
-
-        // First, maximize making the sign bit 0 with a high weight
-        // This will prefer positive numbers (sign bit = 0) over negative ones
-        let sign_equality = self.ctx.eq_(&sign_bit, &zero_bit)?;
-        optimize.assert_soft(&sign_equality.to_z3()?, 1000000)?;
-
-        // Then maximize the target value (with lower weight)
-        // This will find the largest value among those with the preferred sign bit
-        optimize.maximize(&target.to_z3()?)?;
-
-        match optimize.check()? {
-            Z3_L_TRUE => {}
-            Z3_L_FALSE => return Err(ClarirsError::Unsat),
-            _ => return Err(ClarirsError::SolverUnknown(optimize.reason_unknown())),
-        }
-
-        let model = optimize.get_model()?;
-        AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?)?
-            .into_bitvec()
-            .ok_or(ClarirsError::TypeError("Expected AstRef".to_string()))
-    }
-
     fn batch_eval_n(
         &mut self,
         exprs: &[AstRef<'c>],
@@ -694,6 +568,132 @@ impl<'c> Solver<'c> for Z3Solver<'c> {
         }
 
         Ok(rows)
+    }
+
+    fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+        let expr = expr.simplify_z3()?;
+        Ok(expr.concrete() && expr.is_true())
+    }
+
+    fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+        let expr = expr.simplify_z3()?;
+        Ok(expr.concrete() && expr.is_false())
+    }
+
+    fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+        let mut solver = self.clone();
+        solver.add(expr)?;
+        solver.satisfiable()
+    }
+
+    fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+        let mut solver = self.clone();
+        solver.add(&self.context().not(expr)?)?;
+        solver.satisfiable()
+    }
+
+    fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+        let mut optimize = self.mk_filled_optimize()?;
+        optimize.minimize(&expr.to_z3()?)?;
+        match optimize.check()? {
+            Z3_L_TRUE => {}
+            Z3_L_FALSE => return Err(ClarirsError::Unsat),
+            _ => return Err(ClarirsError::SolverUnknown(optimize.reason_unknown())),
+        }
+
+        let model = optimize.get_model()?;
+        AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?)?
+            .into_bitvec()
+            .ok_or(ClarirsError::TypeError("Expected AstRef".to_string()))
+    }
+
+    fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+        let mut optimize = self.mk_filled_optimize()?;
+        optimize.maximize(&expr.to_z3()?)?;
+        match optimize.check()? {
+            Z3_L_TRUE => {}
+            Z3_L_FALSE => return Err(ClarirsError::Unsat),
+            _ => return Err(ClarirsError::SolverUnknown(optimize.reason_unknown())),
+        }
+
+        let model = optimize.get_model()?;
+        AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?)?
+            .into_bitvec()
+            .ok_or(ClarirsError::TypeError("Expected AstRef".to_string()))
+    }
+
+    fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+        let mut optimize = self.mk_filled_optimize()?;
+        // Get the size of the bitvector
+        let size = expr.size();
+
+        // For signed minimization, the sign bit should be 1 (for negative numbers)
+        // Extract the sign bit
+        let sign_bit = self.ctx.extract(expr, size - 1, size - 1)?;
+        let one_bit = self.ctx.bvv(BitVec::from((1, 1)))?;
+
+        // Create a target variable equal to the expression
+        let target_name = format!("min_signed_target_{size}");
+        let target = self.ctx.bvs(&target_name, size)?;
+        let equality = self.ctx.eq_(&target, expr)?;
+        optimize.assert(&equality.to_z3()?)?;
+
+        // First, maximize the sign bit with a high weight
+        // This will prefer negative numbers (sign bit = 1) over positive ones
+        let sign_equality = self.ctx.eq_(&sign_bit, &one_bit)?;
+        optimize.assert_soft(&sign_equality.to_z3()?, 1000000)?;
+
+        // Then minimize the target value (with lower weight)
+        // This will find the smallest value among those with the preferred sign bit
+        optimize.minimize(&target.to_z3()?)?;
+
+        match optimize.check()? {
+            Z3_L_TRUE => {}
+            Z3_L_FALSE => return Err(ClarirsError::Unsat),
+            _ => return Err(ClarirsError::SolverUnknown(optimize.reason_unknown())),
+        }
+
+        let model = optimize.get_model()?;
+        AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?)?
+            .into_bitvec()
+            .ok_or(ClarirsError::TypeError("Expected AstRef".to_string()))
+    }
+
+    fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+        let mut optimize = self.mk_filled_optimize()?;
+        // Get the size of the bitvector
+        let size = expr.size();
+
+        // For signed maximization, the sign bit should be 0 (for positive numbers)
+        // Extract the sign bit
+        let sign_bit = self.ctx.extract(expr, size - 1, size - 1)?;
+        let zero_bit = self.ctx.bvv(BitVec::from((0, 1)))?;
+
+        // Create a target variable equal to the expression
+        let target_name = format!("max_signed_target_{size}");
+        let target = self.ctx.bvs(&target_name, size)?;
+        let equality = self.ctx.eq_(&target, expr)?;
+        optimize.assert(&equality.to_z3()?)?;
+
+        // First, maximize making the sign bit 0 with a high weight
+        // This will prefer positive numbers (sign bit = 0) over negative ones
+        let sign_equality = self.ctx.eq_(&sign_bit, &zero_bit)?;
+        optimize.assert_soft(&sign_equality.to_z3()?, 1000000)?;
+
+        // Then maximize the target value (with lower weight)
+        // This will find the largest value among those with the preferred sign bit
+        optimize.maximize(&target.to_z3()?)?;
+
+        match optimize.check()? {
+            Z3_L_TRUE => {}
+            Z3_L_FALSE => return Err(ClarirsError::Unsat),
+            _ => return Err(ClarirsError::SolverUnknown(optimize.reason_unknown())),
+        }
+
+        let model = optimize.get_model()?;
+        AstRef::from_z3(expr.context(), model.eval(&expr.to_z3()?)?)?
+            .into_bitvec()
+            .ok_or(ClarirsError::TypeError("Expected AstRef".to_string()))
     }
 }
 

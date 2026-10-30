@@ -68,6 +68,37 @@ impl<'c, S: Solver<'c>> Solver<'c> for ConcreteEarlyResolutionMixin<'c, S> {
         self.inner.satisfiable_with_extra(extra)
     }
 
+    fn batch_eval_n(
+        &mut self,
+        exprs: &[AstRef<'c>],
+        n: u32,
+    ) -> Result<Vec<Vec<AstRef<'c>>>, ClarirsError> {
+        // If every expression is concrete, try to resolve the values without
+        // invoking the solver. Concrete expressions have a single value, so
+        // there is exactly one row.
+        if exprs.iter().all(|expr| expr.concrete()) {
+            if n == 0 {
+                return Ok(Vec::new());
+            }
+            let mut row = Vec::with_capacity(exprs.len());
+            for expr in exprs {
+                let simplified = expr.simplify_ext(false, true)?;
+                // Only use the shortcut if simplification folded the
+                // expression to a constant; anything else (e.g. an op the
+                // simplifier cannot fold) needs the full solver.
+                if !matches!(
+                    simplified.op(),
+                    AstOp::BoolV(..) | AstOp::BVV(..) | AstOp::FPV(..) | AstOp::StringV(..)
+                ) {
+                    return self.inner.batch_eval_n(exprs, n);
+                }
+                row.push(simplified);
+            }
+            return Ok(vec![row]);
+        }
+        self.inner.batch_eval_n(exprs, n)
+    }
+
     fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
         // If the expression is concrete, we can determine the result without the solver
         // Assumes the expression is already simplified
@@ -141,37 +172,6 @@ impl<'c, S: Solver<'c>> Solver<'c> for ConcreteEarlyResolutionMixin<'c, S> {
         }
         self.inner.max_signed(expr)
     }
-
-    fn batch_eval_n(
-        &mut self,
-        exprs: &[AstRef<'c>],
-        n: u32,
-    ) -> Result<Vec<Vec<AstRef<'c>>>, ClarirsError> {
-        // If every expression is concrete, try to resolve the values without
-        // invoking the solver. Concrete expressions have a single value, so
-        // there is exactly one row.
-        if exprs.iter().all(|expr| expr.concrete()) {
-            if n == 0 {
-                return Ok(Vec::new());
-            }
-            let mut row = Vec::with_capacity(exprs.len());
-            for expr in exprs {
-                let simplified = expr.simplify_ext(false, true)?;
-                // Only use the shortcut if simplification folded the
-                // expression to a constant; anything else (e.g. an op the
-                // simplifier cannot fold) needs the full solver.
-                if !matches!(
-                    simplified.op(),
-                    AstOp::BoolV(..) | AstOp::BVV(..) | AstOp::FPV(..) | AstOp::StringV(..)
-                ) {
-                    return self.inner.batch_eval_n(exprs, n);
-                }
-                row.push(simplified);
-            }
-            return Ok(vec![row]);
-        }
-        self.inner.batch_eval_n(exprs, n)
-    }
 }
 
 #[cfg(test)]
@@ -213,6 +213,14 @@ mod tests {
             panic!("PanickingSolver::satisfiable should not be called");
         }
 
+        fn batch_eval_n(
+            &mut self,
+            _: &[AstRef<'c>],
+            _: u32,
+        ) -> Result<Vec<Vec<AstRef<'c>>>, ClarirsError> {
+            panic!("PanickingSolver::batch_eval_n should not be called");
+        }
+
         fn is_true(&mut self, _: &AstRef<'c>) -> Result<bool, ClarirsError> {
             panic!("PanickingSolver::is_true should not be called");
         }
@@ -243,14 +251,6 @@ mod tests {
 
         fn max_signed(&mut self, _: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
             panic!("PanickingSolver::max_signed should not be called");
-        }
-
-        fn batch_eval_n(
-            &mut self,
-            _: &[AstRef<'c>],
-            _: u32,
-        ) -> Result<Vec<Vec<AstRef<'c>>>, ClarirsError> {
-            panic!("PanickingSolver::batch_eval_n should not be called");
         }
 
         fn simplify(&mut self) -> Result<(), ClarirsError> {

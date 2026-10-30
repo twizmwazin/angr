@@ -279,38 +279,6 @@ impl<'c, S: Solver<'c>> Solver<'c> for ModelCacheMixin<'c, S> {
         self.inner.satisfiable_with_extra(extra)
     }
 
-    fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        self.inner.is_true(expr)
-    }
-
-    fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        self.inner.is_false(expr)
-    }
-
-    fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        self.inner.has_true(expr)
-    }
-
-    fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        self.inner.has_false(expr)
-    }
-
-    fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.inner.min_unsigned(expr)
-    }
-
-    fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.inner.max_unsigned(expr)
-    }
-
-    fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.inner.min_signed(expr)
-    }
-
-    fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.inner.max_signed(expr)
-    }
-
     fn batch_eval_n(
         &mut self,
         exprs: &[AstRef<'c>],
@@ -359,6 +327,38 @@ impl<'c, S: Solver<'c>> Solver<'c> for ModelCacheMixin<'c, S> {
             self.cache_model();
         }
         Ok(results)
+    }
+
+    fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+        self.inner.is_true(expr)
+    }
+
+    fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+        self.inner.is_false(expr)
+    }
+
+    fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+        self.inner.has_true(expr)
+    }
+
+    fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+        self.inner.has_false(expr)
+    }
+
+    fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+        self.inner.min_unsigned(expr)
+    }
+
+    fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+        self.inner.max_unsigned(expr)
+    }
+
+    fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+        self.inner.min_signed(expr)
+    }
+
+    fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+        self.inner.max_signed(expr)
     }
 }
 
@@ -412,6 +412,15 @@ mod tests {
             self.satisfiable_calls.set(self.satisfiable_calls.get() + 1);
             self.inner.satisfiable()
         }
+        fn batch_eval_n(
+            &mut self,
+            exprs: &[AstRef<'c>],
+            n: u32,
+        ) -> Result<Vec<Vec<AstRef<'c>>>, ClarirsError> {
+            self.eval_calls.set(self.eval_calls.get() + 1);
+            self.inner.batch_eval_n(exprs, n)
+        }
+
         fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
             self.inner.is_true(expr)
         }
@@ -435,14 +444,6 @@ mod tests {
         }
         fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
             self.inner.max_signed(expr)
-        }
-        fn batch_eval_n(
-            &mut self,
-            exprs: &[AstRef<'c>],
-            n: u32,
-        ) -> Result<Vec<Vec<AstRef<'c>>>, ClarirsError> {
-            self.eval_calls.set(self.eval_calls.get() + 1);
-            self.inner.batch_eval_n(exprs, n)
         }
     }
 

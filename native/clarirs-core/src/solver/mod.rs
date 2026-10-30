@@ -53,8 +53,7 @@ pub trait Solver<'c>: Clone + HasContext<'c> {
     /// Evaluate an expression in the current model. Returns
     /// [`ClarirsError::Unsat`] if the constraints are unsatisfiable.
     fn eval(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        let mut results = self.eval_n(expr, 1)?;
-        results.pop().ok_or(ClarirsError::Unsat)
+        self.eval_n(expr, 1)?.pop().ok_or(ClarirsError::Unsat)
     }
 
     /// Find up to `n` distinct solutions for an expression. Returns none if
@@ -76,8 +75,9 @@ pub trait Solver<'c>: Clone + HasContext<'c> {
     /// value per expression in order. Returns [`ClarirsError::Unsat`] if the
     /// constraints are unsatisfiable.
     fn batch_eval(&mut self, exprs: &[AstRef<'c>]) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        let mut rows = self.batch_eval_n(exprs, 1)?;
-        rows.pop().ok_or(ClarirsError::Unsat)
+        self.batch_eval_n(exprs, 1)?
+            .pop()
+            .ok_or(ClarirsError::Unsat)
     }
 
     /// Find up to `n` distinct rows, each holding one value per expression in

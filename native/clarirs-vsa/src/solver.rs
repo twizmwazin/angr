@@ -14,40 +14,6 @@ impl<'c> VSASolver<'c> {
     pub fn new(ctx: &'c Context<'c>) -> Self {
         Self { ctx }
     }
-
-    /// Enumerate up to `n` values of a single expression from its value set.
-    fn eval_one(&self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        match expr.ast_type() {
-            AstType::Bool => expr
-                .simplify()?
-                .reduce()?
-                .into_bool()
-                .and_then(|comp_result| match comp_result {
-                    ComparisonResult::True => Ok(vec![self.context().boolv(true)?]),
-                    ComparisonResult::False => Ok(vec![self.context().boolv(false)?]),
-                    ComparisonResult::Maybe => match n {
-                        0 => Ok(vec![]),
-                        1 => Ok(vec![self.context().boolv(true)?]),
-                        _ => Ok(vec![
-                            self.context().boolv(true)?,
-                            self.context().boolv(false)?,
-                        ]),
-                    },
-                }),
-            AstType::BitVec(_) => expr.simplify()?.reduce()?.into_bv().and_then(|si| {
-                if si.is_empty() {
-                    return Ok(vec![]);
-                }
-                si.eval(n)
-                    .into_iter()
-                    .map(|bv| self.context().bvv(BitVec::from((bv, expr.size()))))
-                    .collect()
-            }),
-            AstType::Float(_) | AstType::String => Err(ClarirsError::UnsupportedOperation(
-                "Only boolean and bitvector evaluation is supported in VSASolver".to_string(),
-            )),
-        }
-    }
 }
 
 /// The first `limit` rows of the cartesian product of `columns`, in
@@ -125,10 +91,36 @@ impl<'c> Solver<'c> for VSASolver<'c> {
         // relational information between them, so the set of consistent rows
         // is over-approximated by the cartesian product of the per-expression
         // value sets. Each column needs at most `n` values to fill `n` rows.
-        let columns = exprs
-            .iter()
-            .map(|expr| self.eval_one(expr, n))
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut columns = Vec::with_capacity(exprs.len());
+        for expr in exprs {
+            let values = match expr.ast_type() {
+                AstType::Bool => match expr.simplify()?.reduce()?.into_bool()? {
+                    ComparisonResult::True => vec![self.context().boolv(true)?],
+                    ComparisonResult::False => vec![self.context().boolv(false)?],
+                    ComparisonResult::Maybe => match n {
+                        1 => vec![self.context().boolv(true)?],
+                        _ => vec![self.context().boolv(true)?, self.context().boolv(false)?],
+                    },
+                },
+                AstType::BitVec(_) => {
+                    let si = expr.simplify()?.reduce()?.into_bv()?;
+                    if si.is_empty() {
+                        return Ok(Vec::new());
+                    }
+                    si.eval(n)
+                        .into_iter()
+                        .map(|bv| self.context().bvv(BitVec::from((bv, expr.size()))))
+                        .collect::<Result<Vec<_>, _>>()?
+                }
+                AstType::Float(_) | AstType::String => {
+                    return Err(ClarirsError::UnsupportedOperation(
+                        "Only boolean and bitvector evaluation is supported in VSASolver"
+                            .to_string(),
+                    ));
+                }
+            };
+            columns.push(values);
+        }
         Ok(cartesian_rows(&columns, n as usize))
     }
 
