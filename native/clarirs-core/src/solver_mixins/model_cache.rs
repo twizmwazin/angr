@@ -115,14 +115,6 @@ impl<'c, S: Solver<'c>> ModelCacheMixin<'c, S> {
         }
     }
 
-    pub fn inner(&self) -> &S {
-        &self.inner
-    }
-
-    pub fn inner_mut(&mut self) -> &mut S {
-        &mut self.inner
-    }
-
     /// Extract a model from the inner solver for the current constraints and
     /// cache it for future reuse. Best-effort: any failure (including an
     /// unverifiable assignment) is silently ignored, since the cache is only
@@ -212,124 +204,92 @@ impl<'c, S: Solver<'c>> ModelCacheMixin<'c, S> {
     }
 }
 
-impl<'c, S: Solver<'c>> HasContext<'c> for ModelCacheMixin<'c, S> {
-    fn context(&self) -> &'c Context<'c> {
-        self.inner.context()
-    }
-}
+impl<'c, S: Solver<'c>> SolverMixin<'c> for ModelCacheMixin<'c, S> {
+    type Inner = S;
 
-impl<'c, S: Solver<'c>> Solver<'c> for ModelCacheMixin<'c, S> {
-    fn add(&mut self, constraint: &AstRef<'c>) -> Result<(), ClarirsError> {
+    fn inner(&self) -> &S {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut S {
+        &mut self.inner
+    }
+
+    fn add(this: &mut Self, constraint: &AstRef<'c>) -> Result<(), ClarirsError> {
         // Adding a constraint only tightens the set. A satisfiable result may
         // no longer hold, so drop it; an unsatisfiable result stays
         // unsatisfiable, so keep it. Cached models that the new constraint
         // invalidates are pruned lazily on next use (see `has_witness`).
-        if self.sat == Some(true) {
-            self.sat = None;
+        if this.sat == Some(true) {
+            this.sat = None;
         }
-        self.inner.add(constraint)
+        this.inner.add(constraint)
     }
 
-    fn clear(&mut self) -> Result<(), ClarirsError> {
-        self.sat = None;
-        self.models.clear();
-        self.inner.clear()
+    fn clear(this: &mut Self) -> Result<(), ClarirsError> {
+        this.sat = None;
+        this.models.clear();
+        this.inner.clear()
     }
 
-    fn constraints(&self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        self.inner.constraints()
-    }
-
-    fn simplify(&mut self) -> Result<(), ClarirsError> {
+    fn simplify(this: &mut Self) -> Result<(), ClarirsError> {
         // Simplification rewrites the constraints; drop cached models rather
         // than reason about whether each still applies. Equivalence-preserving
         // simplification cannot change satisfiability, so keep `sat`.
-        self.models.clear();
-        self.inner.simplify()
+        this.models.clear();
+        this.inner.simplify()
     }
 
-    fn satisfiable(&mut self) -> Result<bool, ClarirsError> {
-        if let Some(sat) = self.sat {
+    fn satisfiable(this: &mut Self) -> Result<bool, ClarirsError> {
+        if let Some(sat) = this.sat {
             return Ok(sat);
         }
-        let constraints = self.inner.constraints()?;
-        let sat = if self.has_witness(&constraints) {
+        let constraints = this.inner.constraints()?;
+        let sat = if this.has_witness(&constraints) {
             true
         } else {
-            self.inner.satisfiable()?
+            this.inner.satisfiable()?
         };
-        self.sat = Some(sat);
+        this.sat = Some(sat);
         Ok(sat)
     }
 
-    fn satisfiable_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
+    fn satisfiable_with_extra(this: &mut Self, extra: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
         if extra.is_empty() {
-            return self.satisfiable();
+            return this.satisfiable();
         }
         // If the persistent set alone is unsatisfiable, so is any extension.
-        if self.sat == Some(false) {
+        if this.sat == Some(false) {
             return Ok(false);
         }
-        let constraints = self.inner.constraints()?;
-        if self.has_witness_with_extra(&constraints, extra) {
+        let constraints = this.inner.constraints()?;
+        if this.has_witness_with_extra(&constraints, extra) {
             return Ok(true);
         }
         // Cache miss: defer to the inner solver, which can check the extra
         // constraints incrementally (e.g. via Z3 assumptions).
-        self.inner.satisfiable_with_extra(extra)
+        this.inner.satisfiable_with_extra(extra)
     }
 
-    fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        self.inner.is_true(expr)
-    }
-
-    fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        self.inner.is_false(expr)
-    }
-
-    fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        self.inner.has_true(expr)
-    }
-
-    fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        self.inner.has_false(expr)
-    }
-
-    fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.inner.min_unsigned(expr)
-    }
-
-    fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.inner.max_unsigned(expr)
-    }
-
-    fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.inner.min_signed(expr)
-    }
-
-    fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.inner.max_signed(expr)
-    }
-
-    fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+    fn eval_n(this: &mut Self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
         if n == 0 {
             return Ok(Vec::new());
         }
-        if self.sat == Some(false) {
+        if this.sat == Some(false) {
             return Ok(Vec::new());
         }
 
         // Try to answer entirely from cached models. Each value comes from a
         // model verified to satisfy the constraints, so it is a genuine,
         // distinct solution.
-        let constraints = self.inner.constraints()?;
+        let constraints = this.inner.constraints()?;
         let mut solutions: Vec<AstRef<'c>> = Vec::new();
         let mut seen: HashSet<u64> = HashSet::new();
         let mut i = 0;
-        while i < self.models.len() {
-            match self.models[i].satisfies(&constraints) {
+        while i < this.models.len() {
+            match this.models[i].satisfies(&constraints) {
                 Ok(true) => {
-                    if let Ok(value) = self.models[i].eval(expr)
+                    if let Ok(value) = this.models[i].eval(expr)
                         && value.concrete()
                         && seen.insert(value.hash())
                     {
@@ -341,36 +301,36 @@ impl<'c, S: Solver<'c>> Solver<'c> for ModelCacheMixin<'c, S> {
                     i += 1;
                 }
                 _ => {
-                    self.models.swap_remove(i);
+                    this.models.swap_remove(i);
                 }
             }
         }
 
         // The cache could not fully answer the query; the inner solver is
         // authoritative. Warm the cache with a fresh model for next time.
-        let results = self.inner.eval_n(expr, n)?;
+        let results = this.inner.eval_n(expr, n)?;
         if !results.is_empty() {
             // A solution exists, so the constraints are satisfiable.
-            self.sat = Some(true);
-            self.cache_model();
+            this.sat = Some(true);
+            this.cache_model();
         }
         Ok(results)
     }
 
-    fn batch_eval(&mut self, exprs: &[AstRef<'c>]) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        if self.sat == Some(false) {
+    fn batch_eval(this: &mut Self, exprs: &[AstRef<'c>]) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+        if this.sat == Some(false) {
             return Err(ClarirsError::Unsat);
         }
         // Forward as a batch so the backend draws every value from one model in
         // a single solve, rather than the per-expression default (one solve per
         // expression). Only the satisfiability flag is updated here.
-        match self.inner.batch_eval(exprs) {
+        match this.inner.batch_eval(exprs) {
             Ok(results) => {
-                self.sat = Some(true);
+                this.sat = Some(true);
                 Ok(results)
             }
             Err(ClarirsError::Unsat) => {
-                self.sat = Some(false);
+                this.sat = Some(false);
                 Err(ClarirsError::Unsat)
             }
             Err(e) => Err(e),
@@ -405,56 +365,25 @@ mod tests {
         }
     }
 
-    impl<'c, S: Solver<'c>> HasContext<'c> for CountingSolver<'c, S> {
-        fn context(&self) -> &'c Context<'c> {
-            self.inner.context()
+    impl<'c, S: Solver<'c>> SolverMixin<'c> for CountingSolver<'c, S> {
+        type Inner = S;
+        fn inner(&self) -> &S {
+            &self.inner
         }
-    }
-
-    impl<'c, S: Solver<'c>> Solver<'c> for CountingSolver<'c, S> {
-        fn add(&mut self, constraint: &AstRef<'c>) -> Result<(), ClarirsError> {
-            self.inner.add(constraint)
+        fn inner_mut(&mut self) -> &mut S {
+            &mut self.inner
         }
-        fn clear(&mut self) -> Result<(), ClarirsError> {
-            self.inner.clear()
+        fn satisfiable(this: &mut Self) -> Result<bool, ClarirsError> {
+            this.satisfiable_calls.set(this.satisfiable_calls.get() + 1);
+            this.inner.satisfiable()
         }
-        fn constraints(&self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-            self.inner.constraints()
-        }
-        fn simplify(&mut self) -> Result<(), ClarirsError> {
-            self.inner.simplify()
-        }
-        fn satisfiable(&mut self) -> Result<bool, ClarirsError> {
-            self.satisfiable_calls.set(self.satisfiable_calls.get() + 1);
-            self.inner.satisfiable()
-        }
-        fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-            self.inner.is_true(expr)
-        }
-        fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-            self.inner.is_false(expr)
-        }
-        fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-            self.inner.has_true(expr)
-        }
-        fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-            self.inner.has_false(expr)
-        }
-        fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-            self.inner.min_unsigned(expr)
-        }
-        fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-            self.inner.max_unsigned(expr)
-        }
-        fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-            self.inner.min_signed(expr)
-        }
-        fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-            self.inner.max_signed(expr)
-        }
-        fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-            self.eval_calls.set(self.eval_calls.get() + 1);
-            self.inner.eval_n(expr, n)
+        fn eval_n(
+            this: &mut Self,
+            expr: &AstRef<'c>,
+            n: u32,
+        ) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+            this.eval_calls.set(this.eval_calls.get() + 1);
+            this.inner.eval_n(expr, n)
         }
     }
 

@@ -47,18 +47,10 @@ impl<'c, S: Solver<'c>> ReplacementSolver<'c, S> {
         }
     }
 
-    pub fn inner(&self) -> &S {
-        &self.inner
-    }
-
     /// Whether replacements are automatically extracted from `x == <concrete>`
     /// style constraints as they are added.
     pub fn auto_replace(&self) -> bool {
         self.auto_replace
-    }
-
-    pub fn inner_mut(&mut self) -> &mut S {
-        &mut self.inner
     }
 
     /// Add an explicit replacement mapping: occurrences of `old` will be
@@ -117,91 +109,95 @@ impl<'c, S: Solver<'c>> ReplacementSolver<'c, S> {
     }
 }
 
-impl<'c, S: Solver<'c>> HasContext<'c> for ReplacementSolver<'c, S> {
-    fn context(&self) -> &'c Context<'c> {
-        self.inner.context()
-    }
-}
+impl<'c, S: Solver<'c>> SolverMixin<'c> for ReplacementSolver<'c, S> {
+    type Inner = S;
 
-impl<'c, S: Solver<'c>> Solver<'c> for ReplacementSolver<'c, S> {
-    fn add(&mut self, constraint: &AstRef<'c>) -> Result<(), ClarirsError> {
-        if self.auto_replace {
-            self.try_extract_replacement(constraint);
+    fn inner(&self) -> &S {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut S {
+        &mut self.inner
+    }
+
+    fn add(this: &mut Self, constraint: &AstRef<'c>) -> Result<(), ClarirsError> {
+        if this.auto_replace {
+            this.try_extract_replacement(constraint);
         }
 
-        self.original_constraints.push(constraint.clone());
-        let replaced = self.apply_replacements(constraint)?;
-        self.inner.add(&replaced)
+        this.original_constraints.push(constraint.clone());
+        let replaced = this.apply_replacements(constraint)?;
+        this.inner.add(&replaced)
     }
 
-    fn clear(&mut self) -> Result<(), ClarirsError> {
-        self.original_constraints.clear();
-        self.inner.clear()
+    fn clear(this: &mut Self) -> Result<(), ClarirsError> {
+        this.original_constraints.clear();
+        this.inner.clear()
     }
 
-    fn constraints(&self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        Ok(self.original_constraints.clone())
+    fn constraints(this: &Self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+        Ok(this.original_constraints.clone())
     }
 
-    fn simplify(&mut self) -> Result<(), ClarirsError> {
-        self.inner.simplify()
-    }
-
-    fn satisfiable(&mut self) -> Result<bool, ClarirsError> {
-        self.inner.satisfiable()
-    }
-
-    fn satisfiable_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
+    fn satisfiable_with_extra(this: &mut Self, extra: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
         let replaced = extra
             .iter()
-            .map(|c| self.apply_replacements(c))
+            .map(|c| this.apply_replacements(c))
             .collect::<Result<Vec<_>, _>>()?;
-        self.inner.satisfiable_with_extra(&replaced)
+        this.inner.satisfiable_with_extra(&replaced)
     }
 
-    fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.is_true(&replaced)
+    fn is_true(this: &mut Self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+        let replaced = this.apply_replacements(expr)?;
+        this.inner.is_true(&replaced)
     }
 
-    fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.is_false(&replaced)
+    fn is_false(this: &mut Self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+        let replaced = this.apply_replacements(expr)?;
+        this.inner.is_false(&replaced)
     }
 
-    fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.has_true(&replaced)
+    fn has_true(this: &mut Self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+        let replaced = this.apply_replacements(expr)?;
+        this.inner.has_true(&replaced)
     }
 
-    fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.has_false(&replaced)
+    fn has_false(this: &mut Self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+        let replaced = this.apply_replacements(expr)?;
+        this.inner.has_false(&replaced)
     }
 
-    fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.min_unsigned(&replaced)
+    fn min_unsigned(this: &mut Self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+        let replaced = this.apply_replacements(expr)?;
+        this.inner.min_unsigned(&replaced)
     }
 
-    fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.max_unsigned(&replaced)
+    fn max_unsigned(this: &mut Self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+        let replaced = this.apply_replacements(expr)?;
+        this.inner.max_unsigned(&replaced)
     }
 
-    fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.min_signed(&replaced)
+    fn min_signed(this: &mut Self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+        let replaced = this.apply_replacements(expr)?;
+        this.inner.min_signed(&replaced)
     }
 
-    fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.max_signed(&replaced)
+    fn max_signed(this: &mut Self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+        let replaced = this.apply_replacements(expr)?;
+        this.inner.max_signed(&replaced)
     }
 
-    fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        let replaced = self.apply_replacements(expr)?;
-        self.inner.eval_n(&replaced, n)
+    fn eval_n(this: &mut Self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+        let replaced = this.apply_replacements(expr)?;
+        this.inner.eval_n(&replaced, n)
+    }
+
+    fn batch_eval(this: &mut Self, exprs: &[AstRef<'c>]) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+        let replaced = exprs
+            .iter()
+            .map(|e| this.apply_replacements(e))
+            .collect::<Result<Vec<_>, _>>()?;
+        this.inner.batch_eval(&replaced)
     }
 }
 

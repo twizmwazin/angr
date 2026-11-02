@@ -20,44 +20,20 @@ impl<'c, S: Solver<'c>> ConcreteEarlyResolutionMixin<'c, S> {
             _marker: std::marker::PhantomData,
         }
     }
+}
 
-    pub fn inner(&self) -> &S {
+impl<'c, S: Solver<'c>> SolverMixin<'c> for ConcreteEarlyResolutionMixin<'c, S> {
+    type Inner = S;
+
+    fn inner(&self) -> &S {
         &self.inner
     }
 
-    pub fn inner_mut(&mut self) -> &mut S {
+    fn inner_mut(&mut self) -> &mut S {
         &mut self.inner
     }
-}
 
-impl<'c, S: Solver<'c>> HasContext<'c> for ConcreteEarlyResolutionMixin<'c, S> {
-    fn context(&self) -> &'c Context<'c> {
-        self.inner.context()
-    }
-}
-
-impl<'c, S: Solver<'c>> Solver<'c> for ConcreteEarlyResolutionMixin<'c, S> {
-    fn add(&mut self, constraint: &AstRef<'c>) -> Result<(), ClarirsError> {
-        self.inner.add(constraint)
-    }
-
-    fn clear(&mut self) -> Result<(), ClarirsError> {
-        self.inner.clear()
-    }
-
-    fn constraints(&self) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        self.inner.constraints()
-    }
-
-    fn simplify(&mut self) -> Result<(), ClarirsError> {
-        self.inner.simplify()
-    }
-
-    fn satisfiable(&mut self) -> Result<bool, ClarirsError> {
-        self.inner.satisfiable()
-    }
-
-    fn satisfiable_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
+    fn satisfiable_with_extra(this: &mut Self, extra: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
         // Concretely-false extras decide the result without the solver.
         if extra
             .iter()
@@ -65,84 +41,84 @@ impl<'c, S: Solver<'c>> Solver<'c> for ConcreteEarlyResolutionMixin<'c, S> {
         {
             return Ok(false);
         }
-        self.inner.satisfiable_with_extra(extra)
+        this.inner.satisfiable_with_extra(extra)
     }
 
-    fn is_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn is_true(this: &mut Self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
         // If the expression is concrete, we can determine the result without the solver
         // Assumes the expression is already simplified
         if expr.concrete() {
             return Ok(matches!(expr.op(), AstOp::BoolV(true)));
         }
-        self.inner.is_true(expr)
+        this.inner.is_true(expr)
     }
 
-    fn is_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn is_false(this: &mut Self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
         // If the expression is concrete, we can determine the result without the solver
         // Assumes the expression is already simplified
         if expr.concrete() {
             return Ok(matches!(expr.op(), AstOp::BoolV(false)));
         }
-        self.inner.is_false(expr)
+        this.inner.is_false(expr)
     }
 
-    fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn has_true(this: &mut Self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
         // If the expression is concrete, has_true is equivalent to is_true
         if expr.concrete() {
-            return self.is_true(expr);
+            return this.is_true(expr);
         }
-        self.inner.has_true(expr)
+        this.inner.has_true(expr)
     }
 
-    fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+    fn has_false(this: &mut Self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
         // If the expression is concrete, has_false is equivalent to is_false
         if expr.concrete() {
-            return self.is_false(expr);
+            return this.is_false(expr);
         }
-        self.inner.has_false(expr)
+        this.inner.has_false(expr)
     }
 
-    fn min_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn min_unsigned(this: &mut Self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
         if expr.concrete() {
             let simplified = expr.simplify_ext(false, true)?;
             if matches!(simplified.op(), AstOp::BVV(..)) {
                 return Ok(simplified);
             }
         }
-        self.inner.min_unsigned(expr)
+        this.inner.min_unsigned(expr)
     }
 
-    fn max_unsigned(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn max_unsigned(this: &mut Self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
         if expr.concrete() {
             let simplified = expr.simplify_ext(false, true)?;
             if matches!(simplified.op(), AstOp::BVV(..)) {
                 return Ok(simplified);
             }
         }
-        self.inner.max_unsigned(expr)
+        this.inner.max_unsigned(expr)
     }
 
-    fn min_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn min_signed(this: &mut Self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
         if expr.concrete() {
             let simplified = expr.simplify_ext(false, true)?;
             if matches!(simplified.op(), AstOp::BVV(..)) {
                 return Ok(simplified);
             }
         }
-        self.inner.min_signed(expr)
+        this.inner.min_signed(expr)
     }
 
-    fn max_signed(&mut self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
+    fn max_signed(this: &mut Self, expr: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
         if expr.concrete() {
             let simplified = expr.simplify_ext(false, true)?;
             if matches!(simplified.op(), AstOp::BVV(..)) {
                 return Ok(simplified);
             }
         }
-        self.inner.max_signed(expr)
+        this.inner.max_signed(expr)
     }
 
-    fn eval_n(&mut self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
+    fn eval_n(this: &mut Self, expr: &AstRef<'c>, n: u32) -> Result<Vec<AstRef<'c>>, ClarirsError> {
         // If concrete, try to resolve the value without invoking the solver
         if expr.concrete() {
             if n == 0 {
@@ -159,14 +135,7 @@ impl<'c, S: Solver<'c>> Solver<'c> for ConcreteEarlyResolutionMixin<'c, S> {
                 return Ok(vec![simplified]);
             }
         }
-        self.inner.eval_n(expr, n)
-    }
-
-    fn batch_eval(&mut self, exprs: &[AstRef<'c>]) -> Result<Vec<AstRef<'c>>, ClarirsError> {
-        // Forward as a batch so the backend can draw every value from a single
-        // model (concrete expressions are handled cheaply there too), rather
-        // than falling back to the per-expression default.
-        self.inner.batch_eval(exprs)
+        this.inner.eval_n(expr, n)
     }
 }
 
