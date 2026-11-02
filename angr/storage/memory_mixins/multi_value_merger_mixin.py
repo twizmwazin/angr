@@ -62,40 +62,39 @@ class MultiValueMergerMixin(MemoryMixin):
     def _collapse_values(self, values_set: set[Any], merged_size: int) -> set[Any]:
         """
         Collapse values_set into a single (possibly TOP) value when it contains TOP or exceeds the element limit.
-        Definition annotations of all values are migrated onto the result.
+        Values that only differ in their annotations are one value carrying all of them. Definition annotations of
+        all values are migrated onto the result.
         """
-        has_top = self._merge_into_top and any(self._is_top_func(v) for v in values_set)
-        if has_top or len(values_set) > self._element_limit:
-            if has_top:
-                ret_val = self._top_func(merged_size * self.state.arch.byte_width)
-            else:
-                # strip annotations from each value and see how many raw values there are in total
-                # We have to use hash manually to determine uniqueness here, because if __hash__ collides,
-                # python implicitly calls __eq__ to determine if the two objects are actually the same
-                # and that just results in a new AST for a BV. Python then tries to convert that AST to a bool
-                # which fails with the safeguard in claripy.ast.bool.Bool.__bool__.
-                stripped_values_dict = {v.hash(): v for v in values_set}
-                if len(stripped_values_dict) > 1:
-                    ret_val = self._top_func(merged_size * self.state.arch.byte_width)
-                else:
-                    # Get the AST back from the hash dict
-                    ret_val = stripped_values_dict[next(iter(stripped_values_dict))]
+        if self._merge_into_top and any(self._is_top_func(v) for v in values_set):
+            return {self._migrate_annotations(self._top_func(merged_size * self.state.arch.byte_width), values_set)}
+        if len(values_set) <= self._element_limit:
+            return values_set
 
-            # migrate annotations
-            annotations = []
-            annotations_set = set()
-            for v in values_set:
-                for anno in v.annotations:
-                    if anno not in annotations_set:
-                        annotations.append(anno)
-                        annotations_set.add(anno)
-            if annotations:
-                annotations = sorted(annotations, key=str)
-                ret_val = ret_val.annotate(*annotations[: self._annotation_limit])
-            merged_val = {ret_val}
-        else:
-            merged_val = values_set
-        return merged_val
+        # We have to use hash manually to determine uniqueness here, because if __hash__ collides, python
+        # implicitly calls __eq__ to determine if the two objects are actually the same and that just results in a
+        # new AST for a BV. Python then tries to convert that AST to a bool which fails with the safeguard in
+        # claripy.ast.bool.Bool.__bool__.
+        groups: dict[int, list[Any]] = {}
+        for v in values_set:
+            groups.setdefault(v.clear_annotations().hash(), []).append(v)
+        if len(groups) > self._element_limit:
+            return {self._migrate_annotations(self._top_func(merged_size * self.state.arch.byte_width), values_set)}
+        return {
+            vs[0] if len(vs) == 1 else self._migrate_annotations(vs[0].clear_annotations(), vs)
+            for vs in groups.values()
+        }
+
+    def _migrate_annotations(self, value: Any, values: Iterable[Any]) -> Any:
+        annotations = []
+        annotations_set = set()
+        for v in values:
+            for anno in v.annotations:
+                if anno not in annotations_set:
+                    annotations.append(anno)
+                    annotations_set.add(anno)
+        if not annotations:
+            return value
+        return value.annotate(*sorted(annotations, key=str)[: self._annotation_limit])
 
     def copy(self, memo=None):
         copied = super().copy(memo)
