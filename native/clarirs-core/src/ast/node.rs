@@ -252,9 +252,6 @@ impl Drop for AstNode<'_> {
         // before `op`'s child references drop, so no cache lock is ever held
         // across the recursive child drops.
         if self.ctx.ast_cache.remove_if_expired(self.hash) {
-            // No live node has this hash, so result caches keyed by it can't
-            // be hit until the node is rebuilt. Evict now: the result's own
-            // drop uses a different key and would never find this entry.
             self.ctx.excavate_ite_cache.remove(self.hash);
         }
     }

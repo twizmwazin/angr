@@ -99,9 +99,7 @@ impl AstCache<'_> {
         }
     }
 
-    /// Remove `key` regardless of whether its value is still alive. For
-    /// result caches keyed by the input node's hash, called when that node
-    /// dies. The common case (no entry) costs only the read lock.
+    /// Remove `key` regardless of whether its value is still alive.
     pub(crate) fn remove(&self, key: u64) {
         if !self.0.read().unwrap().contains_key(&key) {
             return;
