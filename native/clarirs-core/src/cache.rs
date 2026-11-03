@@ -77,20 +77,41 @@ impl AstCache<'_> {
     /// The hot path (entry still live, e.g. the throwaway-duplicate drop) is
     /// served with only the read lock; the write lock is taken just when the
     /// entry actually looks dead, and the check is repeated under it.
-    pub(crate) fn remove_if_expired(&self, key: u64) {
+    ///
+    /// Returns `true` when no live node is cached under `key` afterwards (the
+    /// entry was expired and removed, or there was none), `false` when a live
+    /// node still holds it.
+    pub(crate) fn remove_if_expired(&self, key: u64) -> bool {
         {
             let inner = self.0.read().unwrap();
             match inner.get(&key) {
                 Some(weak) if weak.strong_count() == 0 => {}
-                _ => return,
+                Some(_) => return false,
+                None => return true,
             }
         }
         let mut inner = self.0.write().unwrap();
-        if let Some(weak) = inner.get(&key)
-            && weak.strong_count() == 0
-        {
-            inner.remove(&key);
+        match inner.get(&key) {
+            Some(weak) if weak.strong_count() == 0 => {
+                inner.remove(&key);
+                true
+            }
+            Some(_) => false,
+            None => true,
         }
+    }
+
+    /// Remove `key` whether or not its value is still alive. For caches of
+    /// algorithm results keyed by the *input* node's hash: once no node with
+    /// that hash is alive the entry can't be hit again until the node is
+    /// rebuilt, and the `Weak` it holds would otherwise keep the result's
+    /// allocation pinned after the result dies too. The common case (nothing
+    /// cached under `key`) costs only the read lock.
+    pub(crate) fn remove(&self, key: u64) {
+        if !self.0.read().unwrap().contains_key(&key) {
+            return;
+        }
+        self.0.write().unwrap().remove(&key);
     }
 
     /// Number of entries currently in the cache (live or expired). For tests
@@ -214,6 +235,83 @@ mod tests {
         }
         // Dropping the last strong ref must evict the interning entry.
         assert_eq!(ctx.ast_cache.len(), baseline);
+        Ok(())
+    }
+
+    /// `x + ite(c, a, b)` excavates to a distinct node, `ite(c, x + a, x + b)`.
+    fn excavatable<'c>(ctx: &'c Context<'c>) -> Result<AstRef<'c>, ClarirsError> {
+        let x = ctx.bvs("x", 64)?;
+        let a = ctx.bvs("a", 64)?;
+        let b = ctx.bvs("b", 64)?;
+        let c = ctx.bools("c")?;
+        let ite = ctx.ite(&c, &a, &b)?;
+        ctx.add(&x, &ite)
+    }
+
+    #[test]
+    fn test_excavate_ite_cache_entry_removed_on_drop() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let baseline = ctx.excavate_ite_cache.len();
+        {
+            let expr = excavatable(&ctx)?;
+            let result = expr.excavate_ite()?;
+            assert!(!Arc::ptr_eq(&expr, &result));
+            assert!(ctx.excavate_ite_cache.len() > baseline);
+            // The entry is keyed by `expr` and holds a `Weak` to `result`, so
+            // drop the key first while the value is still alive: the entry
+            // must go with the key rather than outlive both.
+            drop(expr);
+            drop(result);
+        }
+        assert_eq!(ctx.excavate_ite_cache.len(), baseline);
+        Ok(())
+    }
+
+    #[test]
+    fn test_excavate_ite_cache_entry_removed_on_drop_result_first() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let baseline = ctx.excavate_ite_cache.len();
+        {
+            let expr = excavatable(&ctx)?;
+            let result = expr.excavate_ite()?;
+            assert!(ctx.excavate_ite_cache.len() > baseline);
+            drop(result);
+            drop(expr);
+        }
+        assert_eq!(ctx.excavate_ite_cache.len(), baseline);
+        Ok(())
+    }
+
+    #[test]
+    fn test_excavate_ite_cache_identity_entry_removed_on_drop() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let baseline = ctx.excavate_ite_cache.len();
+        {
+            // No ITE to hoist: every node excavates to itself, so each entry's
+            // key and value are the same node.
+            let x = ctx.bvs("x", 64)?;
+            let expr = ctx.add(&x, ctx.bvv(BitVec::from((1, 64)))?)?;
+            let result = expr.excavate_ite()?;
+            assert!(Arc::ptr_eq(&expr, &result));
+            assert!(ctx.excavate_ite_cache.len() > baseline);
+        }
+        assert_eq!(ctx.excavate_ite_cache.len(), baseline);
+        Ok(())
+    }
+
+    #[test]
+    fn test_excavate_ite_cache_entry_survives_live_key() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let expr = excavatable(&ctx)?;
+        let result = expr.excavate_ite()?;
+        let n = ctx.excavate_ite_cache.len();
+        // Dropping an extra handle to the key must not evict its entry: the
+        // next excavation of the same node is still a cache hit.
+        drop(expr.clone());
+        assert_eq!(ctx.excavate_ite_cache.len(), n);
+        let again = expr.excavate_ite()?;
+        assert!(Arc::ptr_eq(&result, &again));
+        assert_eq!(ctx.excavate_ite_cache.len(), n);
         Ok(())
     }
 

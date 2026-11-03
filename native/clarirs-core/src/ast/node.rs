@@ -249,9 +249,19 @@ impl Drop for AstNode<'_> {
         // accumulate dead hashes and pinned allocations. `remove_if_expired`
         // verifies liveness, so a throwaway duplicate built by a racing
         // thread leaves the live entry untouched. This body runs
-        // before `op`'s child references drop, so the cache lock is never held
+        // before `op`'s child references drop, so no cache lock is ever held
         // across the recursive child drops.
-        self.ctx.ast_cache.remove_if_expired(self.hash);
+        if self.ctx.ast_cache.remove_if_expired(self.hash) {
+            // No node with this hash is alive any more, so result caches keyed
+            // by it can't be hit again until the node is rebuilt. Drop their
+            // entries now: `excavate_ite_cache` maps this node's hash to a
+            // `Weak` of the excavated node, which neither node's drop would
+            // otherwise find (the result's own hash is a different key), so a
+            // key dropped before its result would leave a dead entry and a
+            // pinned allocation behind once the result dies too. A live
+            // duplicate (the interning race above) keeps the entries.
+            self.ctx.excavate_ite_cache.remove(self.hash);
+        }
     }
 }
 
