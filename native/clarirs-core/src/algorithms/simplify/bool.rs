@@ -930,25 +930,11 @@ fn simplify_unsigned_cmp<'c>(
             }
             _ => None,
         },
-        // CMP(Sub(ZeroExt(n, inner), BVV(k)), BVV(c)) where k and c fit in inner's size
-        // => CMP(Sub(inner, extract(k)), extract(c))
-        AstOp::Sub(lhs_sub, rhs_sub) => {
-            if let AstOp::ZeroExt(inner, ext_size) = lhs_sub.op()
-                && let AstOp::BVV(k) = rhs_sub.op()
-                && c.leading_zeros() as u32 >= *ext_size
-                && k.leading_zeros() as u32 >= *ext_size
-            {
-                let inner_size = inner.size();
-                Some((
-                    ctx.sub(inner, &ctx.extract(rhs_sub, inner_size - 1, 0)?)?,
-                    ctx.bvv(c.extract(0, inner_size - 1)?)?,
-                ))
-            } else {
-                None
-            }
-        }
-        // CMP(Add(ZeroExt(n, inner), BVV(k)), BVV(c)) where k and c fit in inner's size
-        AstOp::Add(add_args) => {
+        // CMP(Add(ZeroExt(n, inner), BVV(k)), BVV(c)) where k fits in inner's width:
+        // the wide sum cannot wrap, so fold k onto the other side (or concretize if c < k).
+        // Narrowing to `inner + extract(k)` is unsound since the narrow sum can wrap.
+        // Sub has no such rule: ZeroExt(inner) - k wraps whenever inner < k.
+        AstOp::Add(add_args) if add_args.len() == 2 => {
             let ze_idx = add_args
                 .iter()
                 .position(|a| matches!(a.op(), AstOp::ZeroExt(..)));
@@ -956,17 +942,15 @@ fn simplify_unsigned_cmp<'c>(
                 .iter()
                 .position(|a| matches!(a.op(), AstOp::BVV(..)));
             if let (Some(ze_i), Some(bvv_i)) = (ze_idx, bvv_idx)
-                && add_args.len() == 2
-                && let AstOp::ZeroExt(inner, ext_size) = add_args[ze_i].op()
+                && let AstOp::ZeroExt(_, ext_size) = add_args[ze_i].op()
                 && let AstOp::BVV(k) = add_args[bvv_i].op()
-                && c.leading_zeros() as u32 >= *ext_size
+                && *ext_size > 0
                 && k.leading_zeros() as u32 >= *ext_size
             {
-                let inner_size = inner.size();
-                Some((
-                    ctx.add(inner, &ctx.extract(&add_args[bvv_i], inner_size - 1, 0)?)?,
-                    ctx.bvv(c.extract(0, inner_size - 1)?)?,
-                ))
+                if c < k {
+                    return Ok(ctx.boolv(matches!(rel, UCmp::Ugt | UCmp::Uge))?);
+                }
+                Some((add_args[ze_i].clone(), ctx.bvv((c.clone() - k.clone())?)?))
             } else {
                 None
             }

@@ -929,3 +929,67 @@ fn test_ite_absorbs_nested_ite_on_same_condition() -> Result<()> {
     );
     Ok(())
 }
+
+#[test]
+fn test_zero_ext_add_cmp_folds_constant() -> Result<()> {
+    let ctx = Context::new();
+    let x = ctx.bvs("x", 8)?;
+    let bv64 = |v: u64| ctx.bvv(BitVec::from((v, 64)));
+    let bv8 = |v: u64| ctx.bvv(BitVec::from((v, 8)));
+    let plus1 = ctx.add(ctx.zero_ext(&x, 56)?, bv64(1)?)?;
+    let plus5 = ctx.add(ctx.zero_ext(&x, 56)?, bv64(5)?)?;
+
+    assert_eq!(
+        ctx.ult(&plus1, bv64(5)?)?.simplify()?,
+        ctx.ult(&x, bv8(4)?)?
+    );
+    assert_eq!(
+        ctx.ugt(bv64(5)?, &plus1)?.simplify()?,
+        ctx.ugt(bv8(4)?, &x)?
+    );
+    assert_eq!(ctx.ult(&plus1, bv64(0x101)?)?.simplify()?, ctx.true_()?);
+    assert_eq!(ctx.ult(&plus5, bv64(3)?)?.simplify()?, ctx.false_()?);
+    assert_eq!(ctx.uge(&plus5, bv64(3)?)?.simplify()?, ctx.true_()?);
+
+    let minus1 = ctx.sub(ctx.zero_ext(&x, 56)?, bv64(1)?)?;
+    let cmp = ctx.ule(&minus1, bv64(0xFF)?)?;
+    assert_eq!(cmp.simplify()?, ctx.ule(minus1.simplify()?, bv64(0xFF)?)?);
+
+    Ok(())
+}
+
+#[test]
+fn test_zero_ext_add_sub_cmp_matches_concrete_evaluation() -> Result<()> {
+    let ctx = Context::new();
+    let x = ctx.bvs("x", 8)?;
+    let bv64 = |v: u64| ctx.bvv(BitVec::from((v, 64)));
+    let ze = ctx.zero_ext(&x, 56)?;
+
+    for k in [0u64, 1, 5, 0xFF] {
+        for arith in [ctx.add(&ze, bv64(k)?)?, ctx.sub(&ze, bv64(k)?)?] {
+            for c in [0u64, 1, 4, 5, 0xFF, 0x100, 0x104, u64::MAX] {
+                let c = bv64(c)?;
+                for expr in [
+                    ctx.ult(&arith, &c)?,
+                    ctx.ule(&arith, &c)?,
+                    ctx.ugt(&arith, &c)?,
+                    ctx.uge(&arith, &c)?,
+                    ctx.ult(&c, &arith)?,
+                    ctx.ule(&c, &arith)?,
+                    ctx.ugt(&c, &arith)?,
+                    ctx.uge(&c, &arith)?,
+                ] {
+                    let simplified = expr.simplify()?;
+                    for val in 0..=0xffu64 {
+                        let v = ctx.bvv(BitVec::from((val, 8)))?;
+                        let rewritten = simplified.replace(&x, &v)?.simplify()?;
+                        let folded = expr.replace(&x, &v)?.simplify()?;
+                        assert_eq!(rewritten, folded, "{expr:?} at x = {val:#x}");
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
