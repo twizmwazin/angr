@@ -783,20 +783,20 @@ class Unicorn(SimStatePlugin, SupportsMerge):
 
     def merge(self, others, merge_conditions, common_ancestor=None):  # pylint: disable=unused-argument
         self.cooldown_nonunicorn_blocks = max(
-            self.cooldown_nonunicorn_blocks, max(o.cooldown_nonunicorn_blocks for o in others)
+            self.cooldown_nonunicorn_blocks, *(o.cooldown_nonunicorn_blocks for o in others)
         )
-        self.cooldown_symbolic_stop = max(self.cooldown_symbolic_stop, max(o.cooldown_symbolic_stop for o in others))
+        self.cooldown_symbolic_stop = max(self.cooldown_symbolic_stop, *(o.cooldown_symbolic_stop for o in others))
         self.cooldown_unsupported_stop = max(
-            self.cooldown_unsupported_stop, max(o.cooldown_unsupported_stop for o in others)
+            self.cooldown_unsupported_stop, *(o.cooldown_unsupported_stop for o in others)
         )
         self.countdown_nonunicorn_blocks = max(
-            self.countdown_nonunicorn_blocks, max(o.countdown_nonunicorn_blocks for o in others)
+            self.countdown_nonunicorn_blocks, *(o.countdown_nonunicorn_blocks for o in others)
         )
-        self.countdown_symbolic_stop = max(self.countdown_symbolic_stop, max(o.countdown_symbolic_stop for o in others))
+        self.countdown_symbolic_stop = max(self.countdown_symbolic_stop, *(o.countdown_symbolic_stop for o in others))
         self.countdown_unsupported_stop = max(
-            self.countdown_unsupported_stop, max(o.countdown_unsupported_stop for o in others)
+            self.countdown_unsupported_stop, *(o.countdown_unsupported_stop for o in others)
         )
-        self.countdown_stop_point = max(self.countdown_stop_point, max(o.countdown_stop_point for o in others))
+        self.countdown_stop_point = max(self.countdown_stop_point, *(o.countdown_stop_point for o in others))
 
         # get a fresh unicount, just in case
         self._unicount = next(_unicounter)

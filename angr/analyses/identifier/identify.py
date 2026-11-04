@@ -373,7 +373,7 @@ class Identifier(Analysis):
 
         addr_trace = [start.addr, *addr_trace]
         succ_state = None
-        while len(addr_trace):
+        while addr_trace:
             try:
                 succ_state = self.do_trace(addr_trace, reverse_accesses, calling_func_info)
                 break

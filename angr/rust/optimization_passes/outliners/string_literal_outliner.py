@@ -58,7 +58,7 @@ class StringLiteralOutliner(OptimizationPass, DFAMixin, SSAVariableMixin):
                 new_fields[offset] = field
                 new_field_offsets[field_name] = offset
                 field_names.insert(0, (next_offset, next_field_name))
-            if len(field_names):
+            if field_names:
                 offset, field_name = field_names.pop(0)
                 field = expr.fields.get(offset, None)
                 new_fields[offset] = field

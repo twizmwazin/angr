@@ -34,5 +34,5 @@ class SimConcretizationStrategyNorepeatsRange(SimConcretizationStrategy):
         if not all(self._repeat_expr is o._repeat_expr for o in others):
             raise SimMergeError("Unable to merge two different repeat expressions.")
 
-        self._repeat_min = max(self._repeat_min, max(o._repeat_min for o in others))
-        self._repeat_granularity = max(self._repeat_granularity, max(o._repeat_granularity for o in others))
+        self._repeat_min = max(self._repeat_min, *(o._repeat_min for o in others))
+        self._repeat_granularity = max(self._repeat_granularity, *(o._repeat_granularity for o in others))

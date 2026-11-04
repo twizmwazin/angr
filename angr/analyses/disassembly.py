@@ -155,7 +155,7 @@ class Hook(DisassemblyPiece):
     def __init__(self, block):
         self.addr = block.addr
         simproc_name = str(block.sim_procedure)
-        self.name = simproc_name.split()[-1].strip("'<>")
+        self.name = simproc_name.rsplit(maxsplit=1)[-1].strip("'<>")
         self.short_name = simproc_name.strip("'<>").split(".")[-1]
 
     def _render(self, formatting):

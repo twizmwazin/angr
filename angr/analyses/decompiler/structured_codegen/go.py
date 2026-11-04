@@ -11259,6 +11259,6 @@ register_analysis(GoStructuredCodeGenerator, "GoStructuredCodeGenerator")
 
 # Register protobuf serializer/parser pairs for every concrete GoConstruct subclass. Imported after all classes are
 # defined so that ``go_serialize.register_all`` can reference them by name.
-from . import go_serialize as _go_serialize  # pylint: disable=wrong-import-position
+from . import go_serialize as _go_serialize  # noqa: E402  # pylint: disable=wrong-import-position
 
 _go_serialize.register_all()

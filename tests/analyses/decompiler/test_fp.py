@@ -109,7 +109,7 @@ def _env(name: str) -> _Env:
 
 def _sig(text: str) -> str:
     """Extract the function signature line (last line before the opening brace)."""
-    preamble = text.split("{")[0]
+    preamble = text.split("{", maxsplit=1)[0]
     for line in reversed(preamble.strip().splitlines()):
         line = line.strip()
         if line and not line.startswith("extern ") and not line.startswith("//"):
