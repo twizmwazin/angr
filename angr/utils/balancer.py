@@ -612,9 +612,8 @@ class Balancer:
             return truism
         op0, op1 = cast(tuple[BV, BV], lhs.args)
 
-        if op1.op == "BVV":
+        if (v := op1.concrete_value) is not None:
             # if all low bits of right are 1 and all high bits of right are 0, then this is equivalent to Extract()
-            v = cast(int, op1.args[0])
             low_ones = 0
             while v != 0:
                 if v & 1 == 0:
@@ -834,7 +833,7 @@ class Balancer:
         lhs, rhs = cast(tuple[BV, BV], truism.args)
         if rhs.cardinality == 1:
             val = claripy.vsa.eval(rhs, 1)[0]
-            max_int = claripy.BVV((1 << len(lhs)) - 1, len(lhs)).args[0]
+            max_int = (1 << len(lhs)) - 1
 
             if val == 0:
                 self._add_lower_bound(lhs, val + 1)

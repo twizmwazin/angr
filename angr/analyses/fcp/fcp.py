@@ -219,7 +219,7 @@ class SimEngineFCPVEX(
                 if self.base_state is not None:
                     data = self.base_state.memory.load(addr, size, endness=expr.endness)
                     if not data.symbolic:
-                        return data.args[0]
+                        return data.concrete_value
                 else:
                     try:
                         return self.project.loader.memory.unpack_word(addr, size=size, endness=expr.endness)

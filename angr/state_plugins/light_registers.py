@@ -58,7 +58,7 @@ class SimLightRegisters(SimStatePlugin):
                 try:
                     if size.symbolic:
                         raise SimFastMemoryError("Can't handle symbolic register access")
-                    size = offset.args[0]
+                    size = size.concrete_value
                 except AttributeError:
                     raise TypeError("Invalid size argument") from None
 
@@ -66,7 +66,7 @@ class SimLightRegisters(SimStatePlugin):
                 try:
                     if offset.symbolic:
                         raise SimFastMemoryError("Can't handle symbolic register access")
-                    offset = offset.args[0]
+                    offset = offset.concrete_value
                 except AttributeError:
                     raise TypeError("Invalid offset argument") from None
 

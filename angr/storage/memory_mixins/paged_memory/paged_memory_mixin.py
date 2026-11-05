@@ -407,10 +407,10 @@ class PagedMemoryMixin[PageType: PageBase](
     def _load_to_memoryview(self, addr, size, with_bitmap):
         bitmap_size = (size + 7) // 8
         result = self.load(addr, size, endness="Iend_BE")
-        if result.op == "BVV":
+        if (concrete := result.concrete_value) is not None:
             if with_bitmap:
-                return memoryview(result.args[0].to_bytes(size, "big")), memoryview(bytes(bitmap_size))
-            return memoryview(result.args[0].to_bytes(size, "big"))
+                return memoryview(concrete.to_bytes(size, "big")), memoryview(bytes(bitmap_size))
+            return memoryview(concrete.to_bytes(size, "big"))
         if result.op == "Concat":
             bytes_out = bytearray(size)
             bitmap_out = bytearray(bitmap_size)
@@ -460,7 +460,7 @@ class PagedMemoryMixin[PageType: PageBase](
                         chopped = chopped[:lo_chop]
 
                     if len(chopped) > 0:
-                        bytes_out[byte_idx : byte_idx + byte_size] = chopped.args[0].to_bytes(byte_size, "big")
+                        bytes_out[byte_idx : byte_idx + byte_size] = chopped.concrete_value.to_bytes(byte_size, "big")
                 else:
                     if not with_bitmap:
                         return memoryview(bytes(bytes_out))[:byte_idx]

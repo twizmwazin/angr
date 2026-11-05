@@ -179,15 +179,15 @@ class ConstantResolver(IndirectJumpResolver):
 
             if resolved_tmp is not None:
                 if (
-                    isinstance(resolved_tmp, claripy.ast.Base)
-                    and resolved_tmp.op == "BVV"
-                    and self._is_target_valid(cfg, resolved_tmp.args[0])
+                    isinstance(resolved_tmp, claripy.ast.BV)
+                    and (target := resolved_tmp.concrete_value) is not None
+                    and self._is_target_valid(cfg, target)
                 ):
                     self._resolved += 1
                     # print(f"{self._resolved} ({self._props_saved} saved, {self._cache_hits} cached) / "
                     #       f"{self._resolved + self._unresolved}")
-                    # print(f"+ Function: {func_addr:#x}, block {addr:#x}, target {resolved_tmp.args[0]:#x}")
-                    return True, [resolved_tmp.args[0]]
+                    # print(f"+ Function: {func_addr:#x}, block {addr:#x}, target {target:#x}")
+                    return True, [target]
                 if isinstance(resolved_tmp, int) and self._is_target_valid(cfg, resolved_tmp):
                     self._resolved += 1
                     # print(f"{self._resolved} ({self._props_saved} saved, {self._cache_hits} cached) / "

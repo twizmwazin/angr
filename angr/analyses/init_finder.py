@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import cast
 
 import pyvex
 from cle.loader import MetaELF
@@ -47,9 +46,10 @@ class SimEngineInitFinderVEX(SimEngineNostmtVEX[None, claripy.ast.Base | int | N
     def _is_addr_uninitialized(self, addr: int | claripy.ast.Base):
         # is it writing to a global, uninitialized region?
 
-        if isinstance(addr, claripy.ast.Base):
-            assert addr.op == "BVV"
-            addr = cast(int, addr.args[0])
+        if isinstance(addr, claripy.ast.BV):
+            concrete_addr = addr.concrete_value
+            assert concrete_addr is not None
+            addr = concrete_addr
 
         obj = self.project.loader.find_object_containing(addr)
         if obj is not None:
@@ -69,8 +69,8 @@ class SimEngineInitFinderVEX(SimEngineNostmtVEX[None, claripy.ast.Base | int | N
         return False
 
     def _is_pointer(self, addr):
-        if isinstance(addr, claripy.ast.Base):
-            addr = addr.args[0]
+        if isinstance(addr, claripy.ast.BV):
+            addr = addr.concrete_value
 
         if isinstance(addr, int) and addr > 0x400:
             return self.project.loader.find_object_containing(addr) is not None

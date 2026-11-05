@@ -13,8 +13,8 @@ class PropagatorLoadCallback:
 
     def propagator_load_callback(self, addr: claripy.ast.BV | int, size: int) -> bool:  # pylint:disable=unused-argument
         # only allow loading if the address falls into a read-only region
-        if isinstance(addr, claripy.ast.BV) and addr.op == "BVV":
-            addr_v = addr.args[0]
+        if isinstance(addr, claripy.ast.BV) and addr.concrete_value is not None:
+            addr_v = addr.concrete_value
         elif isinstance(addr, int):
             addr_v = addr
         else:

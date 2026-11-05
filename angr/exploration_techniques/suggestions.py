@@ -134,7 +134,11 @@ class Suggestions(ExplorationTechnique):
                             "...generated %s from %s to %s",
                             t[4],
                             state.project.loader.describe_addr(t[2]),
-                            state.project.loader.describe_addr(t[3].args[0]) if t[3].op == "BVV" else "<symbol>",
+                            (
+                                state.project.loader.describe_addr(t[3].concrete_value)
+                                if t[3].concrete_value is not None
+                                else "<symbol>"
+                            ),
                         )
                     descriptions.extend(state.solver.describe_variables(t[0]))
                 descriptions = set(descriptions)

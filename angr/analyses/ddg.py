@@ -1260,7 +1260,7 @@ class DDG(Analysis):
             if expr_0.tmp_deps and (not expr_1.tmp_deps and not expr_1.reg_deps):
                 # tmp - const
 
-                const_value = expr_1.ast.args[0]
+                const_value = expr_1.ast.concrete_value
 
                 tmp = next(iter(expr_0.tmp_deps))
                 if tmp in self._temp_register_symbols:
@@ -1277,7 +1277,7 @@ class DDG(Analysis):
 
             if expr_0.tmp_deps and (not expr_1.tmp_deps and not expr_1.reg_deps):
                 # tmp + const
-                const_value = expr_1.ast.args[0]
+                const_value = expr_1.ast.concrete_value
 
                 tmp = next(iter(expr_0.tmp_deps))
                 if tmp in self._temp_register_symbols:
@@ -1294,7 +1294,7 @@ class DDG(Analysis):
 
             if expr_0.tmp_deps and (not expr_1.tmp_deps and not expr_1.reg_deps):
                 # tmp - const
-                const_value = expr_1.ast.args[0]
+                const_value = expr_1.ast.concrete_value
                 tmp = next(iter(expr_0.tmp_deps))
 
                 const_def = ProgramVariable(SimConstantVariable(value=const_value, size=len(expr_1.ast)), location)
@@ -1308,7 +1308,7 @@ class DDG(Analysis):
 
             if expr_0.tmp_deps and (not expr_1.tmp_deps and not expr_1.reg_deps):
                 # tmp + const
-                const_value = expr_1.ast.args[0]
+                const_value = expr_1.ast.concrete_value
                 tmp = next(iter(expr_0.tmp_deps))
 
                 const_def = ProgramVariable(SimConstantVariable(value=const_value, size=len(expr_1.ast)), location)

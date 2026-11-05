@@ -896,7 +896,7 @@ class ConditionProcessor:
             # `lo == 0` extracts already lower to a clean `base & mask` and are left alone.
             for ext, other in (cond_.args, cond_.args[::-1]):
                 if (
-                    ext.op == "Extract" and other.op == "BVV" and other.args[0] == 0 and ext.args[1] != 0  # lo
+                    ext.op == "Extract" and other.concrete_value == 0 and ext.args[1] != 0  # lo
                 ):
                     hi, lo, base = ext.args
                     mask = ((1 << (hi - lo + 1)) - 1) << lo
@@ -949,13 +949,9 @@ class ConditionProcessor:
             "__mod__": lambda cond_, tags: _binary_op_reduce("Mod", cond_.args, tags),
             "LShR": lambda cond_, tags: _binary_op_reduce("Shr", cond_.args, tags),
             "BVV": lambda cond_, tags: ailment.Expr.Const(
-                self.ail_manager.next_atom(), cond_.args[0], cond_.size(), **tags
+                self.ail_manager.next_atom(), cond_.concrete_value, cond_.size(), **tags
             ),
-            "BoolV": lambda cond_, tags: (
-                ailment.Expr.Const(self.ail_manager.next_atom(), True, 1, **tags)
-                if cond_.args[0] is True
-                else ailment.Expr.Const(self.ail_manager.next_atom(), False, 1, **tags)
-            ),
+            "BoolV": lambda cond_, tags: ailment.Expr.Const(self.ail_manager.next_atom(), cond_.is_true(), 1, **tags),
             "Extract": lambda cond_, tags: self._convert_extract(*cond_.args, tags),
             "ZeroExt": lambda cond_, tags: _binary_op_reduce(
                 "Concat", [claripy.BVV(0, cond_.args[0]), cond_.args[1]], tags
@@ -1164,7 +1160,7 @@ class ConditionProcessor:
         if isinstance(r, claripy.ast.BV) and r.size() == 1 and must_bool:
             # convert to a BoolS
             if r.op == "BVV":
-                r = claripy.false() if r.args[0] == 0 else claripy.true()
+                r = claripy.false() if r.concrete_value == 0 else claripy.true()
             else:
                 # r.op == "BVS"
                 r = claripy.BoolS(f"bool_from_bv1_{r.args[0]}", explicit_name=True)

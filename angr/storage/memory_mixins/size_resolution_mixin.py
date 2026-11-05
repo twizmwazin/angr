@@ -23,9 +23,7 @@ class SizeNormalizationMixin(MemoryMixin):
             raise TypeError("Must provide size to load")
         if type(size) is int:
             out_size = size
-        elif getattr(size, "op", None) == "BVV":
-            out_size = size.args[0]
-        else:
+        elif (out_size := getattr(size, "concrete_value", None)) is None:
             raise Exception("Size must be concretely resolved by this point in the memory stack")
 
         return super().load(addr, size=out_size, **kwargs)
@@ -36,9 +34,7 @@ class SizeNormalizationMixin(MemoryMixin):
             out_size = max_size
         elif type(size) is int:
             out_size = size
-        elif getattr(size, "op", None) == "BVV":
-            out_size = size.args[0]
-        else:
+        elif (out_size := getattr(size, "concrete_value", None)) is None:
             raise Exception("Size must be concretely resolved by this point in the memory stack")
 
         if out_size > max_size:

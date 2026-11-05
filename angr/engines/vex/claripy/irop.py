@@ -648,8 +648,8 @@ class SimIROp:
     @staticmethod
     def _op_Iop_SliceV128(args):
         left, right, imm = args
-        assert imm.op == "BVV"
-        imm = imm.args[0]
+        imm = imm.concrete_value
+        assert imm is not None
         return claripy.Concat(left, right)[127 + imm * 8 : imm * 8]
 
     @staticmethod
@@ -1255,9 +1255,10 @@ class SimIROp:
         log2(width in bytes): 0 -> 8 bits, 1 -> 16, 2 -> 32, 3 -> 64.
         """
         mask, width_code = args
-        if not isinstance(width_code, claripy.ast.Base) or width_code.op != "BVV":
+        width = width_code.concrete_value if isinstance(width_code, claripy.ast.BV) else None
+        if width is None:
             raise SimOperationError(f"{self.name} requires a concrete element width")
-        elem_bits = 8 << (width_code.args[0] & 3)
+        elem_bits = 8 << (width & 3)
         count = self._output_size_bits // elem_bits
         # lane 0 is the least significant, so build most-significant first
         lanes = [
@@ -1283,9 +1284,10 @@ class SimIROp:
         6 GT, 7 TRUE -- all with the op's own signedness.
         """
         _dst, src1, src2, imm8 = args
-        if not isinstance(imm8, claripy.ast.Base) or imm8.op != "BVV":
+        imm = imm8.concrete_value if isinstance(imm8, claripy.ast.BV) else None
+        if imm is None:
             raise SimOperationError(f"{self.name} requires a concrete predicate")
-        pred = imm8.args[0] & 7
+        pred = imm & 7
         signed = self._vector_signed == "S"
         elem_bits = self._vector_size
         count = self._vector_count
@@ -1346,9 +1348,10 @@ class SimIROp:
         (a << 2) | (b << 1) | c, matching _mm512_ternarylogic_epi32.
         """
         a, b, c, imm8 = args
-        if not isinstance(imm8, claripy.ast.Base) or imm8.op != "BVV":
+        imm = imm8.concrete_value if isinstance(imm8, claripy.ast.BV) else None
+        if imm is None:
             raise SimOperationError(f"{self.name} requires a concrete truth table")
-        table = imm8.args[0] & 0xFF
+        table = imm & 0xFF
 
         # OR together the minterms the table selects; each minterm is the
         # bitwise AND of the three sources in their true or complemented form.

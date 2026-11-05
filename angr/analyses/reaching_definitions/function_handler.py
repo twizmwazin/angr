@@ -324,7 +324,7 @@ class FunctionHandler:
         """
         if isinstance(target, MultiValues):
             target_bv = target.one_value()
-            target_int = target_bv.args[0] if target_bv is not None and target_bv.op == "BVV" else None
+            target_int = target_bv.concrete_value if target_bv is not None else None
         else:
             target_int = target
         if callsite.context is None:
@@ -355,8 +355,8 @@ class FunctionHandler:
         if data.address is None and data.address_multi is not None:
             for vs in data.address_multi.values():
                 for val in vs:
-                    if val is not None and val.op == "BVV":
-                        data.address = val.args[0]
+                    if val is not None and val.concrete_value is not None:
+                        data.address = val.concrete_value
                         break
                 if data.address is not None:
                     break

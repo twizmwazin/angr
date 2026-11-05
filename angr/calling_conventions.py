@@ -95,9 +95,10 @@ class AllocHelper:
 
     def size(self):
         val = self.translate(self.ptr, claripy.BVV(0, len(self.ptr)))
-        assert isinstance(val, claripy.ast.Base) and val.op == "BVV"
-        assert isinstance(val.args[0], int)
-        return abs(val.args[0])
+        assert isinstance(val, claripy.ast.BV)
+        size = val.concrete_value
+        assert size is not None
+        return abs(size)
 
     @classmethod
     def calc_size(cls, val, arch):

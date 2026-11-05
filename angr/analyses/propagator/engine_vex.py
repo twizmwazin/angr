@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import logging
-from typing import cast
 
 import pyvex
 
@@ -77,9 +76,8 @@ class SimEnginePropagatorVEX(
         if sp_offset is not None:
             # Local variable
             return self.state.load_local_variable(sp_offset, size, endness)
-        if addr.op == "BVV" and self._allow_loading(addr, size):
+        if (addr_int := addr.concrete_value) is not None and self._allow_loading(addr, size):
             # Try loading from the state
-            addr_int = cast(int, addr.args[0])
             if self.base_state is not None:
                 _l.debug("Loading %d bytes from %x.", size, addr_int)
                 data = self.base_state.memory.load(addr, size, endness=endness)
@@ -98,9 +96,9 @@ class SimEnginePropagatorVEX(
     #
 
     def _handle_function(self, addr):
-        if self.arch.name == "X86" and isinstance(addr, claripy.ast.Base) and addr.op == "BVV":
+        if self.arch.name == "X86" and isinstance(addr, claripy.ast.BV) and addr.concrete_value is not None:
             try:
-                b = self.project.loader.memory.load(addr.args[0], 4)
+                b = self.project.loader.memory.load(addr.concrete_value, 4)
             except KeyError:
                 return
             except TypeError:
@@ -149,9 +147,8 @@ class SimEnginePropagatorVEX(
         if sp_offset is not None:
             # Local variables
             self.state.store_local_variable(sp_offset, size, data, endness)
-        elif addr.op == "BVV":
+        elif (addr_int := addr.concrete_value) is not None:
             # a memory address
-            addr_int = cast(int, addr.args[0])
             variable = VEXMemVar(addr_int, size)
             self.state.add_replacement(self._codeloc(block_only=False), variable, data)
 

@@ -358,7 +358,7 @@ class JumpTableProcessor(
         elif expr.op == "__add__":
             if len(expr.args) == 1:
                 return JumpTableProcessor._extract_spoffset_from_expr(cast(claripy.ast.BV, expr.args[0]))
-            if len(expr.args) == 2 and cast(claripy.ast.BV, expr.args[1]).op == "BVV":
+            if len(expr.args) == 2 and cast(claripy.ast.BV, expr.args[1]).concrete:
                 sp_offset = JumpTableProcessor._extract_spoffset_from_expr(cast(claripy.ast.BV, expr.args[0]))
                 if sp_offset is not None:
                     delta = cast(claripy.ast.BV, expr.args[1]).concrete_value
@@ -387,7 +387,7 @@ class JumpTableProcessor(
         elif expr.op == "__add__":
             if len(expr.args) == 1:
                 return JumpTableProcessor._extract_regoffset_from_expr(cast(claripy.ast.BV, expr.args[0]))
-            if len(expr.args) == 2 and cast(claripy.ast.BV, expr.args[1]).op == "BVV":
+            if len(expr.args) == 2 and cast(claripy.ast.BV, expr.args[1]).concrete:
                 reg_offset = JumpTableProcessor._extract_regoffset_from_expr(cast(claripy.ast.BV, expr.args[0]))
                 if reg_offset is not None:
                     delta = cast(claripy.ast.BV, expr.args[1]).concrete_value
@@ -788,12 +788,13 @@ class ShrBoundsConstraintHook:
         arg0, arg1 = cons.args
         if arg1.op == "LShR":
             arg0, arg1 = arg1, arg0
-        if not (arg0.op == "LShR" and arg1.op == "BVV" and arg1.args[0] == 0):
+        if not (arg0.op == "LShR" and arg1.concrete_value == 0):
             return None
         value_expr, shift = arg0.args
-        if shift.op != "BVV" or not 0 < shift.args[0] < value_expr.size():
+        shift_amount = shift.concrete_value
+        if shift_amount is None or not 0 < shift_amount < value_expr.size():
             return None
-        bound = (1 << shift.args[0]) - 1
+        bound = (1 << shift_amount) - 1
         is_le = (cons.op == "__eq__") ^ invert
         return claripy.ULE(value_expr, bound) if is_le else claripy.UGT(value_expr, bound)
 
@@ -2582,7 +2583,7 @@ class JumpTableResolver(IndirectJumpResolver):
 
             read_length = state.inspect.attrs.mem_read_length
             if not isinstance(read_length, int):
-                read_length = read_length.args[3]  # max
+                read_length = state.solver.max(read_length)
             if read_length > 16:
                 return
             new_read_addr = claripy.BVV(UninitReadMeta.uninit_read_base, state.arch.bits)

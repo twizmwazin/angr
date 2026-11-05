@@ -975,8 +975,8 @@ class LiveDefinitions:
                 heap_offset = self.get_heap_offset(pointer)
                 if heap_offset is not None:
                     addr = HeapAddress(heap_offset)
-                elif pointer.op == "BVV":
-                    addr = cast(int, pointer.args[0])
+                elif pointer.concrete_value is not None:
+                    addr = pointer.concrete_value
                 else:
                     # cannot resolve
                     return None
@@ -994,7 +994,7 @@ class LiveDefinitions:
                     size = MAX_SIZE if sz == 0 else sz
                     break
 
-                if any(one.op == "BVV" and one.args[0] == 0 for one in mv[0]):
+                if any(one.concrete_value == 0 for one in mv[0]):
                     # We found a null terminator
                     size = sz + 1
                     break
@@ -1016,7 +1016,7 @@ class LiveDefinitions:
         if "heap_base" in addr.variables:
             if addr.op == "BVS":
                 return 0
-            if addr.op == "__add__" and len(addr.args) == 2 and cast(claripy.ast.BV, addr.args[1]).op == "BVV":
+            if addr.op == "__add__" and len(addr.args) == 2 and cast(claripy.ast.BV, addr.args[1]).concrete:
                 return cast(claripy.ast.BV, addr.args[1]).concrete_value
         return None
 

@@ -365,38 +365,27 @@ class AddressConcretizationMixin(MemoryMixin):
             # the implementation of conditionality must be at the bottom of the stack
             self._store_one_addr(concrete_addr, data, trivial, addr, condition, size, **kwargs)
 
-    def permissions(self, addr, permissions=None, **kwargs):
+    @staticmethod
+    def _concrete_addr(addr, error_msg: str) -> int:
         if type(addr) is int:
-            pass
-        elif getattr(addr, "op", None) == "BVV":
-            addr = addr.args[0]
-        else:
-            raise SimMemoryAddressError("Cannot get/set permissions for a symbolic address")
+            return addr
+        concrete = getattr(addr, "concrete_value", None)
+        if concrete is None:
+            raise SimMemoryAddressError(error_msg)
+        return concrete
+
+    def permissions(self, addr, permissions=None, **kwargs):
+        addr = self._concrete_addr(addr, "Cannot get/set permissions for a symbolic address")
         return super().permissions(addr, permissions=permissions, **kwargs)
 
     def map_region(self, addr, length, permissions, **kwargs):
-        if type(addr) is int:
-            pass
-        elif getattr(addr, "op", None) == "BVV":
-            addr = addr.args[0]
-        else:
-            raise SimMemoryAddressError("Cannot map a region for a symbolic address")
+        addr = self._concrete_addr(addr, "Cannot map a region for a symbolic address")
         return super().map_region(addr, length, permissions, **kwargs)
 
     def unmap_region(self, addr, length, **kwargs):
-        if type(addr) is int:
-            pass
-        elif getattr(addr, "op", None) == "BVV":
-            addr = addr.args[0]
-        else:
-            raise SimMemoryAddressError("Cannot unmap a region for a symbolic address")
+        addr = self._concrete_addr(addr, "Cannot unmap a region for a symbolic address")
         return super().unmap_region(addr, length, **kwargs)
 
     def concrete_load(self, addr, size, writing=False, **kwargs):
-        if type(addr) is int:
-            pass
-        elif getattr(addr, "op", None) == "BVV":
-            addr = addr.args[0]
-        else:
-            raise SimMemoryAddressError("Cannot unmap a region for a symbolic address")
+        addr = self._concrete_addr(addr, "Cannot unmap a region for a symbolic address")
         return super().concrete_load(addr, size, writing=writing, **kwargs)

@@ -78,15 +78,16 @@ def op_concretize(op):
         #    18 | PUT(cc_dep1) = t24
         #    19 | PUT(cc_dep2) = t25
         #    20 | PUT(cc_ndep) = 0x0000000000000000
-        if op.args[0].op == "BVV":
-            return op.args[0].args[0]
-        if op.args[1].op == "BVV":
-            return op.args[1].args[0]
-    if op.op != "BVV":
+        if op.args[0].concrete_value is not None:
+            return op.args[0].concrete_value
+        if op.args[1].concrete_value is not None:
+            return op.args[1].concrete_value
+    value = op.concrete_value
+    if value is None:
         raise SimError(
             f"Hit a symbolic conditional operation (need If or BVV, got {op.op}). " + "Something has gone wildly wrong."
         )
-    return op.args[0]
+    return value
 
 
 def strip_simaction(val):
@@ -1027,11 +1028,9 @@ def pc_calculate_rdata_c(state, cc_op, cc_dep1, cc_dep2, cc_ndep, platform: Plat
 def generic_rotate_with_carry(state, left, arg, rot_amt, carry_bit_in, sz):
     # returns cf, of, result
     # make sure sz is not symbolic
-    if sz.op != "BVV":
+    sz = sz.concrete_value
+    if sz is None:
         raise SimError('Hit a symbolic "sz" in an x86 rotate with carry instruction. Panic.')
-
-    # convert sz to concrete value
-    sz = sz.args[0]
     bits = sz * 8
     bits_in = len(arg)
 
@@ -1277,8 +1276,8 @@ def x86g_create_fpucw(state, fpround):
 
 def x86g_calculate_daa_das_aaa_aas(state, flags_and_AX, opcode):
     assert len(flags_and_AX) == 32
-    assert opcode.op == "BVV"
-    opcode = opcode.args[0]
+    opcode = opcode.concrete_value
+    assert opcode is not None
 
     r_O = flags_and_AX[data["X86"]["CondBitOffsets"]["G_CC_SHIFT_O"] + 16].zero_extend(31)
     r_S = flags_and_AX[data["X86"]["CondBitOffsets"]["G_CC_SHIFT_S"] + 16].zero_extend(31)
@@ -1362,8 +1361,8 @@ def x86g_calculate_daa_das_aaa_aas(state, flags_and_AX, opcode):
 
 def x86g_calculate_aad_aam(state, flags_and_AX, opcode):
     assert len(flags_and_AX) == 32
-    assert opcode.op == "BVV"
-    opcode = opcode.args[0]
+    opcode = opcode.concrete_value
+    assert opcode is not None
 
     r_AL = (flags_and_AX >> 0) & 0xFF
     r_AH = (flags_and_AX >> 8) & 0xFF

@@ -115,8 +115,10 @@ def error_converter(f):
 def _concrete_bool(e):
     if isinstance(e, bool):
         return e
-    if (isinstance(e, claripy.ast.Base) and e.op == "BoolV") or (isinstance(e, SimActionObject) and e.op == "BoolV"):
-        return e.args[0]
+    if isinstance(e, SimActionObject):
+        e = e.ast
+    if isinstance(e, claripy.ast.Bool):
+        return e.concrete_value
     return None
 
 

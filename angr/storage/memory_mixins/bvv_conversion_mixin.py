@@ -43,8 +43,8 @@ class DataNormalizationMixin(MemoryMixin):
 
         if type(size) is int:
             bits = size * byte_width
-        elif getattr(size, "op", None) == "BVV":
-            bits = size.args[0] * byte_width
+        elif (concrete_size := getattr(size, "concrete_value", None)) is not None:
+            bits = concrete_size * byte_width
         else:
             bits = None
 

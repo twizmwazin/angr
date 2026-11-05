@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import cast
 
 import pyvex
 
@@ -54,8 +53,8 @@ class SimEngineXRefsVEX(SimEngineNostmtVEX[None, None, None]):  # go girl give u
         :return:        A concrete value or None if nothing concrete can be extracted.
         """
 
-        if isinstance(expr, claripy.ast.Base) and expr.op == "BVV":
-            return cast(int, expr.args[0])
+        if isinstance(expr, claripy.ast.BV):
+            return expr.concrete_value
         return None
 
     def _process_block_end(self, stmt_result, whitelist):

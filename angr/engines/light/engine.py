@@ -112,16 +112,16 @@ class SimEngineLight[StateType, DataType_co, BlockType: BlockProtocol, ResultTyp
                 if len(spoffset_expr.args) == 1:
                     # Unexpected but fine
                     return 0
-                if isinstance(spoffset_expr.args[1], claripy.ast.Base) and spoffset_expr.args[1].op == "BVV":
-                    return cast(int, spoffset_expr.args[1].args[0])
+                offset = cast(claripy.ast.BV, spoffset_expr.args[1]).concrete_value
+                if offset is not None:
+                    return offset
             elif spoffset_expr.op == "__sub__":
                 if len(spoffset_expr.args) == 1:
                     # Unexpected but fine
                     return 0
-                if isinstance(spoffset_expr.args[1], claripy.ast.Base) and spoffset_expr.args[1].op == "BVV":
-                    return -cast(int, spoffset_expr.args[1].args[0]) & (
-                        (1 << cast(claripy.ast.BV, spoffset_expr).size()) - 1
-                    )
+                offset = cast(claripy.ast.BV, spoffset_expr.args[1]).concrete_value
+                if offset is not None:
+                    return -offset & ((1 << cast(claripy.ast.BV, spoffset_expr).size()) - 1)
         return None
 
 
