@@ -209,8 +209,6 @@ pub trait AstFactory<'c>: Sized {
         self.make_ast(AstOp::Sub(vec![lhs.into_owned(), rhs.into_owned()]))
     }
 
-    /// `args[0] - args[1] - ... - args[n-1]`: the first operand is the positive
-    /// term and every later operand is subtracted from it.
     fn sub_many(
         &'c self,
         args: impl IntoIterator<Item = AstRef<'c>>,

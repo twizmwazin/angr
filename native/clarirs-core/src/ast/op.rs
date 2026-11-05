@@ -84,8 +84,6 @@ pub enum AstOp<'c> {
     Neg(AstRef<'c>),
     Xor(Vec<AstRef<'c>>),
     Add(Vec<AstRef<'c>>),
-    /// `args[0] - args[1] - ... - args[n-1]`: the first operand is the positive
-    /// term and every later operand is subtracted from it.
     Sub(Vec<AstRef<'c>>),
     Mul(Vec<AstRef<'c>>),
     UDiv(AstRef<'c>, AstRef<'c>),

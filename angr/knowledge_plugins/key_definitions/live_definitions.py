@@ -342,7 +342,6 @@ class LiveDefinitions:
                 elif len(addr.args) == 1:
                     return 0
             elif addr.op == "__sub__":
-                # __sub__ is n-ary: the first argument is the positive term and the rest are subtracted from it
                 offs = [
                     LiveDefinitions.get_stack_offset(cast(claripy.ast.BV, arg), had_stack_base=True)
                     for arg in addr.args

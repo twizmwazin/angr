@@ -46,8 +46,6 @@ class TestAddSubConstantFolding(unittest.TestCase):
 
 
 class TestNarySub(unittest.TestCase):
-    """__sub__ is n-ary: the first argument is the positive term and the rest are subtracted from it."""
-
     def test_sub_takes_many_operands(self):
         x = claripy.BVS("x", 32)
         y = claripy.BVS("y", 32)

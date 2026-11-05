@@ -568,8 +568,6 @@ pub(crate) fn simplify_bv<'c>(
             }
         }
         AstOp::Sub(_) => {
-            // Sub(p, n1, ..., nk) = p - n1 - ... - nk: the first operand is the
-            // positive term and every later operand is subtracted from it.
             let simplified = state.get_all_simplified()?;
             let size = simplified[0].size();
 
