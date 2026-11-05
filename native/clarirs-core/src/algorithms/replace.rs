@@ -1,6 +1,5 @@
 #![allow(clippy::mutable_key_type)]
 
-use std::cell::OnceCell;
 use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::iter;
@@ -24,27 +23,103 @@ fn commutative_operands<'a, 'c>(op: &'a AstOp<'c>) -> Option<&'a [AstRef<'c>]> {
     }
 }
 
+/// A set of `from → to` substitutions for [`AstNode::replace_many`].
+///
+/// Besides whole-node matches, an entry whose `from` is an associative and
+/// commutative op (see [`commutative_operands`]) also matches a subset of
+/// the operands of a larger node of the same op, in any order:
+/// `(a + b + c).replace(a + c, d)` gives `b + d`. Those entries are indexed
+/// on insertion, so a set built once can be applied to many expressions.
+#[derive(Clone, Debug, Default)]
+pub struct Replacements<'c> {
+    by_from: HashMap<AstRef<'c>, AstRef<'c>>,
+    /// The entries whose `from` is a commutative op, most operands first so
+    /// that the most specific one wins, then by hash for determinism.
+    patterns: Vec<(AstRef<'c>, AstRef<'c>)>,
+}
+
+impl<'c> Replacements<'c> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Adds `from → to`, replacing any entry for the same `from`.
+    pub fn insert(&mut self, from: AstRef<'c>, to: AstRef<'c>) {
+        self.patterns.retain(|(f, _)| *f != from);
+        if commutative_operands(from.op()).is_some_and(|v| !v.is_empty()) {
+            let key = |f: &AstRef<'c>| (Reverse(f.op().num_children()), f.hash());
+            let at = self.patterns.partition_point(|(f, _)| key(f) < key(&from));
+            self.patterns.insert(at, (from.clone(), to.clone()));
+        }
+        self.by_from.insert(from, to);
+    }
+
+    /// Removes the entry for `from`, returning its `to`.
+    pub fn remove(&mut self, from: &AstRef<'c>) -> Option<AstRef<'c>> {
+        self.patterns.retain(|(f, _)| f != from);
+        self.by_from.remove(from)
+    }
+
+    /// Keeps only the entries for which `keep(from, to)` holds.
+    pub fn retain(&mut self, mut keep: impl FnMut(&AstRef<'c>, &AstRef<'c>) -> bool) {
+        self.patterns.retain(|(f, t)| keep(f, t));
+        self.by_from.retain(|f, t| keep(f, t));
+    }
+
+    pub fn clear(&mut self) {
+        self.patterns.clear();
+        self.by_from.clear();
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.by_from.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.by_from.len()
+    }
+
+    /// The `to` of the entry for `from`.
+    pub fn get(&self, from: &AstRef<'c>) -> Option<&AstRef<'c>> {
+        self.by_from.get(from)
+    }
+
+    /// Every `(from, to)`, in no particular order.
+    pub fn iter(&self) -> impl Iterator<Item = (&AstRef<'c>, &AstRef<'c>)> {
+        self.by_from.iter()
+    }
+}
+
+impl<'c> FromIterator<(AstRef<'c>, AstRef<'c>)> for Replacements<'c> {
+    fn from_iter<I: IntoIterator<Item = (AstRef<'c>, AstRef<'c>)>>(iter: I) -> Self {
+        let mut replacements = Self::new();
+        replacements.extend(iter);
+        replacements
+    }
+}
+
+impl<'c> Extend<(AstRef<'c>, AstRef<'c>)> for Replacements<'c> {
+    fn extend<I: IntoIterator<Item = (AstRef<'c>, AstRef<'c>)>>(&mut self, iter: I) {
+        for (from, to) in iter {
+            self.insert(from, to);
+        }
+    }
+}
+
 /// Rebuilds `node` from its replaced `children`, first substituting every
 /// `(from, to)` in `patterns` whose `from` is the same commutative op as
 /// `node` and whose operands are all among `node`'s original operands, as
 /// often as they are. The `to`s follow the unmatched operands (which keep
 /// their replaced forms), and a lone operand is returned bare.
-fn substitute_operands<'c, 'p>(
+fn substitute_operands<'c>(
     ctx: &'c Context<'c>,
     node: &AstRef<'c>,
     children: &[AstRef<'c>],
-    patterns: impl FnOnce() -> &'p [(&'p AstRef<'c>, &'p AstRef<'c>)],
-) -> Result<AstRef<'c>, ClarirsError>
-where
-    'c: 'p,
-{
-    let Some(operands) = commutative_operands(node.op()) else {
+    patterns: &[(AstRef<'c>, AstRef<'c>)],
+) -> Result<AstRef<'c>, ClarirsError> {
+    let Some(operands) = commutative_operands(node.op()).filter(|_| !patterns.is_empty()) else {
         return ctx.make_ast(node.op().with_children(children));
     };
-    let patterns = patterns();
-    if patterns.is_empty() {
-        return ctx.make_ast(node.op().with_children(children));
-    }
     // The multiset of `asts`, as hash → number of occurrences.
     let multiset = |asts: &[AstRef<'c>]| {
         asts.iter().fold(HashMap::new(), |mut counts, ast| {
@@ -73,7 +148,7 @@ where
                 for (hash, n) in &needed {
                     unmatched.entry(*hash).and_modify(|left| *left -= times * n);
                 }
-                substituted.extend(iter::repeat_n((*to).clone(), times));
+                substituted.extend(iter::repeat_n(to.clone(), times));
                 Ok((unmatched, substituted))
             },
         )?;
@@ -114,7 +189,7 @@ impl<'c> AstNode<'c> {
     ) -> Result<AstRef<'c>, ClarirsError> {
         let from = from.clone().into();
         let to = to.clone().into();
-        self.replace_many(&HashMap::from([(from, to)]))
+        self.replace_many(&Replacements::from_iter([(from, to)]))
     }
 
     /// Applies every `from → to` in `replacements` in a single pass. Each
@@ -126,31 +201,11 @@ impl<'c> AstNode<'c> {
     /// [`ClarirsError::TypeError`].
     pub fn replace_many(
         self: &Arc<Self>,
-        replacements: &HashMap<AstRef<'c>, AstRef<'c>>,
+        replacements: &Replacements<'c>,
     ) -> Result<AstRef<'c>, ClarirsError> {
         if replacements.is_empty() {
             return Ok(self.clone());
         }
-
-        // Operand-subset patterns, most operands first so that the most
-        // specific one wins, then by hash for determinism. Collected once the
-        // walk reaches a commutative node, as replacements are mostly leaves.
-        let patterns = OnceCell::new();
-        let patterns = || {
-            patterns
-                .get_or_init(|| {
-                    let mut patterns: Vec<_> = replacements
-                        .iter()
-                        .filter(|(from, _)| {
-                            commutative_operands(from.op()).is_some_and(|v| !v.is_empty())
-                        })
-                        .collect();
-                    patterns
-                        .sort_by_key(|(from, _)| (Reverse(from.op().num_children()), from.hash()));
-                    patterns
-                })
-                .as_slice()
-        };
 
         let ctx = self.context();
         walk(
@@ -162,7 +217,7 @@ impl<'c> AstNode<'c> {
                 ),
                 replacement => Ok(replacement.cloned()),
             },
-            |node, children| substitute_operands(ctx, &node, children, patterns),
+            |node, children| substitute_operands(ctx, &node, children, &replacements.patterns),
             &GenericCache::default(),
         )
     }
@@ -205,7 +260,7 @@ mod tests {
                 Err(ClarirsError::TypeError(_))
             ));
             assert!(matches!(
-                expr.replace_many(&HashMap::from([(a.clone(), wrong.clone())])),
+                expr.replace_many(&Replacements::from_iter([(a.clone(), wrong.clone())])),
                 Err(ClarirsError::TypeError(_))
             ));
             assert!(matches!(
@@ -259,7 +314,8 @@ mod tests {
         );
         // Matches inside other ops; the unmatched operands still get their
         // own replacements, a matched operand is taken as it was.
-        let replacements = HashMap::from([(from.clone(), d.clone()), (b.clone(), e.clone())]);
+        let replacements =
+            Replacements::from_iter([(from.clone(), d.clone()), (b.clone(), e.clone())]);
         let expr = ctx.mul(
             ctx.add_many([a.clone(), ctx.neg(&from)?, c.clone()])?,
             ctx.add_many([b.clone(), abc.clone()])?,
@@ -269,7 +325,8 @@ mod tests {
             ctx.mul(ctx.add(ctx.neg(&d)?, &d)?, ctx.add(&e, ctx.add(&e, &d)?)?)?
         );
         // The pattern with more operands takes precedence.
-        let replacements = HashMap::from([(from.clone(), d.clone()), (abc.clone(), e.clone())]);
+        let replacements =
+            Replacements::from_iter([(from.clone(), d.clone()), (abc.clone(), e.clone())]);
         assert_eq!(
             ctx.add_many([a.clone(), b.clone(), c.clone(), c.clone()])?
                 .replace_many(&replacements)?,

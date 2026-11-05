@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 
 use clarirs_core::algorithms::{
     canonicalize::compare_names, collect_vars::collect_vars, structurally_match,
@@ -259,7 +259,7 @@ impl Base {
         });
 
         let ctx = self.inner.context();
-        let mut replacements: HashMap<AstRef<'static>, AstRef<'static>> = HashMap::new();
+        let mut replacements = Replacements::new();
         for (_, var) in sorted_vars {
             let key = var.hash();
             let canonical_ast = match dict.get_item(key)? {

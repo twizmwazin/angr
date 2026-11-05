@@ -1,3 +1,4 @@
+pub use crate::algorithms::replace::Replacements;
 pub use crate::ast::node::IntoOwned;
 pub use crate::ast::op::{AstOp, AstType};
 pub use crate::ast::{Annotation, AnnotationType, AstFactory, AstNode, AstRef};

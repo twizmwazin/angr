@@ -135,7 +135,11 @@ pub fn canonicalize<'c>(
         }
     }
 
-    let result = ast.replace_many(&replacement_map)?;
+    let replacements: Replacements<'c> = replacement_map
+        .iter()
+        .map(|(var, canonical)| (var.clone(), canonical.clone()))
+        .collect();
+    let result = ast.replace_many(&replacements)?;
 
     let counter = var_mapping.len();
 
