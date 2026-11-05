@@ -118,9 +118,9 @@ class SimEngineLight[StateType, DataType_co, BlockType: BlockProtocol, ResultTyp
                 if len(spoffset_expr.args) == 1:
                     # Unexpected but fine
                     return 0
-                subtracted = spoffset_expr.args[1:]
+                subtracted = cast(tuple[claripy.ast.BV, ...], spoffset_expr.args[1:])
                 if all(isinstance(arg, claripy.ast.Base) and arg.op == "BVV" for arg in subtracted):
-                    return -sum(cast(int, arg.args[0]) for arg in subtracted) & (
+                    return -sum(cast(int, arg.concrete_value) for arg in subtracted) & (
                         (1 << cast(claripy.ast.BV, spoffset_expr).size()) - 1
                     )
         return None
