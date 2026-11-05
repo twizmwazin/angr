@@ -24,13 +24,10 @@ pub struct ReplacementSolver<'c, S: Solver<'c>> {
     /// solver from `constraints()` must not pick up values substituted by the
     /// replacements.
     original_constraints: Vec<AstRef<'c>>,
-    /// The canonical set of replacements (AST → replacement AST).
+    /// The replacements (AST → replacement AST).
     replacements: HashMap<AstRef<'c>, AstRef<'c>>,
-    /// Cache that includes derived replacements from sub-expression traversal.
-    replacement_cache: HashMap<AstRef<'c>, AstRef<'c>>,
     /// Whether to automatically extract replacements from `x == <concrete>` constraints.
     auto_replace: bool,
-    _marker: std::marker::PhantomData<&'c ()>,
 }
 
 impl<'c, S: Solver<'c>> ReplacementSolver<'c, S> {
@@ -43,9 +40,7 @@ impl<'c, S: Solver<'c>> ReplacementSolver<'c, S> {
             inner,
             original_constraints: Vec::new(),
             replacements: HashMap::new(),
-            replacement_cache: HashMap::new(),
             auto_replace,
-            _marker: std::marker::PhantomData,
         }
     }
 
@@ -66,22 +61,18 @@ impl<'c, S: Solver<'c>> ReplacementSolver<'c, S> {
     /// Add an explicit replacement mapping: occurrences of `old` will be
     /// replaced with `new` in all future queries.
     pub fn add_replacement(&mut self, old: AstRef<'c>, new: AstRef<'c>) {
-        self.replacements.insert(old.clone(), new.clone());
-        self.replacement_cache.insert(old, new);
+        self.replacements.insert(old, new);
     }
 
     /// Remove specific replacements by their hashes.
     pub fn remove_replacements(&mut self, hashes: &[u64]) {
         self.replacements
             .retain(|old, _| !hashes.contains(&old.hash()));
-        // Rebuild cache from canonical replacements
-        self.replacement_cache = self.replacements.clone();
     }
 
     /// Clear all replacements.
     pub fn clear_replacements(&mut self) {
         self.replacements.clear();
-        self.replacement_cache.clear();
     }
 
     /// Get the current replacement map (AST → AstRef).
@@ -91,7 +82,7 @@ impl<'c, S: Solver<'c>> ReplacementSolver<'c, S> {
 
     /// Apply known replacements to an AstRef.
     fn apply_replacements(&self, ast: &AstRef<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        ast.replace_many(&self.replacement_cache)
+        ast.replace_many(&self.replacements)
     }
 
     /// Try to extract a replacement from an equality constraint like `sym == concrete`.
