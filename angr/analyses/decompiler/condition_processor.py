@@ -74,25 +74,18 @@ def _op_with_unified_size(op, conv: Callable, operand0, operand1, ins_addr: int,
     return op(conv(operand0, nobool=True, ins_addr=ins_addr), conv(operand1, nobool=True, ins_addr=ins_addr))
 
 
-def _symbol_name(symbol: claripy.ast.Base) -> str:
-    """The name of a `BVS`/`BoolS` that keys the condition mapping."""
-    name = symbol.name
-    assert name is not None, f"expected a symbolic leaf, got {symbol.op}"
-    return name
-
-
 def _dummy_bvs(condition, condition_mapping, name_suffix="", must_bool=False):
     if must_bool:
         var = claripy.BoolS(f"ailexpr_{condition!r}{name_suffix}", explicit_name=True)
     else:
         var = claripy.BVS(f"ailexpr_{condition!r}{name_suffix}", condition.bits, explicit_name=True)
-    condition_mapping[_symbol_name(var)] = condition
+    condition_mapping[var.name] = condition
     return var
 
 
 def _dummy_bools(condition, condition_mapping, name_suffix=""):
     var = claripy.BoolS(f"ailexpr_{condition!r}{name_suffix}", explicit_name=True)
-    condition_mapping[_symbol_name(var)] = condition
+    condition_mapping[var.name] = condition
     return var
 
 
@@ -244,7 +237,8 @@ class ConditionProcessor:
     def __init__(self, arch, ail_manager: Manager, condition_mapping=None):
         self.arch = arch
         self.ail_manager = ail_manager
-        self._condition_mapping: dict[str, Any] = {} if condition_mapping is None else condition_mapping
+        # keyed by the name of the BVS/BoolS standing in for an AIL expression
+        self._condition_mapping: dict[str | None, Any] = {} if condition_mapping is None else condition_mapping
         self.jump_table_conds: dict[int, set] = defaultdict(set)
         self.reaching_conditions = {}
         self.guarding_conditions = {}
@@ -1036,12 +1030,12 @@ class ConditionProcessor:
                     var = claripy.BVS(
                         f"ailexpr_{condition!r}-{condition.idx}-{ins_addr:x}", condition.bits, explicit_name=True
                     )
-            self._condition_mapping[_symbol_name(var)] = condition
+            self._condition_mapping[var.name] = condition
             return var
         if isinstance(condition, ailment.expression.Extract):
             var_ = self.claripy_ast_from_ail_condition(condition.base, ins_addr=ins_addr)
             offset_expr = (
-                _symbol_name(self.claripy_ast_from_ail_condition(condition.offset, ins_addr=ins_addr))
+                self.claripy_ast_from_ail_condition(condition.offset, ins_addr=ins_addr).name
                 if not isinstance(condition.offset, ailment.expression.Const)
                 else condition.offset.value
             )
@@ -1050,20 +1044,20 @@ class ConditionProcessor:
                 condition.bits,
                 explicit_name=True,
             )
-            self._condition_mapping[_symbol_name(var)] = condition
+            self._condition_mapping[var.name] = condition
             return var
         if isinstance(condition, ailment.expression.Insert):
             var_ = self.claripy_ast_from_ail_condition(condition.base, ins_addr=ins_addr)
             value = self.claripy_ast_from_ail_condition(condition.value, ins_addr=ins_addr)
             offset_expr = (
-                _symbol_name(self.claripy_ast_from_ail_condition(condition.offset, ins_addr=ins_addr))
+                self.claripy_ast_from_ail_condition(condition.offset, ins_addr=ins_addr).name
                 if not isinstance(condition.offset, ailment.expression.Const)
                 else condition.offset.value
             )
             var = claripy.BVS(
                 f"ailexpr_Insert({offset_expr}, {value.hash()}, {var_.hash()})", condition.bits, explicit_name=True
             )
-            self._condition_mapping[_symbol_name(var)] = condition
+            self._condition_mapping[var.name] = condition
             return var
         if isinstance(condition, ailment.Expr.Convert):
             # convert is special. if it generates a 1-bit variable, it should be treated as a BoolS
@@ -1075,7 +1069,7 @@ class ConditionProcessor:
                 var_ = self.claripy_ast_from_ail_condition(condition.operands[0], ins_addr=ins_addr)
                 name = f"ailexpr_Conv({condition.from_bits}->{condition.to_bits}, {var_.hash()})"
                 var = claripy.BVS(name, condition.to_bits, explicit_name=True)
-            self._condition_mapping[_symbol_name(var)] = condition
+            self._condition_mapping[var.name] = condition
             return var
         if isinstance(condition, ailment.Expr.Const):
             val = condition.value
@@ -1101,7 +1095,7 @@ class ConditionProcessor:
                 var = claripy.BoolS(f"ailtmp_{condition.tmp_idx}", explicit_name=True)
             else:
                 var = claripy.BVS(f"ailtmp_{condition.tmp_idx}", condition.bits, explicit_name=True)
-            self._condition_mapping[_symbol_name(var)] = condition
+            self._condition_mapping[var.name] = condition
             return var
         if isinstance(condition, ailment.Expr.MultiStatementExpression):
             # just cache it
@@ -1109,7 +1103,7 @@ class ConditionProcessor:
                 var = claripy.BoolS(f"mstmtexpr_{hash(condition)}", explicit_name=True)
             else:
                 var = claripy.BVS(f"mstmtexpr_{hash(condition)}", condition.bits, explicit_name=True)
-            self._condition_mapping[_symbol_name(var)] = condition
+            self._condition_mapping[var.name] = condition
             return var
 
         if not isinstance(
@@ -1121,7 +1115,7 @@ class ConditionProcessor:
                 var = claripy.BoolS(f"ailexpr_opaque_{hash(condition)}", explicit_name=True)
             else:
                 var = claripy.BVS(f"ailexpr_opaque_{hash(condition)}", condition.bits, explicit_name=True)
-            self._condition_mapping[_symbol_name(var)] = condition
+            self._condition_mapping[var.name] = condition
             return var
         lambda_expr = _ail2claripy_op_mapping.get(condition.verbose_op)
         if lambda_expr is None:
@@ -1146,14 +1140,14 @@ class ConditionProcessor:
 
         if isinstance(r, claripy.ast.Bool) and nobool:
             r = claripy.BVS(f"ailexpr_from_bool_{r!r}", 1, explicit_name=True)
-            self._condition_mapping[_symbol_name(r)] = condition
+            self._condition_mapping[r.name] = condition
 
         if r is NotImplemented:
             if condition.bits == 1 and not nobool:
                 r = claripy.BoolS(f"ailexpr_{condition!r}", explicit_name=True)
             else:
                 r = claripy.BVS(f"ailexpr_{condition!r}", condition.bits, explicit_name=True)
-            self._condition_mapping[_symbol_name(r)] = condition
+            self._condition_mapping[r.name] = condition
         # don't lose tags, nor the floating-point flag of an FP comparison (claripy folds !(a == b) into a != b,
         # so the negation of an FP comparison annotates that comparison)
         tags = condition.tags
@@ -1171,7 +1165,7 @@ class ConditionProcessor:
             else:
                 # r.op == "BVS"
                 r = claripy.BoolS(f"bool_from_bv1_{r.name}", explicit_name=True)
-                self._condition_mapping[_symbol_name(r)] = condition
+                self._condition_mapping[r.name] = condition
         return r
 
     #
