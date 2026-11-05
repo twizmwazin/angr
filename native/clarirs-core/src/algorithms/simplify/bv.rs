@@ -575,63 +575,20 @@ pub(crate) fn simplify_bv<'c>(
             let mut negatives: Vec<AstRef<'c>> = Vec::new();
             let mut neg_const: Option<BitVec> = None;
 
-            fn subtract<'c>(
-                arg: &AstRef<'c>,
-                negatives: &mut Vec<AstRef<'c>>,
-                neg_const: &mut Option<BitVec>,
-            ) -> Result<(), SimplifyError<'c>> {
-                match arg.op() {
-                    AstOp::BVV(v) if v.is_zero() => {}
-                    AstOp::BVV(v) => {
-                        *neg_const = Some(match neg_const.take() {
-                            Some(acc) => (acc + v.clone())?,
-                            None => v.clone(),
-                        });
-                    }
-                    // p - (a + b) => p - a - b
-                    AstOp::Add(inner) => {
-                        for a in inner {
-                            subtract(a, negatives, neg_const)?;
-                        }
-                    }
-                    _ => negatives.push(arg.clone()),
-                }
-                Ok(())
-            }
-
-            // Split a positive operand into its symbolic terms and its constant.
-            fn split_positive<'c>(arg: &AstRef<'c>) -> (Vec<AstRef<'c>>, Option<BitVec>) {
-                match arg.op() {
-                    AstOp::BVV(v) => (Vec::new(), Some(v.clone())),
-                    AstOp::Add(add_args) => {
-                        let mut terms = Vec::with_capacity(add_args.len());
-                        let mut constant = None;
-                        for a in add_args {
-                            match a.op() {
-                                AstOp::BVV(v) if constant.is_none() => constant = Some(v.clone()),
-                                _ => terms.push(a.clone()),
-                            }
-                        }
-                        (terms, constant)
-                    }
-                    _ => (vec![arg.clone()], None),
-                }
-            }
-
             // The symbolic positive terms, and a constant that lives on the
             // positive side (a bare BVV, or one carried by a positive Add).
             let (mut pos_terms, mut pos_const) = match simplified[0].op() {
                 // (a - b) - c => a - b - c
                 AstOp::Sub(inner) => {
                     for n in &inner[1..] {
-                        subtract(n, &mut negatives, &mut neg_const)?;
+                        sub_subtract(n, &mut negatives, &mut neg_const)?;
                     }
-                    split_positive(&inner[0])
+                    sub_split_positive(&inner[0])
                 }
-                _ => split_positive(&simplified[0]),
+                _ => sub_split_positive(&simplified[0]),
             };
             for arg in &simplified[1..] {
-                subtract(arg, &mut negatives, &mut neg_const)?;
+                sub_subtract(arg, &mut negatives, &mut neg_const)?;
             }
 
             // A term that is both added and subtracted cancels out:
@@ -1589,5 +1546,52 @@ pub(crate) fn simplify_bv<'c>(
             Ok(ctx.widen(lhs, rhs)?)
         }
         _ => unreachable!("non-bitvector op dispatched to simplify_bv"),
+    }
+}
+
+/// Records one subtracted operand of a `Sub`: constants accumulate into
+/// `neg_const`, a sum spreads over its terms (`p - (a + b) => p - a - b`), and
+/// anything else is kept as a symbolic subtracted term.
+fn sub_subtract<'c>(
+    arg: &AstRef<'c>,
+    negatives: &mut Vec<AstRef<'c>>,
+    neg_const: &mut Option<BitVec>,
+) -> Result<(), SimplifyError<'c>> {
+    let terms = match arg.op() {
+        AstOp::Add(inner) => inner.as_slice(),
+        _ => std::slice::from_ref(arg),
+    };
+    for term in terms {
+        match term.op() {
+            AstOp::BVV(v) if v.is_zero() => {}
+            AstOp::BVV(v) => {
+                *neg_const = Some(match neg_const.take() {
+                    Some(acc) => (acc + v.clone())?,
+                    None => v.clone(),
+                });
+            }
+            _ => negatives.push(term.clone()),
+        }
+    }
+    Ok(())
+}
+
+/// Splits the positive operand of a `Sub` into its symbolic terms and the
+/// constant it carries, if any.
+fn sub_split_positive<'c>(arg: &AstRef<'c>) -> (Vec<AstRef<'c>>, Option<BitVec>) {
+    match arg.op() {
+        AstOp::BVV(v) => (Vec::new(), Some(v.clone())),
+        AstOp::Add(add_args) => {
+            let mut terms = Vec::with_capacity(add_args.len());
+            let mut constant = None;
+            for a in add_args {
+                match a.op() {
+                    AstOp::BVV(v) if constant.is_none() => constant = Some(v.clone()),
+                    _ => terms.push(a.clone()),
+                }
+            }
+            (terms, constant)
+        }
+        _ => (vec![arg.clone()], None),
     }
 }
