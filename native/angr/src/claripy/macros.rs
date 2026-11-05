@@ -7,8 +7,8 @@ macro_rules! add_pyfunctions {
     };
 }
 
-/// The per-class wrapper plumbing: a weakref cache keyed by AST hash, `new`/`new_with_name`
-/// reusing a live wrapper before building one with `$init(base, inner)`, and `Drop` eviction.
+/// The per-class wrapper plumbing: a weakref cache keyed by AST hash, `new` reusing a live
+/// wrapper before building one with `$init(base, inner)`, and `Drop` eviction.
 #[macro_export]
 macro_rules! ast_wrapper {
     ($ty:ident, $cache:ident, $init:expr) => {
@@ -17,19 +17,11 @@ macro_rules! ast_wrapper {
         > = ::std::sync::LazyLock::new(::dashmap::DashMap::new);
 
         impl $ty {
+            /// Wrap an AST without simplifying it, keeping its annotation set exactly as
+            /// given.
             pub fn new<'py>(
                 py: Python<'py>,
                 inner: &AstRef<'static>,
-            ) -> Result<Bound<'py, $ty>, ClaripyError> {
-                Self::new_with_name(py, inner, None)
-            }
-
-            /// Wrap an AST without simplifying it, keeping its annotation set exactly as
-            /// given.
-            pub fn new_with_name<'py>(
-                py: Python<'py>,
-                inner: &AstRef<'static>,
-                name: Option<String>,
             ) -> Result<Bound<'py, $ty>, ClaripyError> {
                 if let Some(cache_hit) = $cache.get(&inner.hash()).and_then(|cache_hit| {
                     cache_hit
@@ -41,7 +33,7 @@ macro_rules! ast_wrapper {
                 } else {
                     let this = Bound::new(
                         py,
-                        $init(Base::new_with_name(py, inner, name)?, inner.clone()),
+                        $init(Base::new(py, inner)?, inner.clone()),
                     )?;
                     let weakref = ::pyo3::types::PyWeakrefReference::new(&this)?;
                     $cache.insert(inner.hash(), weakref.unbind());

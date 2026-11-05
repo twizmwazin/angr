@@ -560,7 +560,7 @@ pub fn FPS<'py>(
         let counter = FPS_COUNTER.fetch_add(1, Ordering::Relaxed);
         name = format!("{name}_{counter}");
     }
-    FP::new_with_name(py, &GLOBAL_CONTEXT.fps(&name, sort)?, Some(name))
+    FP::new(py, &GLOBAL_CONTEXT.fps(&name, sort)?)
 }
 
 #[pyfunction]

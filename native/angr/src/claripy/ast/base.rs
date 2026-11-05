@@ -36,8 +36,6 @@ type Reduced<'py> = (
 #[pyclass(subclass, frozen, weakref, module = "angr.rustylib.claripy.ast.base")]
 pub struct Base {
     inner: AstRef<'static>,
-    name: Option<String>,
-    encoded_name: Option<Vec<u8>>,
     /// Python annotation objects created once at construction, in the same order as `inner.annotations()`, so reads avoid the Rust round-trip.
     annotations: Vec<Py<PyAnnotation>>,
     /// Python `args` tuple built on first access.
@@ -52,16 +50,7 @@ impl AstWrapper for Base {
 }
 
 impl Base {
-    pub fn new_with_name(
-        py: Python,
-        inner: &AstRef<'static>,
-        name: Option<String>,
-    ) -> Result<Self, ClaripyError> {
-        // A symbol's name lives in its op, so a wrapper rebuilt from the Rust side (for
-        // example a child reached through `.args`, or a cache miss after the original
-        // wrapper was collected) carries the same `.name` as the one `BVS()` returned.
-        let name = name.or_else(|| Self::symbol_name(inner));
-        let encoded_name = name.as_ref().map(|name| name.as_bytes().to_vec());
+    pub fn new(py: Python, inner: &AstRef<'static>) -> Result<Self, ClaripyError> {
         let annotations = inner
             .annotations()
             .iter()
@@ -69,21 +58,9 @@ impl Base {
             .collect::<Result<Vec<_>, _>>()?;
         Ok(Self {
             inner: inner.clone(),
-            name,
-            encoded_name,
             annotations,
             args: PyOnceLock::new(),
         })
-    }
-
-    /// The name of a symbolic leaf (`BVS`, `BoolS`, `FPS`, `StringS`), or `None` for any other op.
-    fn symbol_name(inner: &AstRef<'static>) -> Option<String> {
-        match inner.op() {
-            AstOp::BoolS(name) | AstOp::BVS(name, _) | AstOp::FPS(name, _) | AstOp::StringS(name) => {
-                Some(name.as_str().to_string())
-            }
-            _ => None,
-        }
     }
 
     /// A clone of the wrapped [`AstRef`].
@@ -114,14 +91,21 @@ impl Base {
 
 #[pymethods]
 impl Base {
+    /// The name of a symbolic leaf (`BVS`, `BoolS`, `FPS`, `StringS`), or `None` for any other op.
+    /// It is read from the op, so every wrapper of the same symbol reports it.
     #[getter]
     pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
+        match self.inner.op() {
+            AstOp::BoolS(name) | AstOp::BVS(name, _) | AstOp::FPS(name, _) | AstOp::StringS(name) => {
+                Some(name.as_str())
+            }
+            _ => None,
+        }
     }
 
     #[getter]
     pub fn _encoded_name(&self) -> Option<&[u8]> {
-        self.encoded_name.as_deref()
+        self.name().map(str::as_bytes)
     }
 
     #[getter]

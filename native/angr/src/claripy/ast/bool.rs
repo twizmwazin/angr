@@ -195,7 +195,7 @@ pub fn BoolS<'py>(
         let counter = BOOLS_COUNTER.fetch_add(1, Ordering::Relaxed);
         name = format!("{name}_{counter}");
     }
-    Bool::new_with_name(py, &GLOBAL_CONTEXT.bools(&name)?, Some(name.clone()))
+    Bool::new(py, &GLOBAL_CONTEXT.bools(&name)?)
 }
 
 #[pyfunction]

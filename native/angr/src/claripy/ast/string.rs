@@ -137,7 +137,7 @@ pub fn StringS<'py>(
         let counter = STRINGS_COUNTER.fetch_add(1, Ordering::Relaxed);
         name = format!("{name}_{counter}");
     }
-    PyAstString::new_with_name(py, &GLOBAL_CONTEXT.strings(&name)?, Some(name))
+    PyAstString::new(py, &GLOBAL_CONTEXT.strings(&name)?)
 }
 
 #[pyfunction]

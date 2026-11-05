@@ -1036,7 +1036,7 @@ pub fn BVS(
         let counter = BVS_COUNTER.fetch_add(1, Ordering::Relaxed);
         name = format!("{name}_{counter}_{size}");
     }
-    BV::new_with_name(py, &GLOBAL_CONTEXT.bvs(&name, size)?, Some(name))
+    BV::new(py, &GLOBAL_CONTEXT.bvs(&name, size)?)
 }
 
 #[pyfunction(signature = (value, size = None))]
