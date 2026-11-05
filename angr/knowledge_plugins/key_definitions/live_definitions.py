@@ -341,11 +341,15 @@ class LiveDefinitions:
                         return LiveDefinitions._as_signed_offset(off0 + off1, addr.size())
                 elif len(addr.args) == 1:
                     return 0
-            elif addr.op == "__sub__" and len(addr.args) == 2:
-                off0 = LiveDefinitions.get_stack_offset(cast(claripy.ast.BV, addr.args[0]), had_stack_base=True)
-                off1 = LiveDefinitions.get_stack_offset(cast(claripy.ast.BV, addr.args[1]), had_stack_base=True)
-                if off0 is not None and off1 is not None:
-                    return LiveDefinitions._as_signed_offset(off0 - off1, addr.size())
+            elif addr.op == "__sub__":
+                # __sub__ is n-ary: the first argument is the positive term and the rest are subtracted from it
+                offs = [
+                    LiveDefinitions.get_stack_offset(cast(claripy.ast.BV, arg), had_stack_base=True)
+                    for arg in addr.args
+                ]
+                if all(off is not None for off in offs):
+                    offs = cast(list[int], offs)
+                    return LiveDefinitions._as_signed_offset(offs[0] - sum(offs[1:]), addr.size())
         return None
 
     @staticmethod

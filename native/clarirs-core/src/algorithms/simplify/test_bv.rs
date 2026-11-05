@@ -1309,6 +1309,114 @@ fn test_extract_distributes_over_union() -> Result<()> {
 }
 
 #[test]
+fn test_nary_sub() -> Result<()> {
+    let ctx = Context::new();
+    let bvv = |v: u64| ctx.bvv(BitVec::from((v, 64)));
+    let x = ctx.bvs("x", 64)?;
+    let y = ctx.bvs("y", 64)?;
+    let z = ctx.bvs("z", 64)?;
+
+    // Concrete operands fold left to right: 100 - 30 - 20 = 50.
+    let folded = ctx.sub_many([bvv(100)?, bvv(30)?, bvv(20)?])?.simplify()?;
+    assert_eq!(folded, bvv(50)?);
+
+    // A single operand is just that operand.
+    assert_eq!(ctx.sub_many([x.clone()])?.simplify()?, x);
+
+    // Symbolic n-ary subs are already in canonical form.
+    let sub3 = ctx.sub_many([x.clone(), y.clone(), z.clone()])?;
+    assert_eq!(sub3.simplify()?, sub3);
+
+    // Nested subs flatten: (x - y) - z => x - y - z.
+    let nested = ctx.sub(ctx.sub(&x, &y)?, &z)?.simplify()?;
+    assert_eq!(nested, sub3);
+
+    // Subtracting a sum spreads over its terms: x - (y + z) => x - y - z.
+    let sub_of_add = ctx.sub(&x, ctx.add(&y, &z)?)?.simplify()?;
+    assert_eq!(sub_of_add, sub3);
+
+    // Subtracted constants merge into one trailing term: x - 3 - y - 4 => x - y - 7.
+    let consts = ctx
+        .sub_many([x.clone(), bvv(3)?, y.clone(), bvv(4)?])?
+        .simplify()?;
+    assert_eq!(consts, ctx.sub_many([x.clone(), y.clone(), bvv(7)?])?);
+
+    // A constant on the positive side absorbs the subtracted ones: (x + 10) - y - 4 => (x + 6) - y.
+    let pos_const = ctx
+        .sub_many([ctx.add(&x, bvv(10)?)?, y.clone(), bvv(4)?])?
+        .simplify()?;
+    assert_eq!(pos_const, ctx.sub(ctx.add(&x, bvv(6)?)?, &y)?);
+
+    // 10 - x - 4 => 6 - x.
+    let lead_const = ctx.sub_many([bvv(10)?, x.clone(), bvv(4)?])?.simplify()?;
+    assert_eq!(lead_const, ctx.sub(bvv(6)?, &x)?);
+
+    // Subtracting the positive term cancels it: x - y - x => 0 - y.
+    let cancel = ctx
+        .sub_many([x.clone(), y.clone(), x.clone()])?
+        .simplify()?;
+    assert_eq!(cancel, ctx.sub(bvv(0)?, &y)?);
+
+    // ... also when it is one term of a positive sum: (x + y) - x => y.
+    let cancel_sum = ctx.sub(ctx.add(&x, &y)?, &x)?.simplify()?;
+    assert_eq!(cancel_sum, y);
+
+    // A positive sum with a constant and several symbolic terms is stable.
+    let stable = ctx.sub(ctx.add_many([x.clone(), y.clone(), bvv(5)?])?, &z)?;
+    assert_eq!(stable.simplify()?, stable);
+
+    // Zeros drop out: x - 0 - y - 0 => x - y.
+    let zeros = ctx
+        .sub_many([x.clone(), bvv(0)?, y.clone(), bvv(0)?])?
+        .simplify()?;
+    assert_eq!(zeros, ctx.sub(&x, &y)?);
+
+    // Adding a constant to an n-ary sub with a leading constant: 5 + (10 - x - y) => 15 - x - y.
+    let add_lead = ctx.add(bvv(5)?, ctx.sub_many([bvv(10)?, x.clone(), y.clone()])?)?;
+    assert_eq!(
+        add_lead.simplify()?,
+        ctx.sub_many([bvv(15)?, x.clone(), y.clone()])?
+    );
+
+    // ... and with a trailing constant: 5 + (x - y - 3) => (x - y) + 2.
+    let add_trail = ctx.add(bvv(5)?, ctx.sub_many([x.clone(), y.clone(), bvv(3)?])?)?;
+    assert_eq!(add_trail.simplify()?, ctx.add(ctx.sub(&x, &y)?, bvv(2)?)?);
+
+    // Extracting the low bits distributes over every operand.
+    let low = ctx.extract(&sub3, 7, 0)?.simplify()?;
+    assert_eq!(
+        low,
+        ctx.sub_many([
+            ctx.extract(&x, 7, 0)?,
+            ctx.extract(&y, 7, 0)?,
+            ctx.extract(&z, 7, 0)?,
+        ])?
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_nary_sub_compare_to_zero() -> Result<()> {
+    let ctx = Context::new();
+    let bvv = |v: u64| ctx.bvv(BitVec::from((v, 64)));
+    let x = ctx.bvs("x", 64)?;
+    let y = ctx.bvs("y", 64)?;
+
+    // (x - y - 7) == 0  =>  (x - y) == 7
+    let eq = ctx
+        .eq_(ctx.sub_many([x.clone(), y.clone(), bvv(7)?])?, bvv(0)?)?
+        .simplify()?;
+    assert_eq!(eq, ctx.eq_(ctx.sub(&x, &y)?, bvv(7)?)?);
+
+    // (x - 7) != 0  =>  x != 7
+    let neq = ctx.neq(ctx.sub(&x, bvv(7)?)?, bvv(0)?)?.simplify()?;
+    assert_eq!(neq, ctx.neq(&x, bvv(7)?)?);
+
+    Ok(())
+}
+
+#[test]
 fn test_shared_subterms_simplify_once_per_call() -> Result<()> {
     // Each level uses the previous node twice, and rewrites push the extract
     // down through every level, so simplifying a shared subterm once per path

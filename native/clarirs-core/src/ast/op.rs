@@ -84,7 +84,9 @@ pub enum AstOp<'c> {
     Neg(AstRef<'c>),
     Xor(Vec<AstRef<'c>>),
     Add(Vec<AstRef<'c>>),
-    Sub(AstRef<'c>, AstRef<'c>),
+    /// `args[0] - args[1] - ... - args[n-1]`: the first operand is the positive
+    /// term and every later operand is subtracted from it.
+    Sub(Vec<AstRef<'c>>),
     Mul(Vec<AstRef<'c>>),
     UDiv(AstRef<'c>, AstRef<'c>),
     SDiv(AstRef<'c>, AstRef<'c>),
@@ -203,7 +205,7 @@ macro_rules! ast_op_arity {
 
 ast_op_arity! {
     leaf: [BoolS, BoolV, BVS, BVV, FPS, FPV, StringS, StringV],
-    nary: [And, Or, Xor, Add, Mul, Concat, Union, Intersection],
+    nary: [And, Or, Xor, Add, Sub, Mul, Concat, Union, Intersection],
     unary: [
         Not, Neg, ByteReverse, ZeroExt(n), SignExt(n), Extract(hi, lo), StrLen, StrToBV,
         FpToIEEEBV, FpToUBV(size, rm), FpToSBV(size, rm), FpNeg, FpAbs, FpSqrt(rm),
@@ -212,7 +214,7 @@ ast_op_arity! {
     ],
     binary: [
         Eq, Neq, ULT, ULE, UGT, UGE, SLT, SLE, SGT, SGE, FpLt, FpLeq, FpGt, FpGeq,
-        StrContains, StrPrefixOf, StrSuffixOf, Sub, UDiv, SDiv, URem, SRem, ShL, LShR, AShR,
+        StrContains, StrPrefixOf, StrSuffixOf, UDiv, SDiv, URem, SRem, ShL, LShR, AShR,
         RotateLeft, RotateRight, Widen, FpAdd(rm), FpSub(rm), FpMul(rm),
         FpDiv(rm), StrConcat,
     ],
@@ -314,11 +316,12 @@ impl<'c> AstOp<'c> {
             // Bitvectors
             AstOp::BVS(_, width) => AstType::BitVec(*width),
             AstOp::BVV(bv) => AstType::BitVec(bv.len()),
-            AstOp::Add(v) | AstOp::Mul(v) | AstOp::Union(v) | AstOp::Intersection(v) => {
-                AstType::BitVec(v.first().map(|a| a.size()).unwrap_or(0))
-            }
+            AstOp::Add(v)
+            | AstOp::Sub(v)
+            | AstOp::Mul(v)
+            | AstOp::Union(v)
+            | AstOp::Intersection(v) => AstType::BitVec(v.first().map(|a| a.size()).unwrap_or(0)),
             AstOp::Neg(a)
-            | AstOp::Sub(a, _)
             | AstOp::UDiv(a, _)
             | AstOp::SDiv(a, _)
             | AstOp::URem(a, _)
@@ -509,7 +512,11 @@ impl<'c> AstOp<'c> {
             ),
 
             // N-ary bitvector arithmetic and VSA set operations (same width)
-            AstOp::Add(v) | AstOp::Mul(v) | AstOp::Union(v) | AstOp::Intersection(v) => {
+            AstOp::Add(v)
+            | AstOp::Sub(v)
+            | AstOp::Mul(v)
+            | AstOp::Union(v)
+            | AstOp::Intersection(v) => {
                 let first = nonempty(v)?;
                 require(
                     first.ast_type().is_bitvec()
@@ -519,8 +526,7 @@ impl<'c> AstOp<'c> {
             }
 
             // Binary bitvector operations (same width)
-            AstOp::Sub(a, b)
-            | AstOp::UDiv(a, b)
+            AstOp::UDiv(a, b)
             | AstOp::SDiv(a, b)
             | AstOp::URem(a, b)
             | AstOp::SRem(a, b)

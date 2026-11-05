@@ -409,11 +409,17 @@ pub(crate) fn simplify_bool<'c>(
                         )?)
                     }
 
-                    // (x - C) == 0  ==>  x == C
-                    (AstOp::Sub(lhs_sub, rhs_sub), AstOp::BVV(val))
-                        if val.is_zero() && matches!(rhs_sub.op(), AstOp::BVV(..)) =>
+                    // (x - ... - C) == 0  ==>  (x - ...) == C
+                    (AstOp::Sub(sub_args), AstOp::BVV(val))
+                        if val.is_zero()
+                            && matches!(sub_args[sub_args.len() - 1].op(), AstOp::BVV(..)) =>
                     {
-                        state.rerun(ctx.eq_(lhs_sub.clone(), rhs_sub.clone())?)
+                        let (c, rest) = sub_args.split_last().unwrap();
+                        let lhs = match rest {
+                            [only] => only.clone(),
+                            _ => ctx.sub_many(rest.to_vec())?,
+                        };
+                        state.rerun(ctx.eq_(lhs, c.clone())?)
                     }
 
                     // (sum + C) == 0  ==>  sum == -C
@@ -588,11 +594,17 @@ pub(crate) fn simplify_bool<'c>(
                         )?)
                     }
 
-                    // (x - C) != 0  ==>  x != C
-                    (AstOp::Sub(lhs_sub, rhs_sub), AstOp::BVV(val))
-                        if val.is_zero() && matches!(rhs_sub.op(), AstOp::BVV(..)) =>
+                    // (x - ... - C) != 0  ==>  (x - ...) != C
+                    (AstOp::Sub(sub_args), AstOp::BVV(val))
+                        if val.is_zero()
+                            && matches!(sub_args[sub_args.len() - 1].op(), AstOp::BVV(..)) =>
                     {
-                        state.rerun(ctx.neq(lhs_sub.clone(), rhs_sub.clone())?)
+                        let (c, rest) = sub_args.split_last().unwrap();
+                        let lhs = match rest {
+                            [only] => only.clone(),
+                            _ => ctx.sub_many(rest.to_vec())?,
+                        };
+                        state.rerun(ctx.neq(lhs, c.clone())?)
                     }
 
                     // (sum + C) != 0  ==>  sum != -C
@@ -932,8 +944,9 @@ fn simplify_unsigned_cmp<'c>(
         },
         // CMP(Sub(ZeroExt(n, inner), BVV(k)), BVV(c)) where k and c fit in inner's size
         // => CMP(Sub(inner, extract(k)), extract(c))
-        AstOp::Sub(lhs_sub, rhs_sub) => {
-            if let AstOp::ZeroExt(inner, ext_size) = lhs_sub.op()
+        AstOp::Sub(sub_args) => {
+            if let [lhs_sub, rhs_sub] = sub_args.as_slice()
+                && let AstOp::ZeroExt(inner, ext_size) = lhs_sub.op()
                 && let AstOp::BVV(k) = rhs_sub.op()
                 && c.leading_zeros() as u32 >= *ext_size
                 && k.leading_zeros() as u32 >= *ext_size

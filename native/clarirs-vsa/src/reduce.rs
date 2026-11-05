@@ -77,6 +77,12 @@ mod tests {
         let sum = ctx.add_many([bv(1)?, bv(2)?, bv(3)?])?;
         assert_eq!(sum.reduce()?.into_bv()?, StridedInterval::constant(8, 6u8));
 
+        let difference = ctx.sub_many([bv(10)?, bv(2)?, bv(3)?])?;
+        assert_eq!(
+            difference.reduce()?.into_bv()?,
+            StridedInterval::constant(8, 5u8)
+        );
+
         let product = ctx.mul_many([bv(2)?, bv(3)?, bv(4)?])?;
         assert_eq!(
             product.reduce()?.into_bv()?,

@@ -142,6 +142,24 @@ mod to_z3 {
     }
 
     #[test]
+    fn sub_nary() {
+        // x - y - z lowers to the left-nested (x - y) - z.
+        let ctx = Context::new();
+        let x = ctx.bvs("x", 8).unwrap();
+        let y = ctx.bvs("y", 8).unwrap();
+        let z = ctx.bvs("z", 8).unwrap();
+        let ast = ctx.sub_many([x, y, z]).unwrap();
+        let z3_ast = ast.to_z3().unwrap();
+
+        assert_eq!(z3_ast.decl_kind(), DeclKind::Bsub);
+        let inner = z3_ast.arg(0).unwrap();
+        assert_eq!(inner.decl_kind(), DeclKind::Bsub);
+        assert_eq!(inner.arg(0).unwrap().symbol_name().as_deref(), Some("x"));
+        assert_eq!(inner.arg(1).unwrap().symbol_name().as_deref(), Some("y"));
+        assert_eq!(z3_ast.arg(1).unwrap().symbol_name().as_deref(), Some("z"));
+    }
+
+    #[test]
     fn mul() {
         let ctx = Context::new();
         let x = ctx.bvs("x", 8).unwrap();

@@ -43,3 +43,59 @@ class TestAddSubConstantFolding(unittest.TestCase):
             s = claripy.Solver()
             s.add(x == 4)
             self.assertEqual(list(s.eval(expr, 1)), [9])
+
+
+class TestNarySub(unittest.TestCase):
+    """__sub__ is n-ary: the first argument is the positive term and the rest are subtracted from it."""
+
+    def test_sub_takes_many_operands(self):
+        x = claripy.BVS("x", 32)
+        y = claripy.BVS("y", 32)
+        z = claripy.BVS("z", 32)
+        expr = claripy.Sub(x, y, z)
+        self.assertEqual(expr.op, "__sub__")
+        self.assertEqual(expr.args, (x, y, z))
+        self.assertEqual(repr(expr), f"<BV32 {x.args[0]} - {y.args[0]} - {z.args[0]}>")
+
+        s = claripy.Solver()
+        s.add(claripy.And(x == 10, y == 3, z == 4))
+        self.assertEqual(list(s.eval(expr, 1)), [3])
+
+    def test_nested_sub_flattens(self):
+        x = claripy.BVS("x", 32)
+        y = claripy.BVS("y", 32)
+        z = claripy.BVS("z", 32)
+        self.assertIs((x - y) - z, claripy.Sub(x, y, z))
+        # x - (y + z) spreads over the sum
+        self.assertIs(x - (y + z), claripy.Sub(x, y, z))
+        # the right-hand side of a subtraction is not flattened: x - (y - z) == x - y + z
+        expr = x - (y - z)
+        self.assertEqual(expr.args, (x, y - z))
+
+    def test_subtracted_constants_fold_into_one_trailing_term(self):
+        x = claripy.BVS("x", 32)
+        y = claripy.BVS("y", 32)
+        expr = x - 3 - y - 4
+        self.assertEqual(expr.op, "__sub__")
+        self.assertEqual(expr.args[:2], (x, y))
+        self.assertEqual(expr.args[2].concrete_value, 7)
+
+        # a constant on the positive side absorbs the subtracted ones
+        expr = (x + 10) - y - 4
+        self.assertEqual(expr.op, "__sub__")
+        self.assertEqual(len(expr.args), 2)
+        self.assertEqual(expr.args[0].op, "__add__")
+        self.assertEqual(expr.args[0].args[1].concrete_value, 6)
+        self.assertIs(expr.args[1], y)
+
+    def test_concrete_sub_folds(self):
+        self.assertEqual(claripy.Sub(claripy.BVV(100, 32), 30, 20).concrete_value, 50)
+        self.assertEqual(claripy.Sub(claripy.BVV(0, 32), 1, 1).concrete_value, 0xFFFFFFFE)
+
+    def test_sub_round_trips_through_z3(self):
+        x = claripy.BVS("x", 32)
+        y = claripy.BVS("y", 32)
+        z = claripy.BVS("z", 32)
+        s = claripy.Solver()
+        s.add(claripy.And(claripy.Sub(x, y, z) == 5, y == 1, z == 2))
+        self.assertEqual(list(s.eval(x, 1)), [8])

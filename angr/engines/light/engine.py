@@ -118,8 +118,10 @@ class SimEngineLight[StateType, DataType_co, BlockType: BlockProtocol, ResultTyp
                 if len(spoffset_expr.args) == 1:
                     # Unexpected but fine
                     return 0
-                if isinstance(spoffset_expr.args[1], claripy.ast.Base) and spoffset_expr.args[1].op == "BVV":
-                    return -cast(int, spoffset_expr.args[1].args[0]) & (
+                # __sub__ is n-ary: the first argument is the positive term and the rest are subtracted from it
+                subtracted = spoffset_expr.args[1:]
+                if all(isinstance(arg, claripy.ast.Base) and arg.op == "BVV" for arg in subtracted):
+                    return -sum(cast(int, arg.args[0]) for arg in subtracted) & (
                         (1 << cast(claripy.ast.BV, spoffset_expr).size()) - 1
                     )
         return None
