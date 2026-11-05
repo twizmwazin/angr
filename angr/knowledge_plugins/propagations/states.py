@@ -178,10 +178,7 @@ class PropagatorState:
         :return:        True if the expression is TOP, False otherwise.
         """
         if isinstance(expr, claripy.ast.Base):
-            if expr.op == "BVS" and expr.args[0] == "TOP":
-                return True
-            if "TOP" in expr.variables:
-                return True
+            return "TOP" in expr.variables
         return False
 
     @staticmethod

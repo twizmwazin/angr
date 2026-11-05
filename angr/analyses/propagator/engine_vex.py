@@ -96,7 +96,7 @@ class SimEnginePropagatorVEX(
     #
 
     def _handle_function(self, addr):
-        if self.arch.name == "X86" and isinstance(addr, claripy.ast.BV) and addr.concrete_value is not None:
+        if self.arch.name == "X86" and isinstance(addr, claripy.ast.BV) and addr.concrete:
             try:
                 b = self.project.loader.memory.load(addr.concrete_value, 4)
             except KeyError:

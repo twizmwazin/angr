@@ -78,9 +78,9 @@ def op_concretize(op):
         #    18 | PUT(cc_dep1) = t24
         #    19 | PUT(cc_dep2) = t25
         #    20 | PUT(cc_ndep) = 0x0000000000000000
-        if op.args[0].concrete_value is not None:
+        if op.args[0].concrete:
             return op.args[0].concrete_value
-        if op.args[1].concrete_value is not None:
+        if op.args[1].concrete:
             return op.args[1].concrete_value
     value = op.concrete_value
     if value is None:

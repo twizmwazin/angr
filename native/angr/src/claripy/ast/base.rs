@@ -57,6 +57,10 @@ impl Base {
         inner: &AstRef<'static>,
         name: Option<String>,
     ) -> Result<Self, ClaripyError> {
+        // A symbol's name lives in its op, so a wrapper rebuilt from the Rust side (for
+        // example a child reached through `.args`, or a cache miss after the original
+        // wrapper was collected) carries the same `.name` as the one `BVS()` returned.
+        let name = name.or_else(|| Self::symbol_name(inner));
         let encoded_name = name.as_ref().map(|name| name.as_bytes().to_vec());
         let annotations = inner
             .annotations()
@@ -70,6 +74,16 @@ impl Base {
             annotations,
             args: PyOnceLock::new(),
         })
+    }
+
+    /// The name of a symbolic leaf (`BVS`, `BoolS`, `FPS`, `StringS`), or `None` for any other op.
+    fn symbol_name(inner: &AstRef<'static>) -> Option<String> {
+        match inner.op() {
+            AstOp::BoolS(name) | AstOp::BVS(name, _) | AstOp::FPS(name, _) | AstOp::StringS(name) => {
+                Some(name.as_str().to_string())
+            }
+            _ => None,
+        }
     }
 
     /// A clone of the wrapped [`AstRef`].

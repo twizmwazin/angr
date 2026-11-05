@@ -355,7 +355,7 @@ class FunctionHandler:
         if data.address is None and data.address_multi is not None:
             for vs in data.address_multi.values():
                 for val in vs:
-                    if val is not None and val.concrete_value is not None:
+                    if val is not None and val.concrete:
                         data.address = val.concrete_value
                         break
                 if data.address is not None:

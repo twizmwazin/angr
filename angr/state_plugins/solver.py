@@ -423,7 +423,7 @@ class SimSolver(SimStatePlugin, SupportsMerge):
             if (
                 size != r.length
                 or uninitialized != r.has_annotation_type(claripy.annotation.UninitializedAnnotation)
-                or bool(explicit_name) ^ (r.args[0] == name)
+                or bool(explicit_name) ^ (r.name == name)
             ):
                 l.warning("Variable %s being retrieved with different settings than it was tracked with", name)
         else:

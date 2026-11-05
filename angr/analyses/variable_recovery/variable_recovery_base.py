@@ -295,7 +295,7 @@ class VariableRecoveryStateBase:
 
     @staticmethod
     def is_top(thing) -> bool:
-        return bool(isinstance(thing, claripy.ast.BV) and thing.op == "BVS" and thing.args[0] == "top")
+        return bool(isinstance(thing, claripy.ast.BV) and thing.op == "BVS" and thing.name == "top")
 
     @staticmethod
     def extract_variables(expr: claripy.ast.Base) -> Generator[tuple[int, SimVariable]]:
@@ -333,7 +333,7 @@ class VariableRecoveryStateBase:
         # recursive function that returns a python int without really trying to handle bitvector arithmetic wrapping
         r = None
         if addr.op == "BVS":
-            if addr.args[0] == "stack_base":
+            if addr.name == "stack_base":
                 return 0
             return None
         if addr.op == "BVV":

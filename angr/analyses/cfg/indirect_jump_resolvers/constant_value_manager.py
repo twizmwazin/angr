@@ -47,7 +47,7 @@ class ConstantValueManager:
         codeloc = CodeLocation(state.scratch.bbl_addr, state.scratch.stmt_idx, ins_addr=state.scratch.ins_addr)
         if codeloc in self.mapping:
             reg_read_offset = state.inspect.attrs.reg_read_offset
-            if isinstance(reg_read_offset, claripy.ast.BV) and reg_read_offset.concrete_value is not None:
+            if isinstance(reg_read_offset, claripy.ast.BV) and reg_read_offset.concrete:
                 reg_read_offset = reg_read_offset.concrete_value
             variable = VEXReg(reg_read_offset, state.inspect.attrs.reg_read_length)
             if variable in self.mapping[codeloc]:

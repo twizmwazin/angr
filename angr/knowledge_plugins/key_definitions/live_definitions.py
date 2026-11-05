@@ -296,10 +296,7 @@ class LiveDefinitions:
         :return:        True if the expression is TOP, False otherwise.
         """
         if isinstance(expr, claripy.ast.Base):
-            if expr.op == "BVS" and expr.args[0] == "TOP":
-                return True
-            if "TOP" in expr.variables:
-                return True
+            return "TOP" in expr.variables
         return False
 
     def stack_address(self, offset: int) -> claripy.ast.bv.BV:
@@ -975,8 +972,8 @@ class LiveDefinitions:
                 heap_offset = self.get_heap_offset(pointer)
                 if heap_offset is not None:
                     addr = HeapAddress(heap_offset)
-                elif pointer.concrete_value is not None:
-                    addr = pointer.concrete_value
+                elif pointer.concrete:
+                    addr = cast(int, pointer.concrete_value)
                 else:
                     # cannot resolve
                     return None

@@ -142,7 +142,7 @@ class SimEngineAILSimState(SimEngineLightAIL[StateType, DataType, bool, None]):
         return claripy.BVS("ail_engine_top", bits)
 
     def _is_top(self, expr):
-        return expr.op == "BVS" and expr.args[0].startswith("ail_engine_top")
+        return expr.op == "BVS" and expr.name.startswith("ail_engine_top")
 
     def _find_ptr_region(self, ptr: claripy.ast.BV) -> tuple[MemoryMixin, claripy.ast.BV | int]:
         region: MemoryMixin | None = None

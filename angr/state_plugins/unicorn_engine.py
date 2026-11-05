@@ -9,6 +9,7 @@ import logging
 import sys
 import threading
 import time
+from typing import cast
 
 import archinfo
 import cffi  # lmao
@@ -1135,12 +1136,12 @@ class Unicorn(SimStatePlugin, SupportsMerge):
         # allow any SimMemory errors to propagate upward. they will be caught immediately above
         perm = self.state.memory.permissions(addr)
 
-        if perm.concrete_value is None:
+        if not perm.concrete:
             perm = 7
         elif options.ENABLE_NX not in self.state.options:
-            perm = perm.concrete_value | 4
+            perm = cast(int, perm.concrete_value) | 4
         else:
-            perm = perm.concrete_value
+            perm = cast(int, perm.concrete_value)
 
         # this should return two memoryviews: the page data and its symbolic-ness bitmap, one bit per byte
         # if they are writable they are direct references to the state backing store and can be mapped directly --

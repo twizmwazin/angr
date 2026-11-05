@@ -364,7 +364,7 @@ class JumpTableProcessor(
                     delta = cast(claripy.ast.BV, expr.args[1]).concrete_value
                     sp_offset += delta
                     return sp_offset
-        elif expr.op == "__and__" and len(expr.args) == 2 and cast(claripy.ast.BV, expr.args[1]).op == "BVV":
+        elif expr.op == "__and__" and len(expr.args) == 2 and cast(claripy.ast.BV, expr.args[1]).concrete:
             # ignore all masking on SpOffsets
             return JumpTableProcessor._extract_spoffset_from_expr(cast(claripy.ast.BV, expr.args[0]))
         return None
@@ -393,7 +393,7 @@ class JumpTableProcessor(
                     delta = cast(claripy.ast.BV, expr.args[1]).concrete_value
                     reg_offset += delta
                     return reg_offset
-        elif expr.op == "__and__" and len(expr.args) == 2 and cast(claripy.ast.BV, expr.args[1]).op == "BVV":
+        elif expr.op == "__and__" and len(expr.args) == 2 and cast(claripy.ast.BV, expr.args[1]).concrete:
             # ignore all masking on SpOffsets
             return JumpTableProcessor._extract_spoffset_from_expr(cast(claripy.ast.BV, expr.args[0]))
         return None
