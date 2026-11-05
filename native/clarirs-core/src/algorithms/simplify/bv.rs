@@ -544,7 +544,9 @@ pub(crate) fn simplify_bv<'c>(
                             }
                         }
                         _ => {
-                            if changed {
+                            if let Some(sub) = negative_constant_as_sub(ctx, &sym_args)? {
+                                state.rerun(sub)
+                            } else if changed {
                                 state.rerun(ctx.add_many(sym_args)?)
                             } else {
                                 Ok(ctx.add_many(sym_args)?)
@@ -553,7 +555,9 @@ pub(crate) fn simplify_bv<'c>(
                     }
                 }
                 _ => {
-                    if changed {
+                    if let Some(sub) = negative_constant_as_sub(ctx, &sym_args)? {
+                        state.rerun(sub)
+                    } else if changed {
                         state.rerun(ctx.add_many(sym_args)?)
                     } else {
                         Ok(ctx.add_many(sym_args)?)
@@ -1540,4 +1544,31 @@ pub(crate) fn simplify_bv<'c>(
         }
         _ => unreachable!("non-bitvector op dispatched to simplify_bv"),
     }
+}
+
+/// `x + c` with the sign bit of `c` set, written as `x - (-c)` so that one value has one
+/// form. The smallest signed value is its own negation and stays an Add.
+fn negative_constant_as_sub<'c>(
+    ctx: &'c Context<'c>,
+    args: &[AstRef<'c>],
+) -> Result<Option<AstRef<'c>>, ClarirsError> {
+    let Some((last, rest)) = args.split_last() else {
+        return Ok(None);
+    };
+    let AstOp::BVV(c) = last.op() else {
+        return Ok(None);
+    };
+    if rest.is_empty() || c.len() == 1 || !c.sign() {
+        return Ok(None);
+    }
+    let negated = (-c.clone())?;
+    if negated.sign() {
+        return Ok(None);
+    }
+    let sum = if rest.len() == 1 {
+        rest[0].clone()
+    } else {
+        ctx.add_many(rest.to_vec())?
+    };
+    Ok(Some(ctx.sub(sum, ctx.bvv(negated)?)?))
 }
