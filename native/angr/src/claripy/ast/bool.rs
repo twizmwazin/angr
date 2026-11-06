@@ -46,9 +46,10 @@ impl Bool {
             "And" => GLOBAL_CONTEXT.and(args.asts::<Bool>(py)?)?,
             "Or" => GLOBAL_CONTEXT.or(args.asts::<Bool>(py)?)?,
             "Xor" => GLOBAL_CONTEXT.xor(args.asts::<Bool>(py)?)?,
-            // Equality is defined over every sort; the core checks both sides agree.
-            "__eq__" => GLOBAL_CONTEXT.eq_(&args.ast::<Base>(py, 0)?, &args.ast::<Base>(py, 1)?)?,
-            "__ne__" => GLOBAL_CONTEXT.neq(&args.ast::<Base>(py, 0)?, &args.ast::<Base>(py, 1)?)?,
+            // Equality is defined over every sort and any number of operands;
+            // the core checks that all of them agree.
+            "__eq__" => GLOBAL_CONTEXT.eq_many(args.asts::<Base>(py)?)?,
+            "__ne__" => GLOBAL_CONTEXT.neq_many(args.asts::<Base>(py)?)?,
             "ULE" | "__le__" => {
                 GLOBAL_CONTEXT.ule(&args.ast::<BV>(py, 0)?, &args.ast::<BV>(py, 1)?)?
             }

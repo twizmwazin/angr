@@ -51,8 +51,9 @@ pub enum AstOp<'c> {
     ITE(AstRef<'c>, AstRef<'c>, AstRef<'c>),
 
     // Equality (any sort) and bitvector comparisons (all produce a bool).
-    Eq(AstRef<'c>, AstRef<'c>),
-    Neq(AstRef<'c>, AstRef<'c>),
+    // `Eq`/`Neq` are n-ary SMT-LIB `=`/`distinct` (all equal / pairwise distinct).
+    Eq(Vec<AstRef<'c>>),
+    Neq(Vec<AstRef<'c>>),
     ULT(AstRef<'c>, AstRef<'c>),
     ULE(AstRef<'c>, AstRef<'c>),
     UGT(AstRef<'c>, AstRef<'c>),
@@ -202,7 +203,7 @@ macro_rules! ast_op_arity {
 
 ast_op_arity! {
     leaf: [BoolS, BoolV, BVS, BVV, FPS, FPV, StringS, StringV],
-    nary: [And, Or, Xor, Add, Mul, Concat, Union, Intersection, StrConcat],
+    nary: [And, Or, Xor, Eq, Neq, Add, Mul, Concat, Union, Intersection, StrConcat],
     unary: [
         Not, Neg, ByteReverse, ZeroExt(n), SignExt(n), Extract(hi, lo), StrLen, StrToBV,
         FpToIEEEBV, FpToUBV(size, rm), FpToSBV(size, rm), FpNeg, FpAbs, FpSqrt(rm),
@@ -210,7 +211,7 @@ ast_op_arity! {
         FpIsNan, FpIsInf, StrIsDigit, BVToStr,
     ],
     binary: [
-        Eq, Neq, ULT, ULE, UGT, UGE, SLT, SLE, SGT, SGE, FpEq, FpLt, FpLeq, FpGt, FpGeq,
+        ULT, ULE, UGT, UGE, SLT, SLE, SGT, SGE, FpEq, FpLt, FpLeq, FpGt, FpGeq,
         StrContains, StrPrefixOf, StrSuffixOf, Sub, UDiv, SDiv, URem, SRem, ShL, LShR, AShR,
         RotateLeft, RotateRight, Widen, FpAdd(rm), FpSub(rm), FpMul(rm),
         FpDiv(rm),
@@ -422,10 +423,13 @@ impl<'c> AstOp<'c> {
             }
 
             // Equality over any sort
-            AstOp::Eq(a, b) | AstOp::Neq(a, b) => require(
-                a.ast_type() == b.ast_type(),
-                "equality operands must have the same sort",
-            ),
+            AstOp::Eq(v) | AstOp::Neq(v) => {
+                require(v.len() >= 2, "Eq/Neq require at least two operands")?;
+                require(
+                    v.iter().all(|a| a.ast_type() == v[0].ast_type()),
+                    "equality operands must have the same sort",
+                )
+            }
 
             // Bitvector comparisons
             AstOp::ULT(a, b)

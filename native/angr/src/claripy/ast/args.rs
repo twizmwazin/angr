@@ -79,6 +79,8 @@ impl ExtractPyArgs for AstRef<'static> {
             AstOp::And(args)
             | AstOp::Or(args)
             | AstOp::Xor(args)
+            | AstOp::Eq(args)
+            | AstOp::Neq(args)
             | AstOp::Add(args)
             | AstOp::Mul(args)
             | AstOp::Concat(args)
@@ -110,9 +112,7 @@ impl ExtractPyArgs for AstRef<'static> {
             | AstOp::BvToFpUnsigned(a, _, _) => vec![wrap_child(py, a)?],
 
             // Binary ops
-            AstOp::Eq(a, b)
-            | AstOp::Neq(a, b)
-            | AstOp::ULT(a, b)
+            AstOp::ULT(a, b)
             | AstOp::ULE(a, b)
             | AstOp::UGT(a, b)
             | AstOp::UGE(a, b)

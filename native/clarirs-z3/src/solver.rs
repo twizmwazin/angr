@@ -669,6 +669,44 @@ mod tests {
     }
 
     #[test]
+    fn test_solver_nary_eq_neq() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let x = ctx.bvs("x", 8)?;
+        let y = ctx.bvs("y", 8)?;
+        let z = ctx.bvs("z", 8)?;
+
+        // Pairwise distinct: no two of the three may agree.
+        let mut solver = Z3Solver::new(&ctx);
+        solver.add(&ctx.neq_many([x.clone(), y.clone(), z.clone()])?)?;
+        let (xv, yv, zv) = (solver.eval(&x)?, solver.eval(&y)?, solver.eval(&z)?);
+        assert_ne!(xv, yv);
+        assert_ne!(yv, zv);
+        assert_ne!(xv, zv);
+
+        // All equal: pinning one operand pins the others.
+        let mut solver = Z3Solver::new(&ctx);
+        solver.add(&ctx.eq_many([x.clone(), y.clone(), z.clone()])?)?;
+        solver.add(&ctx.eq_(&y, ctx.bvv(BitVec::from((7u64, 8)))?)?)?;
+        assert_eq!(solver.eval(&x)?, ctx.bvv(BitVec::from((7u64, 8)))?);
+        assert_eq!(solver.eval(&z)?, ctx.bvv(BitVec::from((7u64, 8)))?);
+
+        // All equal together with pairwise distinct is unsatisfiable.
+        let mut solver = Z3Solver::new(&ctx);
+        solver.add(&ctx.eq_many([x.clone(), y.clone(), z.clone()])?)?;
+        solver.add(&ctx.neq_many([x.clone(), y.clone(), z.clone()])?)?;
+        assert!(!solver.satisfiable()?);
+
+        // Three distinct booleans is unsatisfiable, and the simplifier agrees.
+        let (a, b, c) = (ctx.bools("a")?, ctx.bools("b")?, ctx.bools("c")?);
+        let mut solver = Z3Solver::new(&ctx);
+        solver.add(&ctx.neq_many([a.clone(), b.clone(), c.clone()])?)?;
+        assert!(!solver.satisfiable()?);
+        assert_eq!(ctx.neq_many([a, b, c])?.simplify()?, ctx.false_()?);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_last_check_cleared_by_new_assertions() -> Result<(), ClarirsError> {
         let ctx = Context::new();
         let mut solver = Z3Solver::new(&ctx);

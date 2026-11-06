@@ -179,14 +179,24 @@ impl<'c> AstExtZ3<'c> for AstRef<'c> {
                                 Z3_mk_false(z3_ctx)
                             }
                             .try_into()?,
-                            // Equality (any sort) is Z3's `=`/`distinct`. On floats that is
-                            // identity of the value (NaN equals NaN, +0 differs from -0);
-                            // IEEE equality is `FpEq` below.
-                            AstOp::Eq(..) => binop!(z3_ctx, children, Z3_mk_eq),
+                            // Z3's `=` is binary: a conjunction over adjacent pairs. Two
+                            // operands skip the conjunction, as Z3 keeps a one-argument
+                            // `and` rather than unwrapping it.
+                            AstOp::Eq(..) if children.len() == 2 => {
+                                binop!(z3_ctx, children, Z3_mk_eq)
+                            }
+                            AstOp::Eq(..) => {
+                                let terms = children
+                                    .windows(2)
+                                    .map(|w| RcAst::try_from(Z3_mk_eq(z3_ctx, *w[0], *w[1])))
+                                    .collect::<Result<Vec<_>, _>>()?;
+                                let args: Vec<_> = terms.iter().map(|t| **t).collect();
+                                Z3_mk_and(z3_ctx, args.len() as u32, args.as_ptr()).try_into()?
+                            }
                             AstOp::Neq(..) => {
-                                let a = child(children, 0)?;
-                                let b = child(children, 1)?;
-                                Z3_mk_distinct(z3_ctx, 2, [**a, **b].as_ptr()).try_into()?
+                                let args: Vec<_> = children.iter().map(|c| **c).collect();
+                                Z3_mk_distinct(z3_ctx, args.len() as u32, args.as_ptr())
+                                    .try_into()?
                             }
                             AstOp::ULT(..) => binop!(z3_ctx, children, Z3_mk_bvult),
                             AstOp::ULE(..) => binop!(z3_ctx, children, Z3_mk_bvule),
@@ -593,11 +603,13 @@ impl<'c> AstExtZ3<'c> for AstRef<'c> {
                         DeclKind::False => ctx.false_(),
                         DeclKind::Not => {
                             let inner = AstRef::from_z3(ctx, arg(0)?)?;
-                            // Not(Eq(a, b)) canonicalizes to Neq(a, b).
-                            if let AstOp::Eq(a, b) = inner.op() {
-                                ctx.neq(a, b)
-                            } else {
-                                ctx.not(inner)
+                            // Not(Eq(a, b)) canonicalizes to Neq(a, b). This only holds
+                            // for two operands: an n-ary Neq means pairwise distinct.
+                            match inner.op() {
+                                AstOp::Eq(args) if args.len() == 2 => {
+                                    ctx.neq_many(args.iter().cloned())
+                                }
+                                _ => ctx.not(inner),
                             }
                         }
                         DeclKind::And | DeclKind::Or => {
@@ -615,21 +627,19 @@ impl<'c> AstExtZ3<'c> for AstRef<'c> {
                             AstRef::from_z3(ctx, arg(0)?)?,
                             AstRef::from_z3(ctx, arg(1)?)?,
                         ),
-                        DeclKind::Eq => {
-                            let lhs = AstRef::from_z3(ctx, arg(0)?)?;
-                            let rhs = AstRef::from_z3(ctx, arg(1)?)?;
-                            // eq_ picks the right per-sort equality from the operand type.
-                            ctx.eq_(lhs, rhs)
-                        }
-                        DeclKind::Distinct => {
-                            if Z3_get_app_num_args(z3_ctx, app) != 2 {
-                                return Err(ClarirsError::ConversionError(
-                                    "Distinct with != 2 args not supported".to_string(),
-                                ));
+                        // Both are n-ary in Z3 exactly as in clarirs: `=` is all-equal
+                        // and `distinct` is pairwise distinct. The operand type picks
+                        // the right per-sort equality.
+                        DeclKind::Eq | DeclKind::Distinct => {
+                            let num_args = Z3_get_app_num_args(z3_ctx, app);
+                            let mut args = Vec::with_capacity(num_args as usize);
+                            for i in 0..num_args {
+                                args.push(AstRef::from_z3(ctx, arg(i)?)?);
                             }
-                            let lhs = AstRef::from_z3(ctx, arg(0)?)?;
-                            let rhs = AstRef::from_z3(ctx, arg(1)?)?;
-                            ctx.neq(lhs, rhs)
+                            match decl_kind {
+                                DeclKind::Eq => ctx.eq_many(args),
+                                _ => ctx.neq_many(args),
+                            }
                         }
                         DeclKind::Ult => ctx.ult(
                             AstRef::from_z3(ctx, arg(0)?)?,

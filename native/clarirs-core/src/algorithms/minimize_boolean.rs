@@ -299,7 +299,9 @@ fn ast_to_expr<'c>(
             let negated = match node.op() {
                 AstOp::Not(_) | AstOp::And(_) | AstOp::Or(_) => return Ok(None),
                 AstOp::BoolV(value) => return Ok(Some(Expr::Const(*value))),
-                AstOp::Neq(a, b) => ctx.eq_(a, b)?,
+                // Only a binary Neq is the negation of Eq; an n-ary one means
+                // pairwise distinct and stays an opaque predicate.
+                AstOp::Neq(args) if args.len() == 2 => ctx.eq_many(args.iter().cloned())?,
                 AstOp::UGT(a, b) => ctx.ule(a, b)?,
                 AstOp::UGE(a, b) => ctx.ult(a, b)?,
                 AstOp::SGT(a, b) => ctx.sle(a, b)?,

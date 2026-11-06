@@ -189,6 +189,96 @@ mod to_z3 {
     }
 
     #[test]
+    fn nary_eq_is_chain_of_eq() {
+        let ctx = Context::new();
+        let a = ctx.bvs("a", 32).unwrap();
+        let b = ctx.bvs("b", 32).unwrap();
+        let c = ctx.bvs("c", 32).unwrap();
+        let eq = ctx.eq_many([a, b, c]).unwrap();
+        let z3_ast = eq.to_z3().unwrap();
+        assert_eq!(z3_ast.decl_kind(), DeclKind::And);
+        assert_eq!(z3_ast.num_args(), 2);
+        for i in 0..2 {
+            let pair = z3_ast.arg(i).unwrap();
+            assert_eq!(pair.decl_kind(), DeclKind::Eq);
+        }
+        assert_eq!(
+            z3_ast
+                .arg(0)
+                .unwrap()
+                .arg(0)
+                .unwrap()
+                .symbol_name()
+                .as_deref(),
+            Some("a")
+        );
+        assert_eq!(
+            z3_ast
+                .arg(0)
+                .unwrap()
+                .arg(1)
+                .unwrap()
+                .symbol_name()
+                .as_deref(),
+            Some("b")
+        );
+        assert_eq!(
+            z3_ast
+                .arg(1)
+                .unwrap()
+                .arg(0)
+                .unwrap()
+                .symbol_name()
+                .as_deref(),
+            Some("b")
+        );
+        assert_eq!(
+            z3_ast
+                .arg(1)
+                .unwrap()
+                .arg(1)
+                .unwrap()
+                .symbol_name()
+                .as_deref(),
+            Some("c")
+        );
+    }
+
+    #[test]
+    fn nary_neq_is_distinct() {
+        let ctx = Context::new();
+        let a = ctx.bvs("a", 32).unwrap();
+        let b = ctx.bvs("b", 32).unwrap();
+        let c = ctx.bvs("c", 32).unwrap();
+        let neq = ctx.neq_many([a, b, c]).unwrap();
+        let z3_ast = neq.to_z3().unwrap();
+        assert_eq!(z3_ast.decl_kind(), DeclKind::Distinct);
+        assert_eq!(z3_ast.num_args(), 3);
+        assert_eq!(z3_ast.arg(2).unwrap().symbol_name().as_deref(), Some("c"));
+    }
+
+    #[test]
+    fn nary_fp_eq_neq_is_identity() {
+        let ctx = Context::new();
+        let a = ctx.fps("a", FSort::f64()).unwrap();
+        let b = ctx.fps("b", FSort::f64()).unwrap();
+        let c = ctx.fps("c", FSort::f64()).unwrap();
+
+        // `=`/`distinct` on floats is identity of the value, not fp.eq.
+        let eq = ctx.eq_many([a.clone(), b.clone(), c.clone()]).unwrap();
+        let z3_ast = eq.to_z3().unwrap();
+        assert_eq!(z3_ast.decl_kind(), DeclKind::And);
+        assert_eq!(z3_ast.num_args(), 2);
+        assert_eq!(z3_ast.arg(0).unwrap().decl_kind(), DeclKind::Eq);
+        assert_eq!(z3_ast.arg(1).unwrap().decl_kind(), DeclKind::Eq);
+
+        let neq = ctx.neq_many([a, b, c]).unwrap();
+        let z3_ast = neq.to_z3().unwrap();
+        assert_eq!(z3_ast.decl_kind(), DeclKind::Distinct);
+        assert_eq!(z3_ast.num_args(), 3);
+    }
+
+    #[test]
     fn ult() {
         let ctx = Context::new();
         let a = ctx.bvs("a", 32).unwrap();
@@ -1096,6 +1186,33 @@ mod roundtrip {
         let b = ctx.bvs("b", 32).unwrap();
         let ast = ctx.neq(a, b).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
+    }
+
+    #[test]
+    fn nary_neq() {
+        let ctx = Context::new();
+        let a = ctx.bvs("a", 32).unwrap();
+        let b = ctx.bvs("b", 32).unwrap();
+        let c = ctx.bvs("c", 32).unwrap();
+        // `distinct` is n-ary on both sides, so it survives a round trip.
+        let ast = ctx.neq_many([a, b, c]).unwrap();
+        assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
+    }
+
+    #[test]
+    fn nary_eq_from_z3() {
+        let ctx = Context::new();
+        let a = ctx.bvs("a", 32).unwrap();
+        let b = ctx.bvs("b", 32).unwrap();
+        let c = ctx.bvs("c", 32).unwrap();
+        // Z3 has no n-ary `=`, so a three-way Eq goes out as a chain of binary
+        // equalities and comes back as their conjunction.
+        let ast = ctx.eq_many([a.clone(), b.clone(), c.clone()]).unwrap();
+        assert_eq!(
+            round_trip(&ctx, &ast).unwrap(),
+            ctx.and2(ctx.eq_(&a, &b).unwrap(), ctx.eq_(&b, &c).unwrap())
+                .unwrap()
+        );
     }
 
     #[test]

@@ -5,10 +5,11 @@ use crate::{
     ast::{
         AstFactory,
         annotation::{Annotation, AnnotationType},
-        op::AstOp,
+        op::{AstOp, AstType},
     },
     context::Context,
 };
+use clarirs_num::FSort;
 
 #[test]
 fn test_prim() -> Result<()> {
@@ -286,8 +287,11 @@ fn test_bv_eq_neq_constant_canonicalized_to_right() -> Result<()> {
         assert_eq!(ctx.eq_(c, &x)?.simplify()?, ctx.eq_(&x, c)?.simplify()?);
 
         let simplified = ctx.neq(c, &x)?.simplify()?;
-        let AstOp::Neq(lhs, rhs) = simplified.op() else {
+        let AstOp::Neq(args) = simplified.op() else {
             panic!("expected Neq, got {:?}", simplified.op())
+        };
+        let [lhs, rhs] = args.as_slice() else {
+            panic!("expected two operands, got {}", args.len())
         };
         assert!(matches!(rhs.op(), AstOp::BVV(_)), "constant should be rhs");
         assert!(matches!(lhs.op(), AstOp::BVS(..)), "symbol should be lhs");
@@ -967,5 +971,234 @@ fn test_fp_eq_is_not_reflexive() -> Result<()> {
     // survives simplification as such.
     let fp_neq = ctx.not(&fp_eq)?;
     assert_eq!(fp_neq.simplify()?, fp_neq);
+    Ok(())
+}
+
+// ---------------------------------------------------------------
+// n-ary Eq / Neq
+// ---------------------------------------------------------------
+
+#[test]
+fn test_nary_eq_neq_validation() -> Result<()> {
+    let ctx = Context::new();
+    let x = ctx.bvs("x", 8)?;
+    let y = ctx.bvs("y", 8)?;
+    let z = ctx.bvs("z", 8)?;
+    let b = ctx.bools("b")?;
+
+    // Fewer than two operands is rejected, as is a mix of sorts.
+    assert!(ctx.eq_many([]).is_err());
+    assert!(ctx.eq_many([x.clone()]).is_err());
+    assert!(ctx.neq_many([x.clone()]).is_err());
+    assert!(ctx.eq_many([x.clone(), b.clone()]).is_err());
+    assert!(ctx.neq_many([x.clone(), y.clone(), b.clone()]).is_err());
+
+    // The binary constructors build the same node as the n-ary ones.
+    assert_eq!(ctx.eq_(&x, &y)?, ctx.eq_many([x.clone(), y.clone()])?);
+    assert_eq!(ctx.neq(&x, &y)?, ctx.neq_many([x.clone(), y.clone()])?);
+
+    let eq = ctx.eq_many([x.clone(), y.clone(), z.clone()])?;
+    assert_eq!(eq.op().num_children(), 3);
+    assert_eq!(eq.ast_type(), AstType::Bool);
+    assert_eq!(eq.op().child_iter().collect::<Vec<_>>(), vec![x, y, z]);
+
+    Ok(())
+}
+
+#[test]
+fn test_nary_eq_simplify() -> Result<()> {
+    let ctx = Context::new();
+    let x = ctx.bvs("x", 8)?;
+    let y = ctx.bvs("y", 8)?;
+    let z = ctx.bvs("z", 8)?;
+    let one = ctx.bvv(BitVec::from((1u64, 8)))?;
+    let two = ctx.bvv(BitVec::from((2u64, 8)))?;
+
+    // All the same operand: true. A repeated operand is dropped and the
+    // binary rules take over.
+    assert_eq!(
+        ctx.eq_many([x.clone(), x.clone(), x.clone()])?.simplify()?,
+        ctx.true_()?
+    );
+    assert_eq!(
+        ctx.eq_many([x.clone(), y.clone(), x.clone()])?.simplify()?,
+        ctx.eq_(&x, &y)?.simplify()?
+    );
+    assert_eq!(
+        ctx.eq_many([one.clone(), x.clone(), x.clone()])?
+            .simplify()?,
+        ctx.eq_(&x, &one)?
+    );
+
+    // Two different constants can never both equal x.
+    assert_eq!(
+        ctx.eq_many([x.clone(), one.clone(), two.clone()])?
+            .simplify()?,
+        ctx.false_()?
+    );
+    assert_eq!(
+        ctx.eq_many([one.clone(), one.clone(), one.clone()])?
+            .simplify()?,
+        ctx.true_()?
+    );
+
+    // Three distinct operands stay n-ary, with the constant moved last.
+    let simplified = ctx.eq_many([x.clone(), y.clone(), z.clone()])?.simplify()?;
+    assert_eq!(simplified, ctx.eq_many([x.clone(), y.clone(), z.clone()])?);
+    let simplified = ctx
+        .eq_many([one.clone(), x.clone(), y.clone()])?
+        .simplify()?;
+    assert_eq!(
+        simplified,
+        ctx.eq_many([x.clone(), y.clone(), one.clone()])?
+    );
+
+    // Children are simplified in place.
+    let x_plus_zero = ctx.add(&x, ctx.bvv(BitVec::from((0u64, 8)))?)?;
+    assert_eq!(
+        ctx.eq_many([x_plus_zero, y.clone(), z.clone()])?
+            .simplify()?,
+        ctx.eq_many([x.clone(), y.clone(), z.clone()])?
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_nary_neq_simplify() -> Result<()> {
+    let ctx = Context::new();
+    let x = ctx.bvs("x", 8)?;
+    let y = ctx.bvs("y", 8)?;
+    let z = ctx.bvs("z", 8)?;
+    let bv = |v: u64| ctx.bvv(BitVec::from((v, 8)));
+
+    // A repeated operand can never be pairwise distinct.
+    assert_eq!(
+        ctx.neq_many([x.clone(), y.clone(), x.clone()])?
+            .simplify()?,
+        ctx.false_()?
+    );
+    assert_eq!(
+        ctx.neq_many([x.clone(), bv(1)?, bv(1)?])?.simplify()?,
+        ctx.false_()?
+    );
+    // Distinct constants are pairwise distinct.
+    assert_eq!(
+        ctx.neq_many([bv(1)?, bv(2)?, bv(3)?])?.simplify()?,
+        ctx.true_()?
+    );
+
+    // Three symbols stay n-ary; constants move last.
+    assert_eq!(
+        ctx.neq_many([x.clone(), y.clone(), z.clone()])?
+            .simplify()?,
+        ctx.neq_many([x.clone(), y.clone(), z.clone()])?
+    );
+    assert_eq!(
+        ctx.neq_many([bv(1)?, x.clone(), bv(2)?, y.clone()])?
+            .simplify()?,
+        ctx.neq_many([x.clone(), y.clone(), bv(1)?, bv(2)?])?
+    );
+
+    // Pigeonhole: three booleans, or five 2-bit vectors, cannot all differ.
+    let (a, b, c) = (ctx.bools("a")?, ctx.bools("b")?, ctx.bools("c")?);
+    assert_eq!(
+        ctx.neq_many([a.clone(), b.clone(), c.clone()])?
+            .simplify()?,
+        ctx.false_()?
+    );
+    let small: Vec<_> = (0..5)
+        .map(|i| ctx.bvs(format!("s{i}"), 2))
+        .collect::<Result<_, _>>()?;
+    assert_eq!(ctx.neq_many(small.clone())?.simplify()?, ctx.false_()?);
+    let four = small[..4].to_vec();
+    assert_eq!(ctx.neq_many(four.clone())?.simplify()?, ctx.neq_many(four)?);
+
+    Ok(())
+}
+
+#[test]
+fn test_nary_eq_neq_float() -> Result<()> {
+    let ctx = Context::new();
+    let x = ctx.fps("x", FSort::f64())?;
+    let y = ctx.fps("y", FSort::f64())?;
+    let one = ctx.fpv(1.0f64)?;
+    let two = ctx.fpv(2.0f64)?;
+    let nan = ctx.fpv(f64::NAN)?;
+    let other_nan = ctx.fpv(f64::from_bits(f64::NAN.to_bits() | 1))?;
+    let pos_zero = ctx.fpv(0.0f64)?;
+    let neg_zero = ctx.fpv(-0.0f64)?;
+
+    // `=` on floats is identity of the value, so it is reflexive and every
+    // NaN is one value, while +0 and -0 are two.
+    assert_ne!(nan, other_nan);
+    assert_eq!(
+        ctx.eq_many([x.clone(), x.clone(), y.clone()])?.simplify()?,
+        ctx.eq_(&x, &y)?
+    );
+    assert_eq!(
+        ctx.eq_many([x.clone(), nan.clone(), other_nan.clone()])?
+            .simplify()?,
+        ctx.eq_(&x, &nan)?
+    );
+    assert_eq!(
+        ctx.eq_many([x.clone(), one.clone(), two.clone()])?
+            .simplify()?,
+        ctx.false_()?
+    );
+    assert_eq!(
+        ctx.eq_many([x.clone(), pos_zero.clone(), neg_zero.clone()])?
+            .simplify()?,
+        ctx.false_()?
+    );
+
+    // `distinct` is the negation of `=` pairwise.
+    assert_eq!(
+        ctx.neq_many([x.clone(), nan.clone(), other_nan.clone()])?
+            .simplify()?,
+        ctx.false_()?
+    );
+    assert_eq!(
+        ctx.neq_many([x.clone(), x.clone(), y.clone()])?
+            .simplify()?,
+        ctx.false_()?
+    );
+    assert_eq!(
+        ctx.neq_many([one, pos_zero, neg_zero])?.simplify()?,
+        ctx.true_()?
+    );
+    assert_eq!(
+        ctx.neq_many([x.clone(), y.clone(), nan.clone()])?
+            .simplify()?,
+        ctx.neq_many([x, y, nan])?
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_nary_eq_neq_are_not_negations() -> Result<()> {
+    let ctx = Context::new();
+    let x = ctx.bvs("x", 8)?;
+    let y = ctx.bvs("y", 8)?;
+    let z = ctx.bvs("z", 8)?;
+    let eq = ctx.eq_many([x.clone(), y.clone(), z.clone()])?;
+    let neq = ctx.neq_many([x.clone(), y.clone(), z.clone()])?;
+
+    // Binary: Not(Eq) is Neq and vice versa.
+    assert_eq!(ctx.not(ctx.eq_(&x, &y)?)?.simplify()?, ctx.neq(&x, &y)?);
+    assert_eq!(ctx.not(ctx.neq(&x, &y)?)?.simplify()?, ctx.eq_(&x, &y)?);
+    // n-ary: "not all equal" is not "pairwise distinct".
+    assert_eq!(ctx.not(&eq)?.simplify()?, ctx.not(&eq)?);
+    assert_eq!(ctx.not(&neq)?.simplify()?, ctx.not(&neq)?);
+
+    // They exclude each other, but one of them need not hold.
+    assert_eq!(ctx.and2(&eq, &neq)?.simplify()?, ctx.false_()?);
+    assert_eq!(ctx.or2(&eq, &neq)?.simplify()?, ctx.or2(&eq, &neq)?);
+    assert_eq!(
+        ctx.or2(ctx.eq_(&x, &y)?, ctx.neq(&x, &y)?)?.simplify()?,
+        ctx.true_()?
+    );
+
     Ok(())
 }

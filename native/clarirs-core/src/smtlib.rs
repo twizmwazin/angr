@@ -106,8 +106,8 @@ fn to_smtlib_op(ast: &AstRef<'_>, children: &[String]) -> String {
         // Booleans
         AstOp::BoolS(s) => smtlib_symbol(s.as_str()),
         AstOp::BoolV(b) => b.to_string(),
-        AstOp::Eq(..) => format!("(= {} {})", children[0], children[1]),
-        AstOp::Neq(..) => format!("(distinct {} {})", children[0], children[1]),
+        AstOp::Eq(..) => format!("(= {})", children.join(" ")),
+        AstOp::Neq(..) => format!("(distinct {})", children.join(" ")),
         AstOp::ULT(..) => format!("(bvult {} {})", children[0], children[1]),
         AstOp::ULE(..) => format!("(bvule {} {})", children[0], children[1]),
         AstOp::UGT(..) => format!("(bvugt {} {})", children[0], children[1]),
@@ -492,6 +492,28 @@ mod tests {
 
         let neq = ctx.neq(&x, &y).unwrap();
         assert_eq!(neq.to_smtlib(), "(distinct x y)");
+    }
+
+    #[test]
+    fn test_nary_eq_neq() {
+        let ctx = Context::new();
+        let x = ctx.bvs("x", 64).unwrap();
+        let y = ctx.bvs("y", 64).unwrap();
+        let z = ctx.bvs("z", 64).unwrap();
+
+        let eq = ctx.eq_many([x.clone(), y.clone(), z.clone()]).unwrap();
+        assert_eq!(eq.to_smtlib(), "(= x y z)");
+        let neq = ctx.neq_many([x, y, z]).unwrap();
+        assert_eq!(neq.to_smtlib(), "(distinct x y z)");
+
+        // `=` and `distinct` are the same on every sort, floats included.
+        let a = ctx.fps("a", FSort::f32()).unwrap();
+        let b = ctx.fps("b", FSort::f32()).unwrap();
+        let c = ctx.fps("c", FSort::f32()).unwrap();
+        let eq = ctx.eq_many([a.clone(), b.clone(), c.clone()]).unwrap();
+        assert_eq!(eq.to_smtlib(), "(= a b c)");
+        let neq = ctx.neq_many([a, b, c]).unwrap();
+        assert_eq!(neq.to_smtlib(), "(distinct a b c)");
     }
 
     #[test]

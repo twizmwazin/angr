@@ -85,11 +85,14 @@ impl<'c, S: Solver<'c>> ReplacementSolver<'c, S> {
     /// Try to extract a replacement from an equality constraint like `sym == concrete`.
     fn try_extract_replacement(&mut self, constraint: &AstRef<'c>) {
         match constraint.op() {
-            AstOp::Eq(lhs, rhs) => {
-                if lhs.symbolic() && !rhs.symbolic() {
-                    self.add_replacement(lhs.clone(), rhs.clone());
-                } else if !lhs.symbolic() && rhs.symbolic() {
-                    self.add_replacement(rhs.clone(), lhs.clone());
+            // `Eq` means all operands are equal, so when exactly one of them is
+            // concrete every symbolic operand can be replaced by it.
+            AstOp::Eq(args) => {
+                let mut concrete = args.iter().filter(|a| !a.symbolic());
+                if let (Some(value), None) = (concrete.next(), concrete.next()) {
+                    for arg in args.iter().filter(|a| a.symbolic()) {
+                        self.add_replacement(arg.clone(), value.clone());
+                    }
                 }
             }
             AstOp::Not(inner) => {
@@ -240,6 +243,30 @@ mod tests {
         // Evaluating x should now return 5
         let result = solver.eval(&x)?;
         assert_eq!(result, five);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_replacement_solver_auto_extract_nary() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let inner = ConcreteSolver::new(&ctx);
+        let mut solver = ReplacementSolver::new(inner);
+
+        let x = ctx.bvs("x", 8)?;
+        let y = ctx.bvs("y", 8)?;
+        let five = ctx.bvv(BitVec::from((5, 8)))?;
+
+        // x == 5 == y pins both symbols to 5.
+        solver.add(&ctx.eq_many([x.clone(), five.clone(), y.clone()])?)?;
+        assert_eq!(solver.eval(&x)?, five);
+        assert_eq!(solver.eval(&y)?, five);
+
+        // Two different constants is a contradiction, not a replacement.
+        let mut solver = ReplacementSolver::new(ConcreteSolver::new(&ctx));
+        let six = ctx.bvv(BitVec::from((6, 8)))?;
+        let _ = solver.add(&ctx.eq_many([x.clone(), five.clone(), six])?);
+        assert!(solver.replacements().get(&x).is_none());
 
         Ok(())
     }

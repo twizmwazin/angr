@@ -147,22 +147,41 @@ pub trait AstFactory<'c>: Sized {
         self.make_ast(AstOp::Xor(vec![lhs.into_owned(), rhs.into_owned()]))
     }
 
-    /// Equality over operands of any matching sort. For floats this has IEEE
-    /// `fp.eq` semantics, otherwise it is structural.
+    /// Equality over two operands of any matching sort. For floats this has
+    /// IEEE `fp.eq` semantics, otherwise it is structural.
     fn eq_(
         &'c self,
         lhs: impl IntoOwned<AstRef<'c>>,
         rhs: impl IntoOwned<AstRef<'c>>,
     ) -> Result<AstRef<'c>, ClarirsError> {
-        self.make_ast(AstOp::Eq(lhs.into_owned(), rhs.into_owned()))
+        self.make_ast(AstOp::Eq(vec![lhs.into_owned(), rhs.into_owned()]))
     }
 
+    /// Equality over any number (at least two) of operands of one sort: true
+    /// when all of them are equal, like SMT-LIB `=`.
+    fn eq_many(
+        &'c self,
+        args: impl IntoIterator<Item = AstRef<'c>>,
+    ) -> Result<AstRef<'c>, ClarirsError> {
+        self.make_ast(AstOp::Eq(args.into_iter().collect()))
+    }
+
+    /// Disequality over two operands of any matching sort.
     fn neq(
         &'c self,
         lhs: impl IntoOwned<AstRef<'c>>,
         rhs: impl IntoOwned<AstRef<'c>>,
     ) -> Result<AstRef<'c>, ClarirsError> {
-        self.make_ast(AstOp::Neq(lhs.into_owned(), rhs.into_owned()))
+        self.make_ast(AstOp::Neq(vec![lhs.into_owned(), rhs.into_owned()]))
+    }
+
+    /// Disequality over any number (at least two) of operands of one sort:
+    /// true when they are pairwise distinct, like SMT-LIB `distinct`.
+    fn neq_many(
+        &'c self,
+        args: impl IntoIterator<Item = AstRef<'c>>,
+    ) -> Result<AstRef<'c>, ClarirsError> {
+        self.make_ast(AstOp::Neq(args.into_iter().collect()))
     }
 
     fn neg(&'c self, ast: impl IntoOwned<AstRef<'c>>) -> Result<AstRef<'c>, ClarirsError> {
@@ -673,7 +692,7 @@ pub trait AstFactory<'c>: Sized {
         lhs: impl IntoOwned<AstRef<'c>>,
         rhs: impl IntoOwned<AstRef<'c>>,
     ) -> Result<AstRef<'c>, ClarirsError> {
-        self.make_ast(AstOp::Eq(lhs.into_owned(), rhs.into_owned()))
+        self.make_ast(AstOp::Eq(vec![lhs.into_owned(), rhs.into_owned()]))
     }
 
     fn str_neq(
@@ -681,7 +700,7 @@ pub trait AstFactory<'c>: Sized {
         lhs: impl IntoOwned<AstRef<'c>>,
         rhs: impl IntoOwned<AstRef<'c>>,
     ) -> Result<AstRef<'c>, ClarirsError> {
-        self.make_ast(AstOp::Neq(lhs.into_owned(), rhs.into_owned()))
+        self.make_ast(AstOp::Neq(vec![lhs.into_owned(), rhs.into_owned()]))
     }
 
     /// If-then-else. `then` and `else_` must have the same sort.

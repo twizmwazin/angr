@@ -21,8 +21,10 @@ pub(crate) fn simplify_bool<'c>(
                 AstOp::Not(inner) => Ok(inner.clone()),
                 AstOp::BoolV(v) => Ok(ctx.boolv(!v)?),
 
-                AstOp::Eq(lhs, rhs) => Ok(ctx.neq(lhs.clone(), rhs.clone())?),
-                AstOp::Neq(lhs, rhs) => Ok(ctx.eq_(lhs.clone(), rhs.clone())?),
+                // Only a binary Neq is the negation of Eq: an n-ary Neq means
+                // pairwise distinct, not "not all equal".
+                AstOp::Eq(args) if args.len() == 2 => Ok(ctx.neq_many(args.iter().cloned())?),
+                AstOp::Neq(args) if args.len() == 2 => Ok(ctx.eq_many(args.iter().cloned())?),
 
                 // !(a > b)  ==>  a <= b
                 AstOp::UGT(lhs, rhs) => state.rerun(ctx.ule(lhs.clone(), rhs.clone())?),
@@ -107,9 +109,15 @@ pub(crate) fn simplify_bool<'c>(
             for i in 0..absorbed_args.len() {
                 for j in (i + 1)..absorbed_args.len() {
                     match (absorbed_args[i].op(), absorbed_args[j].op()) {
-                        (AstOp::Eq(var1, val1), AstOp::Neq(var2, val2))
-                        | (AstOp::Neq(var2, val2), AstOp::Eq(var1, val1))
-                        | (AstOp::ULT(var1, val1), AstOp::UGE(var2, val2))
+                        // All equal and pairwise distinct exclude each other at
+                        // any arity.
+                        (AstOp::Eq(eq_args), AstOp::Neq(neq_args))
+                        | (AstOp::Neq(neq_args), AstOp::Eq(eq_args))
+                            if eq_args == neq_args =>
+                        {
+                            return Ok(ctx.false_()?);
+                        }
+                        (AstOp::ULT(var1, val1), AstOp::UGE(var2, val2))
                         | (AstOp::UGE(var2, val2), AstOp::ULT(var1, val1))
                         | (AstOp::ULE(var1, val1), AstOp::UGT(var2, val2))
                         | (AstOp::UGT(var2, val2), AstOp::ULE(var1, val1))
@@ -198,9 +206,15 @@ pub(crate) fn simplify_bool<'c>(
             for i in 0..absorbed_args.len() {
                 for j in (i + 1)..absorbed_args.len() {
                     match (absorbed_args[i].op(), absorbed_args[j].op()) {
-                        (AstOp::Eq(var1, val1), AstOp::Neq(var2, val2))
-                        | (AstOp::Neq(var2, val2), AstOp::Eq(var1, val1))
-                        | (AstOp::ULT(var1, val1), AstOp::UGE(var2, val2))
+                        // Only for two operands: with more, "not all equal" is
+                        // weaker than "pairwise distinct".
+                        (AstOp::Eq(eq_args), AstOp::Neq(neq_args))
+                        | (AstOp::Neq(neq_args), AstOp::Eq(eq_args))
+                            if eq_args == neq_args && eq_args.len() == 2 =>
+                        {
+                            return Ok(ctx.true_()?);
+                        }
+                        (AstOp::ULT(var1, val1), AstOp::UGE(var2, val2))
                         | (AstOp::UGE(var2, val2), AstOp::ULT(var1, val1))
                         | (AstOp::ULE(var1, val1), AstOp::UGT(var2, val2))
                         | (AstOp::UGT(var2, val2), AstOp::ULE(var1, val1))
@@ -269,6 +283,35 @@ pub(crate) fn simplify_bool<'c>(
                 }
             } else {
                 Ok(combined)
+            }
+        }
+        // More than two operands: all of them are equal. `=` is reflexive on
+        // every sort, so a repeated operand is dropped, and two different
+        // values make the whole equality false. Once two operands remain the
+        // binary rules below take over.
+        AstOp::Eq(args) if args.len() > 2 => {
+            let is_value = |a: &AstRef<'c>| a.is_leaf() && a.concrete();
+            let simplified = state.get_all_simplified()?;
+            let operands: Vec<AstRef<'c>> = simplified
+                .iter()
+                .enumerate()
+                .filter(|(i, a)| !simplified[..*i].iter().any(|o| same_value(o, a)))
+                .map(|(_, a)| a.clone())
+                .collect();
+            // Two distinct values of one sort are never equal.
+            if operands.iter().filter(|a| is_value(a)).count() > 1 {
+                return Ok(ctx.false_()?);
+            }
+            match operands.len() {
+                1 => Ok(ctx.true_()?),
+                2 => state.rerun(ctx.eq_many(operands)?),
+                _ => {
+                    // Values last, the way the binary rules put a lone
+                    // constant on the right.
+                    let (symbolic, values): (Vec<_>, Vec<_>) =
+                        operands.into_iter().partition(|a| !is_value(a));
+                    Ok(ctx.eq_many(symbolic.into_iter().chain(values))?)
+                }
             }
         }
         AstOp::Eq(..) => match state.get_child_available(0).ast_type() {
@@ -453,6 +496,31 @@ pub(crate) fn simplify_bool<'c>(
                 }
             }
         },
+        // More than two operands: pairwise distinct. Any repeated operand
+        // makes it false, as does having more operands than the sort has
+        // values; operands that are all distinct values make it true.
+        AstOp::Neq(args) if args.len() > 2 => {
+            let is_value = |a: &AstRef<'c>| a.is_leaf() && a.concrete();
+            let args = state.get_all_simplified()?;
+            let values_in_sort = match args[0].ast_type() {
+                AstType::Bool => Some(2u64),
+                AstType::BitVec(width) if width < 64 => Some(1u64 << width),
+                _ => None,
+            };
+            if values_in_sort.is_some_and(|n| args.len() as u64 > n)
+                || args
+                    .iter()
+                    .enumerate()
+                    .any(|(i, a)| args[i + 1..].iter().any(|b| same_value(a, b)))
+            {
+                return Ok(ctx.false_()?);
+            }
+            if args.iter().all(is_value) {
+                return Ok(ctx.true_()?);
+            }
+            let (symbolic, values): (Vec<_>, Vec<_>) = args.into_iter().partition(|a| !is_value(a));
+            Ok(ctx.neq_many(symbolic.into_iter().chain(values))?)
+        }
         AstOp::Neq(..) => match state.get_child_available(0).ast_type() {
             AstType::Bool => {
                 let early_lhs = state.get_child_available(0);
@@ -994,5 +1062,14 @@ fn simplify_unsigned_cmp<'c>(
         Some((x, c)) if rel == kind => state.rerun(kind.build(ctx, x, c)?),
         Some((x, c)) => state.rerun(kind.build(ctx, c, x)?),
         None => Ok(kind.build(ctx, lhs, rhs)?),
+    }
+}
+
+/// Whether `a` and `b` are the same value under SMT-LIB `=`: structural
+/// identity, except that every NaN is one value whatever its bits.
+fn same_value<'c>(a: &AstRef<'c>, b: &AstRef<'c>) -> bool {
+    match (a.op(), b.op()) {
+        (AstOp::FPV(x), AstOp::FPV(y)) => x.eq_smtlib(y),
+        _ => a == b,
     }
 }
