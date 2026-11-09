@@ -37,7 +37,7 @@ impl<T> From<T> for Ignored<T> {
 
 /// This struct is a sort of hack to allow us to access data in python
 /// annotations, while supporting unknown annotations.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum AnnotationType {
     /// A user-defined Python annotation, held as the Python object itself.
     #[cfg(feature = "python")]
@@ -62,6 +62,78 @@ pub enum AnnotationType {
         region_base_addr: BigUint,
     },
     Uninitialized,
+}
+
+impl AnnotationType {
+    fn rank(&self) -> u8 {
+        match self {
+            #[cfg(feature = "python")]
+            AnnotationType::PyAnnotation { .. } => 0,
+            AnnotationType::SimplificationAvoidance => 1,
+            AnnotationType::StridedInterval { .. } => 2,
+            AnnotationType::EmptyStridedInterval => 3,
+            AnnotationType::Region { .. } => 4,
+            AnnotationType::Uninitialized => 5,
+        }
+    }
+}
+
+impl PartialOrd for AnnotationType {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+/// Orders like the derived `Ord` would (by variant, then by field), but two Python
+/// annotations of the same class, which share their name allocation, skip the string
+/// comparison. Same-class annotations are what annotation sets are mostly made of.
+impl Ord for AnnotationType {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            #[cfg(feature = "python")]
+            (
+                AnnotationType::PyAnnotation {
+                    name: a,
+                    obj_hash: ha,
+                    ..
+                },
+                AnnotationType::PyAnnotation {
+                    name: b,
+                    obj_hash: hb,
+                    ..
+                },
+            ) => {
+                if Arc::ptr_eq(a, b) {
+                    ha.cmp(hb)
+                } else {
+                    a.cmp(b).then(ha.cmp(hb))
+                }
+            }
+            (
+                AnnotationType::StridedInterval {
+                    stride: s1,
+                    lower_bound: l1,
+                    upper_bound: u1,
+                },
+                AnnotationType::StridedInterval {
+                    stride: s2,
+                    lower_bound: l2,
+                    upper_bound: u2,
+                },
+            ) => (s1, l1, u1).cmp(&(s2, l2, u2)),
+            (
+                AnnotationType::Region {
+                    region_id: i1,
+                    region_base_addr: b1,
+                },
+                AnnotationType::Region {
+                    region_id: i2,
+                    region_base_addr: b2,
+                },
+            ) => (i1, b1).cmp(&(i2, b2)),
+            _ => self.rank().cmp(&other.rank()),
+        }
+    }
 }
 
 /// An annotation attached to an AST node. Nodes hold them as `Arc<Annotation>`,
