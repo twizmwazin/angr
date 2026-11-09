@@ -8,23 +8,49 @@ use pyo3::types::{PyDict, PyTuple, PyType};
 
 use crate::claripy::prelude::*;
 
-/// `module:class` of each user-defined annotation class seen, keyed by the type object's
-/// address; the type is kept alive so the address cannot be reused.
-static PY_ANNOTATION_TYPE_NAMES: LazyLock<PyAnnotationTypeNames> = LazyLock::new(DashMap::new);
+/// What a Python annotation class converts to, cached per type object (kept alive so
+/// its address cannot be reused). This replaces a chain of downcasts and, for user
+/// classes, the name lookups on every conversion.
+static PY_ANNOTATION_CLASSES: LazyLock<PyAnnotationClasses> = LazyLock::new(DashMap::new);
 
-type PyAnnotationTypeNames = DashMap<usize, (Py<PyType>, Arc<str>)>;
+type PyAnnotationClasses = DashMap<usize, (Py<PyType>, AnnotationClass)>;
 
-fn py_annotation_type_name(ty: &Bound<'_, PyType>) -> PyResult<Arc<str>> {
+#[derive(Clone)]
+enum AnnotationClass {
+    SimplificationAvoidance,
+    StridedInterval,
+    EmptyStridedInterval,
+    Region,
+    Uninitialized,
+    /// A user-defined class, with its `module:class` name.
+    User(Arc<str>),
+}
+
+fn classify(slf: &Bound<'_, PyAnnotation>) -> PyResult<AnnotationClass> {
+    let ty = slf.get_type();
     let key = ty.as_ptr() as usize;
-    if let Some(entry) = PY_ANNOTATION_TYPE_NAMES.get(&key) {
+    if let Some(entry) = PY_ANNOTATION_CLASSES.get(&key) {
         return Ok(entry.1.clone());
     }
-    let py = ty.py();
-    let module_name = ty.getattr(intern!(py, "__module__"))?.extract::<String>()?;
-    let class_name = ty.getattr(intern!(py, "__name__"))?.extract::<String>()?;
-    let name: Arc<str> = format!("{module_name}:{class_name}").into();
-    PY_ANNOTATION_TYPE_NAMES.insert(key, (ty.clone().unbind(), name.clone()));
-    Ok(name)
+    let any = slf.as_any();
+    let class = if any.is_instance_of::<SimplificationAvoidanceAnnotation>() {
+        AnnotationClass::SimplificationAvoidance
+    } else if any.is_instance_of::<StridedIntervalAnnotation>() {
+        AnnotationClass::StridedInterval
+    } else if any.is_instance_of::<EmptyStridedIntervalAnnotation>() {
+        AnnotationClass::EmptyStridedInterval
+    } else if any.is_instance_of::<RegionAnnotation>() {
+        AnnotationClass::Region
+    } else if any.is_instance_of::<UninitializedAnnotation>() {
+        AnnotationClass::Uninitialized
+    } else {
+        let py = ty.py();
+        let module_name = ty.getattr(intern!(py, "__module__"))?.extract::<String>()?;
+        let class_name = ty.getattr(intern!(py, "__name__"))?.extract::<String>()?;
+        AnnotationClass::User(format!("{module_name}:{class_name}").into())
+    };
+    PY_ANNOTATION_CLASSES.insert(key, (ty.unbind(), class.clone()));
+    Ok(class)
 }
 
 /// `claripy.annotation.Annotation`
@@ -67,56 +93,62 @@ impl PyAnnotation {
     /// its subclasses) into the core [`Annotation`] consumed by the solver.
     pub fn to_annotation(slf: &Bound<'_, PyAnnotation>) -> Result<Arc<Annotation>, ClaripyError> {
         let any = slf.as_any();
-        let annotation = if any.cast::<SimplificationAvoidanceAnnotation>().is_ok() {
-            Annotation::new(AnnotationType::SimplificationAvoidance, false, false)
-        } else if let Ok(si) = any.cast::<StridedIntervalAnnotation>() {
-            let si = si.get();
-            Annotation::new(
-                AnnotationType::StridedInterval {
-                    stride: si.stride.clone(),
-                    lower_bound: si.lower_bound.clone(),
-                    upper_bound: si.upper_bound.clone(),
-                },
-                false,
-                false,
-            )
-        } else if any.cast::<EmptyStridedIntervalAnnotation>().is_ok() {
-            Annotation::new(AnnotationType::EmptyStridedInterval, false, false)
-        } else if let Ok(region) = any.cast::<RegionAnnotation>() {
-            let region = region.get();
-            Annotation::new(
-                AnnotationType::Region {
-                    region_id: region.region_id.clone(),
-                    region_base_addr: region.region_base_addr.clone(),
-                },
-                false,
-                false,
-            )
-        } else if any.cast::<UninitializedAnnotation>().is_ok() {
-            Annotation::new(AnnotationType::Uninitialized, false, true)
-        } else {
-            // User-defined annotation: hold on to the Python object itself.
-            let py = slf.py();
-            let eliminatable = slf
-                .getattr(intern!(py, "eliminatable"))
-                .and_then(|v| v.extract::<bool>())
-                .unwrap_or(true);
-            let relocatable = slf
-                .getattr(intern!(py, "relocatable"))
-                .and_then(|v| v.extract::<bool>())
-                .unwrap_or(false);
-            let name = py_annotation_type_name(&slf.get_type())?;
-            // Identify the annotation by the object's hash, not the object.
-            let obj_hash = slf.hash()? as i64;
-            Annotation::new(
-                AnnotationType::PyAnnotation {
-                    name,
-                    object: Ignored(Arc::new(slf.clone().into_any().unbind())),
-                    obj_hash,
-                },
-                eliminatable,
-                relocatable,
-            )
+        let annotation = match classify(slf)? {
+            AnnotationClass::SimplificationAvoidance => {
+                Annotation::new(AnnotationType::SimplificationAvoidance, false, false)
+            }
+            AnnotationClass::StridedInterval => {
+                let si = any.cast::<StridedIntervalAnnotation>()?.get();
+                Annotation::new(
+                    AnnotationType::StridedInterval {
+                        stride: si.stride.clone(),
+                        lower_bound: si.lower_bound.clone(),
+                        upper_bound: si.upper_bound.clone(),
+                    },
+                    false,
+                    false,
+                )
+            }
+            AnnotationClass::EmptyStridedInterval => {
+                Annotation::new(AnnotationType::EmptyStridedInterval, false, false)
+            }
+            AnnotationClass::Region => {
+                let region = any.cast::<RegionAnnotation>()?.get();
+                Annotation::new(
+                    AnnotationType::Region {
+                        region_id: region.region_id.clone(),
+                        region_base_addr: region.region_base_addr.clone(),
+                    },
+                    false,
+                    false,
+                )
+            }
+            AnnotationClass::Uninitialized => {
+                Annotation::new(AnnotationType::Uninitialized, false, true)
+            }
+            AnnotationClass::User(name) => {
+                // User-defined annotation: hold on to the Python object itself.
+                let py = slf.py();
+                let eliminatable = slf
+                    .getattr(intern!(py, "eliminatable"))
+                    .and_then(|v| v.extract::<bool>())
+                    .unwrap_or(true);
+                let relocatable = slf
+                    .getattr(intern!(py, "relocatable"))
+                    .and_then(|v| v.extract::<bool>())
+                    .unwrap_or(false);
+                // Identify the annotation by the object's hash, not the object.
+                let obj_hash = slf.hash()? as i64;
+                Annotation::new(
+                    AnnotationType::PyAnnotation {
+                        name,
+                        object: Ignored(slf.clone().into_any().unbind()),
+                        obj_hash,
+                    },
+                    eliminatable,
+                    relocatable,
+                )
+            }
         };
 
         Ok(annotation)
