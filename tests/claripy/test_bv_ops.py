@@ -75,6 +75,35 @@ class TestBVOperations(unittest.TestCase):
         result = self.bv_zero - self.bv_one
         self._check_equal(result, (1 << 32) - 1)
 
+        # N-ary subtraction is left-associative
+        result = claripy.Sub(self.bv1, self.bv2, self.bv_one)
+        self._check_equal(result, 4)
+
+        # Chained symbolic subtraction flattens into one node
+        sym_z = claripy.BVS("z", 8)
+        chained = self.sym_x - self.sym_y - sym_z
+        self.assertEqual(chained.op, "__sub__")
+        self.assertEqual(len(chained.args), 3)
+        self.assertIs(chained.args[0], self.sym_x)
+        self.assertIs(chained.args[1], self.sym_y)
+        self.assertIs(chained.args[2], sym_z)
+        self.assertIs(claripy.Sub(self.sym_x, self.sym_y, sym_z), chained)
+
+        # A subtraction on the right-hand side is a different expression
+        right = self.sym_x - (self.sym_y - sym_z)
+        self.assertEqual(len(right.args), 2)
+
+        solver = claripy.SolverZ3()
+        solver.add([self.sym_x == 10, self.sym_y == 3, sym_z == 2])
+        self.assertEqual(solver.eval(chained, 1)[0], 5)
+        self.assertEqual(solver.eval(right, 1)[0], 9)
+
+        # Round-trips through (op, args)
+        rebuilt = claripy.ast.BV(chained.op, chained.args)
+        self.assertEqual(rebuilt.op, "__sub__")
+        self.assertEqual(len(rebuilt.args), 3)
+        self.assertEqual(solver.eval(rebuilt, 1)[0], 5)
+
     def test_mul(self):
         """Test multiplication operation"""
         result = self.bv1 * self.bv2

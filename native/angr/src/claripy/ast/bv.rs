@@ -54,7 +54,7 @@ impl BV {
             "__neg__" => GLOBAL_CONTEXT.neg(&args.ast::<BV>(py, 0)?)?,
             "__invert__" => GLOBAL_CONTEXT.not(&args.ast::<BV>(py, 0)?)?,
             "__add__" => GLOBAL_CONTEXT.add_many(args.asts::<BV>(py)?)?,
-            "__sub__" => GLOBAL_CONTEXT.sub(&args.ast::<BV>(py, 0)?, &args.ast::<BV>(py, 1)?)?,
+            "__sub__" => GLOBAL_CONTEXT.sub_many(args.asts::<BV>(py)?)?,
             "__mul__" => GLOBAL_CONTEXT.mul_many(args.asts::<BV>(py)?)?,
             "__floordiv__" => {
                 GLOBAL_CONTEXT.udiv(&args.ast::<BV>(py, 0)?, &args.ast::<BV>(py, 1)?)?
@@ -1149,22 +1149,8 @@ macro_rules! nary_op {
 }
 
 nary_op!(Add, add_many);
+nary_op!(Sub, sub_many);
 nary_op!(Mul, mul_many);
-
-#[pyfunction(signature = (lhs, rhs, *rest))]
-pub fn Sub<'py>(
-    py: Python<'py>,
-    lhs: CoerceBV,
-    rhs: CoerceBV,
-    rest: Vec<CoerceBV>,
-) -> Result<Bound<'py, BV>, ClaripyError> {
-    let (elhs, erhs) = CoerceBV::unpack_pair(&lhs, &rhs)?;
-    let mut acc = GLOBAL_CONTEXT.sub(&elhs, &erhs)?;
-    for arg in &rest {
-        acc = GLOBAL_CONTEXT.sub(&acc, &arg.unpack_like(&elhs)?)?;
-    }
-    BV::new(py, &acc.simplify_ext(true, true)?)
-}
 
 binop!(UDiv, udiv, BV);
 binop!(SDiv, sdiv, BV);

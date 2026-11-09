@@ -1,3 +1,5 @@
+use std::iter;
+
 use num_bigint::{BigInt, BigUint};
 use num_traits::{Num, One, ToPrimitive, Zero};
 
@@ -518,27 +520,36 @@ pub(crate) fn simplify_bv<'c>(
                 2 => {
                     let (a, b) = (&sym_args[0], &sym_args[1]);
                     match (a.op(), b.op()) {
-                        // v + (bvv - other) => (v + bvv) - other
-                        (AstOp::BVV(v), AstOp::Sub(bvv, other))
-                        | (AstOp::Sub(bvv, other), AstOp::BVV(v))
-                            if matches!(bvv.op(), AstOp::BVV(_)) =>
+                        // v + (bvv - other - ...) => (v + bvv) - other - ...
+                        (AstOp::BVV(v), AstOp::Sub(sub_args))
+                        | (AstOp::Sub(sub_args), AstOp::BVV(v))
+                            if matches!(sub_args[0].op(), AstOp::BVV(_)) =>
                         {
-                            if let AstOp::BVV(bvv_value) = bvv.op() {
+                            if let AstOp::BVV(bvv_value) = sub_args[0].op() {
                                 let combined_value = (v.clone() + bvv_value.clone())?;
                                 let combined_bvv = ctx.bvv(combined_value)?;
-                                state.rerun(ctx.sub(combined_bvv, other.clone())?)
+                                state.rerun(ctx.sub_many(
+                                    iter::once(combined_bvv).chain(sub_args[1..].iter().cloned()),
+                                )?)
                             } else {
                                 unreachable!()
                             }
                         }
-                        (AstOp::BVV(v), AstOp::Sub(other, bvv))
-                        | (AstOp::Sub(other, bvv), AstOp::BVV(v))
-                            if matches!(bvv.op(), AstOp::BVV(_)) =>
+                        // v + (other - ... - bvv) => (other - ...) + (v - bvv)
+                        (AstOp::BVV(v), AstOp::Sub(sub_args))
+                        | (AstOp::Sub(sub_args), AstOp::BVV(v))
+                            if matches!(sub_args.last().map(|a| a.op()), Some(AstOp::BVV(_))) =>
                         {
-                            if let AstOp::BVV(bvv_value) = bvv.op() {
+                            if let [others @ .., bvv] = sub_args.as_slice()
+                                && let AstOp::BVV(bvv_value) = bvv.op()
+                            {
                                 let combined_value = (v.clone() - bvv_value.clone())?;
                                 let combined_bvv = ctx.bvv(combined_value)?;
-                                state.rerun(ctx.add(other.clone(), combined_bvv)?)
+                                let other = match others {
+                                    [only] => only.clone(),
+                                    _ => ctx.sub_many(others.iter().cloned())?,
+                                };
+                                state.rerun(ctx.add(other, combined_bvv)?)
                             } else {
                                 unreachable!()
                             }
@@ -561,54 +572,79 @@ pub(crate) fn simplify_bv<'c>(
                 }
             }
         }
-        AstOp::Sub(..) => {
-            let lhs = state.get_child_simplified(0)?;
-            let rhs = state.get_child_simplified(1)?;
-            match (lhs.op(), rhs.op()) {
-                (AstOp::BVV(value1), AstOp::BVV(value2)) => {
-                    Ok(ctx.bvv((value1.clone() - value2.clone())?)?)
-                }
-                (AstOp::Sub(inner_lhs, inner_rhs), AstOp::BVV(v))
-                    if matches!(inner_rhs.op(), AstOp::BVV(_)) =>
-                {
-                    // (a - b) - c  => a - (b + c)
-                    if let AstOp::BVV(b_val) = inner_rhs.op() {
-                        let combined_value = (b_val.clone() + v.clone())?;
-                        let combined_bvv = ctx.bvv(combined_value)?;
-                        let new_sub = ctx.sub(inner_lhs.clone(), combined_bvv)?;
-                        state.rerun(new_sub)
-                    } else {
-                        unreachable!()
+        AstOp::Sub(_) => {
+            // Simplify all children in one batch to avoid quadratic re-runs.
+            let simplified = state.get_all_simplified()?;
+
+            let size = simplified[0].size();
+
+            // Subtraction is left-associative, so only a Sub in the minuend
+            // position can be flattened: (a - b) - c => a - b - c
+            let (mut minuend, inner_subtrahends) = match simplified[0].op() {
+                AstOp::Sub(inner_args) => (inner_args[0].clone(), &inner_args[1..]),
+                _ => (simplified[0].clone(), &[][..]),
+            };
+
+            // Fold constant subtrahends into one and drop zeros
+            let mut bvv_acc: Option<BitVec> = None;
+            let mut subtrahends: Vec<AstRef<'c>> = Vec::new();
+            for arg in inner_subtrahends.iter().chain(&simplified[1..]) {
+                match arg.op() {
+                    AstOp::BVV(v) if v.is_zero() => {}
+                    AstOp::BVV(v) => {
+                        bvv_acc = Some(match bvv_acc {
+                            Some(acc) => (acc + v.clone())?,
+                            None => v.clone(),
+                        });
                     }
+                    _ => subtrahends.push(arg.clone()),
                 }
-                (AstOp::Add(add_args), AstOp::BVV(v)) => {
-                    // Find a BVV among the Add args to combine with
-                    if let Some(bvv_idx) = add_args
-                        .iter()
-                        .position(|a| matches!(a.op(), AstOp::BVV(_)))
+            }
+
+            // Fold the constant into the minuend when it has one to fold into
+            if let Some(c) = bvv_acc.take_if(|c| !c.is_zero()) {
+                match minuend.op() {
+                    // m - c - ... => (m - c) - ...
+                    AstOp::BVV(m) => minuend = ctx.bvv((m.clone() - c)?)?,
+                    // (sum + b) - c - ... => (sum + (b - c)) - ...
+                    AstOp::Add(add_args)
+                        if add_args.iter().any(|a| matches!(a.op(), AstOp::BVV(_))) =>
                     {
-                        if let AstOp::BVV(b_val) = add_args[bvv_idx].op() {
-                            // (sum + b) - c => sum + (b - c)
-                            let combined_value = (b_val.clone() - v.clone())?;
-                            let combined_bvv = ctx.bvv(combined_value)?;
-                            let mut new_args: Vec<AstRef<'c>> = add_args
-                                .iter()
-                                .enumerate()
-                                .filter(|(i, _)| *i != bvv_idx)
-                                .map(|(_, a)| a.clone())
-                                .collect();
-                            new_args.push(combined_bvv);
-                            state.rerun(ctx.add_many(new_args)?)
-                        } else {
-                            unreachable!()
-                        }
+                        let mut folded = Some(c);
+                        let new_args = add_args
+                            .iter()
+                            .map(|a| match (a.op(), folded.take()) {
+                                (AstOp::BVV(b), Some(c)) => ctx.bvv((b.clone() - c)?),
+                                (_, c) => {
+                                    folded = c;
+                                    Ok(a.clone())
+                                }
+                            })
+                            .collect::<Result<Vec<_>, _>>()?;
+                        minuend = ctx.add_many(new_args)?;
+                    }
+                    _ => subtrahends.push(ctx.bvv(c)?),
+                }
+            }
+
+            match subtrahends.as_slice() {
+                // Nothing left to subtract. The minuend may be a rebuilt Add.
+                [] => state.rerun(minuend),
+                // x - x => 0
+                [rhs] if minuend == *rhs => Ok(ctx.bvv(BitVec::zeros(size))?),
+                _ => {
+                    let args: Vec<AstRef<'c>> = iter::once(minuend).chain(subtrahends).collect();
+                    let changed = args.len() != simplified.len()
+                        || args
+                            .iter()
+                            .zip(simplified.iter())
+                            .any(|(a, b)| a.hash() != b.hash());
+                    if changed {
+                        state.rerun(ctx.sub_many(args)?)
                     } else {
-                        Ok(ctx.sub(lhs, rhs)?)
+                        Ok(ctx.sub_many(args)?)
                     }
                 }
-                (_, AstOp::BVV(v)) if v.is_zero() => Ok(lhs.clone()),
-                (..) if lhs == rhs => Ok(ctx.bvv(BitVec::zeros(lhs.size()))?),
-                _ => Ok(ctx.sub(lhs, rhs)?),
             }
         }
         AstOp::Mul(_) => {
@@ -1061,10 +1097,12 @@ pub(crate) fn simplify_bv<'c>(
                         .collect::<Result<_, _>>()?;
                     state.rerun(ctx.add_many(extracted)?)
                 }
-                AstOp::Sub(lhs, rhs) if *low == 0 => {
-                    let lhs_extracted = ctx.extract(lhs, *high, 0)?;
-                    let rhs_extracted = ctx.extract(rhs, *high, 0)?;
-                    state.rerun(ctx.sub(&lhs_extracted, &rhs_extracted)?)
+                AstOp::Sub(sub_args) if *low == 0 => {
+                    let extracted: Vec<AstRef<'c>> = sub_args
+                        .iter()
+                        .map(|a| ctx.extract(a, *high, 0))
+                        .collect::<Result<_, _>>()?;
+                    state.rerun(ctx.sub_many(extracted)?)
                 }
 
                 // Propagate extract through bitwise operations

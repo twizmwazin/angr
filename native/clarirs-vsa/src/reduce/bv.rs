@@ -86,7 +86,7 @@ pub(crate) fn reduce_bv(
         AstOp::Xor(..) => fold_si(children, StridedInterval::bitxor)?,
         AstOp::Neg(..) => child_si(children, 0)?.neg(),
         AstOp::Add(..) => fold_si(children, StridedInterval::add)?,
-        AstOp::Sub(..) => child_si(children, 0)?.sub(&child_si(children, 1)?),
+        AstOp::Sub(..) => fold_si(children, StridedInterval::sub)?,
         AstOp::Mul(..) => fold_si(children, StridedInterval::mul)?,
         AstOp::UDiv(..) => child_si(children, 0)?.udiv(&child_si(children, 1)?)?,
         AstOp::SDiv(..) => child_si(children, 0)?.sdiv(&child_si(children, 1)?)?,

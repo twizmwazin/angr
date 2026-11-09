@@ -217,7 +217,16 @@ pub trait AstFactory<'c>: Sized {
         lhs: impl IntoOwned<AstRef<'c>>,
         rhs: impl IntoOwned<AstRef<'c>>,
     ) -> Result<AstRef<'c>, ClarirsError> {
-        self.make_ast(AstOp::Sub(lhs.into_owned(), rhs.into_owned()))
+        self.make_ast(AstOp::Sub(vec![lhs.into_owned(), rhs.into_owned()]))
+    }
+
+    /// Left-associative subtraction: `args[0] - args[1] - ...`.
+    fn sub_many(
+        &'c self,
+        args: impl IntoIterator<Item = AstRef<'c>>,
+    ) -> Result<AstRef<'c>, ClarirsError> {
+        let args: Vec<AstRef<'c>> = args.into_iter().collect();
+        self.make_ast(AstOp::Sub(args))
     }
 
     fn udiv(

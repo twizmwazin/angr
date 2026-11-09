@@ -1367,3 +1367,88 @@ fn test_ite_absorbs_nested_ite_on_same_condition() -> Result<()> {
     assert_eq!(unrelated.simplify()?, unrelated);
     Ok(())
 }
+
+#[test]
+fn test_sub_nary() -> Result<()> {
+    let ctx = Context::new();
+    let x = ctx.bvs("x", 8)?;
+    let y = ctx.bvs("y", 8)?;
+    let z = ctx.bvs("z", 8)?;
+    let bvv = |v: u64| ctx.bvv(BitVec::from((v, 8)));
+
+    // Sub is left-associative, so a Sub in the minuend position flattens
+    let nested = ctx.sub(ctx.sub(&x, &y)?, &z)?.simplify()?;
+    assert_eq!(nested, ctx.sub_many([x.clone(), y.clone(), z.clone()])?);
+
+    // ... but one in a subtrahend position does not: x - (y - z) != x - y - z
+    let right = ctx.sub(&x, ctx.sub(&y, &z)?)?;
+    assert_eq!(right.simplify()?, right);
+
+    // Fully concrete
+    let concrete = ctx.sub_many([bvv(10)?, bvv(3)?, bvv(4)?])?.simplify()?;
+    assert_eq!(concrete, bvv(3)?);
+
+    // Constant subtrahends fold into one, trailing the symbolic ones
+    let folded = ctx
+        .sub_many([x.clone(), bvv(1)?, y.clone(), bvv(2)?])?
+        .simplify()?;
+    assert_eq!(folded, ctx.sub_many([x.clone(), y.clone(), bvv(3)?])?);
+
+    // ... including across a flattened minuend
+    let folded = ctx.sub(ctx.sub(&x, bvv(1)?)?, bvv(2)?)?.simplify()?;
+    assert_eq!(folded, ctx.sub(&x, bvv(3)?)?);
+
+    // ... and into a constant minuend
+    let folded = ctx
+        .sub_many([bvv(10)?, x.clone(), bvv(3)?, y.clone()])?
+        .simplify()?;
+    assert_eq!(folded, ctx.sub_many([bvv(7)?, x.clone(), y.clone()])?);
+
+    // Zero subtrahends disappear
+    let zeros = ctx.sub_many([x.clone(), bvv(0)?, bvv(0)?])?.simplify()?;
+    assert_eq!(zeros, x);
+
+    // Constants that cancel leave no constant behind
+    let cancel = ctx
+        .sub_many([x.clone(), bvv(1)?, y.clone(), bvv(255)?])?
+        .simplify()?;
+    assert_eq!(cancel, ctx.sub(&x, &y)?);
+
+    // (x + 5) - y - 3 => (x + 2) - y
+    let add = ctx
+        .sub_many([ctx.add(&x, bvv(5)?)?, y.clone(), bvv(3)?])?
+        .simplify()?;
+    assert_eq!(add, ctx.sub(ctx.add(&x, bvv(2)?)?, &y)?);
+
+    // (x + 5) - 5 => x
+    let add = ctx.sub(ctx.add(&x, bvv(5)?)?, bvv(5)?)?.simplify()?;
+    assert_eq!(add, x);
+
+    // 1 + (x - y - 3) => (x - y) + 0xfe
+    let sum = ctx
+        .add(bvv(1)?, ctx.sub_many([x.clone(), y.clone(), bvv(3)?])?)?
+        .simplify()?;
+    assert_eq!(sum, ctx.add(ctx.sub(&x, &y)?, bvv(254)?)?);
+
+    // Extract of the low bits distributes over every operand
+    let w = ctx.bvs("w", 16)?;
+    let v = ctx.bvs("v", 16)?;
+    let u = ctx.bvs("u", 16)?;
+    let extracted = ctx
+        .extract(ctx.sub_many([w.clone(), v.clone(), u.clone()])?, 7, 0)?
+        .simplify()?;
+    assert_eq!(
+        extracted,
+        ctx.sub_many([
+            ctx.extract(&w, 7, 0)?,
+            ctx.extract(&v, 7, 0)?,
+            ctx.extract(&u, 7, 0)?
+        ])?
+    );
+
+    // A Sub needs at least one operand, all of the same width
+    assert!(ctx.sub_many([]).is_err());
+    assert!(ctx.sub_many([x.clone(), w.clone()]).is_err());
+
+    Ok(())
+}

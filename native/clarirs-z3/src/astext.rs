@@ -240,7 +240,7 @@ impl<'c> AstExtZ3<'c> for AstRef<'c> {
                             }
                             AstOp::Neg(..) => unop!(z3_ctx, children, Z3_mk_bvneg),
                             AstOp::Add(..) => naryop!(z3_ctx, children, Z3_mk_bvadd),
-                            AstOp::Sub(..) => binop!(z3_ctx, children, Z3_mk_bvsub),
+                            AstOp::Sub(..) => naryop!(z3_ctx, children, Z3_mk_bvsub),
                             AstOp::Mul(..) => naryop!(z3_ctx, children, Z3_mk_bvmul),
                             AstOp::UDiv(..) => binop!(z3_ctx, children, Z3_mk_bvudiv),
                             AstOp::SDiv(..) => binop!(z3_ctx, children, Z3_mk_bvsdiv),
@@ -722,6 +722,7 @@ impl<'c> AstExtZ3<'c> for AstRef<'c> {
                         | DeclKind::Bor
                         | DeclKind::Bxor
                         | DeclKind::Badd
+                        | DeclKind::Bsub
                         | DeclKind::Bmul => {
                             let num_args = Z3_get_app_num_args(z3_ctx, app);
                             let mut args = Vec::with_capacity(num_args as usize);
@@ -733,13 +734,10 @@ impl<'c> AstExtZ3<'c> for AstRef<'c> {
                                 DeclKind::Bor => ctx.or(args),
                                 DeclKind::Bxor => ctx.xor(args),
                                 DeclKind::Badd => ctx.add_many(args),
+                                DeclKind::Bsub => ctx.sub_many(args),
                                 _ => ctx.mul_many(args),
                             }
                         }
-                        DeclKind::Bsub => ctx.sub(
-                            AstRef::from_z3(ctx, arg(0)?)?,
-                            AstRef::from_z3(ctx, arg(1)?)?,
-                        ),
                         // z3's rewriter replaces these four with its internal
                         // total forms, so anything read back out of a solver
                         // carries the _i spelling rather than the base one.

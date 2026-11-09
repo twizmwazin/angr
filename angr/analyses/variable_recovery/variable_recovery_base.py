@@ -347,11 +347,14 @@ class VariableRecoveryStateBase:
                 arg_offsets.append(arg_offset)
             r = sum(arg_offsets)
         elif addr.op == "__sub__":
-            r1 = VariableRecoveryStateBase._get_stack_offset(cast(claripy.ast.BV, addr.args[0]))
-            r2 = VariableRecoveryStateBase._get_stack_offset(cast(claripy.ast.BV, addr.args[1]))
-            if r1 is None or r2 is None:
-                return None
-            r = r1 - r2
+            # __sub__ is n-ary and left-associative: args[0] - args[1] - ...
+            arg_offsets = []
+            for arg in addr.args:
+                arg_offset = VariableRecoveryStateBase._get_stack_offset(cast(claripy.ast.BV, arg))
+                if arg_offset is None:
+                    return None
+                arg_offsets.append(arg_offset)
+            r = arg_offsets[0] - sum(arg_offsets[1:])
         return r
 
     def get_stack_offset(self, addr: claripy.ast.Bits) -> int | None:
