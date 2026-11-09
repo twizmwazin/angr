@@ -39,10 +39,8 @@ macro_rules! ast_wrapper {
                 }) {
                     Ok(cache_hit)
                 } else {
-                    let this = Bound::new(
-                        py,
-                        $init(Base::new_with_name(py, inner, name)?, inner.clone()),
-                    )?;
+                    let this =
+                        Bound::new(py, $init(Base::new_with_name(inner, name)?, inner.clone()))?;
                     let weakref = ::pyo3::types::PyWeakrefReference::new(&this)?;
                     $cache.insert(inner.hash(), weakref.unbind());
 
