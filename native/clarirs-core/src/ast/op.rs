@@ -256,30 +256,36 @@ impl<'c> AstOp<'c> {
             AstOp::BoolS(s) | AstOp::BVS(s, _) | AstOp::FPS(s, _) | AstOp::StringS(s) => {
                 Some(Arc::new(BTreeSet::from([s.clone()])))
             }
-            _ => {
-                let mut widest: Option<Arc<BTreeSet<InternedString>>> = None;
-                for child in self.child_iter() {
-                    if let Some(vars) = &child.variables
-                        && widest.as_ref().is_none_or(|w| vars.len() > w.len())
-                    {
-                        widest = Some(vars.clone());
-                    }
-                }
-                let widest = widest?;
-                let mut union: Option<BTreeSet<InternedString>> = None;
-                for child in self.child_iter() {
-                    if let Some(vars) = &child.variables
-                        && !Arc::ptr_eq(vars, &widest)
-                        && !vars.is_subset(&widest)
-                    {
-                        union
-                            .get_or_insert_with(|| (*widest).clone())
-                            .extend(vars.iter().cloned());
-                    }
-                }
-                Some(union.map_or(widest, Arc::new))
+            _ => Self::union_variables(self.child_iter()),
+        }
+    }
+
+    /// The union of `children`'s variable sets, or `None` if there are none.
+    /// When one child's set already holds them all, that set is shared, not copied.
+    pub fn union_variables(
+        children: impl Iterator<Item = AstRef<'c>> + Clone,
+    ) -> Option<Arc<BTreeSet<InternedString>>> {
+        let mut widest: Option<Arc<BTreeSet<InternedString>>> = None;
+        for child in children.clone() {
+            if let Some(vars) = &child.variables
+                && widest.as_ref().is_none_or(|w| vars.len() > w.len())
+            {
+                widest = Some(vars.clone());
             }
         }
+        let widest = widest?;
+        let mut union: Option<BTreeSet<InternedString>> = None;
+        for child in children {
+            if let Some(vars) = &child.variables
+                && !Arc::ptr_eq(vars, &widest)
+                && !vars.is_subset(&widest)
+            {
+                union
+                    .get_or_insert_with(|| (*widest).clone())
+                    .extend(vars.iter().cloned());
+            }
+        }
+        Some(union.map_or(widest, Arc::new))
     }
 
     /// Computes the type (sort) of the result of this operation. The type of an
@@ -594,6 +600,7 @@ impl<'c> AstOp<'c> {
     }
 }
 
+#[derive(Clone)]
 pub struct AstOpChildIter<'a, 'c> {
     op: &'a AstOp<'c>,
     index: usize,

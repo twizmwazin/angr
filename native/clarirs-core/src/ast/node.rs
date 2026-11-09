@@ -63,10 +63,11 @@ impl<'c> AstNode<'c> {
         annotations: BTreeSet<Arc<Annotation>>,
         ast_type: AstType,
         hash: u64,
+        variables: Option<Arc<BTreeSet<InternedString>>>,
     ) -> Self {
         debug_assert_eq!(ast_type, op.infer_type());
         debug_assert_eq!(hash, structural_hash(ast_type, &op, &annotations));
-        let variables = op.variables();
+        debug_assert_eq!(variables, op.variables());
         let depth = 1 + op.child_iter().map(|c| c.depth()).max().unwrap_or(0);
         // Symbolic propagates from: having variables, the op itself being inherently
         // symbolic (e.g. VSA Union/Intersection/Widen), or any child being symbolic.

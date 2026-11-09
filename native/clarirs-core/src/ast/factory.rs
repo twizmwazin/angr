@@ -36,7 +36,30 @@ pub trait AstFactory<'c>: Sized {
         let ctx = self.context();
         let ast_type = op.infer_type();
         let hash = structural_hash(ast_type, &op, &annotations);
-        self.intern_ast(hash, || AstNode::new(ctx, op, annotations, ast_type, hash))
+        self.intern_ast(hash, || {
+            let variables = op.variables();
+            AstNode::new(ctx, op, annotations, ast_type, hash, variables)
+        })
+    }
+
+    /// Like [`make_ast`](Self::make_ast), with the node's variable set supplied by the
+    /// caller. The simplifier uses this when it rebuilds an n-ary op from flattened
+    /// operands: the union over the original operands is already shared by one of them,
+    /// while recomputing it over the flattened list costs one insert per variable.
+    fn make_ast_with_variables(
+        &'c self,
+        op: AstOp<'c>,
+        variables: Option<Arc<BTreeSet<InternedString>>>,
+    ) -> Result<AstRef<'c>, ClarirsError> {
+        debug_assert_eq!(variables, op.variables());
+        op.validate()?;
+        let ctx = self.context();
+        let annotations = Self::relocatable_child_annotations(&op, BTreeSet::new());
+        let ast_type = op.infer_type();
+        let hash = structural_hash(ast_type, &op, &annotations);
+        self.intern_ast(hash, || {
+            AstNode::new(ctx, op, annotations, ast_type, hash, variables)
+        })
     }
 
     /// Construct a node with `annotations` plus the relocatable annotations of
@@ -44,8 +67,17 @@ pub trait AstFactory<'c>: Sized {
     fn make_ast_annotated(
         &'c self,
         op: AstOp<'c>,
-        mut annotations: BTreeSet<Arc<Annotation>>,
+        annotations: BTreeSet<Arc<Annotation>>,
     ) -> Result<AstRef<'c>, ClarirsError> {
+        let annotations = Self::relocatable_child_annotations(&op, annotations);
+        self.make_ast_exact(op, annotations)
+    }
+
+    /// `annotations` plus the relocatable annotations of `op`'s children.
+    fn relocatable_child_annotations(
+        op: &AstOp<'c>,
+        mut annotations: BTreeSet<Arc<Annotation>>,
+    ) -> BTreeSet<Arc<Annotation>> {
         for child in op.child_iter() {
             let child_annotations = child.annotations();
             if child_annotations.is_empty() {
@@ -61,7 +93,7 @@ pub trait AstFactory<'c>: Sized {
                 }
             }
         }
-        self.make_ast_exact(op, annotations)
+        annotations
     }
 
     fn make_ast(&'c self, op: AstOp<'c>) -> Result<AstRef<'c>, ClarirsError> {

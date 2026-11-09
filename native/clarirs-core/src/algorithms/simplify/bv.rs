@@ -22,6 +22,7 @@ pub(crate) fn simplify_bv<'c>(
         AstOp::And(_) => {
             // Simplify all children in one batch to avoid quadratic re-runs.
             let simplified = state.get_all_simplified()?;
+            let vars = AstOp::union_variables(simplified.iter().cloned());
 
             let size = simplified[0].size();
 
@@ -89,13 +90,6 @@ pub(crate) fn simplify_bv<'c>(
                     sym_args.push(ctx.bvv(bvv.clone())?);
                 }
             }
-
-            // Check if anything changed
-            let changed = sym_args.len() != simplified.len()
-                || sym_args
-                    .iter()
-                    .zip(simplified.iter())
-                    .any(|(a, b)| a.hash() != b.hash());
 
             match sym_args.len() {
                 0 => Ok(ctx.bvv(BitVec::from((
@@ -180,53 +174,40 @@ pub(crate) fn simplify_bv<'c>(
                                                     ctx.lshr(&masked_a, lshr_amt.clone())?;
                                                 let result = ctx.or2(new_shl, new_lshr)?;
                                                 state.rerun(result)
-                                            } else if changed {
-                                                state.rerun(ctx.and(sym_args)?)
                                             } else {
-                                                Ok(ctx.and(sym_args)?)
+                                                Ok(ctx.make_ast_with_variables(
+                                                    AstOp::And(sym_args),
+                                                    vars.clone(),
+                                                )?)
                                             }
-                                        } else if changed {
-                                            state.rerun(ctx.and(sym_args)?)
                                         } else {
-                                            Ok(ctx.and(sym_args)?)
+                                            Ok(ctx.make_ast_with_variables(
+                                                AstOp::And(sym_args),
+                                                vars.clone(),
+                                            )?)
                                         }
-                                    } else if changed {
-                                        state.rerun(ctx.and(sym_args)?)
                                     } else {
-                                        Ok(ctx.and(sym_args)?)
+                                        Ok(ctx.make_ast_with_variables(
+                                            AstOp::And(sym_args),
+                                            vars.clone(),
+                                        )?)
                                     }
                                 }
-                                _ => {
-                                    if changed {
-                                        state.rerun(ctx.and(sym_args)?)
-                                    } else {
-                                        Ok(ctx.and(sym_args)?)
-                                    }
-                                }
+                                _ => Ok(ctx
+                                    .make_ast_with_variables(AstOp::And(sym_args), vars.clone())?),
                             }
                         }
 
-                        _ => {
-                            if changed {
-                                state.rerun(ctx.and(sym_args)?)
-                            } else {
-                                Ok(ctx.and(sym_args)?)
-                            }
-                        }
+                        _ => Ok(ctx.make_ast_with_variables(AstOp::And(sym_args), vars.clone())?),
                     }
                 }
-                _ => {
-                    if changed {
-                        state.rerun(ctx.and(sym_args)?)
-                    } else {
-                        Ok(ctx.and(sym_args)?)
-                    }
-                }
+                _ => Ok(ctx.make_ast_with_variables(AstOp::And(sym_args), vars.clone())?),
             }
         }
         AstOp::Or(_) => {
             // Simplify all children in one batch to avoid quadratic re-runs.
             let simplified = state.get_all_simplified()?;
+            let vars = AstOp::union_variables(simplified.iter().cloned());
 
             let size = simplified[0].size();
             let all_ones = BitVec::from(((BigUint::one() << size) - BigUint::one(), size));
@@ -296,12 +277,6 @@ pub(crate) fn simplify_bv<'c>(
                 }
             }
 
-            let changed = sym_args.len() != simplified.len()
-                || sym_args
-                    .iter()
-                    .zip(simplified.iter())
-                    .any(|(a, b)| a.hash() != b.hash());
-
             match sym_args.len() {
                 0 => Ok(ctx.bvv(BitVec::zeros(size))?),
                 1 => Ok(sym_args.into_iter().next().unwrap()),
@@ -323,27 +298,16 @@ pub(crate) fn simplify_bv<'c>(
                             parts.reverse();
                             state.rerun(ctx.concat(parts)?)
                         }
-                        _ => {
-                            if changed {
-                                state.rerun(ctx.or(sym_args)?)
-                            } else {
-                                Ok(ctx.or(sym_args)?)
-                            }
-                        }
+                        _ => Ok(ctx.make_ast_with_variables(AstOp::Or(sym_args), vars.clone())?),
                     }
                 }
-                _ => {
-                    if changed {
-                        state.rerun(ctx.or(sym_args)?)
-                    } else {
-                        Ok(ctx.or(sym_args)?)
-                    }
-                }
+                _ => Ok(ctx.make_ast_with_variables(AstOp::Or(sym_args), vars.clone())?),
             }
         }
         AstOp::Xor(_) => {
             // Simplify all children in one batch to avoid quadratic re-runs.
             let simplified = state.get_all_simplified()?;
+            let vars = AstOp::union_variables(simplified.iter().cloned());
 
             let size = simplified[0].size();
 
@@ -406,12 +370,6 @@ pub(crate) fn simplify_bv<'c>(
                 sym_args.push(ctx.bvv(bvv.clone())?);
             }
 
-            let changed = sym_args.len() != simplified.len()
-                || sym_args
-                    .iter()
-                    .zip(simplified.iter())
-                    .any(|(a, b)| a.hash() != b.hash());
-
             match sym_args.len() {
                 0 => Ok(ctx.bvv(BitVec::zeros(size))?),
                 1 => Ok(sym_args.into_iter().next().unwrap()),
@@ -435,22 +393,10 @@ pub(crate) fn simplify_bv<'c>(
                             parts.reverse();
                             state.rerun(ctx.concat(parts)?)
                         }
-                        _ => {
-                            if changed {
-                                state.rerun(ctx.xor(sym_args)?)
-                            } else {
-                                Ok(ctx.xor(sym_args)?)
-                            }
-                        }
+                        _ => Ok(ctx.make_ast_with_variables(AstOp::Xor(sym_args), vars.clone())?),
                     }
                 }
-                _ => {
-                    if changed {
-                        state.rerun(ctx.xor(sym_args)?)
-                    } else {
-                        Ok(ctx.xor(sym_args)?)
-                    }
-                }
+                _ => Ok(ctx.make_ast_with_variables(AstOp::Xor(sym_args), vars.clone())?),
             }
         }
         AstOp::Neg(..) => {
@@ -465,6 +411,7 @@ pub(crate) fn simplify_bv<'c>(
         AstOp::Add(_) => {
             // Simplify all children in one batch to avoid quadratic re-runs.
             let simplified = state.get_all_simplified()?;
+            let vars = AstOp::union_variables(simplified.iter().cloned());
 
             let size = simplified[0].size();
 
@@ -505,12 +452,6 @@ pub(crate) fn simplify_bv<'c>(
             {
                 sym_args.push(ctx.bvv(bvv.clone())?);
             }
-
-            let changed = sym_args.len() != simplified.len()
-                || sym_args
-                    .iter()
-                    .zip(simplified.iter())
-                    .any(|(a, b)| a.hash() != b.hash());
 
             if let [a, b] = sym_args.as_slice() {
                 match (a.op(), b.op()) {
@@ -557,16 +498,12 @@ pub(crate) fn simplify_bv<'c>(
                             let sum = if sym_args.len() == 1 {
                                 sym_args.pop().unwrap()
                             } else {
-                                ctx.add_many(sym_args)?
+                                ctx.make_ast_with_variables(AstOp::Add(sym_args), vars.clone())?
                             };
                             return state.rerun(ctx.sub(sum, ctx.bvv(negated)?)?);
                         }
                     }
-                    if changed {
-                        state.rerun(ctx.add_many(sym_args)?)
-                    } else {
-                        Ok(ctx.add_many(sym_args)?)
-                    }
+                    Ok(ctx.make_ast_with_variables(AstOp::Add(sym_args), vars.clone())?)
                 }
             }
         }
@@ -623,6 +560,7 @@ pub(crate) fn simplify_bv<'c>(
         AstOp::Mul(_) => {
             // Simplify all children in one batch to avoid quadratic re-runs.
             let simplified = state.get_all_simplified()?;
+            let vars = AstOp::union_variables(simplified.iter().cloned());
 
             let size = simplified[0].size();
 
@@ -673,22 +611,10 @@ pub(crate) fn simplify_bv<'c>(
                 }
             }
 
-            let changed = sym_args.len() != simplified.len()
-                || sym_args
-                    .iter()
-                    .zip(simplified.iter())
-                    .any(|(a, b)| a.hash() != b.hash());
-
             match sym_args.len() {
                 0 => Ok(ctx.bvv(BitVec::from((1, size)))?),
                 1 => Ok(sym_args.into_iter().next().unwrap()),
-                _ => {
-                    if changed {
-                        state.rerun(ctx.mul_many(sym_args)?)
-                    } else {
-                        Ok(ctx.mul_many(sym_args)?)
-                    }
-                }
+                _ => Ok(ctx.make_ast_with_variables(AstOp::Mul(sym_args), vars.clone())?),
             }
         }
         AstOp::UDiv(..) => {

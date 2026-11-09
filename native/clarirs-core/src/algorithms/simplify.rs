@@ -61,15 +61,19 @@ struct SimplifyState<'c> {
 
 impl<'c> SimplifyState<'c> {
     fn new(expr: AstRef<'c>) -> Self {
-        // A child that is already its own simplified form is filled in up front.
-        let children = expr
-            .child_iter()
-            .map(|child| {
-                (!child.has_blocking_annotations
-                    && child.simplified.load(Ordering::Relaxed) == child.hash())
-                .then_some(child)
-            })
-            .collect();
+        // A child that is already its own simplified form is filled in up front. A node
+        // that is its own simplified form is answered from its marker and needs none.
+        let children = if expr.simplified.load(Ordering::Relaxed) == expr.hash() {
+            Vec::new()
+        } else {
+            expr.child_iter()
+                .map(|child| {
+                    (!child.has_blocking_annotations
+                        && child.simplified.load(Ordering::Relaxed) == child.hash())
+                    .then_some(child)
+                })
+                .collect()
+        };
         Self {
             expr,
             children,
