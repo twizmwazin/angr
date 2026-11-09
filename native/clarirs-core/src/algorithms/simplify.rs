@@ -1,6 +1,7 @@
 mod bool;
 mod bv;
 mod float;
+mod resugar;
 mod string;
 
 #[cfg(test)]
@@ -115,8 +116,8 @@ fn simplify<'c>(
     respect_annotations: bool,
     error_on_dbz: bool,
 ) -> Result<AstRef<'c>, ClarirsError> {
-    // Keeps simplified nodes and their results interned for the whole call.
-    let mut keep_alive: Vec<AstRef<'c>> = Vec::new();
+    // Every simplified node with its result, kept interned for the whole call.
+    let mut simplified_nodes: Vec<(AstRef<'c>, AstRef<'c>)> = Vec::new();
     let mut work_stack: Vec<SimplifyState<'c>> = Vec::new();
     // Each state pushed onto the work stack pushes exactly one result here.
     let mut results: Vec<AstRef<'c>> = Vec::new();
@@ -129,13 +130,7 @@ fn simplify<'c>(
             state.children[idx] = results.pop();
         }
 
-        let blocked = state
-            .expr
-            .annotations()
-            .iter()
-            .any(|a| !a.eliminatable() && !a.relocatable())
-            || !state.expr.simplifiable();
-        let should_simplify = !respect_annotations || !blocked;
+        let should_simplify = !respect_annotations || !is_blocked(&state.expr);
         if should_simplify {
             // Reuse the inline-cached simplified form if present (`0` = none;
             // a dropped node resolves to a miss via the AST cache).
@@ -193,8 +188,7 @@ fn simplify<'c>(
                         .simplified
                         .store(annotated.as_ref().hash(), Ordering::Relaxed);
 
-                    keep_alive.push(annotated.clone());
-                    keep_alive.push(state.expr);
+                    simplified_nodes.push((state.expr, annotated.clone()));
                     results.push(annotated);
                 }
                 Err(SimplifyError::MissingChild(index)) => {
@@ -243,9 +237,23 @@ fn simplify<'c>(
         }
     }
 
-    results
+    let result = results
         .pop()
-        .ok_or_else(|| ClarirsError::InvalidArguments("No result produced".to_string()))
+        .ok_or_else(|| ClarirsError::InvalidArguments("No result produced".to_string()))?;
+
+    // The rewrites above express subtraction as addition of negated terms. Turn the result
+    // back into subtractions once, here, rather than per node: a subtraction built midway
+    // would only be taken apart again by the node above it.
+    resugar::resugar(&result, respect_annotations, &simplified_nodes)
+}
+
+/// Whether the simplifier must leave `ast` untouched when it respects annotations.
+fn is_blocked(ast: &AstRef<'_>) -> bool {
+    !ast.simplifiable()
+        || ast
+            .annotations()
+            .iter()
+            .any(|a| !a.eliminatable() && !a.relocatable())
 }
 
 /// Simplifies an ITE of any sort with the rewrites every sort shares.

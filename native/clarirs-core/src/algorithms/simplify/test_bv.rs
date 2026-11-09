@@ -3,6 +3,7 @@ use crate::prelude::*;
 use anyhow::Result;
 use num_bigint::BigUint;
 use smallvec::SmallVec;
+use std::sync::Arc;
 
 #[test]
 fn test_neg() -> Result<()> {
@@ -1365,5 +1366,145 @@ fn test_ite_absorbs_nested_ite_on_same_condition() -> Result<()> {
     let other = ctx.ite(ctx.bools("c2")?, &a, &b)?;
     let unrelated = ctx.ite(&c, &other, &d)?;
     assert_eq!(unrelated.simplify()?, unrelated);
+    Ok(())
+}
+
+#[test]
+fn test_add_cancels_opposing_terms() -> Result<()> {
+    let ctx = Context::new();
+    let x = ctx.bvs("x", 64)?;
+    let y = ctx.bvs("y", 64)?;
+    let z = ctx.bvs("z", 64)?;
+    let zero = ctx.bvv(BitVec::zeros(64))?;
+
+    // x + -x => 0
+    assert_eq!(ctx.add(&x, ctx.neg(&x)?)?.simplify()?, zero);
+    // (x + y) - x => y
+    assert_eq!(ctx.sub(ctx.add(&x, &y)?, &x)?.simplify()?, y);
+    // (x - y) + y => x
+    assert_eq!(ctx.add(ctx.sub(&x, &y)?, &y)?.simplify()?, x);
+    // (x + y + z) - (x + y) => z
+    let sum = ctx.add_many([x.clone(), y.clone(), z.clone()])?;
+    assert_eq!(ctx.sub(&sum, ctx.add(&x, &y)?)?.simplify()?, z);
+    // x - (x - y) => y
+    assert_eq!(ctx.sub(&x, ctx.sub(&x, &y)?)?.simplify()?, y);
+    // Terms cancel one for one: x + x - x => x
+    assert_eq!(ctx.sub(ctx.add(&x, &x)?, &x)?.simplify()?, x);
+    // ... and across constants: (x + 5) - (x + 3) => 2
+    let five = ctx.bvv(BitVec::from((5, 64)))?;
+    let three = ctx.bvv(BitVec::from((3, 64)))?;
+    assert_eq!(
+        ctx.sub(ctx.add(&x, &five)?, ctx.add(&x, &three)?)?
+            .simplify()?,
+        ctx.bvv(BitVec::from((2, 64)))?
+    );
+    // The low bits of a sum cancel as well.
+    assert_eq!(
+        ctx.extract(ctx.sub(ctx.add(&x, &y)?, &x)?, 31, 0)?
+            .simplify()?,
+        ctx.extract(&y, 31, 0)?
+    );
+    Ok(())
+}
+
+#[test]
+fn test_sub_is_reexpressed() -> Result<()> {
+    let ctx = Context::new();
+    let x = ctx.bvs("x", 64)?;
+    let y = ctx.bvs("y", 64)?;
+    let z = ctx.bvs("z", 64)?;
+    let five = ctx.bvv(BitVec::from((5, 64)))?;
+    let minus_five = ctx.bvv(BitVec::from((u64::MAX - 4, 64)))?;
+
+    // A subtraction comes back as a subtraction, however it was spelled.
+    let x_minus_y = ctx.sub(&x, &y)?;
+    assert_eq!(x_minus_y.simplify()?, x_minus_y);
+    assert_eq!(ctx.add(&x, ctx.neg(&y)?)?.simplify()?, x_minus_y);
+    assert_eq!(ctx.add(ctx.neg(&y)?, &x)?.simplify()?, x_minus_y);
+
+    // A constant that is negative as a signed number is subtracted.
+    let x_minus_5 = ctx.sub(&x, &five)?;
+    assert_eq!(x_minus_5.simplify()?, x_minus_5);
+    assert_eq!(ctx.add(&x, &minus_five)?.simplify()?, x_minus_5);
+    // The minimum signed value is its own negation and stays added.
+    let min = ctx.add(&x, ctx.bvv(BitVec::from((1u64 << 63, 64)))?)?;
+    assert_eq!(min.simplify()?, min);
+
+    // Every subtracted term lands in one subtrahend.
+    assert_eq!(
+        ctx.sub(ctx.sub(ctx.sub(&x, &y)?, &z)?, &five)?.simplify()?,
+        ctx.sub(&x, ctx.add_many([y.clone(), z.clone(), five.clone()])?)?
+    );
+    // A constant is the minuend when nothing else is added.
+    assert_eq!(ctx.sub(&five, &x)?.simplify()?, ctx.sub(&five, &x)?);
+    assert_eq!(
+        ctx.sub(&minus_five, &x)?.simplify()?,
+        ctx.sub(&minus_five, &x)?
+    );
+    // With nothing to subtract from, the sum is negated.
+    assert_eq!(
+        ctx.sub(ctx.neg(&x)?, &y)?.simplify()?,
+        ctx.neg(ctx.add(&x, &y)?)?
+    );
+    assert_eq!(ctx.neg(&x_minus_y)?.simplify()?, ctx.sub(&y, &x)?);
+
+    // Subtractions below other operations are re-expressed too.
+    let nested = ctx.mul(ctx.add(&x, ctx.neg(&y)?)?, &z)?;
+    assert_eq!(nested.simplify()?, ctx.mul(&x_minus_y, &z)?);
+    Ok(())
+}
+
+#[test]
+fn test_reexpressed_sub_is_stable() -> Result<()> {
+    // Builds each expression's simplified form by hand.
+    fn forms<'c>(ctx: &'c Context<'c>) -> Result<Vec<AstRef<'c>>> {
+        let x = ctx.bvs("x", 64)?;
+        let y = ctx.bvs("y", 64)?;
+        let z = ctx.bvs("z", 64)?;
+        let five = ctx.bvv(BitVec::from((5, 64)))?;
+        Ok(vec![
+            ctx.sub(&x, &y)?,
+            ctx.sub(ctx.add(&x, &five)?, ctx.add(&y, &z)?)?,
+            ctx.neg(ctx.add(&x, &y)?)?,
+            ctx.sub(ctx.neg(&five)?.simplify()?, ctx.add(&x, &y)?)?,
+            ctx.sub(&five, ctx.add(&x, &y)?)?,
+            ctx.mul(ctx.sub(&x, &five)?, ctx.sub(&y, &z)?)?,
+        ])
+    }
+
+    let ctx = Context::new();
+    for form in forms(&ctx)? {
+        // Nothing here has been simplified yet, so every subtraction is taken apart and
+        // put back together the same way.
+        let simplified = form.simplify()?;
+        assert_eq!(simplified, form);
+        // The output is final: simplifying it again hands back the same node.
+        assert!(Arc::ptr_eq(&simplified.simplify()?, &simplified));
+    }
+
+    // A re-expressed subtraction inside a later sum still cancels.
+    let x = ctx.bvs("x", 64)?;
+    let y = ctx.bvs("y", 64)?;
+    let z = ctx.bvs("z", 64)?;
+    let x_minus_y = ctx.sub(&x, &y)?.simplify()?;
+    assert_eq!(ctx.add(&x_minus_y, &y)?.simplify()?, x);
+    assert_eq!(
+        ctx.sub(&z, &x_minus_y)?.simplify()?,
+        ctx.sub(ctx.add(&z, &y)?, &x)?
+    );
+    Ok(())
+}
+
+#[test]
+fn test_reexpressed_sub_keeps_annotations() -> Result<()> {
+    let ctx = Context::new();
+    let x = ctx.bvs("x", 64)?;
+    let y = ctx.bvs("y", 64)?;
+    let annotation = Annotation::new(AnnotationType::Uninitialized, true, true);
+
+    let annotated = ctx.annotate(&ctx.add(&x, ctx.neg(&y)?)?, [annotation.clone()])?;
+    let simplified = annotated.simplify()?;
+    assert!(matches!(simplified.op(), AstOp::Sub(..)));
+    assert!(simplified.annotations().contains(&annotation));
     Ok(())
 }

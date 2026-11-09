@@ -43,3 +43,28 @@ class TestAddSubConstantFolding(unittest.TestCase):
             s = claripy.Solver()
             s.add(x == 4)
             self.assertEqual(list(s.eval(expr, 1)), [9])
+
+
+class TestSubAsAdd(unittest.TestCase):
+    """Subtraction is simplified as addition of negated terms, so opposing terms of a sum
+    cancel, and the result is expressed as a subtraction again."""
+
+    def test_opposing_terms_cancel(self):
+        x = claripy.BVS("x", 32)
+        y = claripy.BVS("y", 32)
+        self.assertIs((x + y) - x, y)
+        self.assertIs((x - y) + y, x)
+        self.assertIs(x - (x - y), y)
+        self.assertEqual((x + -x).concrete_value, 0)
+        self.assertEqual(((x + 5) - (x + 3)).concrete_value, 2)
+
+    def test_result_is_a_subtraction(self):
+        x = claripy.BVS("x", 32)
+        y = claripy.BVS("y", 32)
+        z = claripy.BVS("z", 32)
+        self.assertIs(x + -y, x - y)
+        self.assertIs(-y + x, x - y)
+        self.assertIs(x + claripy.BVV(0xFFFFFFFB, 32), x - 5)
+        self.assertIs(x - y - z, x - (y + z))
+        self.assertEqual((x - y).op, "__sub__")
+        self.assertEqual((x - 5).args[1].concrete_value, 5)

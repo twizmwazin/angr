@@ -459,6 +459,15 @@ pub(crate) fn simplify_bv<'c>(
                 AstOp::BVV(value) => Ok(ctx.bvv((-value.clone())?)?),
                 // -(-x) = x (double negation)
                 AstOp::Neg(inner) => Ok(inner.clone()),
+                // -(a + b) = -a + -b, so that a sum only ever holds negated terms and the
+                // enclosing Add can cancel them against their opposites.
+                AstOp::Add(args) => {
+                    let negated: Vec<AstRef<'c>> =
+                        args.iter().map(|a| ctx.neg(a)).collect::<Result<_, _>>()?;
+                    state.rerun(ctx.add_many(negated)?)
+                }
+                // -(a - b) = b - a
+                AstOp::Sub(lhs, rhs) => state.rerun(ctx.sub(rhs, lhs)?),
                 _ => Ok(ctx.neg(inner)?),
             }
         }
@@ -468,42 +477,37 @@ pub(crate) fn simplify_bv<'c>(
 
             let size = simplified[0].size();
 
-            // Flatten nested Adds, fold constants, remove identities
-            let mut bvv_acc: Option<BitVec> = None;
-            let mut sym_args: Vec<AstRef<'c>> = Vec::new();
+            // Flatten nested sums into signed terms and fold the constants.
+            let (mut terms, constant) = collect_sum_terms(&simplified)?;
 
-            for arg in &simplified {
-                match arg.op() {
-                    AstOp::Add(inner_args) => {
-                        for inner in inner_args {
-                            match inner.op() {
-                                AstOp::BVV(v) if v.is_zero() => {}
-                                AstOp::BVV(v) => {
-                                    bvv_acc = Some(match bvv_acc {
-                                        Some(acc) => (acc + v.clone())?,
-                                        None => v.clone(),
-                                    });
-                                }
-                                _ => sym_args.push(inner.clone()),
-                            }
-                        }
-                    }
-                    AstOp::BVV(v) if v.is_zero() => {}
-                    AstOp::BVV(v) => {
-                        bvv_acc = Some(match bvv_acc {
-                            Some(acc) => (acc + v.clone())?,
-                            None => v.clone(),
-                        });
-                    }
-                    _ => sym_args.push(arg.clone()),
+            // Cancel opposing terms: x + -x = 0. Each term keeps as many copies as its net
+            // count, in its original position.
+            if terms.iter().any(|(_, negated)| *negated) {
+                let mut net: ahash::AHashMap<u64, i64> =
+                    ahash::AHashMap::with_capacity(terms.len());
+                for (term, negated) in &terms {
+                    *net.entry(term.hash()).or_insert(0) += if *negated { -1 } else { 1 };
                 }
+                terms.retain(|(term, negated)| {
+                    let remaining = net.get_mut(&term.hash()).unwrap();
+                    if *negated && *remaining < 0 {
+                        *remaining += 1;
+                        true
+                    } else if !*negated && *remaining > 0 {
+                        *remaining -= 1;
+                        true
+                    } else {
+                        false
+                    }
+                });
             }
 
-            // Check folded BVV
-            if let Some(ref bvv) = bvv_acc
-                && !bvv.is_zero()
-            {
-                sym_args.push(ctx.bvv(bvv.clone())?);
+            let mut sym_args: Vec<AstRef<'c>> = terms
+                .into_iter()
+                .map(|(term, negated)| if negated { ctx.neg(term) } else { Ok(term) })
+                .collect::<Result<_, _>>()?;
+            if !constant.is_zero() {
+                sym_args.push(ctx.bvv(constant)?);
             }
 
             let changed = sym_args.len() != simplified.len()
@@ -515,102 +519,16 @@ pub(crate) fn simplify_bv<'c>(
             match sym_args.len() {
                 0 => Ok(ctx.bvv(BitVec::zeros(size))?),
                 1 => Ok(sym_args.into_iter().next().unwrap()),
-                2 => {
-                    let (a, b) = (&sym_args[0], &sym_args[1]);
-                    match (a.op(), b.op()) {
-                        // v + (bvv - other) => (v + bvv) - other
-                        (AstOp::BVV(v), AstOp::Sub(bvv, other))
-                        | (AstOp::Sub(bvv, other), AstOp::BVV(v))
-                            if matches!(bvv.op(), AstOp::BVV(_)) =>
-                        {
-                            if let AstOp::BVV(bvv_value) = bvv.op() {
-                                let combined_value = (v.clone() + bvv_value.clone())?;
-                                let combined_bvv = ctx.bvv(combined_value)?;
-                                state.rerun(ctx.sub(combined_bvv, other.clone())?)
-                            } else {
-                                unreachable!()
-                            }
-                        }
-                        (AstOp::BVV(v), AstOp::Sub(other, bvv))
-                        | (AstOp::Sub(other, bvv), AstOp::BVV(v))
-                            if matches!(bvv.op(), AstOp::BVV(_)) =>
-                        {
-                            if let AstOp::BVV(bvv_value) = bvv.op() {
-                                let combined_value = (v.clone() - bvv_value.clone())?;
-                                let combined_bvv = ctx.bvv(combined_value)?;
-                                state.rerun(ctx.add(other.clone(), combined_bvv)?)
-                            } else {
-                                unreachable!()
-                            }
-                        }
-                        _ => {
-                            if changed {
-                                state.rerun(ctx.add_many(sym_args)?)
-                            } else {
-                                Ok(ctx.add_many(sym_args)?)
-                            }
-                        }
-                    }
-                }
-                _ => {
-                    if changed {
-                        state.rerun(ctx.add_many(sym_args)?)
-                    } else {
-                        Ok(ctx.add_many(sym_args)?)
-                    }
-                }
+                _ if changed => state.rerun(ctx.add_many(sym_args)?),
+                _ => Ok(ctx.add_many(sym_args)?),
             }
         }
-        AstOp::Sub(..) => {
-            let lhs = state.get_child_simplified(0)?;
-            let rhs = state.get_child_simplified(1)?;
-            match (lhs.op(), rhs.op()) {
-                (AstOp::BVV(value1), AstOp::BVV(value2)) => {
-                    Ok(ctx.bvv((value1.clone() - value2.clone())?)?)
-                }
-                (AstOp::Sub(inner_lhs, inner_rhs), AstOp::BVV(v))
-                    if matches!(inner_rhs.op(), AstOp::BVV(_)) =>
-                {
-                    // (a - b) - c  => a - (b + c)
-                    if let AstOp::BVV(b_val) = inner_rhs.op() {
-                        let combined_value = (b_val.clone() + v.clone())?;
-                        let combined_bvv = ctx.bvv(combined_value)?;
-                        let new_sub = ctx.sub(inner_lhs.clone(), combined_bvv)?;
-                        state.rerun(new_sub)
-                    } else {
-                        unreachable!()
-                    }
-                }
-                (AstOp::Add(add_args), AstOp::BVV(v)) => {
-                    // Find a BVV among the Add args to combine with
-                    if let Some(bvv_idx) = add_args
-                        .iter()
-                        .position(|a| matches!(a.op(), AstOp::BVV(_)))
-                    {
-                        if let AstOp::BVV(b_val) = add_args[bvv_idx].op() {
-                            // (sum + b) - c => sum + (b - c)
-                            let combined_value = (b_val.clone() - v.clone())?;
-                            let combined_bvv = ctx.bvv(combined_value)?;
-                            let mut new_args: Vec<AstRef<'c>> = add_args
-                                .iter()
-                                .enumerate()
-                                .filter(|(i, _)| *i != bvv_idx)
-                                .map(|(_, a)| a.clone())
-                                .collect();
-                            new_args.push(combined_bvv);
-                            state.rerun(ctx.add_many(new_args)?)
-                        } else {
-                            unreachable!()
-                        }
-                    } else {
-                        Ok(ctx.sub(lhs, rhs)?)
-                    }
-                }
-                (_, AstOp::BVV(v)) if v.is_zero() => Ok(lhs.clone()),
-                (..) if lhs == rhs => Ok(ctx.bvv(BitVec::zeros(lhs.size()))?),
-                _ => Ok(ctx.sub(lhs, rhs)?),
-            }
-        }
+        // a - b = a + -b. Subtraction is simplified as addition, so that the Add rules see
+        // every term of a sum; `resugar` turns the result back into a subtraction.
+        AstOp::Sub(..) => state.rerun(ctx.add(
+            state.get_child_available(0),
+            ctx.neg(state.get_child_available(1))?,
+        )?),
         AstOp::Mul(_) => {
             // Simplify all children in one batch to avoid quadratic re-runs.
             let simplified = state.get_all_simplified()?;
@@ -1066,6 +984,9 @@ pub(crate) fn simplify_bv<'c>(
                     let rhs_extracted = ctx.extract(rhs, *high, 0)?;
                     state.rerun(ctx.sub(&lhs_extracted, &rhs_extracted)?)
                 }
+                AstOp::Neg(inner) if *low == 0 => {
+                    state.rerun(ctx.neg(ctx.extract(inner, *high, 0)?)?)
+                }
 
                 // Propagate extract through bitwise operations
                 // extract(n, m, a & b & ...) = extract(n, m, a) & extract(n, m, b) & ...
@@ -1518,4 +1439,33 @@ pub(crate) fn simplify_bv<'c>(
         }
         _ => unreachable!("non-bitvector op dispatched to simplify_bv"),
     }
+}
+
+/// Flattens the operands of a sum into its signed terms and its constant part.
+///
+/// Nested `Add`, `Sub` and `Neg` operands are taken apart, so the terms are none of those;
+/// a term is paired with `true` when the sum subtracts it. Terms keep their source order.
+#[allow(clippy::type_complexity)]
+fn collect_sum_terms<'c>(
+    args: &[AstRef<'c>],
+) -> Result<(Vec<(AstRef<'c>, bool)>, BitVec), ClarirsError> {
+    let mut terms = Vec::with_capacity(args.len());
+    let mut constant = BitVec::zeros(args[0].size());
+    // Explicit stack: an unsimplified operand can nest arbitrarily deep.
+    let mut stack: Vec<(AstRef<'c>, bool)> =
+        args.iter().rev().map(|arg| (arg.clone(), false)).collect();
+    while let Some((arg, negated)) = stack.pop() {
+        match arg.op() {
+            AstOp::Add(inner) => stack.extend(inner.iter().rev().map(|a| (a.clone(), negated))),
+            AstOp::Sub(lhs, rhs) => {
+                stack.push((rhs.clone(), !negated));
+                stack.push((lhs.clone(), negated));
+            }
+            AstOp::Neg(inner) => stack.push((inner.clone(), !negated)),
+            AstOp::BVV(v) if negated => constant = (constant - v.clone())?,
+            AstOp::BVV(v) => constant = (constant + v.clone())?,
+            _ => terms.push((arg, negated)),
+        }
+    }
+    Ok((terms, constant))
 }

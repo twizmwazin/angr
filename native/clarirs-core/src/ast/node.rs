@@ -2,7 +2,10 @@ use std::{
     collections::BTreeSet,
     fmt::Debug,
     hash::{Hash, Hasher},
-    sync::{Arc, atomic::AtomicU64},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicU64},
+    },
 };
 
 use crate::{
@@ -25,6 +28,9 @@ pub struct AstNode<'c> {
     simplifiable: bool,
     /// Hash of this node's simplified form (`0` = none), resolved via the AST cache.
     pub(crate) simplified: AtomicU64,
+    /// Set once this node is known to be the final output form of the simplifier, with its
+    /// sums re-expressed as subtractions, so that pass never walks it again.
+    pub(crate) resugared: AtomicBool,
 }
 
 impl Debug for AstNode<'_> {
@@ -89,6 +95,7 @@ impl<'c> AstNode<'c> {
             symbolic,
             simplifiable,
             simplified: AtomicU64::new(0),
+            resugared: AtomicBool::new(false),
         }
     }
 
@@ -136,6 +143,7 @@ impl<'c> AstNode<'c> {
             symbolic: self.symbolic,
             simplifiable,
             simplified: AtomicU64::new(0),
+            resugared: AtomicBool::new(false),
         })
     }
 
