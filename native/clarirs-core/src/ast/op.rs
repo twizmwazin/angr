@@ -83,7 +83,6 @@ pub enum AstOp<'c> {
     Neg(AstRef<'c>),
     Xor(Vec<AstRef<'c>>),
     Add(Vec<AstRef<'c>>),
-    /// Left-associative: `Sub([a, b, c])` is `(a - b) - c`.
     Sub(Vec<AstRef<'c>>),
     Mul(Vec<AstRef<'c>>),
     UDiv(AstRef<'c>, AstRef<'c>),

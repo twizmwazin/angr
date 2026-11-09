@@ -347,7 +347,6 @@ class VariableRecoveryStateBase:
                 arg_offsets.append(arg_offset)
             r = sum(arg_offsets)
         elif addr.op == "__sub__":
-            # __sub__ is n-ary and left-associative: args[0] - args[1] - ...
             arg_offsets = []
             for arg in addr.args:
                 arg_offset = VariableRecoveryStateBase._get_stack_offset(cast(claripy.ast.BV, arg))

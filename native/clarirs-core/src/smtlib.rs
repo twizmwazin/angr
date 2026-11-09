@@ -164,7 +164,6 @@ fn to_smtlib_op(ast: &AstRef<'_>, children: &[String]) -> String {
                 .iter()
                 .fold(String::new(), |acc, c| format!("{acc} {c}"))
         ),
-        // bvsub is strictly binary in SMT-LIB, so nest left-associatively
         AstOp::Sub(..) => children[1..]
             .iter()
             .fold(children[0].clone(), |acc, c| format!("(bvsub {acc} {c})")),
@@ -487,7 +486,6 @@ mod tests {
         let sub = ctx.sub(&x, &y).unwrap();
         assert_eq!(sub.to_smtlib(), "(bvsub x y)");
 
-        // bvsub is binary in SMT-LIB, so an n-ary Sub nests left-associatively
         let z = ctx.bvs("z", 64).unwrap();
         let sub = ctx.sub_many([x.clone(), y.clone(), z]).unwrap();
         assert_eq!(sub.to_smtlib(), "(bvsub (bvsub x y) z)");
