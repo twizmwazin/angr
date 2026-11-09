@@ -42,7 +42,7 @@ impl Hash for AstNode<'_> {
 
 impl PartialEq for AstNode<'_> {
     fn eq(&self, other: &Self) -> bool {
-        self.op == other.op && self.annotations == other.annotations
+        self.hash == other.hash && self.op == other.op && self.annotations == other.annotations
     }
 }
 
