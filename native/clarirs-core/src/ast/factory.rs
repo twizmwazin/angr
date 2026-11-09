@@ -34,9 +34,9 @@ pub trait AstFactory<'c>: Sized {
     ) -> Result<AstRef<'c>, ClarirsError> {
         op.validate()?;
         let ctx = self.context();
-        self.intern_ast(structural_hash(op.infer_type(), &op, &annotations), || {
-            AstNode::new(ctx, op, annotations)
-        })
+        let ast_type = op.infer_type();
+        let hash = structural_hash(ast_type, &op, &annotations);
+        self.intern_ast(hash, || AstNode::new(ctx, op, annotations, ast_type, hash))
     }
 
     /// Construct a node with `annotations` plus the relocatable annotations of

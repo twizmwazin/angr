@@ -55,14 +55,17 @@ impl<'c> HasContext<'c> for AstNode<'c> {
 }
 
 impl<'c> AstNode<'c> {
-    /// Build a node, deriving its cached metadata including the structural hash.
-    /// The node's [`AstType`] is inferred from the operation.
+    /// Build a node, deriving its cached metadata. `ast_type` and `hash` are passed in by
+    /// the factory, which already computed them to probe the cache.
     pub(crate) fn new(
         ctx: &'c Context<'c>,
         op: AstOp<'c>,
         annotations: BTreeSet<Arc<Annotation>>,
+        ast_type: AstType,
+        hash: u64,
     ) -> Self {
-        let ast_type = op.infer_type();
+        debug_assert_eq!(ast_type, op.infer_type());
+        debug_assert_eq!(hash, structural_hash(ast_type, &op, &annotations));
         let variables = op.variables();
         let depth = 1 + op.child_iter().map(|c| c.depth()).max().unwrap_or(0);
         // Symbolic propagates from: having variables, the op itself being inherently
@@ -76,8 +79,6 @@ impl<'c> AstNode<'c> {
             (symbolic || !blocking_here) && op.child_iter().all(|c| c.simplifiable());
         let has_blocking_annotations =
             blocking_here || op.child_iter().any(|c| c.has_blocking_annotations);
-
-        let hash = structural_hash(ast_type, &op, &annotations);
 
         Self {
             op,
