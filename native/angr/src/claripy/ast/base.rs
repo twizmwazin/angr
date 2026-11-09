@@ -39,8 +39,9 @@ pub struct Base {
     inner: AstRef<'static>,
     name: Option<String>,
     encoded_name: Option<Vec<u8>>,
-    /// Python annotation objects created once at construction, in the same order as `inner.annotations()`, so reads avoid the Rust round-trip.
-    annotations: Vec<Py<PyAnnotation>>,
+    /// Python annotation objects, in the same order as `inner.annotations()`, built on
+    /// first access so reads avoid the Rust round-trip without every wrapper paying for it.
+    annotations: PyOnceLock<Vec<Py<PyAnnotation>>>,
     /// Python `args` tuple built on first access.
     /// This is important, otherwise expr.args will cause a new Python list to be created each time it's accessed.
     args: PyOnceLock<Py<PyTuple>>,
@@ -54,22 +55,27 @@ impl AstWrapper for Base {
 
 impl Base {
     pub fn new_with_name(
-        py: Python,
+        _py: Python,
         inner: &AstRef<'static>,
         name: Option<String>,
     ) -> Result<Self, ClaripyError> {
         let encoded_name = name.as_ref().map(|name| name.as_bytes().to_vec());
-        let annotations = inner
-            .annotations()
-            .iter()
-            .map(|annotation| PyAnnotation::from_annotation(py, annotation).map(Bound::unbind))
-            .collect::<Result<Vec<_>, _>>()?;
         Ok(Self {
             inner: inner.clone(),
             name,
             encoded_name,
-            annotations,
+            annotations: PyOnceLock::new(),
             args: PyOnceLock::new(),
+        })
+    }
+
+    fn py_annotations(&self, py: Python<'_>) -> Result<&Vec<Py<PyAnnotation>>, ClaripyError> {
+        self.annotations.get_or_try_init(py, || {
+            self.inner
+                .annotations()
+                .iter()
+                .map(|annotation| PyAnnotation::from_annotation(py, annotation).map(Bound::unbind))
+                .collect()
         })
     }
 
@@ -160,11 +166,15 @@ impl Base {
     }
 
     #[getter]
-    pub fn annotations<'py>(&self, py: Python<'py>) -> Vec<Bound<'py, PyAnnotation>> {
-        self.annotations
+    pub fn annotations<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> Result<Vec<Bound<'py, PyAnnotation>>, ClaripyError> {
+        Ok(self
+            .py_annotations(py)?
             .iter()
             .map(|annotation| annotation.bind(py).clone())
-            .collect()
+            .collect())
     }
 
     pub fn hash(&self) -> u64 {
@@ -344,7 +354,7 @@ impl Base {
         annotation_type: Bound<'_, PyType>,
     ) -> Result<bool, ClaripyError> {
         let py = annotation_type.py();
-        for annotation in &self.annotations {
+        for annotation in self.py_annotations(py)? {
             if annotation.bind(py).is_instance(&annotation_type)? {
                 return Ok(true);
             }
@@ -358,7 +368,7 @@ impl Base {
     ) -> Result<Vec<Bound<'py, PyAnnotation>>, ClaripyError> {
         let py = annotation_type.py();
         let mut matching = Vec::new();
-        for annotation in &self.annotations {
+        for annotation in self.py_annotations(py)? {
             let annotation = annotation.bind(py);
             if annotation.is_instance(&annotation_type)? {
                 matching.push(annotation.clone());
@@ -372,7 +382,7 @@ impl Base {
         annotation_type: Bound<'py, PyType>,
     ) -> Result<Option<Bound<'py, PyAnnotation>>, ClaripyError> {
         let py = annotation_type.py();
-        for annotation in &self.annotations {
+        for annotation in self.py_annotations(py)? {
             let annotation = annotation.bind(py);
             if annotation.is_instance(&annotation_type)? {
                 return Ok(Some(annotation.clone()));
@@ -529,7 +539,11 @@ impl Base {
         // `self.annotations` mirrors `self.inner.annotations()` in order, so the
         // cached Python objects can drive the type check while the core
         // annotations are what we rebuild from.
-        for (py_annotation, annotation) in self.annotations.iter().zip(self.inner.annotations()) {
+        for (py_annotation, annotation) in self
+            .py_annotations(py)?
+            .iter()
+            .zip(self.inner.annotations())
+        {
             if !py_annotation.bind(py).is_instance(&annotation_type)? {
                 kept.insert(annotation.clone());
             }
