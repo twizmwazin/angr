@@ -54,30 +54,73 @@ impl<'c> HasContext<'c> for AstNode<'c> {
     }
 }
 
+/// What an [`AstNode`] carries besides its op, for a caller that already knows some
+/// of it. Anything left `None` is computed: the annotations as the relocatable ones
+/// of the op's children, the rest from the op; given derived values are checked in
+/// debug builds.
+#[derive(Default)]
+pub struct Precomputed {
+    /// Exactly the annotations the node gets.
+    pub annotations: Option<BTreeSet<Arc<Annotation>>>,
+    pub ast_type: Option<AstType>,
+    pub hash: Option<u64>,
+    /// The node's variables; the inner `None` means it has none.
+    pub variables: Option<Option<Arc<BTreeSet<InternedString>>>>,
+    pub depth: Option<u32>,
+    pub symbolic: Option<bool>,
+    pub simplifiable: Option<bool>,
+}
+
+impl Precomputed {
+    pub fn with_variables(variables: Option<Arc<BTreeSet<InternedString>>>) -> Self {
+        Self {
+            variables: Some(variables),
+            ..Default::default()
+        }
+    }
+}
+
 impl<'c> AstNode<'c> {
-    /// Build a node, deriving its cached metadata including the structural hash.
-    /// The node's [`AstType`] is inferred from the operation.
+    /// Build a node, deriving the cached metadata not supplied in `pre`.
     pub(crate) fn new(
         ctx: &'c Context<'c>,
         op: AstOp<'c>,
         annotations: BTreeSet<Arc<Annotation>>,
+        pre: Precomputed,
     ) -> Self {
-        let ast_type = op.infer_type();
-        let variables = op.variables();
-        let depth = 1 + op.child_iter().map(|c| c.depth()).max().unwrap_or(0);
+        let ast_type = pre.ast_type.unwrap_or_else(|| op.infer_type());
+        debug_assert_eq!(ast_type, op.infer_type());
+        let variables = pre.variables.unwrap_or_else(|| op.variables());
+        debug_assert_eq!(variables, op.variables());
+        let depth = pre
+            .depth
+            .unwrap_or_else(|| 1 + op.child_iter().map(|c| c.depth()).max().unwrap_or(0));
+        debug_assert_eq!(
+            depth,
+            1 + op.child_iter().map(|c| c.depth()).max().unwrap_or(0)
+        );
         // Symbolic propagates from: having variables, the op itself being inherently
         // symbolic (e.g. VSA Union/Intersection/Widen), or any child being symbolic.
-        let symbolic = variables.is_some()
-            || op.is_inherently_symbolic()
-            || op.child_iter().any(|c| c.symbolic());
+        let compute_symbolic = || {
+            variables.is_some()
+                || op.is_inherently_symbolic()
+                || op.child_iter().any(|c| c.symbolic())
+        };
+        let symbolic = pre.symbolic.unwrap_or_else(compute_symbolic);
+        debug_assert_eq!(symbolic, compute_symbolic());
 
         let blocking_here = annotations.iter().any(|a| a.blocks_simplification());
-        let simplifiable =
-            (symbolic || !blocking_here) && op.child_iter().all(|c| c.simplifiable());
+        let compute_simplifiable =
+            || (symbolic || !blocking_here) && op.child_iter().all(|c| c.simplifiable());
+        let simplifiable = pre.simplifiable.unwrap_or_else(compute_simplifiable);
+        debug_assert_eq!(simplifiable, compute_simplifiable());
         let has_blocking_annotations =
             blocking_here || op.child_iter().any(|c| c.has_blocking_annotations);
 
-        let hash = structural_hash(ast_type, &op, &annotations);
+        let hash = pre
+            .hash
+            .unwrap_or_else(|| structural_hash(ast_type, &op, &annotations));
+        debug_assert_eq!(hash, structural_hash(ast_type, &op, &annotations));
 
         Self {
             op,

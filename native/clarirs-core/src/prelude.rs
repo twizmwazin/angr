@@ -1,4 +1,4 @@
-pub use crate::ast::node::IntoOwned;
+pub use crate::ast::node::{IntoOwned, Precomputed};
 pub use crate::ast::op::{AstOp, AstType};
 pub use crate::ast::{Annotation, AnnotationType, AstFactory, AstNode, AstRef};
 pub use crate::context::{Context, HasContext, InternedString};

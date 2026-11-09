@@ -181,24 +181,24 @@ pub(crate) fn simplify_bv<'c>(
                                                 let result = ctx.or2(new_shl, new_lshr)?;
                                                 state.rerun(result)
                                             } else if changed {
-                                                state.rerun(ctx.and(sym_args)?)
+                                                state.flattened(AstOp::And(sym_args))
                                             } else {
                                                 Ok(ctx.and(sym_args)?)
                                             }
                                         } else if changed {
-                                            state.rerun(ctx.and(sym_args)?)
+                                            state.flattened(AstOp::And(sym_args))
                                         } else {
                                             Ok(ctx.and(sym_args)?)
                                         }
                                     } else if changed {
-                                        state.rerun(ctx.and(sym_args)?)
+                                        state.flattened(AstOp::And(sym_args))
                                     } else {
                                         Ok(ctx.and(sym_args)?)
                                     }
                                 }
                                 _ => {
                                     if changed {
-                                        state.rerun(ctx.and(sym_args)?)
+                                        state.flattened(AstOp::And(sym_args))
                                     } else {
                                         Ok(ctx.and(sym_args)?)
                                     }
@@ -208,7 +208,7 @@ pub(crate) fn simplify_bv<'c>(
 
                         _ => {
                             if changed {
-                                state.rerun(ctx.and(sym_args)?)
+                                state.flattened(AstOp::And(sym_args))
                             } else {
                                 Ok(ctx.and(sym_args)?)
                             }
@@ -217,7 +217,7 @@ pub(crate) fn simplify_bv<'c>(
                 }
                 _ => {
                     if changed {
-                        state.rerun(ctx.and(sym_args)?)
+                        state.flattened(AstOp::And(sym_args))
                     } else {
                         Ok(ctx.and(sym_args)?)
                     }
@@ -325,7 +325,7 @@ pub(crate) fn simplify_bv<'c>(
                         }
                         _ => {
                             if changed {
-                                state.rerun(ctx.or(sym_args)?)
+                                state.flattened(AstOp::Or(sym_args))
                             } else {
                                 Ok(ctx.or(sym_args)?)
                             }
@@ -334,7 +334,7 @@ pub(crate) fn simplify_bv<'c>(
                 }
                 _ => {
                     if changed {
-                        state.rerun(ctx.or(sym_args)?)
+                        state.flattened(AstOp::Or(sym_args))
                     } else {
                         Ok(ctx.or(sym_args)?)
                     }
@@ -437,7 +437,7 @@ pub(crate) fn simplify_bv<'c>(
                         }
                         _ => {
                             if changed {
-                                state.rerun(ctx.xor(sym_args)?)
+                                state.flattened(AstOp::Xor(sym_args))
                             } else {
                                 Ok(ctx.xor(sym_args)?)
                             }
@@ -446,7 +446,7 @@ pub(crate) fn simplify_bv<'c>(
                 }
                 _ => {
                     if changed {
-                        state.rerun(ctx.xor(sym_args)?)
+                        state.flattened(AstOp::Xor(sym_args))
                     } else {
                         Ok(ctx.xor(sym_args)?)
                     }
@@ -563,7 +563,7 @@ pub(crate) fn simplify_bv<'c>(
                         }
                     }
                     if changed {
-                        state.rerun(ctx.add_many(sym_args)?)
+                        state.flattened(AstOp::Add(sym_args))
                     } else {
                         Ok(ctx.add_many(sym_args)?)
                     }
@@ -684,7 +684,7 @@ pub(crate) fn simplify_bv<'c>(
                 1 => Ok(sym_args.into_iter().next().unwrap()),
                 _ => {
                     if changed {
-                        state.rerun(ctx.mul_many(sym_args)?)
+                        state.flattened(AstOp::Mul(sym_args))
                     } else {
                         Ok(ctx.mul_many(sym_args)?)
                     }

@@ -25,18 +25,39 @@ pub trait AstFactory<'c>: Sized {
     // Provided methods
 
     /// The single node constructor entry point all `make_*` helpers delegate to.
-    /// The node gets exactly `annotations`; relocatable annotations of children
-    /// are NOT collected.
+    /// Whatever `pre` leaves out is computed (see [`Precomputed`]).
+    fn make_ast_precomputed(
+        &'c self,
+        op: AstOp<'c>,
+        mut pre: Precomputed,
+    ) -> Result<AstRef<'c>, ClarirsError> {
+        op.validate()?;
+        let ctx = self.context();
+        let annotations = pre
+            .annotations
+            .take()
+            .unwrap_or_else(|| Self::relocatable_child_annotations(&op, BTreeSet::new()));
+        let ast_type = *pre.ast_type.get_or_insert_with(|| op.infer_type());
+        let hash = *pre
+            .hash
+            .get_or_insert_with(|| structural_hash(ast_type, &op, &annotations));
+        self.intern_ast(hash, || AstNode::new(ctx, op, annotations, pre))
+    }
+
+    /// Construct a node with exactly `annotations`; relocatable annotations of
+    /// children are NOT collected.
     fn make_ast_exact(
         &'c self,
         op: AstOp<'c>,
         annotations: BTreeSet<Arc<Annotation>>,
     ) -> Result<AstRef<'c>, ClarirsError> {
-        op.validate()?;
-        let ctx = self.context();
-        self.intern_ast(structural_hash(op.infer_type(), &op, &annotations), || {
-            AstNode::new(ctx, op, annotations)
-        })
+        self.make_ast_precomputed(
+            op,
+            Precomputed {
+                annotations: Some(annotations),
+                ..Default::default()
+            },
+        )
     }
 
     /// Construct a node with `annotations` plus the relocatable annotations of
@@ -44,8 +65,17 @@ pub trait AstFactory<'c>: Sized {
     fn make_ast_annotated(
         &'c self,
         op: AstOp<'c>,
-        mut annotations: BTreeSet<Arc<Annotation>>,
+        annotations: BTreeSet<Arc<Annotation>>,
     ) -> Result<AstRef<'c>, ClarirsError> {
+        let annotations = Self::relocatable_child_annotations(&op, annotations);
+        self.make_ast_exact(op, annotations)
+    }
+
+    /// `annotations` plus the relocatable annotations of `op`'s children.
+    fn relocatable_child_annotations(
+        op: &AstOp<'c>,
+        mut annotations: BTreeSet<Arc<Annotation>>,
+    ) -> BTreeSet<Arc<Annotation>> {
         for child in op.child_iter() {
             let child_annotations = child.annotations();
             if child_annotations.is_empty() {
@@ -61,11 +91,11 @@ pub trait AstFactory<'c>: Sized {
                 }
             }
         }
-        self.make_ast_exact(op, annotations)
+        annotations
     }
 
     fn make_ast(&'c self, op: AstOp<'c>) -> Result<AstRef<'c>, ClarirsError> {
-        self.make_ast_annotated(op, BTreeSet::new())
+        self.make_ast_precomputed(op, Precomputed::default())
     }
 
     fn bools<S: AsRef<str>>(&'c self, name: S) -> Result<AstRef<'c>, ClarirsError> {

@@ -117,6 +117,18 @@ impl<'c> SimplifyState<'c> {
     fn rerun(&self, new_ast: AstRef<'c>) -> Result<AstRef<'c>, SimplifyError<'c>> {
         Err(SimplifyError::ReRun(new_ast))
     }
+
+    /// Build `op`, this node's op over operands flattened out of its simplified
+    /// children. Its variables are theirs, which one child usually already holds,
+    /// while deriving them from the flattened operands costs an insert each.
+    fn flattened(&self, op: AstOp<'c>) -> Result<AstRef<'c>, SimplifyError<'c>> {
+        let children = self.get_all_simplified()?;
+        let variables = self.expr.op().with_children(&children).variables();
+        Ok(self
+            .expr
+            .context()
+            .make_ast_precomputed(op, Precomputed::with_variables(variables))?)
+    }
 }
 
 fn simplify<'c>(
