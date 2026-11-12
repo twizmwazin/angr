@@ -8,10 +8,10 @@ import os
 import unittest
 
 import angr
-from angr.codenode import FuncNode
 from tests.common import bin_location
 
 FAUXWARE = os.path.join(bin_location, "tests", "x86_64", "fauxware")
+from angr.codenode import FuncNode
 
 
 class TestAddCallToEvictedCaller(unittest.TestCase):

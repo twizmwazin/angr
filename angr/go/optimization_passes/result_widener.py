@@ -110,7 +110,7 @@ class GoResultWidener(OptimizationPass):
                 if moved:
                     # the function moved a call's later result words down (`return nil, err` after a call that
                     # returned (T, error)): the originals left behind are not results
-                    extent = min(extent, *moved)
+                    extent = min(extent, min(moved))
                 sites.append((block, idx, stmt, extent))
                 if not unknown:
                     extents.append(extent)

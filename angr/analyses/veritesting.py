@@ -533,9 +533,9 @@ class Veritesting(Analysis):
 
         if self._enable_function_inlining:
             call_tracing_filter = CallTracingFilter(self.project, depth=0)
-            tracing_filter = call_tracing_filter.filter
+            filter = call_tracing_filter.filter  # pylint:disable=redefined-builtin
         else:
-            tracing_filter = None
+            filter = None
 
         # To better handle syscalls, we make a copy of all registers if they are not symbolic
         cfg_initial_state = self.project.factory.blank_state(mode="fastpath")
@@ -553,7 +553,7 @@ class Veritesting(Analysis):
             starts=((ip_int, state.history.jumpkind),),
             context_sensitivity_level=0,
             call_depth=1,
-            call_tracing_filter=tracing_filter,
+            call_tracing_filter=filter,
             initial_state=cfg_initial_state,
             normalize=True,
         )

@@ -6397,6 +6397,6 @@ register_analysis(CStructuredCodeGenerator, "CStructuredCodeGenerator")
 
 # Register protobuf serializer/parser pairs for every concrete CConstruct subclass. Imported after all classes are
 # defined so that ``c_serialize.register_all`` can reference them by name.
-from . import c_serialize as _c_serialize  # noqa: E402  # pylint: disable=wrong-import-position
+from . import c_serialize as _c_serialize  # pylint: disable=wrong-import-position
 
 _c_serialize.register_all()

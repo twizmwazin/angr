@@ -888,7 +888,7 @@ class SimulationManager:
         if self._hierarchy:
             self._hierarchy.add_state(m)
 
-        if others:
+        if len(others):
             others.append(m)
             return self._merge_states(others)
         return m

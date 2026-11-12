@@ -91,7 +91,7 @@ dev = [
     "pytest-split>=0.10.0",
     "pytest-timeout>=2.3.1",
     "pytest-xdist>=3.6.1",
-    "ruff>=0.16",  # 0.16 made the expanded default rule set stable; older releases lint far less
+    "ruff>=0.11.7",
     "sortedcontainers-stubs>=2.4.3",
 ]
 docs = ["furo", "myst-parser", "sphinx", "sphinx-autodoc-typehints"]
@@ -151,31 +151,6 @@ extend-select = [
     "SIM",
     "TID252",
     "UP",
-    # pycodestyle import/statement/runtime checks: ruff's pre-0.16 default set, dropped from the 0.16 defaults
-    "E4",
-    "E7",
-    "E9",
-    # Rules that pylint also enforces (keeps ruff able to take over the matching pylint messages)
-    "A001",    # redefined-builtin
-    "B904",    # raise-missing-from
-    "C416",    # unnecessary-comprehension
-    "COM818",  # trailing-comma-tuple
-    "F403",    # wildcard-import
-    "F405",    # undefined names behind a wildcard import
-    "G001",    # logging-format-interpolation
-    "G002",    # logging-not-lazy
-    "G003",    # logging with string concatenation
-    "N804",    # bad-classmethod-argument
-    "N805",    # no-self-argument
-    "PLC0207", # use-maxsplit-arg
-    "PLC1802", # use-implicit-booleaness-not-len
-    "PLC2401", # non-ascii-name
-    "PLC2403", # non-ascii-module-import
-    "PLE0302", # unexpected-special-method-signature
-    "PLW0108", # unnecessary-lambda
-    "PLW3301", # nested-min-max
-    "S113",    # missing-timeout
-    "S307",    # eval-used
 ]
 ignore = [
     "BLE001", # Catching Exception
@@ -203,11 +178,7 @@ ignore = [
     "F821", # name not found
 ]
 "angr/procedures/**" = [
-    "A001", # SimProcedure classes are named after the C function they model (exit, open, ...)
     "N999",
-]
-"angr/rustylib/**/*.pyi" = [
-    "A001", # Stubs mirror the Rust module's function names (min, max, eval)
 ]
 "angr/procedures/definitions/*" = [ # TODO: Move to exclude
     "F601", # TODO: BUG! This hides bugs! See: https://github.com/angr/angr/issues/3685

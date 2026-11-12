@@ -118,7 +118,7 @@ def find_exact_cores(
             )
         )
 
-        consumed = dict(hits)
+        consumed = {fi: off for fi, off in hits}
         new_fragments: list[_Fragment] = []
         for fi, frag in enumerate(fragments):
             off = consumed.get(fi)

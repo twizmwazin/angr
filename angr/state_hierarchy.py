@@ -149,7 +149,7 @@ class StateHierarchy:
             lineage = []
 
             predecessors = list(self._graph.predecessors(h))
-            while predecessors:
+            while len(predecessors):
                 lineage.append(predecessors[0])
                 predecessors = list(self._graph.predecessors(predecessors[0]))
 
