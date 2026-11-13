@@ -1643,6 +1643,11 @@ impl StridedInterval {
     }
 
     /// Performs unsigned division with pole splitting for better precision
+    ///
+    /// Division by zero follows SMT-LIB, where `bvudiv x 0` is all ones, the
+    /// same way `urem` answers the dividend for `bvurem x 0`. A divisor that
+    /// may be zero adds all ones to the quotients of its nonzero values, and a
+    /// divisor that is definitely zero gives the constant all ones.
     pub fn udiv(&self, other: &Self) -> Result<Self, ClarirsError> {
         match (self, other) {
             (StridedInterval::Empty { bits }, _) | (_, StridedInterval::Empty { bits }) => {
@@ -1651,114 +1656,73 @@ impl StridedInterval {
             (
                 StridedInterval::Normal {
                     bits: bits1,
-                    stride: s_stride,
                     lower_bound: s_lb,
                     upper_bound: s_ub,
+                    ..
                 },
                 StridedInterval::Normal {
                     bits: bits2,
-                    stride: o_stride,
                     lower_bound: o_lb,
                     upper_bound: o_ub,
+                    ..
                 },
             ) => {
                 let bits = max(*bits1, *bits2);
+                let all_ones = max_int(bits);
 
-                // Check if divisor could be zero
-                if (o_lb == &BigUint::zero() && o_ub == &BigUint::zero())
-                    || (o_stride.is_zero() && o_lb.is_zero())
-                {
-                    // Divisor is definitely zero - return empty
-                    return Ok(Self::empty(bits));
-                }
-
-                // Adjust divisor bounds to avoid zero if it contains zero
-                let (divisor_lb, _divisor_ub) = if other.contains_zero() {
-                    let mut new_lb = o_lb.clone();
-                    let mut new_ub = o_ub.clone();
-
-                    // If lower bound is 0, increment it
-                    if new_lb.is_zero() && !new_ub.is_zero() {
-                        new_lb = BigUint::one();
-                    }
-
-                    // If upper bound is 0, decrement it
-                    if new_ub.is_zero() && !new_lb.is_zero() {
-                        new_ub = modular_sub(&new_ub, &BigUint::one(), bits);
-                    }
-
-                    // If both would be zero, return top conservatively
-                    if new_lb.is_zero() && new_ub.is_zero() {
-                        return Ok(Self::top(bits));
-                    }
-
-                    (new_lb, new_ub)
+                // Split a wrapping dividend at the south pole: its bounds are
+                // not its extremes, [250, 5] / 251 holds 255 / 251 = 1.
+                let dividends = if s_lb <= s_ub {
+                    vec![(s_lb.clone(), s_ub.clone())]
                 } else {
-                    (o_lb.clone(), o_ub.clone())
+                    vec![
+                        (s_lb.clone(), max_int(*bits1)),
+                        (BigUint::zero(), s_ub.clone()),
+                    ]
                 };
 
-                // Simple case: dividing by a constant
-                if o_lb == o_ub {
-                    let divisor = divisor_lb;
-                    if divisor.is_zero() {
-                        return Ok(Self::empty(bits));
+                // The nonzero values of the divisor, split the same way.
+                let mut divisors = Vec::new();
+                if o_lb <= o_ub {
+                    if !o_ub.is_zero() {
+                        divisors.push((max(o_lb.clone(), BigUint::one()), o_ub.clone()));
                     }
-                    let new_stride = if s_stride == &BigUint::zero() {
-                        BigUint::zero()
-                    } else {
-                        BigUint::one()
-                    };
-                    let new_lower = s_lb / &divisor;
-                    let new_upper = s_ub / &divisor;
-                    return Ok(Self::new(bits, new_stride, new_lower, new_upper));
-                }
-
-                // Split at south pole for better precision
-                let splitted_dividends = self.ssplit();
-                let splitted_divisors = other.ssplit();
-
-                let mut resulting_intervals = Vec::new();
-
-                for dividend in &splitted_dividends {
-                    for divisor in &splitted_divisors {
-                        if let (
-                            StridedInterval::Normal {
-                                lower_bound: d_lb,
-                                upper_bound: d_ub,
-                                ..
-                            },
-                            StridedInterval::Normal {
-                                lower_bound: div_lb,
-                                upper_bound: div_ub,
-                                ..
-                            },
-                        ) = (dividend, divisor)
-                        {
-                            // Skip if divisor contains zero
-                            if div_lb.is_zero() || div_ub.is_zero() {
-                                continue;
-                            }
-
-                            let lb = d_lb / div_ub;
-                            let ub = d_ub / div_lb;
-
-                            let tmp = Self::new(bits, BigUint::one(), lb, ub);
-                            resulting_intervals.push(tmp);
-                        }
+                } else {
+                    divisors.push((o_lb.clone(), max_int(*bits2)));
+                    if !o_ub.is_zero() {
+                        divisors.push((BigUint::one(), o_ub.clone()));
                     }
                 }
 
-                // Union all resulting intervals
-                if resulting_intervals.is_empty() {
-                    return Ok(Self::empty(bits));
+                // The hull of the quotients of every pair of pieces.
+                let mut bounds: Option<(BigUint, BigUint)> = None;
+                for (d_lb, d_ub) in &dividends {
+                    for (div_lb, div_ub) in &divisors {
+                        let lb = d_lb / div_ub;
+                        let ub = d_ub / div_lb;
+                        bounds = Some(match bounds {
+                            None => (lb, ub),
+                            Some((lo, hi)) => (lo.min(lb), hi.max(ub)),
+                        });
+                    }
                 }
 
-                let mut result = resulting_intervals[0].clone();
-                for si in &resulting_intervals[1..] {
-                    result = result.union(si);
+                let Some((lo, hi)) = bounds else {
+                    // The divisor is definitely zero.
+                    return Ok(Self::constant(bits, all_ones));
+                };
+                if !other.contains_zero() {
+                    return Ok(Self::new(bits, BigUint::one(), lo, hi));
                 }
 
-                Ok(result)
+                // The divisor may be zero: add all ones, either at the top of
+                // [lo, all ones] or as the start of the wrapping interval
+                // [all ones, hi], whichever is smaller.
+                if &all_ones - &lo <= &hi + BigUint::one() {
+                    Ok(Self::new(bits, BigUint::one(), lo, all_ones))
+                } else {
+                    Ok(Self::new(bits, BigUint::one(), all_ones, hi))
+                }
             }
         }
     }
@@ -1907,6 +1871,14 @@ impl StridedInterval {
                 if o_lb == o_ub {
                     let max_remainder = o_lb - BigUint::one();
                     return Ok(StridedInterval::range(bits, 0u32, max_remainder));
+                }
+
+                // A divisor that may be zero leaves the dividend as it is, which
+                // can be above max(divisor)-1: 10 urem 0 = 10 for [10, 20] urem
+                // [0, 5]. A remainder is never above its dividend, though.
+                if other.contains_zero() {
+                    let (_, self_max) = self.get_unsigned_bounds();
+                    return Ok(StridedInterval::range(bits, 0u32, self_max));
                 }
 
                 // If divisor is a range, the remainder can be from 0 to max(divisor)-1
@@ -3460,6 +3432,85 @@ mod si_arithmetic_op_tests {
     }
 
     #[test]
+    fn test_udiv_is_sound() {
+        // The values of an interval by direct enumeration.
+        fn concretize(si: &StridedInterval) -> Vec<u32> {
+            let StridedInterval::Normal {
+                bits,
+                stride,
+                lower_bound,
+                upper_bound,
+            } = si
+            else {
+                return vec![];
+            };
+            let modulus = 1u32 << *bits;
+            let stride = stride.to_u32().unwrap();
+            let lb = lower_bound.to_u32().unwrap();
+            let ub = upper_bound.to_u32().unwrap();
+            let span = (ub + modulus - lb) % modulus;
+            let steps = span.checked_div(stride).unwrap_or(0);
+            (0..=steps).map(|i| (lb + i * stride) % modulus).collect()
+        }
+
+        // A divisor that may be zero still has nonzero values, and bvudiv x 0
+        // is all ones.
+        let a = StridedInterval::range(8, 10u32, 20u32);
+        let b = StridedInterval::range(8, 0u32, 5u32);
+        let result = a.udiv(&b).unwrap();
+        for expected in [2u32, 10, 20, 255] {
+            assert!(result.contains_value(&BigUint::from(expected)));
+        }
+        assert!(!result.is_top());
+
+        // A divisor that is definitely zero.
+        let zero = StridedInterval::constant(8, 0u32);
+        assert_eq!(a.udiv(&zero).unwrap(), StridedInterval::constant(8, 255u32));
+
+        // A wrapping dividend: 255 / 251 = 1.
+        let a = StridedInterval::range(8, 250u32, 5u32);
+        let b = StridedInterval::constant(8, 251u32);
+        assert_eq!(a.udiv(&b).unwrap(), StridedInterval::range(8, 0u32, 1u32));
+
+        // No zero and no wrapping stays as precise as before.
+        let a = StridedInterval::range(8, 100u32, 200u32);
+        let b = StridedInterval::range(8, 5u32, 10u32);
+        assert_eq!(a.udiv(&b).unwrap(), StridedInterval::range(8, 10u32, 40u32));
+
+        // Exhaustive at 4 bits: every pair of intervals of stride 1 to 3,
+        // wrapping ones included.
+        const BITS: u32 = 4;
+        let mut intervals = Vec::new();
+        for stride in 0u32..=3 {
+            for lb in 0u32..16 {
+                for ub in 0u32..16 {
+                    if (stride == 0) != (lb == ub) {
+                        continue;
+                    }
+                    let si = StridedInterval::new(BITS, stride, lb, ub);
+                    let values = concretize(&si);
+                    intervals.push((si, values));
+                }
+            }
+        }
+
+        for (a, a_values) in &intervals {
+            for (b, b_values) in &intervals {
+                let result = concretize(&a.udiv(b).unwrap());
+                for x in a_values {
+                    for y in b_values {
+                        let expected = x.checked_div(*y).unwrap_or(0xf);
+                        assert!(
+                            result.contains(&expected),
+                            "{a:?} / {b:?} dropped {x} / {y} = {expected}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn test_urem_constant_divisor_non_constant_dividend() {
         // [5, 9] urem 5 is {0, 1, 2, 3, 4}, not the constant 5 % 5.
         let a = StridedInterval::range(32, 5u32, 9u32);
@@ -3497,6 +3548,70 @@ mod si_arithmetic_op_tests {
 
         let a = StridedInterval::constant(32, 42u32);
         assert_eq!(a.urem(&zero).unwrap(), a);
+    }
+
+    #[test]
+    fn test_urem_is_sound() {
+        // The values of an interval by direct enumeration.
+        fn concretize(si: &StridedInterval) -> Vec<u32> {
+            let StridedInterval::Normal {
+                bits,
+                stride,
+                lower_bound,
+                upper_bound,
+            } = si
+            else {
+                return vec![];
+            };
+            let modulus = 1u32 << *bits;
+            let stride = stride.to_u32().unwrap();
+            let lb = lower_bound.to_u32().unwrap();
+            let ub = upper_bound.to_u32().unwrap();
+            let span = (ub + modulus - lb) % modulus;
+            let steps = span.checked_div(stride).unwrap_or(0);
+            (0..=steps).map(|i| (lb + i * stride) % modulus).collect()
+        }
+
+        // A divisor that may be zero leaves the dividend as it is, above the
+        // largest remainder of its nonzero values.
+        let a = StridedInterval::range(8, 10u32, 20u32);
+        let b = StridedInterval::range(8, 0u32, 5u32);
+        let result = a.urem(&b).unwrap();
+        for expected in [0u32, 4, 10, 20] {
+            assert!(result.contains_value(&BigUint::from(expected)));
+        }
+
+        // Exhaustive at 4 bits: every pair of intervals of stride 1 to 3,
+        // wrapping ones included.
+        const BITS: u32 = 4;
+        let mut intervals = Vec::new();
+        for stride in 0u32..=3 {
+            for lb in 0u32..16 {
+                for ub in 0u32..16 {
+                    if (stride == 0) != (lb == ub) {
+                        continue;
+                    }
+                    let si = StridedInterval::new(BITS, stride, lb, ub);
+                    let values = concretize(&si);
+                    intervals.push((si, values));
+                }
+            }
+        }
+
+        for (a, a_values) in &intervals {
+            for (b, b_values) in &intervals {
+                let result = concretize(&a.urem(b).unwrap());
+                for x in a_values {
+                    for y in b_values {
+                        let expected = x.checked_rem(*y).unwrap_or(*x);
+                        assert!(
+                            result.contains(&expected),
+                            "{a:?} urem {b:?} dropped {x} urem {y} = {expected}"
+                        );
+                    }
+                }
+            }
+        }
     }
 
     #[test]
