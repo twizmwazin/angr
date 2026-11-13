@@ -12,7 +12,7 @@ This peephole recognizes the pattern and collapses it to an ITE.
 
 from __future__ import annotations
 
-from angr.ailment.expression import ITE, BinaryOp, Const, Expression, Extract, UnaryOp, VirtualVariable, int_op
+from angr.ailment.expression import ITE, BinaryOp, Const, Expression, Extract, UnaryOp, VirtualVariable
 from angr.ailment.statement import Assignment
 from angr.ailment.utils import is_lsb_extract
 
@@ -194,25 +194,24 @@ class SSEBitwiseSelect(PeepholeOptimizationExprBase):
         # (CmpLTFV, CmpGEFV, etc.) to scalar (CmpLTF, CmpGEF) since we're
         # extracting a scalar boolean condition for the ITE.
         vector_to_scalar = {
-            "CmpLTV": "CmpLTF",
-            "CmpLEV": "CmpLEF",
-            "CmpGTV": "CmpGTF",
-            "CmpGEV": "CmpGEF",
-            "CmpEQV": "CmpEQF",
-            "CmpNEV": "CmpNEF",
+            "CmpLTFV": "CmpLTF",
+            "CmpLEFV": "CmpLEF",
+            "CmpGTFV": "CmpGTF",
+            "CmpGEFV": "CmpGEF",
+            "CmpEQFV": "CmpEQF",
+            "CmpNEFV": "CmpNEF",
         }
         cmp_ops = set(vector_to_scalar.keys())
-        # the mask may come from an integer lane compare as well; either way the selected values are floats
-        if isinstance(expr, BinaryOp) and int_op(expr.op) in cmp_ops:
-            op = int_op(expr.op)
+        if isinstance(expr, BinaryOp) and expr.op in cmp_ops:
+            op = expr.op
             if negated:
                 negate_map = {
-                    "CmpLTV": "CmpGEV",
-                    "CmpGEV": "CmpLTV",
-                    "CmpLEV": "CmpGTV",
-                    "CmpGTV": "CmpLEV",
-                    "CmpEQV": "CmpNEV",
-                    "CmpNEV": "CmpEQV",
+                    "CmpLTFV": "CmpGEFV",
+                    "CmpGEFV": "CmpLTFV",
+                    "CmpLEFV": "CmpGTFV",
+                    "CmpGTFV": "CmpLEFV",
+                    "CmpEQFV": "CmpNEFV",
+                    "CmpNEFV": "CmpEQFV",
                 }
                 op = negate_map.get(op, op)
             # Lower to scalar

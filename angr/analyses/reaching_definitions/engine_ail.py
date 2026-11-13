@@ -597,6 +597,8 @@ class SimEngineRDAIL(SimEngineNostmtAIL[ReachingDefinitionsState, MultiValues, N
         self._expr(expr.operand)
         return self._top(expr.bits)
 
+    _handle_unop_AbsF = _handle_unop_Abs
+
     _handle_unop_Reference = _handle_unop_Default
     _handle_unop_Ctz = _handle_unop_Default
     _handle_unop_Dereference = _handle_unop_Default
@@ -661,14 +663,16 @@ class SimEngineRDAIL(SimEngineNostmtAIL[ReachingDefinitionsState, MultiValues, N
     def _handle_unop_Neg(self, expr) -> MultiValues:
         operand: MultiValues = self._expr(expr.operand)
         bits = expr.bits
-        if expr.floating_point:
-            return self._fp_op(bits, operator.neg, operand)
 
         operand_v = operand.one_value()
 
         if operand_v is not None and operand_v.concrete:
             return MultiValues(-operand_v)  # pylint:disable=invalid-unary-operand-type
         return MultiValues(self.state.top(bits))
+
+    @ail_unop_handler
+    def _handle_unop_NegF(self, expr) -> MultiValues:
+        return self._fp_op(expr.bits, operator.neg, self._expr(expr.operand))
 
     @ail_unop_handler
     def _handle_unop_BitwiseNeg(self, expr) -> MultiValues:
@@ -1148,6 +1152,12 @@ class SimEngineRDAIL(SimEngineNostmtAIL[ReachingDefinitionsState, MultiValues, N
 
     _handle_binop_CmpF = _handle_binop_Cmp
     _handle_binop_CmpEQ = _handle_binop_Cmp
+    _handle_binop_CmpEQF = _handle_binop_Cmp
+    _handle_binop_CmpNEF = _handle_binop_Cmp
+    _handle_binop_CmpLTF = _handle_binop_Cmp
+    _handle_binop_CmpLEF = _handle_binop_Cmp
+    _handle_binop_CmpGTF = _handle_binop_Cmp
+    _handle_binop_CmpGEF = _handle_binop_Cmp
     _handle_binop_CmpNE = _handle_binop_Cmp
     _handle_binop_CmpLE = _handle_binop_Cmp
     _handle_binop_CmpLEs = _handle_binop_Cmp

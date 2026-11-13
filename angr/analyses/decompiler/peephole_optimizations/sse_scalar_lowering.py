@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from angr.ailment.expression import BinaryOp, Const, Convert, Extract, UnaryOp, float_op
+from angr.ailment.expression import BinaryOp, Const, Convert, Extract, UnaryOp
 from angr.ailment.utils import is_lsb_extract
 
 from .base import PeepholeOptimizationExprBase
@@ -43,6 +43,14 @@ _V_TO_SCALAR: dict[str, str] = {
     "DivFV": "DivF",
     "MaxFV": "MaxF",
     "MinFV": "MinF",
+}
+
+# a unary op on a scalar widened into lane 0 -> the scalar FP op (xorps with the sign mask shows up as an integer Neg)
+_UNARY_TO_SCALAR_FP: dict[str, str] = {
+    "Neg": "NegF",
+    "NegF": "NegF",
+    "AbsF": "AbsF",
+    "Sqrt": "Sqrt",
 }
 
 
@@ -186,12 +194,12 @@ class SSEScalarLowering(PeepholeOptimizationExprBase):
             return None
 
         # Pattern: Extract(UnaryOp(Conv(N->128, x)), N@0) -> the floating-point UnaryOp(x)
-        if isinstance(base, UnaryOp) and base.operand.bits > n_bits:
+        if isinstance(base, UnaryOp) and base.operand.bits > n_bits and base.op in _UNARY_TO_SCALAR_FP:
             operand = _unwrap_conv_or_extract(base.operand, n_bits, self.manager)
             if operand is not base.operand:
                 return UnaryOp(
                     expr.idx,
-                    float_op(base.op),
+                    _UNARY_TO_SCALAR_FP[base.op],
                     operand,
                     bits=n_bits,
                     **expr.tags,

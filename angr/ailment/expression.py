@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from angr.rustylib.ailment import ConvertType, VirtualVariableCategory, float_op, int_op, is_float_op
+from angr.rustylib.ailment import ConvertType, VirtualVariableCategory
 
 if TYPE_CHECKING:
     # Static typing story: at runtime every marker below produces (and
@@ -779,8 +779,5 @@ __all__ = [
     "VEXCCallExpression",
     "VirtualVariable",
     "VirtualVariableCategory",
-    "float_op",
-    "int_op",
-    "is_float_op",
     "negate",
 ]

@@ -678,6 +678,14 @@ class SimEngineAILSimState(SimEngineLightAIL[StateType, DataType, bool, None]):
         return -v
 
     @ail_unop_handler
+    def _handle_unop_NegF(self, expr: ailment.UnaryOp):
+        return claripy.fpNeg(self._expr_fp(expr.operand))
+
+    @ail_unop_handler
+    def _handle_unop_AbsF(self, expr: ailment.UnaryOp) -> DataType:
+        return claripy.fpAbs(self._expr_fp(expr.operand))
+
+    @ail_unop_handler
     def _handle_unop_Not(self, expr: ailment.UnaryOp):
         v = self._expr_bv(expr.operand)
         return ~v
@@ -920,6 +928,30 @@ class SimEngineAILSimState(SimEngineLightAIL[StateType, DataType, bool, None]):
     @ail_binop_handler
     def _handle_binop_CmpF(self, expr: ailment.expression.BinaryOp) -> DataType:
         raise NotImplementedError("Not sure what the semantics of this op are")
+
+    @ail_binop_handler
+    def _handle_binop_CmpEQF(self, expr: ailment.expression.BinaryOp) -> DataType:
+        return claripy.fpEQ(self._expr_fp(expr.operands[0]), self._expr_fp(expr.operands[1]))
+
+    @ail_binop_handler
+    def _handle_binop_CmpNEF(self, expr: ailment.expression.BinaryOp) -> DataType:
+        return claripy.Not(claripy.fpEQ(self._expr_fp(expr.operands[0]), self._expr_fp(expr.operands[1])))
+
+    @ail_binop_handler
+    def _handle_binop_CmpLTF(self, expr: ailment.expression.BinaryOp) -> DataType:
+        return claripy.fpLT(self._expr_fp(expr.operands[0]), self._expr_fp(expr.operands[1]))
+
+    @ail_binop_handler
+    def _handle_binop_CmpLEF(self, expr: ailment.expression.BinaryOp) -> DataType:
+        return claripy.fpLEQ(self._expr_fp(expr.operands[0]), self._expr_fp(expr.operands[1]))
+
+    @ail_binop_handler
+    def _handle_binop_CmpGTF(self, expr: ailment.expression.BinaryOp) -> DataType:
+        return claripy.fpGT(self._expr_fp(expr.operands[0]), self._expr_fp(expr.operands[1]))
+
+    @ail_binop_handler
+    def _handle_binop_CmpGEF(self, expr: ailment.expression.BinaryOp) -> DataType:
+        return claripy.fpGEQ(self._expr_fp(expr.operands[0]), self._expr_fp(expr.operands[1]))
 
     @ail_binop_handler
     def _handle_binop_CmpEQ(self, expr: ailment.expression.BinaryOp) -> DataType:

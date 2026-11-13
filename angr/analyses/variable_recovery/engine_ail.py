@@ -1306,25 +1306,21 @@ class SimEngineVRAIL(
         r1 = self._expr_bv(arg1, non_pointer=True)
         result_size = expr.bits
 
-        if not expr.floating_point:
-            # emit signedness constraints
-            int_type_func = typeconsts.signed_int_type if expr.signed else typeconsts.unsigned_int_type
-            if isinstance(r0.typevar, typevars.TypeVariable):
-                tc = typevars.Subtype(r0.typevar, int_type_func(arg0.bits))
-                self.state.add_type_constraint(tc)
-            if isinstance(r1.typevar, typevars.TypeVariable):
-                tc = typevars.Subtype(r1.typevar, int_type_func(arg1.bits))
-                self.state.add_type_constraint(tc)
+        # emit signedness constraints
+        int_type_func = typeconsts.signed_int_type if expr.signed else typeconsts.unsigned_int_type
+        if isinstance(r0.typevar, typevars.TypeVariable):
+            tc = typevars.Subtype(r0.typevar, int_type_func(arg0.bits))
+            self.state.add_type_constraint(tc)
+        if isinstance(r1.typevar, typevars.TypeVariable):
+            tc = typevars.Subtype(r1.typevar, int_type_func(arg1.bits))
+            self.state.add_type_constraint(tc)
 
-        if expr.floating_point:
+        if (r1.data == 0).is_true():
             remainder = self.state.top(result_size)
+        elif expr.signed:
+            remainder = r0.data.SMod(r1.data)
         else:
-            if (r1.data == 0).is_true():
-                remainder = self.state.top(result_size)
-            elif expr.signed:
-                remainder = r0.data.SMod(r1.data)
-            else:
-                remainder = r0.data % r1.data
+            remainder = r0.data % r1.data
 
         # truncation if necessary
         if remainder.size() > result_size:
@@ -1568,8 +1564,8 @@ class SimEngineVRAIL(
     def _handle_binop_Cmp_Default(self, expr):
         arg0, arg1 = expr.operands
 
-        r0 = self._operand(arg0, expr.floating_point)
-        r1 = self._operand(arg1, expr.floating_point)
+        r0 = self._expr(arg0)
+        r1 = self._expr(arg1)
         if (
             r0.typevar is not None
             and r1.typevar is not None
@@ -1578,16 +1574,39 @@ class SimEngineVRAIL(
             tc = typevars.Equivalence(r0.typevar, r1.typevar)
             self.state.add_type_constraint(tc)
 
-        if expr.floating_point:
-            ft = self._fp_type(arg0.bits)
-            if ft is not None:
-                for r in (r0, r1):
-                    self._constrain_richr_as_float(r, ft)
-
         return RichR(self.state.top(expr.bits))
 
     _handle_binop_CmpEQ = _handle_binop_Cmp_Default
     _handle_binop_CmpNE = _handle_binop_Cmp_Default
+
+    @ail_binop_handler
+    def _handle_binop_Cmp_Float(self, expr):
+        """Handle floating-point comparisons: both operands are floats of the operand width."""
+        arg0, arg1 = expr.operands
+
+        r0 = self._operand(arg0, True)
+        r1 = self._operand(arg1, True)
+        if (
+            r0.typevar is not None
+            and r1.typevar is not None
+            and (isinstance(r0.typevar, typevars.TypeVariable) or isinstance(r1.typevar, typevars.TypeVariable))
+        ):
+            tc = typevars.Equivalence(r0.typevar, r1.typevar)
+            self.state.add_type_constraint(tc)
+
+        ft = self._fp_type(arg0.bits)
+        if ft is not None:
+            for r in (r0, r1):
+                self._constrain_richr_as_float(r, ft)
+
+        return RichR(self.state.top(expr.bits))
+
+    _handle_binop_CmpEQF = _handle_binop_Cmp_Float
+    _handle_binop_CmpNEF = _handle_binop_Cmp_Float
+    _handle_binop_CmpLTF = _handle_binop_Cmp_Float
+    _handle_binop_CmpLEF = _handle_binop_Cmp_Float
+    _handle_binop_CmpGTF = _handle_binop_Cmp_Float
+    _handle_binop_CmpGEF = _handle_binop_Cmp_Float
 
     def _handle_binop_Cmp_Signed(self, expr):
         """Handle signed comparisons: add equivalence constraint plus signed type constraint on operands."""
@@ -1615,25 +1634,25 @@ class SimEngineVRAIL(
 
     @ail_binop_handler
     def _handle_binop_CmpLT(self, expr):
-        if expr.signed and not expr.floating_point:
+        if expr.signed:
             return self._handle_binop_Cmp_Signed(expr)
         return self._handle_binop_Cmp_Default(expr)
 
     @ail_binop_handler
     def _handle_binop_CmpLE(self, expr):
-        if expr.signed and not expr.floating_point:
+        if expr.signed:
             return self._handle_binop_Cmp_Signed(expr)
         return self._handle_binop_Cmp_Default(expr)
 
     @ail_binop_handler
     def _handle_binop_CmpGT(self, expr):
-        if expr.signed and not expr.floating_point:
+        if expr.signed:
             return self._handle_binop_Cmp_Signed(expr)
         return self._handle_binop_Cmp_Default(expr)
 
     @ail_binop_handler
     def _handle_binop_CmpGE(self, expr):
-        if expr.signed and not expr.floating_point:
+        if expr.signed:
             return self._handle_binop_Cmp_Signed(expr)
         return self._handle_binop_Cmp_Default(expr)
 
@@ -1738,6 +1757,16 @@ class SimEngineVRAIL(
                 type_constraints=None,
             )
 
+        r = self.state.top(result_size)
+        return RichR(r, typevar=r_inner.typevar)
+
+    @ail_unop_handler
+    def _handle_unop_NegF(self, expr):
+        arg = expr.operands[0]
+        r_inner = self._expr_bv(arg)
+
+        result_size = arg.bits
+
         # FP negation preserves precision.  Propagate the operand's typevar.
         # When the peephole has narrowed the Neg to the actual precision
         # (e.g. 32 bits after Conv round-trip elimination), add a Float
@@ -1745,7 +1774,7 @@ class SimEngineVRAIL(
         # widening Conv fix handles that case.
         typevar = r_inner.typevar
         type_constraints: set[typevars.TypeConstraint] | None = None
-        if unop.floating_point and result_size != 64:
+        if result_size != 64:
             ft = self._fp_type(result_size)
             if ft is not None:
                 typevar = self.tv_manager.new_tv()
@@ -1780,6 +1809,8 @@ class SimEngineVRAIL(
             RichR[claripy.ast.BV | claripy.ast.FP],
             RichR(self.state.top(expr.bits), typevar=operand.typevar),
         )
+
+    _handle_unop_AbsF = _handle_unop_Abs
 
     @ail_unop_handler
     def _handle_unop_Default(self, expr: ailment.expression.UnaryOp) -> RichR[claripy.ast.BV | claripy.ast.FP]:

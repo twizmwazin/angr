@@ -31,7 +31,6 @@ from angr.ailment.expression import (
     VEXCCallExpression,
     VirtualVariable,
     VirtualVariableCategory,
-    float_op,
 )
 from angr.ailment.manager import Manager
 from angr.ailment.statement import Assignment, ConditionalJump, Store
@@ -759,35 +758,35 @@ class TestX87StatusWord(unittest.TestCase):
         self.eflags = Tmp(None, 4, 32)
 
     def _assert_cmp(self, result, op, a=None, b=None):
-        assert isinstance(result, BinaryOp) and result.op == float_op(op), result
+        assert isinstance(result, BinaryOp) and result.op == op, result
         assert result.operands[0].likes(a or self.a) and result.operands[1].likes(b or self.b)
 
     def test_test_ah_0x41_je_is_gt(self):
         # test ah, 0x41; je  ->  a > b
         expr = _cmp_const("CmpEQ", _test_ah(_cmpf(self.a, self.b), self.ftop, 0x41), 0)
-        self._assert_cmp(self.opt.optimize(expr), "CmpGT")
+        self._assert_cmp(self.opt.optimize(expr), "CmpGTF")
 
     def test_test_ah_0x45_jne_is_le(self):
         expr = _cmp_const("CmpNE", _test_ah(_cmpf(self.a, self.b), self.ftop, 0x45), 0)
-        self._assert_cmp(self.opt.optimize(expr), "CmpLE")
+        self._assert_cmp(self.opt.optimize(expr), "CmpLEF")
 
     def test_test_ah_1_bit_is_lt(self):
         # (fsw >> 8) & 1 used as a value: C0 set -> a < b (or unordered)
         fsw = _fsw_ah(_cmpf(self.a, self.b), self.ftop)
         result = self.opt.optimize(_bit(Convert(None, 8, 32, False, fsw), 0))
         assert isinstance(result, Convert) and result.from_bits == 1 and result.to_bits == 32
-        self._assert_cmp(result.operand, "CmpLT")
+        self._assert_cmp(result.operand, "CmpLTF")
 
     def test_and_cmp_0x40_is_eq(self):
         # and ah, 0x45; cmp ah, 0x40; setne  ->  a != b
         masked = BinaryOp(None, "And", [_fsw_ah(_cmpf(self.a, self.b), self.ftop), Const(None, 0x45, 8)], False, bits=8)
-        self._assert_cmp(self.opt.optimize(_cmp_const("CmpNE", masked, 0x40)), "CmpNE")
-        self._assert_cmp(self.opt.optimize(_cmp_const("CmpEQ", masked, 0x40)), "CmpEQ")
+        self._assert_cmp(self.opt.optimize(_cmp_const("CmpNE", masked, 0x40)), "CmpNEF")
+        self._assert_cmp(self.opt.optimize(_cmp_const("CmpEQ", masked, 0x40)), "CmpEQF")
 
     def test_sahf_zf_is_eq(self):
         # sahf; je: bit 6 of the copied flags, OF from the previous eflags stays unknown and is masked away
         eflags = _sahf_eflags(_cmpf(self.a, self.b), self.ftop, self.eflags)
-        self._assert_cmp(self.opt.optimize(_cmp_const("CmpEQ", _bit(eflags, 6), 1)), "CmpEQ")
+        self._assert_cmp(self.opt.optimize(_cmp_const("CmpEQ", _bit(eflags, 6), 1)), "CmpEQF")
 
     def test_sahf_cf_or_zf_is_le(self):
         # sahf; jbe: (flags | flags >> 6) & 1
@@ -808,7 +807,7 @@ class TestX87StatusWord(unittest.TestCase):
             False,
             bits=32,
         )
-        self._assert_cmp(self.opt.optimize(_cmp_const("CmpEQ", cf_or_zf, 1)), "CmpLE")
+        self._assert_cmp(self.opt.optimize(_cmp_const("CmpEQ", cf_or_zf, 1)), "CmpLEF")
 
     def test_fcomi_pf_is_isnan(self):
         # fucomi/ucomisd; jp: (CmpF & 0x45) >> 2 & 1
@@ -843,32 +842,32 @@ class TestX87StatusWord(unittest.TestCase):
         assert isinstance(r, Const) and r.value == 1
 
     def _fp(self, op, a, b):
-        return BinaryOp(None, float_op(op), [a, b], False, bits=1)
+        return BinaryOp(None, op, [a, b], False, bits=1)
 
     def test_redundant_unordered_guard(self):
         # ucomisd; sete; setnp; and: (a == b) & !isunordered(a, b) is a == b
-        eq = self._fp("CmpEQ", self.a, self.b)
+        eq = self._fp("CmpEQF", self.a, self.b)
         ordered = UnaryOp(None, "Not", self._fp("CmpUN", self.a, self.b), bits=1)
         expr = BinaryOp(
             None, "And", [Convert(None, 1, 8, False, eq), Convert(None, 1, 8, False, ordered)], False, bits=8
         )
         result = self.opt.optimize(expr)
         assert isinstance(result, Convert) and result.from_bits == 1 and result.to_bits == 8
-        self._assert_cmp(result.operand, "CmpEQ")
+        self._assert_cmp(result.operand, "CmpEQF")
         # jne/jp: a != b || isnan(a) || isnan(b) is a != b
-        ne = self._fp("CmpNE", self.a, self.b)
+        ne = self._fp("CmpNEF", self.a, self.b)
         nan_a = UnaryOp(None, "IsNaN", self.a, bits=1)
         nan_b = UnaryOp(None, "IsNaN", self.b, bits=1)
         expr = BinaryOp(
             None, "LogicalOr", [BinaryOp(None, "LogicalOr", [ne, nan_a], False, bits=1), nan_b], False, bits=1
         )
-        self._assert_cmp(self.opt.optimize(expr), "CmpNE")
+        self._assert_cmp(self.opt.optimize(expr), "CmpNEF")
         # !isnan(a) alone guards a comparison against a constant
         zero = Const(None, 0.0, 64)
-        lt = self._fp("CmpLT", self.a, zero)
+        lt = self._fp("CmpLTF", self.a, zero)
         not_nan_a = UnaryOp(None, "Not", nan_a, bits=1)
         self._assert_cmp(
-            self.opt.optimize(BinaryOp(None, "LogicalAnd", [not_nan_a, lt], False, bits=1)), "CmpLT", b=zero
+            self.opt.optimize(BinaryOp(None, "LogicalAnd", [not_nan_a, lt], False, bits=1)), "CmpLTF", b=zero
         )
 
     def test_unordered_guards(self):
@@ -876,18 +875,18 @@ class TestX87StatusWord(unittest.TestCase):
         un = self._fp("CmpUN", self.a, self.b)
         # a NaN test of one operand folds away even when the other operand may be NaN (IDA-like)
         expr = BinaryOp(
-            None, "LogicalAnd", [self._fp("CmpLT", self.a, self.b), UnaryOp(None, "Not", nan_a, bits=1)], False, bits=1
+            None, "LogicalAnd", [self._fp("CmpLTF", self.a, self.b), UnaryOp(None, "Not", nan_a, bits=1)], False, bits=1
         )
         result = self.opt.optimize(expr)
         assert isinstance(result, BinaryOp) and result.op == "CmpLTF", result
         result = self.opt.optimize(
-            BinaryOp(None, "LogicalOr", [nan_a, self._fp("CmpLT", self.a, self.b)], False, bits=1)
+            BinaryOp(None, "LogicalOr", [nan_a, self._fp("CmpLTF", self.a, self.b)], False, bits=1)
         )
         assert isinstance(result, BinaryOp) and result.op == "CmpLTF", result
         # the unordered outcome of a comparison of the same operands is folded away (IDA-like, source-like)
-        result = self.opt.optimize(BinaryOp(None, "LogicalOr", [self._fp("CmpEQ", self.a, self.b), un], False, bits=1))
+        result = self.opt.optimize(BinaryOp(None, "LogicalOr", [self._fp("CmpEQF", self.a, self.b), un], False, bits=1))
         assert isinstance(result, BinaryOp) and result.op == "CmpEQF", result
-        not_lt = UnaryOp(None, "Not", self._fp("CmpLT", self.a, self.b), bits=1)
+        not_lt = UnaryOp(None, "Not", self._fp("CmpLTF", self.a, self.b), bits=1)
         result = self.opt.optimize(
             BinaryOp(None, "LogicalAnd", [not_lt, UnaryOp(None, "Not", un, bits=1)], False, bits=1)
         )
@@ -918,60 +917,60 @@ class TestFPLogicFold(unittest.TestCase):
         self.zero = Const(None, 0.0, 64)
 
     def _cmp(self, op, a=None, b=None):
-        return BinaryOp(None, float_op(op), [a or self.a, b or self.b], False, bits=1)
+        return BinaryOp(None, op, [a or self.a, b or self.b], False, bits=1)
 
     def _assert_cmp(self, result, op, b=None):
-        assert isinstance(result, BinaryOp) and result.op == float_op(op), result
+        assert isinstance(result, BinaryOp) and result.op == op, result
         assert result.operands[0].likes(self.a) and result.operands[1].likes(b or self.b), result
 
     def test_ite_ne_or_unordered(self):
         # setne; setp; or: a != b ? 1 : isunordered(a, b)
-        expr = ITE(None, self._cmp("CmpNE"), Const(None, 1, 1), self.un)
-        self._assert_cmp(self.opt.optimize(expr), "CmpNE")
+        expr = ITE(None, self._cmp("CmpNEF"), Const(None, 1, 1), self.un)
+        self._assert_cmp(self.opt.optimize(expr), "CmpNEF")
 
     def test_ite_eq_then_isnan(self):
         # a == 0.0 ? _INSERT(0, 0, isnan(a)) : 1, widened to 8 bits
         nan8 = Insert(None, Const(None, 0, 8), Const(None, 0, 64), Convert(None, 1, 8, False, self.nan_a), "Iend_LE")
-        expr = ITE(None, self._cmp("CmpEQ", b=self.zero), nan8, Const(None, 1, 8))
+        expr = ITE(None, self._cmp("CmpEQF", b=self.zero), nan8, Const(None, 1, 8))
         result = self.opt.optimize(expr)
         assert isinstance(result, Convert) and result.from_bits == 1 and result.to_bits == 8, result
-        self._assert_cmp(result.operand, "CmpNE", b=self.zero)
+        self._assert_cmp(result.operand, "CmpNEF", b=self.zero)
 
     def test_ite_isnan_guard_then_compare(self):
         # isnan(a) ? 1 : a == 0.0
-        expr = ITE(None, self.nan_a, Const(None, 1, 1), self._cmp("CmpEQ", b=self.zero))
-        self._assert_cmp(self.opt.optimize(expr), "CmpEQ", b=self.zero)
+        expr = ITE(None, self.nan_a, Const(None, 1, 1), self._cmp("CmpEQF", b=self.zero))
+        self._assert_cmp(self.opt.optimize(expr), "CmpEQF", b=self.zero)
 
     def test_logical_or_and_chains(self):
-        lt_or_un = BinaryOp(None, "LogicalOr", [self._cmp("CmpLT"), self.un], False, bits=1)
-        self._assert_cmp(self.opt.optimize(lt_or_un), "CmpLT")
+        lt_or_un = BinaryOp(None, "LogicalOr", [self._cmp("CmpLTF"), self.un], False, bits=1)
+        self._assert_cmp(self.opt.optimize(lt_or_un), "CmpLTF")
         ordered = UnaryOp(None, "Not", self.un, bits=1)
-        eq_and_ordered = BinaryOp(None, "LogicalAnd", [self._cmp("CmpEQ"), ordered], False, bits=1)
-        self._assert_cmp(self.opt.optimize(eq_and_ordered), "CmpEQ")
+        eq_and_ordered = BinaryOp(None, "LogicalAnd", [self._cmp("CmpEQF"), ordered], False, bits=1)
+        self._assert_cmp(self.opt.optimize(eq_and_ordered), "CmpEQF")
         # isnan(a) || a < 1.5: the constant cannot be NaN
         c = Const(None, 1.5, 64)
-        nan_or_lt = BinaryOp(None, "LogicalOr", [self.nan_a, self._cmp("CmpLT", b=c)], False, bits=1)
-        self._assert_cmp(self.opt.optimize(nan_or_lt), "CmpLT", b=c)
+        nan_or_lt = BinaryOp(None, "LogicalOr", [self.nan_a, self._cmp("CmpLTF", b=c)], False, bits=1)
+        self._assert_cmp(self.opt.optimize(nan_or_lt), "CmpLTF", b=c)
 
     def test_negated_chain(self):
-        lt_or_un = BinaryOp(None, "LogicalOr", [self._cmp("CmpLT"), self.un], False, bits=1)
-        self._assert_cmp(self.opt.optimize(UnaryOp(None, "Not", lt_or_un, bits=1)), "CmpGE")
-        self._assert_cmp(self.opt.optimize(UnaryOp(None, "Not", self._cmp("CmpLT"), bits=1)), "CmpGE")
+        lt_or_un = BinaryOp(None, "LogicalOr", [self._cmp("CmpLTF"), self.un], False, bits=1)
+        self._assert_cmp(self.opt.optimize(UnaryOp(None, "Not", lt_or_un, bits=1)), "CmpGEF")
+        self._assert_cmp(self.opt.optimize(UnaryOp(None, "Not", self._cmp("CmpLTF"), bits=1)), "CmpGEF")
 
     def test_widened_bitwise_chain(self):
         # (char)isnan(a) | (char)(a >= 0.0) & (char)(a != 0.0)
-        ge = Convert(None, 1, 8, False, self._cmp("CmpGE", b=self.zero))
-        ne = Convert(None, 1, 8, False, self._cmp("CmpNE", b=self.zero))
+        ge = Convert(None, 1, 8, False, self._cmp("CmpGEF", b=self.zero))
+        ne = Convert(None, 1, 8, False, self._cmp("CmpNEF", b=self.zero))
         nan8 = Convert(None, 1, 8, False, self.nan_a)
         expr = BinaryOp(None, "Or", [nan8, BinaryOp(None, "And", [ge, ne], False, bits=8)], False, bits=8)
         result = self.opt.optimize(expr)
         assert isinstance(result, Convert) and result.from_bits == 1 and result.to_bits == 8, result
-        self._assert_cmp(result.operand, "CmpGT", b=self.zero)
+        self._assert_cmp(result.operand, "CmpGTF", b=self.zero)
 
     def test_nan_tests_are_kept(self):
         # a NaN test by itself stays: !isunordered(a, b), a == b ? 0 : isunordered(a, b)
         assert self.opt.optimize(UnaryOp(None, "Not", self.un, bits=1)) is None
-        assert self.opt.optimize(ITE(None, self._cmp("CmpEQ"), Const(None, 0, 1), self.un)) is None
+        assert self.opt.optimize(ITE(None, self._cmp("CmpEQF"), Const(None, 0, 1), self.un)) is None
         # integer logic is not touched
         assert self.opt.optimize(BinaryOp(None, "Or", [Tmp(None, 7, 8), Tmp(None, 8, 8)], False, bits=8)) is None
 
@@ -1134,7 +1133,7 @@ class TestCmpFValueLowering(unittest.TestCase):
             if cond_op == "IsNaN":
                 assert isinstance(cond, UnaryOp) and cond.op == "IsNaN" and cond.operand.likes(operands[0]), cond
             else:
-                assert isinstance(cond, BinaryOp) and cond.op == float_op(cond_op), cond
+                assert isinstance(cond, BinaryOp) and cond.op == cond_op, cond
                 assert all(x.likes(y) for x, y in zip(cond.operands, operands, strict=True)), cond
             assert isinstance(expr.iftrue, Const) and expr.iftrue.value == value, expr
             expr = expr.iffalse
@@ -1146,7 +1145,7 @@ class TestCmpFValueLowering(unittest.TestCase):
             assert isinstance(expr, Convert) and expr.from_bits == 1, expr
             assert (
                 isinstance(expr.operand, BinaryOp)
-                and expr.operand.op == float_op(cond_op)
+                and expr.operand.op == cond_op
                 and all(x.likes(y) for x, y in zip(expr.operand.operands, operands, strict=True))
             ), expr
 
@@ -1157,13 +1156,15 @@ class TestCmpFValueLowering(unittest.TestCase):
         assert isinstance(result, BinaryOp) and result.op == "Or" and result.bits == 16, result
         assert isinstance(result.operands[0], Const) and result.operands[0].value == 0x3800
         a0 = (self.a, zero)
-        self._assert_chain(result.operands[1], [("IsNaN", a0, 0x4500), ("CmpEQ", a0, 0x4000), ("CmpLT", a0, 0x100), 0])
+        self._assert_chain(
+            result.operands[1], [("IsNaN", a0, 0x4500), ("CmpEQF", a0, 0x4000), ("CmpLTF", a0, 0x100), 0]
+        )
 
     def test_operand_order(self):
         # CmpF(b, a) & 0x45: LT means b < a
         masked = BinaryOp(None, "And", [_cmpf(self.b, self.a), Const(None, 0x45, 32)], False, bits=32)
         ba = (self.b, self.a)
-        self._assert_chain(self._lower(masked), [("CmpUN", ba, 0x45), ("CmpEQ", ba, 0x40), ("CmpLT", ba)])
+        self._assert_chain(self._lower(masked), [("CmpUN", ba, 0x45), ("CmpEQF", ba, 0x40), ("CmpLTF", ba)])
 
     def test_nan_operand(self):
         nan = Const(None, 0x7FF8000000000000, 64)
@@ -1179,7 +1180,7 @@ class TestCmpFValueLowering(unittest.TestCase):
         zero_a = Const(None, 0.0, 64)
         zero_b = Const(None, 0.0, 64)
         masked = BinaryOp(None, "And", [_cmpf(zero_a, zero_b), Const(None, 0x45, 32)], False, bits=32)
-        self._assert_chain(self._lower(masked), [("CmpEQ", (zero_a, zero_b), 0x40), ("CmpLT", (zero_a, zero_b))])
+        self._assert_chain(self._lower(masked), [("CmpEQF", (zero_a, zero_b), 0x40), ("CmpLTF", (zero_a, zero_b))])
 
     def test_unknown_bits_not_lowered(self):
         # the ftop bits are unknown: only the CmpF part can be lowered
@@ -1247,32 +1248,32 @@ class TestX86FPConditionCCall(unittest.TestCase):
     def _assert_cmp(self, result, op):
         assert isinstance(result, Convert) and result.from_bits == 1 and result.to_bits == 32, result
         pred = result.operand
-        assert isinstance(pred, BinaryOp) and pred.op == float_op(op), pred
+        assert isinstance(pred, BinaryOp) and pred.op == op, pred
         assert pred.operands[0].likes(self.a) and pred.operands[1].likes(self.b)
 
     def test_test_ah_5_jp_is_ge(self):
         # MSVC `if (a < b)`: test ah, 5; jp skip  ->  skip when a >= b
-        self._assert_cmp(self._rewrite(10, 13, _test_ah(_cmpf(self.a, self.b), self.ftop, 5)), "CmpGE")
+        self._assert_cmp(self._rewrite(10, 13, _test_ah(_cmpf(self.a, self.b), self.ftop, 5)), "CmpGEF")
 
     def test_test_ah_0x44_jnp_is_eq(self):
-        self._assert_cmp(self._rewrite(11, 13, _test_ah(_cmpf(self.a, self.b), self.ftop, 0x44)), "CmpEQ")
+        self._assert_cmp(self._rewrite(11, 13, _test_ah(_cmpf(self.a, self.b), self.ftop, 0x44)), "CmpEQF")
 
     def test_test_ah_0x41_jne_is_le(self):
-        self._assert_cmp(self._rewrite(5, 13, _test_ah(_cmpf(self.a, self.b), self.ftop, 0x41)), "CmpLE")
+        self._assert_cmp(self._rewrite(5, 13, _test_ah(_cmpf(self.a, self.b), self.ftop, 0x41)), "CmpLEF")
 
     def test_sahf_jbe_is_le(self):
         # CondBE over copied flags (sahf)
-        self._assert_cmp(self._rewrite(6, 0, _sahf_eflags(_cmpf(self.a, self.b), self.ftop, self.eflags)), "CmpLE")
+        self._assert_cmp(self._rewrite(6, 0, _sahf_eflags(_cmpf(self.a, self.b), self.ftop, self.eflags)), "CmpLEF")
 
     def test_fcomi_ja_is_gt(self):
         # fcomi: cc_dep1 = CmpF & 0x45; CondNBE
         masked = BinaryOp(None, "And", [_cmpf(self.a, self.b), Const(None, 0x45, 32)], False, bits=32)
-        self._assert_cmp(self._rewrite(7, 0, masked), "CmpGT")
+        self._assert_cmp(self._rewrite(7, 0, masked), "CmpGTF")
 
     def test_cmp_ah_0x40_je_is_eq(self):
         # and ah, 0x45; cmp ah, 0x40; je  (CondZ, SUBB)
         masked = BinaryOp(None, "And", [_fsw_ah(_cmpf(self.a, self.b), self.ftop), Const(None, 0x45, 8)], False, bits=8)
-        self._assert_cmp(self._rewrite(4, 4, Convert(None, 8, 32, False, masked), 0x40), "CmpEQ")
+        self._assert_cmp(self._rewrite(4, 4, Convert(None, 8, 32, False, masked), 0x40), "CmpEQF")
 
     def test_fxam_sahf_jb_is_not_finite(self):
         # fxam; fnstsw ax; sahf; jb: CF = C0, set for NaN and infinity
@@ -1446,33 +1447,33 @@ class TestFPExactIdentities(unittest.TestCase):
 
     @staticmethod
     def _fp(idx, op, a, b, bits=64):
-        return BinaryOp(idx, float_op(op), [a, b], True, bits=bits)
+        return BinaryOp(idx, op, [a, b], True, bits=bits)
 
     def test_mul_one(self):
         x = Tmp(1, 0, 64)
-        r = self._opt(self._fp(2, "Mul", Const(3, 1.0, 64), x))
+        r = self._opt(self._fp(2, "MulF", Const(3, 1.0, 64), x))
         assert r is not None and r.likes(x)
-        r = self._opt(self._fp(2, "Mul", x, Const(3, 1.0, 64)))
+        r = self._opt(self._fp(2, "MulF", x, Const(3, 1.0, 64)))
         assert r is not None and r.likes(x)
         # integer bit pattern of 1.0f
         x32 = Tmp(1, 0, 32)
-        r = self._opt(self._fp(2, "Mul", x32, Const(3, 0x3F800000, 32), bits=32))
+        r = self._opt(self._fp(2, "MulF", x32, Const(3, 0x3F800000, 32), bits=32))
         assert r is not None and r.likes(x32)
-        assert self._opt(self._fp(2, "Mul", x, Const(3, 2.0, 64))) is None
+        assert self._opt(self._fp(2, "MulF", x, Const(3, 2.0, 64))) is None
 
     def test_f2xm1_add_one(self):
         exp2 = UnaryOp(2, "Exp2", Tmp(1, 0, 64), bits=64)
-        f2xm1 = self._fp(3, "Sub", exp2, Const(4, 1.0, 64))
-        r = self._opt(self._fp(5, "Add", f2xm1, Const(6, 1.0, 64)))
+        f2xm1 = self._fp(3, "SubF", exp2, Const(4, 1.0, 64))
+        r = self._opt(self._fp(5, "AddF", f2xm1, Const(6, 1.0, 64)))
         assert r is not None and r.likes(exp2)
-        r = self._opt(self._fp(5, "Add", Const(6, 1.0, 64), f2xm1))
+        r = self._opt(self._fp(5, "AddF", Const(6, 1.0, 64), f2xm1))
         assert r is not None and r.likes(exp2)
 
     def test_inexact_shapes_not_folded(self):
         # (x - 1.0) + 1.0 absorbs a tiny x
         x = Tmp(1, 0, 64)
-        sub = self._fp(3, "Sub", x, Const(4, 1.0, 64))
-        assert self._opt(self._fp(5, "Add", sub, Const(6, 1.0, 64))) is None
+        sub = self._fp(3, "SubF", x, Const(4, 1.0, 64))
+        assert self._opt(self._fp(5, "AddF", sub, Const(6, 1.0, 64))) is None
         # integer arithmetic is left to the integer simplifiers
         imul = BinaryOp(7, "Mul", [x, Const(8, 1, 64)], False, bits=64)
         assert self._opt(imul) is None

@@ -452,6 +452,8 @@ class PurityEngineAIL(SimEngineLightAIL[StateType, DataType_co, StmtDataType, Re
         return self._expr_noconst(expr.operand)
 
     _handle_unop_Abs = _handle_unop_default
+    _handle_unop_AbsF = _handle_unop_default
+    _handle_unop_NegF = _handle_unop_default
     _handle_unop_Clz = _handle_unop_default
     _handle_unop_Ctz = _handle_unop_default
     _handle_unop_GetMSBs = _handle_unop_default
@@ -610,6 +612,12 @@ class PurityEngineAIL(SimEngineLightAIL[StateType, DataType_co, StmtDataType, Re
         return self._expr_noconst(expr.operands[0]) | self._expr_noconst(expr.operands[1])
 
     _handle_binop_AddF = _handle_binop_default
+    _handle_binop_CmpEQF = _handle_binop_default
+    _handle_binop_CmpNEF = _handle_binop_default
+    _handle_binop_CmpLTF = _handle_binop_default
+    _handle_binop_CmpLEF = _handle_binop_default
+    _handle_binop_CmpGTF = _handle_binop_default
+    _handle_binop_CmpGEF = _handle_binop_default
     _handle_binop_AddV = _handle_binop_default
     _handle_binop_SubF = _handle_binop_default
     _handle_binop_SubV = _handle_binop_default

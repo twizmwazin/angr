@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from sortedcontainers import SortedDict
 
-from angr.ailment.expression import Convert, int_op
+from angr.ailment.expression import Convert
 from angr.sim_variable import (
     SimMemoryVariable,
     SimRegisterVariable,
@@ -254,16 +254,28 @@ def vector_convert_name(expr: Convert) -> str:
     return f"Conv{src}to{dst}x{ct}"
 
 
-# floating-point AIL ops that are printed under their own name
-_NAMED_FP_OPS = frozenset({"MaxF", "MinF"})
+# Source operators do not tell integer from floating-point arithmetic: `+` is both Add and AddF. The operator nodes of
+# the generated code (CBinaryOp, CUnaryOp, ...) therefore have one op per source operator, named after the integer
+# AIL op; this maps the floating-point AIL ops onto them.
+_SOURCE_OPERATORS: dict[str, str] = {
+    "AddF": "Add",
+    "SubF": "Sub",
+    "MulF": "Mul",
+    "DivF": "Div",
+    "NegF": "Neg",
+    "AbsF": "Abs",
+    "CmpEQF": "CmpEQ",
+    "CmpNEF": "CmpNE",
+    "CmpLTF": "CmpLT",
+    "CmpLEF": "CmpLE",
+    "CmpGTF": "CmpGT",
+    "CmpGEF": "CmpGE",
+}
 
 
 def source_op(op: str) -> str:
-    """
-    The operator name of an AIL op in the generated code. Source operators do not tell integer from floating-point
-    arithmetic (``+`` is both Add and AddF), so a floating-point op is printed as its integer counterpart.
-    """
-    return op if op in _NAMED_FP_OPS else int_op(op)
+    """The op of the generated code's operator node for an AIL op."""
+    return _SOURCE_OPERATORS.get(op, op)
 
 
 def variable_display_name(v: SimVariable) -> str:

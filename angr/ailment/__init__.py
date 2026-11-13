@@ -8,18 +8,7 @@ from . import expression, statement
 from .block import Block
 from .block_walker import AILBlockRewriter, AILBlockViewer, AILBlockWalker
 from .converter_common import Converter
-from .expression import (
-    BinaryOp,
-    Const,
-    Expression,
-    IRegister,
-    Register,
-    Tmp,
-    UnaryOp,
-    float_op,
-    int_op,
-    is_float_op,
-)
+from .expression import BinaryOp, Const, Expression, IRegister, Register, Tmp, UnaryOp
 from .manager import Manager
 from .statement import Assignment, NoOp, Statement
 
@@ -96,8 +85,5 @@ __all__ = [
     "VEXIRSBConverter",
     "available_converters",
     "expression",
-    "float_op",
-    "int_op",
-    "is_float_op",
     "statement",
 ]

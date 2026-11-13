@@ -586,15 +586,6 @@ class VEXIRSBConverter:
 def _vexop_debug(op_int: int) -> dict[str, Any] | None:
     """Classify a VEX op integer via the Rust port; ``None`` if unsupported."""
 
-def is_float_op(op: str) -> bool:
-    """Whether ``op`` names a floating-point operation (``AddF``, ``CmpEQF``, ``Sqrt``, ``AddFV``, ...)."""
-
-def float_op(op: str) -> str:
-    """The floating-point counterpart of an op name (``Add`` -> ``AddF``, ``AddV`` -> ``AddFV``)."""
-
-def int_op(op: str) -> str:
-    """The integer counterpart of an op name (``AddF`` -> ``Add``, ``AddFV`` -> ``AddV``)."""
-
 # ---------------------------------------------------------------------------
 # Expression variant marker classes
 # ---------------------------------------------------------------------------

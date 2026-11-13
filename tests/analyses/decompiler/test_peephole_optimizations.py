@@ -27,7 +27,6 @@ from angr.ailment.expression import (
     UnaryOp,
     VirtualVariable,
     VirtualVariableCategory,
-    float_op,
 )
 from angr.ailment.manager import Manager
 from angr.ailment.statement import Assignment
@@ -792,7 +791,7 @@ class TestPeepholeBlockContextFixpoint(unittest.TestCase):
             return Const(manager.next_atom(), v, bits)
 
         def fp_cmp(op, a, b):
-            return BinaryOp(manager.next_atom(), float_op(op), [a, b], False, bits=1)
+            return BinaryOp(manager.next_atom(), op, [a, b], False, bits=1)
 
         x = Register(manager.next_atom(), 128, 32)
         y = Register(manager.next_atom(), 132, 32)
@@ -801,8 +800,8 @@ class TestPeepholeBlockContextFixpoint(unittest.TestCase):
             manager.next_atom(),
             "Or",
             [
-                fp_cmp("CmpEQ", x, y),
-                BinaryOp(manager.next_atom(), "Xor", [fp_cmp("CmpLT", x, y), fp_cmp("CmpUN", x, y)], False, bits=1),
+                fp_cmp("CmpEQF", x, y),
+                BinaryOp(manager.next_atom(), "Xor", [fp_cmp("CmpLTF", x, y), fp_cmp("CmpUN", x, y)], False, bits=1),
             ],
             False,
             bits=1,
@@ -816,7 +815,7 @@ class TestPeepholeBlockContextFixpoint(unittest.TestCase):
         mixed = BinaryOp(
             manager.next_atom(),
             "Or",
-            [fp_cmp("CmpLT", x, c(0x437F0000)), fp_cmp("CmpEQ", x64, c(255.0, 64))],
+            [fp_cmp("CmpLTF", x, c(0x437F0000)), fp_cmp("CmpEQF", x64, c(255.0, 64))],
             False,
             bits=1,
         )
@@ -825,14 +824,14 @@ class TestPeepholeBlockContextFixpoint(unittest.TestCase):
 
         # bls: C clear or Z set, as rewritten from armg_calculate_condition(LS | COPY)
         lt_or_eq = BinaryOp(
-            manager.next_atom(), "LogicalOr", [fp_cmp("CmpLT", x, y), fp_cmp("CmpEQ", x, y)], False, bits=1
+            manager.next_atom(), "LogicalOr", [fp_cmp("CmpLTF", x, y), fp_cmp("CmpEQF", x, y)], False, bits=1
         )
         out = opt.optimize(lt_or_eq)
         assert isinstance(out, BinaryOp) and out.op == "CmpLEF"
 
         # an explicit NaN test cannot be folded into an ordered comparison
         nan_or_lt = BinaryOp(
-            manager.next_atom(), "LogicalOr", [fp_cmp("CmpUN", x, y), fp_cmp("CmpLT", x, y)], False, bits=1
+            manager.next_atom(), "LogicalOr", [fp_cmp("CmpUN", x, y), fp_cmp("CmpLTF", x, y)], False, bits=1
         )
         assert opt.optimize(nan_or_lt) is None
 
