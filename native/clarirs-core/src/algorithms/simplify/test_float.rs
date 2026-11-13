@@ -74,3 +74,54 @@ fn test_min_max_fma_round_fold_constants() -> Result<()> {
     assert!(matches!(zeros.op(), AstOp::FPV(f) if f.is_zero() && f.sign()));
     Ok(())
 }
+
+/// `fp_fp(sign, exp, sig)` takes the significand without the hidden bit, like SMT-LIB's
+/// `(fp ...)`, so 1 + 8 + 23 bits make a Float32 and 1 + 11 + 52 bits a Float64.
+#[test]
+fn test_fp_fp_sort_matches_operand_widths() -> Result<()> {
+    let ctx = Context::new();
+
+    let f = ctx.fp_fp(ctx.bvs("s", 1)?, ctx.bvs("e", 8)?, ctx.bvs("m", 23)?)?;
+    assert_eq!(f.ast_type(), AstType::Float(FSort::f32()));
+    assert_eq!(f.size(), 32);
+
+    let d = ctx.fp_fp(ctx.bvs("s", 1)?, ctx.bvs("e", 11)?, ctx.bvs("m", 52)?)?;
+    assert_eq!(d.ast_type(), AstType::Float(FSort::f64()));
+    assert_eq!(d.size(), 64);
+
+    Ok(())
+}
+
+/// The symbolic node and the value it folds to once its operands are concrete must have
+/// the same sort.
+#[test]
+fn test_fp_fp_concrete_fold_keeps_sort() -> Result<()> {
+    let ctx = Context::new();
+
+    // 1.5f32 = sign 0, exponent 0x7f, significand 0x400000
+    let f = ctx.fp_fp(
+        ctx.bvv(BitVec::from((0u64, 1)))?,
+        ctx.bvv(BitVec::from((0x7fu64, 8)))?,
+        ctx.bvv(BitVec::from((0x40_0000u64, 23)))?,
+    )?;
+    let folded = f.simplify()?;
+    assert_eq!(folded, ctx.fpv(Float::F32(1.5))?);
+    assert_eq!(folded.ast_type(), f.ast_type());
+
+    Ok(())
+}
+
+#[test]
+fn test_fp_fp_requires_one_bit_sign() -> Result<()> {
+    let ctx = Context::new();
+    let exp = ctx.bvs("e", 8)?;
+    let sig = ctx.bvs("m", 23)?;
+
+    assert!(matches!(
+        ctx.fp_fp(ctx.bvs("s", 2)?, &exp, &sig),
+        Err(ClarirsError::TypeError(_))
+    ));
+    assert!(ctx.fp_fp(ctx.bvs("s", 1)?, &exp, &sig).is_ok());
+
+    Ok(())
+}

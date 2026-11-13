@@ -734,6 +734,16 @@ mod roundtrip {
         let sig = ctx.bvs("sig", 23).unwrap();
         let ast = ctx.fp_fp(sign, exp, sig).unwrap();
         assert_eq!(ast, round_trip(&ctx, &ast).unwrap());
+
+        // The sort clarirs assigns must be the one Z3 gives the same term.
+        assert_eq!(ast.ast_type(), AstType::Float(FSort::f32()));
+        let z3_ast = ast.to_z3().unwrap();
+        Z3_CONTEXT.with(|&z3_ctx| unsafe {
+            let sort = Z3_get_sort(z3_ctx, *z3_ast).unwrap();
+            assert_eq!(Z3_fpa_get_ebits(z3_ctx, sort), 8);
+            // Z3's sbits counts the hidden bit, FSort::mantissa does not.
+            assert_eq!(Z3_fpa_get_sbits(z3_ctx, sort), 24);
+        });
     }
 
     // -- ITE --

@@ -364,8 +364,10 @@ impl<'c> AstOp<'c> {
             | AstOp::BvToFpSigned(_, sort, _)
             | AstOp::BvToFpUnsigned(_, sort, _) => AstType::Float(*sort),
             AstOp::FpFP(_sign, exp, sig) => {
-                // The significand includes the implicit bit, the mantissa doesn't
-                AstType::Float(FSort::new(exp.size(), sig.size().saturating_sub(1)))
+                // As in SMT-LIB's `(fp sign exp sig)`, the third operand is the trailing
+                // significand without the hidden bit, which is exactly what
+                // `FSort::mantissa` counts: 8 and 23 bits make a Float32.
+                AstType::Float(FSort::new(exp.size(), sig.size()))
             }
 
             // Strings
@@ -586,10 +588,15 @@ impl<'c> AstOp<'c> {
                 )
             }
 
-            AstOp::FpFP(s, e, m) => require(
-                s.ast_type().is_bitvec() && e.ast_type().is_bitvec() && m.ast_type().is_bitvec(),
-                "FpFP requires bitvector operands",
-            ),
+            AstOp::FpFP(s, e, m) => {
+                require(
+                    s.ast_type().is_bitvec()
+                        && e.ast_type().is_bitvec()
+                        && m.ast_type().is_bitvec(),
+                    "FpFP requires bitvector operands",
+                )?;
+                require(s.size() == 1, "FpFP requires a 1-bit sign")
+            }
         }
     }
 }
