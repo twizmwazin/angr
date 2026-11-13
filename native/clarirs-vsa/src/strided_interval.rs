@@ -460,36 +460,57 @@ impl StridedInterval {
             return false;
         }
 
-        let (self_min, self_max) = self.get_unsigned_bounds();
-        let (other_min, other_max) = other.get_unsigned_bounds();
-
-        // Check if bounds are contained
-        let bounds_contained = self_min <= other_min && self_max >= other_max;
-
-        // Check if stride is compatible
-        let stride_compatible = match (self, other) {
-            (
-                StridedInterval::Normal {
-                    stride: s_stride,
-                    lower_bound: s_lb,
-                    ..
-                },
-                StridedInterval::Normal {
-                    stride: o_stride,
-                    lower_bound: o_lb,
-                    ..
-                },
-            ) => {
-                if s_stride.is_zero() {
-                    s_lb == o_lb && o_stride.is_zero()
-                } else {
-                    o_stride % s_stride == BigUint::zero()
-                }
-            }
-            _ => false,
+        let (
+            StridedInterval::Normal {
+                bits,
+                stride: s_stride,
+                lower_bound: s_lb,
+                upper_bound: s_ub,
+            },
+            StridedInterval::Normal {
+                stride: o_stride,
+                lower_bound: o_lb,
+                upper_bound: o_ub,
+                ..
+            },
+        ) = (self, other)
+        else {
+            return false;
         };
 
-        bounds_contained && stride_compatible
+        // Work with offsets from self's lower bound, taken modulo 2**bits, so
+        // that a wrapping interval is handled like any other: self is the
+        // offsets 0, s_stride, ... up to s_span.
+        let s_span = modular_sub(s_ub, s_lb, *bits);
+        if s_stride.is_one() && s_span == max_int(*bits) {
+            // Every value, whatever the lower bound is.
+            return true;
+        }
+
+        // The offset of the last value of other from its lower bound. The
+        // upper bound itself need not be on the stride.
+        let o_span = modular_sub(o_ub, o_lb, *bits);
+        let o_last = if o_stride.is_zero() {
+            BigUint::zero()
+        } else {
+            &o_span - (&o_span % o_stride)
+        };
+        if o_last.is_zero() {
+            return self.contains_value(o_lb);
+        }
+        if s_stride.is_zero() {
+            // other has at least two values, self has one.
+            return false;
+        }
+
+        // Every value of other is a value of self when other starts on self's
+        // stride, steps by a multiple of it, and ends before self does. This is
+        // conservative: it answers false for a few contained intervals, such as
+        // a self whose stride does not divide 2**bits and that laps itself.
+        let offset = modular_sub(o_lb, s_lb, *bits);
+        (&offset % s_stride).is_zero()
+            && (o_stride % s_stride).is_zero()
+            && offset + o_last <= s_span
     }
 
     /// Check if the interval contains a specific value
@@ -3288,6 +3309,106 @@ mod si_properties_tests {
             BigUint::from(10u32),
         );
         assert!(si.contains_zero());
+    }
+
+    #[test]
+    fn test_contains_is_sound() {
+        // The members as a bit set, by direct enumeration: lower_bound,
+        // lower_bound + stride, ... for as long as the offset stays within the
+        // (wrapping) distance from lower_bound to upper_bound.
+        fn concretize(si: &StridedInterval) -> u32 {
+            let StridedInterval::Normal {
+                bits,
+                stride,
+                lower_bound,
+                upper_bound,
+            } = si
+            else {
+                return 0;
+            };
+            let modulus = 1u32 << bits;
+            let stride = u32::try_from(stride).unwrap();
+            let lower = u32::try_from(lower_bound).unwrap();
+            let upper = u32::try_from(upper_bound).unwrap();
+            let span = (upper + modulus - lower) % modulus;
+            let mut members = 1 << lower;
+            let mut offset = stride;
+            while stride != 0 && offset <= span {
+                members |= 1 << ((lower + offset) % modulus);
+                offset += stride;
+            }
+            members
+        }
+
+        // Empty and every stride[lower, upper], wrapping ones included. At 3
+        // bits that is every combination; at 4 bits, to keep the number of
+        // pairs down, only those whose upper bound is a member.
+        fn universe(bits: u32) -> Vec<(StridedInterval, u32)> {
+            let modulus = 1u32 << bits;
+            let mut all = vec![StridedInterval::empty(bits)];
+            for stride in 0..modulus {
+                for lower in 0..modulus {
+                    for span in 0..modulus {
+                        let on_stride = stride == 0 || span % stride == 0;
+                        if (stride == 0) != (span == 0) || (bits > 3 && !on_stride) {
+                            continue;
+                        }
+                        all.push(StridedInterval::new(
+                            bits,
+                            BigUint::from(stride),
+                            BigUint::from(lower),
+                            BigUint::from((lower + span) % modulus),
+                        ));
+                    }
+                }
+            }
+            all.into_iter()
+                .map(|si| {
+                    let members = concretize(&si);
+                    (si, members)
+                })
+                .collect()
+        }
+
+        let si = |stride: u32, lower: u32, upper: u32| {
+            StridedInterval::new(
+                8,
+                BigUint::from(stride),
+                BigUint::from(lower),
+                BigUint::from(upper),
+            )
+        };
+
+        // The stride phase: 5 is in the range of 2[0, 10] but is not a member.
+        assert!(!si(2, 0, 10).contains(&StridedInterval::constant(8, 5u32)));
+        assert!(!si(2, 0, 10).contains(&si(2, 1, 9)));
+        assert!(si(2, 0, 10).contains(&si(4, 2, 10)));
+        // A wrapping self: 1[236, 0] is 236..=255 and 0, not everything.
+        assert!(!si(1, 236, 0).contains(&si(1, 0, 20)));
+        assert!(si(1, 236, 0).contains(&si(1, 250, 0)));
+        assert!(si(1, 236, 20).contains(&si(1, 0, 20)));
+        // union relies on contains to decide that it has nothing to add.
+        let union = si(1, 236, 0).union(&si(1, 0, 20));
+        for value in (236u32..=255).chain(0..=20) {
+            assert!(union.contains_value(&BigUint::from(value)), "{value}");
+        }
+
+        // Every pair of small intervals: contains must never claim an interval
+        // that has a value the container lacks.
+        let mut claimed = 0u32;
+        for bits in [3, 4] {
+            let all = universe(bits);
+            for (a, a_members) in &all {
+                for (b, b_members) in &all {
+                    if a.contains(b) {
+                        claimed += 1;
+                        assert_eq!(b_members & !a_members, 0, "{a:?} contains {b:?}");
+                    }
+                }
+            }
+        }
+        // ... and it still finds the containments there are.
+        assert!(claimed > 10_000, "{claimed}");
     }
 
     #[test]
