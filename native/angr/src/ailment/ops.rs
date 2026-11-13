@@ -1,4 +1,4 @@
-//! Naming rules for AIL operator names.
+//! Classification of AIL operator names.
 //!
 //! Integer and floating-point operations are distinct ops: the floating-point counterpart of an op
 //! carries an `F` suffix (`Add` / `AddF`, `CmpEQ` / `CmpEQF`, `Neg` / `NegF`). Lane-wise vector
@@ -18,36 +18,14 @@ const FP_ONLY_OPS: &[&str] = &[
 /// Ops whose name ends in `F` without being a floating-point op.
 const INT_OPS_ENDING_IN_F: &[&str] = &["CmpF"];
 
-/// Split a lane-wise vector op name into its scalar name and the `V` suffix (empty if scalar).
-fn split_vector(op: &str) -> (&str, &str) {
-    match op.strip_suffix('V') {
-        Some(base) if !base.is_empty() => (base, "V"),
-        _ => (op, ""),
-    }
-}
-
 /// Whether `op` names a floating-point operation.
 pub fn is_float_op(op: &str) -> bool {
-    let (base, _) = split_vector(op);
+    // a lane-wise vector op is named after its scalar op
+    let base = match op.strip_suffix('V') {
+        Some(base) if !base.is_empty() => base,
+        _ => op,
+    };
     (base.ends_with('F') && !INT_OPS_ENDING_IN_F.contains(&base)) || FP_ONLY_OPS.contains(&base)
-}
-
-/// The floating-point counterpart of `op`; a no-op for ops that are already floating-point.
-pub fn float_op(op: &str) -> String {
-    let (base, vector) = split_vector(op);
-    if is_float_op(op) || INT_OPS_ENDING_IN_F.contains(&base) {
-        return op.to_string();
-    }
-    format!("{base}F{vector}")
-}
-
-/// The integer counterpart of `op`; a no-op for integer ops and for floating-point-only ops.
-pub fn int_op(op: &str) -> String {
-    let (base, vector) = split_vector(op);
-    match base.strip_suffix('F') {
-        Some(int_base) if !int_base.is_empty() && is_float_op(op) => format!("{int_base}{vector}"),
-        _ => op.to_string(),
-    }
 }
 
 #[cfg(test)]
@@ -55,38 +33,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn float_and_int_names_round_trip() {
-        for (int, float) in [
-            ("Add", "AddF"),
-            ("CmpEQ", "CmpEQF"),
-            ("Neg", "NegF"),
-            ("AddV", "AddFV"),
-            ("Max", "MaxF"),
+    fn float_ops_are_told_from_integer_ops() {
+        for op in ["Add", "CmpEQ", "Neg", "AddV", "Max", "Round", "V", "CmpF"] {
+            assert!(!is_float_op(op), "{op}");
+        }
+        for op in [
+            "AddF", "CmpEQF", "NegF", "AddFV", "MaxF", "Sqrt", "SqrtV", "CmpUN", "CmpUNV",
+            "SignBit",
         ] {
-            assert!(!is_float_op(int));
-            assert!(is_float_op(float));
-            assert_eq!(float_op(int), float);
-            assert_eq!(float_op(float), float);
-            assert_eq!(int_op(float), int);
-            assert_eq!(int_op(int), int);
+            assert!(is_float_op(op), "{op}");
         }
-    }
-
-    #[test]
-    fn fp_only_ops_keep_their_name() {
-        for op in ["Sqrt", "SqrtV", "CmpUN", "CmpUNV", "SignBit"] {
-            assert!(is_float_op(op));
-            assert_eq!(float_op(op), op);
-            assert_eq!(int_op(op), op);
-        }
-        assert!(!is_float_op("V"));
-        assert!(!is_float_op("Round"));
-    }
-
-    #[test]
-    fn cmpf_is_an_integer_op() {
-        assert!(!is_float_op("CmpF"));
-        assert_eq!(float_op("CmpF"), "CmpF");
-        assert_eq!(int_op("CmpF"), "CmpF");
     }
 }

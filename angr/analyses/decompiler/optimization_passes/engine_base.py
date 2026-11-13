@@ -418,8 +418,10 @@ class SimplifierAILEngine(
         return expr
 
     _handle_unop_Abs = _handle_unop_Default
+    _handle_unop_AbsF = _handle_unop_Default
     _handle_unop_Not = _handle_unop_Default
     _handle_unop_Neg = _handle_unop_Default
+    _handle_unop_NegF = _handle_unop_Default
     _handle_unop_BitwiseNeg = _handle_unop_Default
     _handle_unop_Reference = _handle_unop_Default
     _handle_unop_Dereference = _handle_unop_Default
@@ -493,6 +495,12 @@ class SimplifierAILEngine(
     _handle_binop_CmpF = _handle_binop_Default
 
     _handle_binop_CmpEQ = _handle_binop_Default
+    _handle_binop_CmpEQF = _handle_binop_Default
+    _handle_binop_CmpNEF = _handle_binop_Default
+    _handle_binop_CmpLTF = _handle_binop_Default
+    _handle_binop_CmpLEF = _handle_binop_Default
+    _handle_binop_CmpGTF = _handle_binop_Default
+    _handle_binop_CmpGEF = _handle_binop_Default
 
     _handle_binop_CmpNE = _handle_binop_Default
 

@@ -867,6 +867,12 @@ class SimEngineSSATraversal(SimEngineLightAIL[TraversalState, Value, None, None]
     _handle_binop_CmpGE = _unreachable
     _handle_binop_CmpGT = _unreachable
     _handle_binop_CmpEQ = _unreachable
+    _handle_binop_CmpEQF = _unreachable
+    _handle_binop_CmpNEF = _unreachable
+    _handle_binop_CmpLTF = _unreachable
+    _handle_binop_CmpLEF = _unreachable
+    _handle_binop_CmpGTF = _unreachable
+    _handle_binop_CmpGEF = _unreachable
     _handle_binop_CmpNE = _unreachable
     _handle_binop_CmpORD = _unreachable
     _handle_binop_Add = _unreachable
@@ -925,6 +931,7 @@ class SimEngineSSATraversal(SimEngineLightAIL[TraversalState, Value, None, None]
     _handle_unop_BitwiseNeg = _unreachable
     _handle_unop_Dereference = _unreachable
     _handle_unop_Neg = _unreachable
+    _handle_unop_NegF = _unreachable
     _handle_unop_Not = _unreachable
     _handle_unop_Reference = _unreachable
     _handle_unop_Clz = _unreachable

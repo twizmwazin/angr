@@ -617,8 +617,10 @@ class SimEngineLightAIL[StateType, DataType_co, StmtDataType, ResultType](
         }
         self._unop_handlers: dict[str, Callable[[ailment.UnaryOp], DataType_co]] = {
             "Abs": self._handle_unop_Abs,
+            "AbsF": self._handle_unop_AbsF,
             "Not": self._handle_unop_Not,
             "Neg": self._handle_unop_Neg,
+            "NegF": self._handle_unop_NegF,
             "BitwiseNeg": self._handle_unop_BitwiseNeg,
             "Reference": self._handle_unop_Reference,
             "Dereference": self._handle_unop_Dereference,
@@ -664,6 +666,12 @@ class SimEngineLightAIL[StateType, DataType_co, StmtDataType, ResultType](
             "CmpLE": self._handle_binop_CmpLE,
             "CmpGT": self._handle_binop_CmpGT,
             "CmpGE": self._handle_binop_CmpGE,
+            "CmpEQF": self._handle_binop_CmpEQF,
+            "CmpNEF": self._handle_binop_CmpNEF,
+            "CmpLTF": self._handle_binop_CmpLTF,
+            "CmpLEF": self._handle_binop_CmpLEF,
+            "CmpGTF": self._handle_binop_CmpGTF,
+            "CmpGEF": self._handle_binop_CmpGEF,
             "CmpORD": self._handle_binop_CmpORD,
             "Concat": self._handle_binop_Concat,
             "Ror": self._handle_binop_Ror,
@@ -696,12 +704,6 @@ class SimEngineLightAIL[StateType, DataType_co, StmtDataType, ResultType](
             "PermV": self._handle_binop_PermV,
             "Set": self._handle_binop_Set,
         }
-        # A floating-point op (NegF, CmpEQF, AddFV, ...) without a handler of its own goes to the handler of its
-        # integer counterpart.
-        for handlers in (self._unop_handlers, self._binop_handlers):
-            for op, handler in list(handlers.items()):
-                if not ailment.is_float_op(op):
-                    handlers.setdefault(ailment.float_op(op), handler)
         self._validate_op_handlers()
         super().__init__(*args, **kwargs)
 
@@ -953,12 +955,21 @@ class SimEngineLightAIL[StateType, DataType_co, StmtDataType, ResultType](
         return self._top(expr.bits)
 
     @ail_unop_handler
+    def _handle_unop_AbsF(self, expr: ailment.expression.UnaryOp) -> DataType_co:
+        self._expr(expr.operand)
+        return self._top(expr.bits)
+
+    @ail_unop_handler
     @abstractmethod
     def _handle_unop_Not(self, expr: ailment.expression.UnaryOp) -> DataType_co: ...
 
     @ail_unop_handler
     @abstractmethod
     def _handle_unop_Neg(self, expr: ailment.expression.UnaryOp) -> DataType_co: ...
+
+    @ail_unop_handler
+    @abstractmethod
+    def _handle_unop_NegF(self, expr: ailment.expression.UnaryOp) -> DataType_co: ...
 
     @ail_unop_handler
     @abstractmethod
@@ -1118,6 +1129,30 @@ class SimEngineLightAIL[StateType, DataType_co, StmtDataType, ResultType](
     @ail_binop_handler
     @abstractmethod
     def _handle_binop_CmpGE(self, expr: ailment.expression.BinaryOp) -> DataType_co: ...
+
+    @ail_binop_handler
+    @abstractmethod
+    def _handle_binop_CmpEQF(self, expr: ailment.expression.BinaryOp) -> DataType_co: ...
+
+    @ail_binop_handler
+    @abstractmethod
+    def _handle_binop_CmpNEF(self, expr: ailment.expression.BinaryOp) -> DataType_co: ...
+
+    @ail_binop_handler
+    @abstractmethod
+    def _handle_binop_CmpLTF(self, expr: ailment.expression.BinaryOp) -> DataType_co: ...
+
+    @ail_binop_handler
+    @abstractmethod
+    def _handle_binop_CmpLEF(self, expr: ailment.expression.BinaryOp) -> DataType_co: ...
+
+    @ail_binop_handler
+    @abstractmethod
+    def _handle_binop_CmpGTF(self, expr: ailment.expression.BinaryOp) -> DataType_co: ...
+
+    @ail_binop_handler
+    @abstractmethod
+    def _handle_binop_CmpGEF(self, expr: ailment.expression.BinaryOp) -> DataType_co: ...
 
     @ail_binop_handler
     @abstractmethod
@@ -1359,6 +1394,10 @@ class SimEngineNoexprAIL[StateType, DataType_co, StmtDataType, ResultType](
         pass
 
     @ail_unop_handler
+    def _handle_unop_NegF(self, expr: ailment.expression.UnaryOp) -> DataType_co | None:
+        pass
+
+    @ail_unop_handler
     def _handle_unop_BitwiseNeg(self, expr: ailment.expression.UnaryOp) -> DataType_co | None:
         pass
 
@@ -1504,6 +1543,30 @@ class SimEngineNoexprAIL[StateType, DataType_co, StmtDataType, ResultType](
 
     @ail_binop_handler
     def _handle_binop_CmpGE(self, expr: ailment.expression.BinaryOp) -> DataType_co | None:
+        pass
+
+    @ail_binop_handler
+    def _handle_binop_CmpEQF(self, expr: ailment.expression.BinaryOp) -> DataType_co | None:
+        pass
+
+    @ail_binop_handler
+    def _handle_binop_CmpNEF(self, expr: ailment.expression.BinaryOp) -> DataType_co | None:
+        pass
+
+    @ail_binop_handler
+    def _handle_binop_CmpLTF(self, expr: ailment.expression.BinaryOp) -> DataType_co | None:
+        pass
+
+    @ail_binop_handler
+    def _handle_binop_CmpLEF(self, expr: ailment.expression.BinaryOp) -> DataType_co | None:
+        pass
+
+    @ail_binop_handler
+    def _handle_binop_CmpGTF(self, expr: ailment.expression.BinaryOp) -> DataType_co | None:
+        pass
+
+    @ail_binop_handler
+    def _handle_binop_CmpGEF(self, expr: ailment.expression.BinaryOp) -> DataType_co | None:
         pass
 
     @ail_binop_handler
