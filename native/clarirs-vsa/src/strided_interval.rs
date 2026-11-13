@@ -1055,33 +1055,69 @@ impl StridedInterval {
                     });
                 }
 
-                // Cousot-Cousot widening:
-                // If lower decreased, extrapolate to signed minimum (2^(bits-1))
-                // If upper increased, extrapolate to unsigned maximum (max_int)
-                // Using signed minimum matches claripy's behavior where bounds
-                // are extrapolated to signed boundaries, producing wrapping SIs.
-                let new_lower = if lb2 < lb1 {
-                    BigUint::one() << (bits1 - 1)
+                let bits = *bits1;
+
+                // The gcd of the non-zero values, or zero when there are none.
+                // The stride of a constant is zero and constrains nothing.
+                let gcd_of = |values: &[&BigUint]| {
+                    values
+                        .iter()
+                        .filter(|value| !value.is_zero())
+                        .fold(BigUint::zero(), |acc, value| gcd(&acc, value))
+                };
+
+                // If other lies within the bounds of self, the bounds are
+                // stable and only the stride may have to give way, to put the
+                // values of other on it. The comparison is made on offsets from
+                // the lower bound of self modulo 2**bits, so that it holds for
+                // a wrapping self as well.
+                let span1 = modular_sub(ub1, lb1, bits);
+                let span2 = modular_sub(ub2, lb2, bits);
+                let offset = modular_sub(lb2, lb1, bits);
+                if &offset + &span2 <= span1 {
+                    let new_stride = gcd_of(&[stride1, stride2, &offset]);
+                    return StridedInterval::new(bits, new_stride, lb1.clone(), ub1.clone());
+                }
+
+                // other reaches outside of self. Which way a wrapping interval
+                // has grown is not well defined, so that goes straight to top.
+                if lb1 > ub1 || lb2 > ub2 {
+                    return StridedInterval::top(bits);
+                }
+
+                // Cousot-Cousot widening on the unsigned range: a lower bound
+                // that decreased is extrapolated to zero and an upper bound
+                // that increased to the unsigned maximum, so the result
+                // contains both operands and a chain of widenings is finite:
+                // each step moves a bound to its limit or divides the stride.
+                let lower_decreased = lb2 < lb1;
+                let lb_distance = if lower_decreased {
+                    lb1 - lb2
                 } else {
-                    lb1.clone()
+                    lb2 - lb1
+                };
+                let (new_lower, new_stride) = if lower_decreased {
+                    // Starting from zero, the stride has to divide the lower
+                    // bounds themselves.
+                    (
+                        BigUint::zero(),
+                        gcd_of(&[stride1, stride2, &lb_distance, lb1]),
+                    )
+                } else {
+                    (lb1.clone(), gcd_of(&[stride1, stride2, &lb_distance]))
                 };
                 let new_upper = if ub2 > ub1 {
-                    max_int(*bits1)
+                    let max_value = max_int(bits);
+                    if new_stride.is_zero() {
+                        max_value
+                    } else {
+                        &max_value - (&max_value - &new_lower) % &new_stride
+                    }
                 } else {
                     ub1.clone()
                 };
-                // Compute stride: when both strides are zero, derive from the range
-                let new_stride = if stride1.is_zero() && stride2.is_zero() {
-                    if new_lower == new_upper {
-                        BigUint::zero()
-                    } else {
-                        BigUint::one()
-                    }
-                } else {
-                    gcd(stride1, stride2)
-                };
 
-                StridedInterval::new(*bits1, new_stride, new_lower, new_upper)
+                StridedInterval::new(bits, new_stride, new_lower, new_upper)
             }
         }
     }
@@ -3389,6 +3425,107 @@ mod si_set_op_tests {
         let b = StridedInterval::range(32, 30u32, 40u32);
         let result = a.union(&b);
         assert_eq!(result, StridedInterval::range(32, 10u32, 40u32));
+    }
+
+    #[test]
+    fn test_widen_is_sound() {
+        // The members as a bit set, by direct enumeration: lower_bound,
+        // lower_bound + stride, ... for as long as the offset stays within the
+        // (wrapping) distance from lower_bound to upper_bound.
+        fn concretize(si: &StridedInterval) -> u32 {
+            let StridedInterval::Normal {
+                bits,
+                stride,
+                lower_bound,
+                upper_bound,
+            } = si
+            else {
+                return 0;
+            };
+            let modulus = 1u32 << bits;
+            let stride = u32::try_from(stride).unwrap();
+            let lower = u32::try_from(lower_bound).unwrap();
+            let upper = u32::try_from(upper_bound).unwrap();
+            let span = (upper + modulus - lower) % modulus;
+            let mut members = 1 << lower;
+            let mut offset = stride;
+            while stride != 0 && offset <= span {
+                members |= 1 << ((lower + offset) % modulus);
+                offset += stride;
+            }
+            members
+        }
+
+        // Empty and every stride[lower, upper], wrapping ones included. At 3
+        // bits that is every combination; at 4 bits, to keep the number of
+        // pairs down, only those whose upper bound is a member.
+        fn universe(bits: u32) -> Vec<(StridedInterval, u32)> {
+            let modulus = 1u32 << bits;
+            let mut all = vec![StridedInterval::empty(bits)];
+            for stride in 0..modulus {
+                for lower in 0..modulus {
+                    for span in 0..modulus {
+                        let on_stride = stride == 0 || span % stride == 0;
+                        if (stride == 0) != (span == 0) || (bits > 3 && !on_stride) {
+                            continue;
+                        }
+                        all.push(StridedInterval::new(
+                            bits,
+                            BigUint::from(stride),
+                            BigUint::from(lower),
+                            BigUint::from((lower + span) % modulus),
+                        ));
+                    }
+                }
+            }
+            all.into_iter()
+                .map(|si| {
+                    let members = concretize(&si);
+                    (si, members)
+                })
+                .collect()
+        }
+
+        let si = |stride: u32, lower: u32, upper: u32| {
+            StridedInterval::new(
+                8,
+                BigUint::from(stride),
+                BigUint::from(lower),
+                BigUint::from(upper),
+            )
+        };
+
+        // The lower bound decreased and the upper bound increased: the result
+        // has to contain both operands, not start above them.
+        assert_eq!(si(1, 10, 20).widen(&si(1, 5, 30)), si(1, 0, 255));
+        // Only the lower bound decreased.
+        assert_eq!(si(1, 200, 250).widen(&si(1, 100, 250)), si(1, 0, 250));
+        // Only the upper bound increased; the stride follows the phase.
+        assert_eq!(si(4, 8, 16).widen(&si(4, 8, 20)), si(4, 8, 252));
+        assert_eq!(si(4, 8, 16).widen(&si(4, 10, 22)), si(2, 8, 254));
+        // Nothing grew: the bounds stay, wrapping or not.
+        assert_eq!(si(1, 10, 20).widen(&si(1, 12, 18)), si(1, 10, 20));
+        assert_eq!(si(1, 250, 5).widen(&si(1, 252, 3)), si(1, 250, 5));
+        assert_eq!(si(4, 0, 16).widen(&si(4, 2, 14)), si(2, 0, 16));
+        // A wrapping operand that grew goes to top.
+        assert!(si(1, 250, 5).widen(&si(1, 250, 6)).is_top());
+
+        // Every pair of small intervals: the result has every value of both
+        // operands, and widening by the same operand again changes nothing.
+        for bits in [3, 4] {
+            let all = universe(bits);
+            for (a, a_members) in &all {
+                for (b, b_members) in &all {
+                    let widened = a.widen(b);
+                    assert_eq!(
+                        (a_members | b_members) & !concretize(&widened),
+                        0,
+                        "{a:?} widen {b:?} is {widened:?}"
+                    );
+                    assert_eq!(widened.widen(b), widened, "{a:?} widen {b:?}");
+                }
+            }
+        }
     }
 
     #[test]
