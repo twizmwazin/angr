@@ -2379,6 +2379,110 @@ impl StridedInterval {
     // Shift Operations: Logical Left, Logical Right, Arithmetic Right, Rotate Left, Rotate Right, reverse_bytes
     // ================================================================================================
 
+    /// A sound join of the results of shifting by each possible amount.
+    ///
+    /// The result keeps the greatest stride that every piece agrees on: the gcd
+    /// of the strides and of the distances between the lower bounds. When a
+    /// piece wraps, only a stride that divides `2**bits` survives the
+    /// wrap-around, and the bounds become the whole range.
+    fn shift_hull(bits: u32, pieces: &[Self]) -> Self {
+        let gcd0 = |a: &BigUint, b: &BigUint| -> BigUint {
+            if a.is_zero() && b.is_zero() {
+                BigUint::zero()
+            } else {
+                gcd(a, b)
+            }
+        };
+
+        let mut acc: Option<(BigUint, BigUint, BigUint)> = None;
+        let mut wraps = false;
+        for piece in pieces {
+            let StridedInterval::Normal {
+                stride,
+                lower_bound,
+                upper_bound,
+                ..
+            } = piece
+            else {
+                continue;
+            };
+            let (lo, hi) = if lower_bound <= upper_bound {
+                (lower_bound.clone(), upper_bound.clone())
+            } else {
+                wraps = true;
+                (lower_bound.clone(), lower_bound.clone())
+            };
+            acc = Some(match acc {
+                None => (stride.clone(), lo, hi),
+                Some((g, min_lo, max_hi)) => {
+                    let diff = if lo >= min_lo {
+                        &lo - &min_lo
+                    } else {
+                        &min_lo - &lo
+                    };
+                    (
+                        gcd0(&gcd0(&g, stride), &diff),
+                        min_lo.min(lo),
+                        max_hi.max(hi),
+                    )
+                }
+            });
+        }
+
+        let Some((g, lo, hi)) = acc else {
+            return Self::empty(bits);
+        };
+        if !wraps {
+            return Self::new(bits, g, lo, hi);
+        }
+        let g = gcd0(&g, &(BigUint::one() << bits));
+        let lower = &lo % &g;
+        let upper = &lower + ((max_int(bits) - &lower) / &g) * &g;
+        Self::new(bits, g, lower, upper)
+    }
+
+    /// Shifts left by the constant `shift`.
+    fn shl_by_constant(&self, shift: u32) -> Self {
+        let StridedInterval::Normal {
+            bits,
+            stride,
+            lower_bound,
+            upper_bound,
+        } = self
+        else {
+            return self.clone();
+        };
+        let bits = *bits;
+        if shift >= bits {
+            return Self::constant(bits, 0u32);
+        }
+
+        // The values are lower_bound + i * stride (mod 2**bits) for
+        // 0 <= i * stride <= reach, whether the interval wraps or not.
+        let reach = if stride.is_zero() {
+            BigUint::zero()
+        } else {
+            let span = modular_sub(upper_bound, lower_bound, bits);
+            (&span / stride) * stride
+        };
+
+        let new_stride = stride << shift;
+        if (&reach << shift) <= max_int(bits) {
+            // The shifted values go around the circle less than once, so they
+            // still form one (possibly wrapping) interval.
+            let new_lower = (lower_bound << shift) & max_int(bits);
+            let new_upper = ((lower_bound + &reach) << shift) & max_int(bits);
+            return Self::new(bits, new_stride, new_lower, new_upper);
+        }
+
+        // The shifted values overflow the width and wrap around. All that is
+        // left is their residue modulo gcd(stride << shift, 2**bits).
+        let g = gcd(&new_stride, &(BigUint::one() << bits));
+        let new_lower = (lower_bound << shift) % &g;
+        let new_upper = &new_lower + ((max_int(bits) - &new_lower) / &g) * &g;
+        Self::new(bits, g, new_lower, new_upper)
+    }
+
     /// Shifts left with another interval as the shift amount
     pub fn shl(&self, other: &Self) -> Result<Self, ClarirsError> {
         match (self, other) {
@@ -2386,62 +2490,50 @@ impl StridedInterval {
                 Ok(Self::empty(*bits))
             }
             (
+                StridedInterval::Normal { bits, .. },
                 StridedInterval::Normal {
-                    bits,
-                    stride,
-                    lower_bound,
-                    upper_bound,
-                },
-                StridedInterval::Normal {
+                    bits: o_bits,
+                    stride: o_stride,
                     lower_bound: o_lb,
                     upper_bound: o_ub,
-                    ..
                 },
             ) => {
-                // Simple case: constant shift amount
-                if o_lb == o_ub
-                    && let Some(shift) = o_lb.to_u32()
-                {
-                    if shift >= *bits {
-                        return Ok(Self::constant(*bits, 0u32));
+                // Every shift amount in `other` contributes, not only the
+                // smallest and the largest: 1 << [0, 2] is {1, 2, 4}.
+                let o_span = modular_sub(o_ub, o_lb, *o_bits);
+                let has_amount = |amount: u32| -> bool {
+                    let amount = BigUint::from(amount);
+                    if amount > max_int(*o_bits) {
+                        return false;
                     }
-                    let factor = BigUint::one() << shift;
-                    let new_stride = stride * &factor;
-                    let new_lower = modular_mul(lower_bound, &factor, *bits);
-                    let new_upper = modular_mul(upper_bound, &factor, *bits);
-                    return Ok(Self::new(*bits, new_stride, new_lower, new_upper));
+                    let offset = modular_sub(&amount, o_lb, *o_bits);
+                    offset <= o_span
+                        && if o_stride.is_zero() {
+                            offset.is_zero()
+                        } else {
+                            (&offset % o_stride).is_zero()
+                        }
+                };
+
+                let mut pieces = Vec::new();
+                for amount in 0..*bits {
+                    if has_amount(amount) {
+                        pieces.push(self.shl_by_constant(amount));
+                    }
                 }
 
-                // Improved: compute union of min and max shift results
-                if let (Some(min_shift), Some(max_shift)) = (o_lb.to_u32(), o_ub.to_u32()) {
-                    let min_shift = min_shift.min(*bits);
-                    let max_shift = max_shift.min(*bits);
-
-                    // Compute result for minimum shift
-                    let min_result = if min_shift >= *bits {
-                        Self::constant(*bits, 0u32)
-                    } else {
-                        let factor = BigUint::one() << min_shift;
-                        let new_lower = modular_mul(lower_bound, &factor, *bits);
-                        let new_upper = modular_mul(upper_bound, &factor, *bits);
-                        Self::new(*bits, BigUint::one(), new_lower, new_upper)
-                    };
-
-                    // Compute result for maximum shift
-                    let max_result = if max_shift >= *bits {
-                        Self::constant(*bits, 0u32)
-                    } else {
-                        let factor = BigUint::one() << max_shift;
-                        let new_lower = modular_mul(lower_bound, &factor, *bits);
-                        let new_upper = modular_mul(upper_bound, &factor, *bits);
-                        Self::new(*bits, BigUint::one(), new_lower, new_upper)
-                    };
-
-                    return Ok(min_result.union(&max_result));
+                // Any amount of `bits` or more shifts everything out.
+                let width = BigUint::from(*bits);
+                let may_shift_out = if o_lb <= o_ub {
+                    o_ub >= &width
+                } else {
+                    max_int(*o_bits) >= width
+                };
+                if may_shift_out {
+                    pieces.push(Self::constant(*bits, 0u32));
                 }
 
-                // Fallback to top if shift amount is too large to convert
-                Ok(Self::top(*bits))
+                Ok(Self::shift_hull(*bits, &pieces))
             }
         }
     }
@@ -2473,11 +2565,21 @@ impl StridedInterval {
                     if shift >= *bits {
                         return Ok(Self::constant(*bits, 0u32));
                     }
+                    if lower_bound > upper_bound {
+                        // A wrapping interval holds both 0 and the maximum, and
+                        // its shifted bounds say nothing about what is between:
+                        // [1, 0] >> 1 is not the constant 0.
+                        return Ok(Self::range(*bits, 0u32, max_int(*bits) >> shift));
+                    }
                     let divisor = BigUint::one() << shift;
                     let new_stride = if stride == &BigUint::zero() {
                         BigUint::zero()
+                    } else if (stride % &divisor).is_zero() {
+                        stride / &divisor
                     } else {
-                        max(BigUint::one(), stride / &divisor)
+                        // 5[0, 10] >> 1 is {0, 2, 5}: the low bits that are
+                        // shifted out do not carry evenly.
+                        BigUint::one()
                     };
                     let new_lower = lower_bound >> shift;
                     let new_upper = upper_bound >> shift;
@@ -3703,6 +3805,144 @@ mod si_shift_op_tests {
 
         // Should not be top
         assert!(!result.is_top());
+    }
+
+    #[test]
+    fn test_shl_is_sound() {
+        // The values of an interval, as a bit set, by direct enumeration.
+        fn concretize(si: &StridedInterval) -> u32 {
+            let StridedInterval::Normal {
+                bits,
+                stride,
+                lower_bound,
+                upper_bound,
+            } = si
+            else {
+                return 0;
+            };
+            let modulus = 1u32 << *bits;
+            let stride = stride.to_u32().unwrap();
+            let lb = lower_bound.to_u32().unwrap();
+            let ub = upper_bound.to_u32().unwrap();
+            let span = (ub + modulus - lb) % modulus;
+            let steps = span.checked_div(stride).unwrap_or(0);
+            (0..=steps).fold(0, |set, i| set | 1 << ((lb + i * stride) % modulus))
+        }
+
+        // A constant shift that overflows the width: 100 << 1 = 200.
+        let val = StridedInterval::range(8, 0u32, 200u32);
+        let shift = StridedInterval::constant(8, 1u32);
+        let result = val.shl(&shift).unwrap();
+        assert!(result.contains_value(&BigUint::from(200u32)));
+        assert_eq!(result, StridedInterval::new(8, 2u32, 0u32, 254u32));
+
+        // Every shift amount counts, not only the two ends: 1 << 1 = 2.
+        let val = StridedInterval::constant(8, 1u32);
+        let shift = StridedInterval::range(8, 0u32, 2u32);
+        let result = val.shl(&shift).unwrap();
+        for expected in [1u32, 2, 4] {
+            assert!(result.contains_value(&BigUint::from(expected)));
+        }
+
+        // No overflow keeps the result exact.
+        let val = StridedInterval::new(8, 3u32, 1u32, 10u32);
+        let shift = StridedInterval::constant(8, 2u32);
+        let result = val.shl(&shift).unwrap();
+        assert_eq!(result, StridedInterval::new(8, 12u32, 4u32, 40u32));
+
+        // Exhaustive at 4 bits: every interval, wrapping ones included, shifted
+        // by every interval of stride 1 to 3 whose bounds are 0 to 5 or 15 (any
+        // amount of 4 or more shifts everything out).
+        const BITS: u32 = 4;
+        let mut values = Vec::new();
+        let mut amounts = Vec::new();
+        for stride in 0u32..16 {
+            for lb in 0u32..16 {
+                for ub in 0u32..16 {
+                    if (stride == 0) != (lb == ub) {
+                        continue;
+                    }
+                    let si = StridedInterval::new(BITS, stride, lb, ub);
+                    let set = concretize(&si);
+                    if stride <= 3 && [lb, ub].iter().all(|b| *b <= 5 || *b == 15) {
+                        amounts.push((si.clone(), set));
+                    }
+                    values.push((si, set));
+                }
+            }
+        }
+
+        for (val, val_set) in &values {
+            for (amount, amount_set) in &amounts {
+                let result = concretize(&val.shl(amount).unwrap());
+                for x in (0..16u32).filter(|x| val_set >> x & 1 == 1) {
+                    for k in (0..16u32).filter(|k| amount_set >> k & 1 == 1) {
+                        let expected = if k >= BITS { 0 } else { (x << k) & 0xf };
+                        assert!(
+                            result >> expected & 1 == 1,
+                            "{val:?} << {amount:?} dropped {x} << {k} = {expected}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_lshr_constant_shift_is_sound() {
+        // The values of an interval, as a bit set, by direct enumeration.
+        fn concretize(si: &StridedInterval) -> u32 {
+            let StridedInterval::Normal {
+                bits,
+                stride,
+                lower_bound,
+                upper_bound,
+            } = si
+            else {
+                return 0;
+            };
+            let modulus = 1u32 << *bits;
+            let stride = stride.to_u32().unwrap();
+            let lb = lower_bound.to_u32().unwrap();
+            let ub = upper_bound.to_u32().unwrap();
+            let span = (ub + modulus - lb) % modulus;
+            let steps = span.checked_div(stride).unwrap_or(0);
+            (0..=steps).fold(0, |set, i| set | 1 << ((lb + i * stride) % modulus))
+        }
+
+        // 5[0, 10] >> 1 is {0, 2, 5}, which has no stride of 5 >> 1 = 2.
+        let val = StridedInterval::new(8, 5u32, 0u32, 10u32);
+        let shift = StridedInterval::constant(8, 1u32);
+        let result = val.lshr(&shift).unwrap();
+        for expected in [0u32, 2, 5] {
+            assert!(result.contains_value(&BigUint::from(expected)));
+        }
+
+        // Exhaustive at 4 bits: every interval, wrapping ones included, shifted
+        // by every constant amount.
+        const BITS: u32 = 4;
+        for stride in 0u32..16 {
+            for lb in 0u32..16 {
+                for ub in 0u32..16 {
+                    if (stride == 0) != (lb == ub) {
+                        continue;
+                    }
+                    let val = StridedInterval::new(BITS, stride, lb, ub);
+                    let val_set = concretize(&val);
+                    for k in 0..16u32 {
+                        let amount = StridedInterval::constant(BITS, k);
+                        let result = concretize(&val.lshr(&amount).unwrap());
+                        for x in (0..16u32).filter(|x| val_set >> x & 1 == 1) {
+                            let expected = if k >= BITS { 0 } else { x >> k };
+                            assert!(
+                                result >> expected & 1 == 1,
+                                "{val:?} >> {k} dropped {x} >> {k} = {expected}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
     }
 
     #[test]
