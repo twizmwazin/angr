@@ -28,7 +28,6 @@ use pyo3::types::{PyBytes, PyDict, PyList, PyNone, PyString, PyTuple};
 use crate::ailment::ail_stmt::{AilStatement, Statement};
 use crate::ailment::const_value::ConstValue;
 use crate::ailment::enums::{ConvertType, ExpressionKind, RoundingMode, VirtualVariableCategory};
-use crate::ailment::ops::is_float_op;
 use crate::ailment::tags::{Tags, TagsView};
 use crate::ailment::{CachedHash, CmpMode, hash_of};
 use indexmap::IndexMap;
@@ -3889,7 +3888,7 @@ impl Expression {
             ExprInner::Let { .. } => Ok("let".to_string()),
             ExprInner::UnaryOp { op, .. } => Ok(op.clone()),
             ExprInner::BinaryOp { op, signed, .. } => {
-                if *signed && !is_float_op(op) {
+                if *signed {
                     Ok(format!("{op}s"))
                 } else {
                     Ok(op.clone())
@@ -4448,18 +4447,6 @@ impl Expression {
         match &self.expr.inner {
             ExprInner::BinaryOp { signed, .. } => Ok(*signed),
             _ => Err(PyAttributeError::new_err("no 'signed' on this Expression")),
-        }
-    }
-
-    /// UnaryOp/BinaryOp: whether ``op`` is a floating-point operation. Derived from the op name
-    /// (``AddF``, ``CmpEQF``, ``Sqrt``, ...); integer and floating-point operations are distinct ops.
-    #[getter]
-    fn floating_point(&self) -> PyResult<bool> {
-        match &self.expr.inner {
-            ExprInner::BinaryOp { op, .. } | ExprInner::UnaryOp { op, .. } => Ok(is_float_op(op)),
-            _ => Err(PyAttributeError::new_err(
-                "no 'floating_point' on this Expression",
-            )),
         }
     }
 

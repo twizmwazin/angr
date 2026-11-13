@@ -162,7 +162,7 @@ class TestSerialize(unittest.TestCase):
             rounding_mode=RoundingMode.RM_NearestTiesEven,
         )
         b2 = roundtrip(b)
-        assert b2.op == "AddF" and b2.floating_point
+        assert b2.op == "AddF"
         assert b2.rounding_mode == RoundingMode.RM_NearestTiesEven
 
     def test_binary_op_non_default_rounding_mode(self):

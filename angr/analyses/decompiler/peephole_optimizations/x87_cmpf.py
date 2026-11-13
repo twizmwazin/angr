@@ -286,7 +286,7 @@ class X87CmpF(PeepholeOptimizationExprBase):
                 if negated == is_and:
                     guards.append((i, inner.operand, None))
                 continue
-            if not (isinstance(inner, BinaryOp) and inner.floating_point):
+            if not isinstance(inner, BinaryOp):
                 continue
             a, b = inner.operands
             if inner.op == "CmpUN" or (inner.op in ("CmpEQF", "CmpNEF") and a.likes(b)):

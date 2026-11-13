@@ -702,6 +702,60 @@ if not TYPE_CHECKING:
         """Marker for ``isinstance(x, Op)`` checks."""
 
 
+# The floating-point operations. Integer and floating-point operations are distinct ops: the floating-point
+# counterpart of an integer op carries an F suffix (Add / AddF), ahead of the V suffix of a lane-wise vector op
+# (AddV / AddFV). CmpF is not one of them: it yields an integer condition code.
+FLOAT_OPS: frozenset[str] = frozenset(
+    {
+        # arithmetic
+        "AddF",
+        "SubF",
+        "MulF",
+        "DivF",
+        "NegF",
+        "AbsF",
+        "MaxF",
+        "MinF",
+        "Sqrt",
+        "RSqrtEstF",
+        "RoundF",
+        "Scale",
+        "PRem",
+        "PRem1",
+        # comparisons and classification
+        "CmpEQF",
+        "CmpNEF",
+        "CmpLTF",
+        "CmpLEF",
+        "CmpGTF",
+        "CmpGEF",
+        "CmpUN",
+        "SignBit",
+        # transcendental
+        "Sin",
+        "Cos",
+        "Tan",
+        "Atan2",
+        "Exp2",
+        "Log2",
+        # lane-wise vector operations
+        "AddFV",
+        "SubFV",
+        "MulFV",
+        "DivFV",
+        "MaxFV",
+        "MinFV",
+        "SqrtV",
+        "CmpEQFV",
+        "CmpNEFV",
+        "CmpLTFV",
+        "CmpLEFV",
+        "CmpGTFV",
+        "CmpGEFV",
+        "CmpUNV",
+    }
+)
+
 _LOGICAL_DUAL = {"LogicalAnd": "LogicalOr", "LogicalOr": "LogicalAnd"}
 
 
@@ -746,6 +800,7 @@ def negate(expr: Expression, manager) -> Expression:
 
 
 __all__ = [
+    "FLOAT_OPS",
     "ITE",
     "Array",
     "Atom",

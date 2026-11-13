@@ -197,7 +197,7 @@ class TestNonConstRoundingMode(unittest.TestCase):
         binop = next(
             src
             for s in blk.statements
-            if isinstance(src := getattr(s, "src", None), ailment.Expr.BinaryOp) and src.floating_point
+            if isinstance(src := getattr(s, "src", None), ailment.Expr.BinaryOp) and src.op == "AddF"
         )
         assert isinstance(binop.rounding_mode, RoundingMode)
 
@@ -568,14 +568,14 @@ class TestX87MathOps(unittest.TestCase):
         # Iop_XxxF64(rm, x) -> UnaryOp(Xxx, x): fsqrt, fsin, fcos, fptan
         for insn, op in (("d9fa", "Sqrt"), ("d9fe", "Sin"), ("d9ff", "Cos"), ("d9f2", "Tan")):
             unop = self._only(self._x87(insn), ailment.Expr.UnaryOp, lambda e, op=op: e.op == op)
-            assert unop.floating_point and unop.bits == 64
+            assert unop.bits == 64
             assert isinstance(unop.operand, ailment.Expr.Expression)
 
     def test_fprem_and_status_bits(self):
         # fprem: ST0 = fmod(ST0, ST1); C3210 = x87_fprem_c3210(ST0, ST1)
         srcs = self._x87("d9f8")
         prem = self._only(srcs, ailment.Expr.BinaryOp, lambda e: e.op == "PRem")
-        assert prem.floating_point and prem.bits == 64
+        assert prem.bits == 64
         flags = self._only(srcs, ailment.Expr.DirtyExpression, lambda e: e.callee == "x87_fprem_c3210")
         assert flags.bits == 32
         assert [str(o) for o in flags.operands] == [str(o) for o in prem.operands]
@@ -587,7 +587,7 @@ class TestX87MathOps(unittest.TestCase):
     def test_fpatan(self):
         # fpatan: atan2(ST1, ST0)
         binop = self._only(self._x87("d9f3"), ailment.Expr.BinaryOp, lambda e: e.op == "Atan2")
-        assert binop.floating_point and binop.bits == 64
+        assert binop.bits == 64
 
     def test_fscale(self):
         # fscale: ST0 * 2^trunc(ST1) == Scale(ST0, Conv(64F->s32 RZ, ST1))
@@ -605,7 +605,7 @@ class TestX87MathOps(unittest.TestCase):
         assert isinstance(sub.operands[1], ailment.Expr.Const) and sub.operands[1].value == 1.0
         # fyl2x: y * log2(x); fyl2xp1: y * log2(x + 1)
         mul = self._only(self._x87("d9f1"), ailment.Expr.BinaryOp, lambda e: e.op == "MulF")
-        assert mul.floating_point
+        assert mul.op == "MulF"
         assert isinstance(mul.operands[1], ailment.Expr.UnaryOp) and mul.operands[1].op == "Log2"
         mul = self._only(self._x87("d9f9"), ailment.Expr.BinaryOp, lambda e: e.op == "MulF")
         log2 = mul.operands[1]
@@ -615,10 +615,10 @@ class TestX87MathOps(unittest.TestCase):
     def test_sse_sqrt_and_unordered_compare(self):
         # sqrtpd xmm0, xmm0 ; ret -> Iop_Sqrt64Fx2(rm, x)
         unop = self._only(self._assignments("AMD64", "660f51c0c3"), ailment.Expr.UnaryOp, lambda e: e.op == "SqrtV")
-        assert unop.floating_point and unop.bits == 128
+        assert unop.bits == 128
         # cmpunordps xmm0, xmm1 ; ret -> Iop_CmpUN32Fx4(a, b)
         binop = self._only(self._assignments("AMD64", "0fc2c103c3"), ailment.Expr.BinaryOp, lambda e: e.op == "CmpUNV")
-        assert binop.floating_point and (binop.bits, binop.vector_count, binop.vector_size) == (128, 4, 32)
+        assert (binop.bits, binop.vector_count, binop.vector_size) == (128, 4, 32)
 
 
 class TestPackedFPOps(unittest.TestCase):
@@ -644,7 +644,7 @@ class TestPackedFPOps(unittest.TestCase):
         assert mul.op == "MulFV" and (mul.vector_count, mul.vector_size) == (2, 64)
         assert mul.rounding_mode == RoundingMode.RM_NearestTiesEven
         assert cmp.op == "CmpEQFV" and (cmp.vector_count, cmp.vector_size) == (2, 64)
-        assert sub.op == "SubV" and not sub.floating_point and (sub.vector_count, sub.vector_size) == (2, 64)
+        assert sub.op == "SubV" and (sub.vector_count, sub.vector_size) == (2, 64)
 
 
 class TestFusedMultiplyAdd(unittest.TestCase):
@@ -728,7 +728,7 @@ class TestPPCSinglePrecisionOps(unittest.TestCase):
         # fadds f1, f1, f2 ; fsubs f1, f1, f2 ; fdivs f1, f1, f2 ; blr
         srcs = TestX87MathOps._assignments("PPC64", "ec21102aec211028ec2110244e800020")
         ops = self._f32_rounded(srcs)
-        assert all(isinstance(e, ailment.Expr.BinaryOp) and e.floating_point and e.bits == 64 for e in ops)
+        assert all(isinstance(e, ailment.Expr.BinaryOp) and e.bits == 64 for e in ops)
         assert [e.op for e in ops if isinstance(e, ailment.Expr.BinaryOp)] == ["AddF", "SubF", "DivF"]
 
     def test_fmadds_frsp(self):
@@ -746,7 +746,7 @@ class TestF128Ops(unittest.TestCase):
         # sqxbr %f0, %f0 ; br %r14 -> Iop_SqrtF128(rm, F64HLtoF128(f0, f2))
         srcs = TestX87MathOps._assignments("S390X", "b316000007fe")
         sqrt = TestX87MathOps._only(srcs, ailment.Expr.UnaryOp, lambda e: e.op == "Sqrt")
-        assert sqrt.floating_point and sqrt.bits == 128
+        assert sqrt.bits == 128
         assert isinstance(sqrt.operand, ailment.Expr.Tmp) and sqrt.operand.bits == 128
 
 
@@ -756,13 +756,13 @@ class TestMiscFPOps(unittest.TestCase):
         srcs = TestX87MathOps._assignments("ARMEL", "010b80fe410b80fe1eff2fe1")
         for op in ("MaxF", "MinF"):
             e = TestX87MathOps._only(srcs, ailment.Expr.BinaryOp, lambda e, op=op: e.op == op)
-            assert e.floating_point and e.bits == 64
+            assert e.bits == 64
 
     def test_amd64_vsqrtpd_ymm(self):
         # vsqrtpd ymm0, ymm1 ; ret -> Iop_Sqrt64Fx4 (a unop)
         srcs = TestX87MathOps._assignments("AMD64", "c5fd51c1c3")
         e = TestX87MathOps._only(srcs, ailment.Expr.UnaryOp, lambda e: e.op == "SqrtV")
-        assert e.floating_point and e.bits == 256
+        assert e.bits == 256
 
 
 class TestUnsupportedOpsKeepOperands(unittest.TestCase):

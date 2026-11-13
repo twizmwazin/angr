@@ -2,7 +2,17 @@ from __future__ import annotations
 
 import archinfo
 
-from angr.ailment.expression import BinaryOp, Const, Convert, Expression, Extract, Insert, Reinterpret, UnaryOp
+from angr.ailment.expression import (
+    FLOAT_OPS,
+    BinaryOp,
+    Const,
+    Convert,
+    Expression,
+    Extract,
+    Insert,
+    Reinterpret,
+    UnaryOp,
+)
 
 from .base import PeepholeOptimizationExprBase
 
@@ -37,7 +47,7 @@ def _visibly_fp(expr: Expression) -> bool:
     if isinstance(expr, Const):
         return isinstance(expr.value, float)
     if isinstance(expr, (BinaryOp, UnaryOp)):
-        return expr.floating_point
+        return expr.op in FLOAT_OPS
     if isinstance(expr, Convert):
         return expr.to_type == Convert.TYPE_FP
     if isinstance(expr, Reinterpret):
@@ -69,7 +79,7 @@ class SimplifyMaskedInsert(PeepholeOptimizationExprBase):
         return self._optimize_convert(expr)
 
     def _optimize_and(self, expr: BinaryOp) -> Expression | None:
-        if expr.op != "And" or expr.floating_point or expr.vector_count:
+        if expr.op != "And" or expr.vector_count:
             return None
         mask = (1 << expr.bits) - 1
         inner: Expression = expr

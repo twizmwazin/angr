@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 import struct
 
-from angr.ailment.expression import BinaryOp, Call, Const, Convert, Insert, Reinterpret, UnaryOp
+from angr.ailment.expression import FLOAT_OPS, BinaryOp, Call, Const, Convert, Insert, Reinterpret, UnaryOp
 from angr.ailment.utils import is_lsb_overwrite
 from angr.analyses.decompiler.variable_map import variable_map_of
 from angr.sim_type import SimTypeFloat
@@ -285,7 +285,7 @@ class RemoveRedundantConversions(PeepholeOptimizationExprBase):
                     ins_addr=operand_expr.tags.get("ins_addr"),
                 )
         if isinstance(operand_expr, BinaryOp) and not (
-            operand_expr.floating_point and expr.from_type == Convert.TYPE_INT
+            operand_expr.op in FLOAT_OPS and expr.from_type == Convert.TYPE_INT
         ):
             # (an integer truncation of an FP result extracts bits; none of the integer identities below apply)
             if operand_expr.op in {

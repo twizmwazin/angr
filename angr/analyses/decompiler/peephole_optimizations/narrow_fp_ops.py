@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from angr.ailment.expression import BinaryOp, Convert
+from angr.ailment.expression import FLOAT_OPS, BinaryOp, Convert
 
 from .base import PeepholeOptimizationExprBase
 
@@ -41,7 +41,7 @@ class NarrowFPOperations(PeepholeOptimizationExprBase):
     expr_classes = (BinaryOp,)
 
     def optimize(self, expr: BinaryOp, **kwargs):
-        if not expr.floating_point or len(expr.operands) != 2:
+        if expr.op not in FLOAT_OPS or len(expr.operands) != 2:
             return None
         w0 = _is_fp_widening(expr.operands[0])
         w1 = _is_fp_widening(expr.operands[1])

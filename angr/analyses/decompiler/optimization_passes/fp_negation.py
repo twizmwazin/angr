@@ -3,7 +3,17 @@ from __future__ import annotations
 import logging
 
 from angr.ailment.block import Block
-from angr.ailment.expression import BinaryOp, Const, Convert, Expression, Extract, Phi, UnaryOp, VirtualVariable
+from angr.ailment.expression import (
+    FLOAT_OPS,
+    BinaryOp,
+    Const,
+    Convert,
+    Expression,
+    Extract,
+    Phi,
+    UnaryOp,
+    VirtualVariable,
+)
 from angr.ailment.statement import Assignment, Statement
 from angr.ailment.utils import is_lsb_extract
 from angr.analyses.decompiler.ail_simplifier import AILBlockRewriter
@@ -71,7 +81,7 @@ class _SignFlipRewriter(AILBlockRewriter):
         """Whether the operands of *expr* are read as integers: FP operations reset the context, integer operations
         set it, Extract passes it on, and everything else (stores, calls, phis, ITE) reads a value."""
         if isinstance(expr, (BinaryOp, UnaryOp)):
-            return not expr.floating_point
+            return expr.op not in FLOAT_OPS
         if isinstance(expr, Convert):
             return expr.from_type != Convert.TYPE_FP and expr.to_type != Convert.TYPE_FP
         if isinstance(expr, Extract):
@@ -252,7 +262,7 @@ class FpNegation(OptimizationPass):
         # FP provenance in the expression itself.
         if isinstance(expr, Convert) and Convert.TYPE_FP in (expr.from_type, expr.to_type):
             return True
-        if isinstance(expr, (UnaryOp, BinaryOp)) and expr.floating_point:
+        if isinstance(expr, (UnaryOp, BinaryOp)) and expr.op in FLOAT_OPS:
             return True
 
         if isinstance(expr, VirtualVariable):

@@ -16,7 +16,6 @@ pub mod const_value;
 pub mod convert_vex;
 pub mod enums;
 pub mod manager;
-pub mod ops;
 pub mod tags;
 pub mod vex_ffi;
 pub mod vexop;
