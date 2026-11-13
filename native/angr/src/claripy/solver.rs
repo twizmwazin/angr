@@ -196,12 +196,12 @@ impl PySolver {
     }
 
     fn blank_copy<'py>(slf: &Bound<'py, Self>) -> Result<Bound<'py, PySolver>, ClaripyError> {
-        let solver = slf.borrow().blank_copy_solver()?;
+        let solver = slf.try_borrow().map_err(PyErr::from)?.blank_copy_solver()?;
         Self::wrap_like(slf, solver)
     }
 
     fn branch<'py>(slf: &Bound<'py, Self>) -> Result<Bound<'py, PySolver>, ClaripyError> {
-        let this = slf.borrow();
+        let this = slf.try_borrow().map_err(PyErr::from)?;
         let solver = PySolver {
             inner: this.inner.clone(),
             timeout: this.timeout,
@@ -215,7 +215,7 @@ impl PySolver {
     /// group, like claripy's `constrained_frontend.split()`. Each returned
     /// solver is a blank copy of this one holding one group's constraints.
     fn split<'py>(slf: &Bound<'py, Self>) -> Result<Vec<Bound<'py, PySolver>>, ClaripyError> {
-        let this = slf.borrow();
+        let this = slf.try_borrow().map_err(PyErr::from)?;
         let constraints = this.inner.constraints()?;
 
         // Group constraints by shared variables (transitively).
@@ -284,7 +284,7 @@ impl PySolver {
             let mut options = Vec::new();
 
             // Process self first
-            let self_constraints = slf.borrow().constraints(py)?;
+            let self_constraints = slf.try_borrow().map_err(PyErr::from)?.constraints(py)?;
             let mut self_and_args: Vec<Bound<PyAny>> = vec![merge_conditions[0].clone().into_any()];
             self_and_args.extend(self_constraints.into_iter().map(|c| c.into_any()));
             let self_and_expr = and(py, self_and_args)?;
@@ -292,7 +292,7 @@ impl PySolver {
 
             // Process others
             for (other, condition) in others.iter().zip(merge_conditions.iter().skip(1)) {
-                let other_constraints = other.borrow().constraints(py)?;
+                let other_constraints = other.try_borrow().map_err(PyErr::from)?.constraints(py)?;
                 let mut other_and_args: Vec<Bound<PyAny>> = vec![condition.clone().into_any()];
                 other_and_args.extend(other_constraints.into_iter().map(|c| c.into_any()));
                 let other_and_expr = and(py, other_and_args)?;
@@ -309,7 +309,7 @@ impl PySolver {
 
         Ok((
             matches!(
-                slf.borrow().inner,
+                slf.try_borrow().map_err(PyErr::from)?.inner,
                 DynSolver::Z3(..)
                     | DynSolver::Z3Cacheless(..)
                     | DynSolver::Hybrid(..)
@@ -412,6 +412,7 @@ impl PySolver {
     #[pyo3(signature = (extra_constraints = None))]
     fn unsat_core(
         &mut self,
+        py: Python<'_>,
         extra_constraints: Option<Vec<CoerceBool>>,
     ) -> Result<Vec<usize>, ClaripyError> {
         let extras: Vec<AstRef<'static>> = extra_constraints
@@ -420,7 +421,7 @@ impl PySolver {
             .map(|c| c.0.clone())
             .collect();
         if extras.is_empty() {
-            return Ok(self.inner.unsat_core()?);
+            return Ok(self.inner.unsat_core(py)?);
         }
         // The core names positions in `constraints` followed by the extra
         // constraints. The extras are added to a copy of this solver, and a
@@ -431,7 +432,7 @@ impl PySolver {
         self.with_extra_constraints(extra_constraints, None, |solver| {
             let local = solver.constraints()?;
             solver
-                .unsat_core()?
+                .unsat_core(py)?
                 .into_iter()
                 .map(|i| {
                     local

@@ -4,6 +4,7 @@ use clarirs_core::solver_mixins::{
 };
 use clarirs_vsa::VSASolver;
 use clarirs_z3::Z3Solver;
+use pyo3::Python;
 
 // Type aliases for the wrapped solvers with mixins.
 //
@@ -53,8 +54,8 @@ impl HasContext<'static> for DynSolver {
 
 impl DynSolver {
     /// Get unsat core (only supported for Z3 solver)
-    pub(crate) fn unsat_core(&mut self) -> Result<Vec<usize>, ClarirsError> {
-        match self {
+    pub(crate) fn unsat_core(&mut self, py: Python<'_>) -> Result<Vec<usize>, ClarirsError> {
+        py.detach(|| match self {
             DynSolver::Z3(wrapped_solver) => {
                 // Access through the mixin layers
                 // SimplificationMixin -> ConcreteEarlyResolutionMixin -> ModelCacheMixin -> Z3Solver
@@ -105,7 +106,7 @@ impl DynSolver {
             _ => Err(ClarirsError::UnsupportedOperation(
                 "unsat_core is only supported for Z3 and Hybrid solvers".to_string(),
             )),
-        }
+        })
     }
 
     /// Add a replacement (only supported for Replacement solver)
@@ -160,15 +161,17 @@ impl DynSolver {
 
 macro_rules! dispatch {
     ($self:expr, $method:ident $(, $arg:expr)*) => {
-        match $self {
-            DynSolver::Concrete(solver) => solver.$method($($arg),*),
-            DynSolver::Z3(solver) => solver.$method($($arg),*),
-            DynSolver::Z3Cacheless(solver) => solver.$method($($arg),*),
-            DynSolver::Vsa(solver) => solver.$method($($arg),*),
-            DynSolver::Hybrid(solver) => solver.$method($($arg),*),
-            DynSolver::Replacement(solver) => solver.$method($($arg),*),
-            DynSolver::Composite(solver) => solver.$method($($arg),*),
-        }
+        Python::attach(|py| {
+            py.detach(|| match $self {
+                DynSolver::Concrete(solver) => solver.$method($($arg),*),
+                DynSolver::Z3(solver) => solver.$method($($arg),*),
+                DynSolver::Z3Cacheless(solver) => solver.$method($($arg),*),
+                DynSolver::Vsa(solver) => solver.$method($($arg),*),
+                DynSolver::Hybrid(solver) => solver.$method($($arg),*),
+                DynSolver::Replacement(solver) => solver.$method($($arg),*),
+                DynSolver::Composite(solver) => solver.$method($($arg),*),
+            })
+        })
     };
 }
 
