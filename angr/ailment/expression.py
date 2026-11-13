@@ -246,7 +246,6 @@ else:
             bits=None,
             **tags,
         ) -> _Expression:
-            _reject_floating_point_flag(tags)
             return _Expression._new_unary_op(idx, op, operand, bits=bits, **tags)
 
     class Convert(metaclass=_AilMarkerMeta):
@@ -302,12 +301,6 @@ else:
             **tags,
         ) -> _Expression:
             return _Expression._new_reinterpret(idx, from_bits, from_type, to_bits, to_type, operand, **tags)
-
-    def _reject_floating_point_flag(tags):
-        # integer and floating-point operations are distinct ops (Add / AddF); without this check a stale
-        # floating_point=True would silently turn into a tag
-        if "floating_point" in tags:
-            raise TypeError("floating_point is not an argument: use the floating-point op (e.g. float_op(op))")
 
     _BINOP_FIXED_BITS = {
         "CmpF": 32,
@@ -375,7 +368,6 @@ else:
             vector_size=None,
             **tags,
         ) -> _Expression:
-            _reject_floating_point_flag(tags)
             if bits is None:
                 bits = _binop_bits_for(op, operands)
             return _Expression._new_binary_op(
