@@ -981,49 +981,67 @@ impl StridedInterval {
             return other.clone();
         }
 
-        // Calculate the new bounds
-        let (self_min, self_max) = self.get_unsigned_bounds();
-        let (other_min, other_max) = other.get_unsigned_bounds();
-
-        let new_lower = min(self_min, other_min);
-        let new_upper = max(self_max, other_max);
-
-        // For union, handle special cases to avoid GCD(0,0) and division by zero
-        let new_stride = match (self, other) {
-            (
-                StridedInterval::Normal {
-                    stride: s_stride,
-                    lower_bound: s_lb,
-                    upper_bound: s_ub,
-                    ..
-                },
-                StridedInterval::Normal {
-                    stride: o_stride,
-                    lower_bound: o_lb,
-                    upper_bound: o_ub,
-                    ..
-                },
-            ) => {
-                if s_stride.is_zero() && o_stride.is_zero() {
-                    if s_lb == o_lb && s_ub == o_ub {
-                        BigUint::zero()
-                    } else if s_lb > o_lb {
-                        s_lb - o_lb
-                    } else {
-                        o_lb - s_lb
-                    }
-                } else if s_stride.is_zero() {
-                    o_stride.clone()
-                } else if o_stride.is_zero() {
-                    s_stride.clone()
-                } else {
-                    gcd(s_stride, o_stride)
-                }
-            }
-            _ => BigUint::one(),
+        let (
+            StridedInterval::Normal {
+                bits,
+                stride: s_stride,
+                lower_bound: s_lb,
+                upper_bound: s_ub,
+            },
+            StridedInterval::Normal {
+                stride: o_stride,
+                lower_bound: o_lb,
+                upper_bound: o_ub,
+                ..
+            },
+        ) = (self, other)
+        else {
+            return Self::top(self.bits());
         };
 
-        Self::new(self.bits(), new_stride, new_lower, new_upper)
+        // The gcd of the non-zero values, or zero when there are none. The
+        // stride of a constant is zero and constrains nothing.
+        let gcd_of = |values: &[&BigUint]| {
+            values
+                .iter()
+                .filter(|value| !value.is_zero())
+                .fold(BigUint::zero(), |acc, value| gcd(&acc, value))
+        };
+
+        if s_lb > s_ub || o_lb > o_ub {
+            // A wrapping operand: the result is the whole range, which starts at
+            // zero. A value keeps its remainder modulo a power of two when it
+            // wraps, so the largest power of two that divides both strides and
+            // both lower bounds divides every value, and is a stride that
+            // loses none of them.
+            let stride = BigUint::one() << Self::ntz(&gcd_of(&[s_stride, o_stride, s_lb, o_lb]));
+            let new_upper = max_int(*bits) + BigUint::one() - &stride;
+            return Self::new(*bits, stride, BigUint::zero(), new_upper);
+        }
+
+        // Neither operand wraps. The result starts at the smaller lower bound,
+        // and the other operand starts at an offset from it that the stride has
+        // to divide as well, or the result is on the wrong phase for it:
+        // 2[0, 10] and 2[1, 11] together need a stride of 1.
+        let (new_lower, offset) = if s_lb <= o_lb {
+            (s_lb, o_lb - s_lb)
+        } else {
+            (o_lb, s_lb - o_lb)
+        };
+        let new_stride = gcd_of(&[s_stride, o_stride, &offset]);
+
+        // End at the larger of the last values, which is on the new stride; an
+        // upper bound need not be on the stride of its own interval.
+        let last = |lb: &BigUint, ub: &BigUint, stride: &BigUint| {
+            if stride.is_zero() {
+                lb.clone()
+            } else {
+                ub - (ub - lb) % stride
+            }
+        };
+        let new_upper = max(last(s_lb, s_ub, s_stride), last(o_lb, o_ub, o_stride));
+
+        Self::new(*bits, new_stride, new_lower.clone(), new_upper)
     }
 
     /// Create a widened interval by extending bounds
@@ -3377,6 +3395,114 @@ mod si_properties_tests {
 #[cfg(test)]
 mod si_set_op_tests {
     use super::*;
+
+    #[test]
+    fn test_union_is_sound() {
+        // The members as a bit set, by direct enumeration: lower_bound,
+        // lower_bound + stride, ... for as long as the offset stays within the
+        // (wrapping) distance from lower_bound to upper_bound.
+        fn concretize(si: &StridedInterval) -> u32 {
+            let StridedInterval::Normal {
+                bits,
+                stride,
+                lower_bound,
+                upper_bound,
+            } = si
+            else {
+                return 0;
+            };
+            let modulus = 1u32 << bits;
+            let stride = u32::try_from(stride).unwrap();
+            let lower = u32::try_from(lower_bound).unwrap();
+            let upper = u32::try_from(upper_bound).unwrap();
+            let span = (upper + modulus - lower) % modulus;
+            let mut members = 1 << lower;
+            let mut offset = stride;
+            while stride != 0 && offset <= span {
+                members |= 1 << ((lower + offset) % modulus);
+                offset += stride;
+            }
+            members
+        }
+
+        // Empty and every stride[lower, upper], wrapping ones included. At 3
+        // bits that is every combination; at 4 bits, to keep the number of
+        // pairs down, only those whose upper bound is a member.
+        fn universe(bits: u32) -> Vec<(StridedInterval, u32)> {
+            let modulus = 1u32 << bits;
+            let mut all = vec![StridedInterval::empty(bits)];
+            for stride in 0..modulus {
+                for lower in 0..modulus {
+                    for span in 0..modulus {
+                        let on_stride = stride == 0 || span % stride == 0;
+                        if (stride == 0) != (span == 0) || (bits > 3 && !on_stride) {
+                            continue;
+                        }
+                        all.push(StridedInterval::new(
+                            bits,
+                            BigUint::from(stride),
+                            BigUint::from(lower),
+                            BigUint::from((lower + span) % modulus),
+                        ));
+                    }
+                }
+            }
+            all.into_iter()
+                .map(|si| {
+                    let members = concretize(&si);
+                    (si, members)
+                })
+                .collect()
+        }
+
+        let si = |stride: u32, lower: u32, upper: u32| {
+            StridedInterval::new(
+                8,
+                BigUint::from(stride),
+                BigUint::from(lower),
+                BigUint::from(upper),
+            )
+        };
+
+        // The operands are on different phases of the same stride: the union
+        // has to take the offset between the lower bounds into account.
+        let union = si(2, 0, 10).union(&si(2, 1, 11));
+        for value in 0u32..=11 {
+            assert!(union.contains_value(&BigUint::from(value)), "{value}");
+        }
+        assert_eq!(si(4, 0, 8).union(&si(4, 2, 10)), si(2, 0, 10));
+        assert_eq!(si(4, 0, 8).union(&si(8, 4, 20)), si(4, 0, 20));
+        assert_eq!(
+            StridedInterval::constant(8, 3u32).union(&si(6, 9, 21)),
+            si(6, 3, 21)
+        );
+        // A wrapping operand keeps the power of two in the strides.
+        assert_eq!(si(4, 248, 8).union(&si(2, 2, 10)), si(2, 0, 254));
+
+        // Every pair of small intervals: the union has every value of both.
+        // union answers with one operand when `contains` says that it contains
+        // the other, and `contains` has soundness bugs of its own that are not
+        // this test's subject, so those pairs are left out.
+        let mut checked = 0u32;
+        for bits in [3, 4] {
+            let all = universe(bits);
+            for (a, a_members) in &all {
+                for (b, b_members) in &all {
+                    if a.contains(b) || b.contains(a) {
+                        continue;
+                    }
+                    checked += 1;
+                    let union = a.union(b);
+                    assert_eq!(
+                        (a_members | b_members) & !concretize(&union),
+                        0,
+                        "{a:?} union {b:?} is {union:?}"
+                    );
+                }
+            }
+        }
+        assert!(checked > 100_000, "{checked}");
+    }
 
     #[test]
     fn test_union() {
