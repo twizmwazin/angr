@@ -946,47 +946,11 @@ fn simplify_unsigned_cmp<'c>(
             }
             _ => None,
         },
-        // CMP(Sub(ZeroExt(n, inner), BVV(k)), BVV(c)) where k and c fit in inner's size
-        // => CMP(Sub(inner, extract(k)), extract(c))
-        AstOp::Sub(lhs_sub, rhs_sub) => {
-            if let AstOp::ZeroExt(inner, ext_size) = lhs_sub.op()
-                && let AstOp::BVV(k) = rhs_sub.op()
-                && c.leading_zeros() as u32 >= *ext_size
-                && k.leading_zeros() as u32 >= *ext_size
-            {
-                let inner_size = inner.size();
-                Some((
-                    ctx.sub(inner, &ctx.extract(rhs_sub, inner_size - 1, 0)?)?,
-                    ctx.bvv(c.extract(0, inner_size - 1)?)?,
-                ))
-            } else {
-                None
-            }
-        }
-        // CMP(Add(ZeroExt(n, inner), BVV(k)), BVV(c)) where k and c fit in inner's size
-        AstOp::Add(add_args) => {
-            let ze_idx = add_args
-                .iter()
-                .position(|a| matches!(a.op(), AstOp::ZeroExt(..)));
-            let bvv_idx = add_args
-                .iter()
-                .position(|a| matches!(a.op(), AstOp::BVV(..)));
-            if let (Some(ze_i), Some(bvv_i)) = (ze_idx, bvv_idx)
-                && add_args.len() == 2
-                && let AstOp::ZeroExt(inner, ext_size) = add_args[ze_i].op()
-                && let AstOp::BVV(k) = add_args[bvv_i].op()
-                && c.leading_zeros() as u32 >= *ext_size
-                && k.leading_zeros() as u32 >= *ext_size
-            {
-                let inner_size = inner.size();
-                Some((
-                    ctx.add(inner, &ctx.extract(&add_args[bvv_i], inner_size - 1, 0)?)?,
-                    ctx.bvv(c.extract(0, inner_size - 1)?)?,
-                ))
-            } else {
-                None
-            }
-        }
+        // Note: CMP(ZeroExt(n, x) +/- k, c) must NOT be narrowed to CMP(x +/- k', c') even
+        // when k and c fit in x's width: the narrow add wraps where the wide one cannot
+        // (x = 0xFF: ZeroExt(8, x) + 1 = 0x100, but x + 1 = 0), and the wide sub borrows
+        // into the extension bits where the narrow one cannot (x = 0: ZeroExt(8, x) - 2 =
+        // 0xFFFE, but x - 2 = 0xFE).
         _ => None,
     };
     match rewritten {
