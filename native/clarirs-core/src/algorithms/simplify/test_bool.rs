@@ -812,6 +812,78 @@ fn test_zero_ext_cmp_equal_inner_widths_compares_inners() -> Result<()> {
     Ok(())
 }
 
+/// `CMP(ZeroExt(n, x) + k, c)` must not be narrowed to `CMP(x + k, c)`: the narrow add
+/// wraps where the wide one cannot. With x = 0xFF, `ZeroExt(8, x) + 1 <u 5` is
+/// `0x100 <u 5` (false) while `x + 1 <u 5` is `0 <u 5` (true).
+#[test]
+fn test_zero_ext_add_cmp_not_narrowed() -> Result<()> {
+    let ctx = Context::new();
+    let x = ctx.bvs("x", 8)?;
+    let k = ctx.bvv(BitVec::from((1u64, 16)))?;
+    let c = ctx.bvv(BitVec::from((5u64, 16)))?;
+    let wide = ctx.add(ctx.zero_ext(&x, 8)?, &k)?;
+
+    for expr in [
+        ctx.ult(&wide, &c)?,
+        ctx.ule(&wide, &c)?,
+        ctx.ugt(&wide, &c)?,
+        ctx.uge(&wide, &c)?,
+        ctx.ult(&c, &wide)?,
+        ctx.ule(&c, &wide)?,
+        ctx.ugt(&c, &wide)?,
+        ctx.uge(&c, &wide)?,
+    ] {
+        let simplified = expr.simplify()?;
+        assert!(
+            simplified.child_iter().all(|ch| ch.size() == 16),
+            "{expr:?} was narrowed to {simplified:?}"
+        );
+    }
+
+    // The simplified form must still agree with the original at x = 0xFF.
+    let simplified = ctx.ult(&wide, &c)?.simplify()?;
+    let at_ff = simplified.replace(&x, &ctx.bvv(BitVec::from((0xFFu64, 8)))?)?;
+    assert_eq!(at_ff.simplify()?, ctx.false_()?);
+
+    Ok(())
+}
+
+/// `CMP(ZeroExt(n, x) - k, c)` must not be narrowed to `CMP(x - k, c)`: the wide sub
+/// borrows into the extension bits. With x = 0, `ZeroExt(8, x) - 2 <u 0xFF` is
+/// `0xFFFE <u 0xFF` (false) while `x - 2 <u 0xFF` is `0xFE <u 0xFF` (true).
+#[test]
+fn test_zero_ext_sub_cmp_not_narrowed() -> Result<()> {
+    let ctx = Context::new();
+    let x = ctx.bvs("x", 8)?;
+    let k = ctx.bvv(BitVec::from((2u64, 16)))?;
+    let c = ctx.bvv(BitVec::from((0x00FFu64, 16)))?;
+    let wide = ctx.sub(ctx.zero_ext(&x, 8)?, &k)?;
+
+    for expr in [
+        ctx.ult(&wide, &c)?,
+        ctx.ule(&wide, &c)?,
+        ctx.ugt(&wide, &c)?,
+        ctx.uge(&wide, &c)?,
+        ctx.ult(&c, &wide)?,
+        ctx.ule(&c, &wide)?,
+        ctx.ugt(&c, &wide)?,
+        ctx.uge(&c, &wide)?,
+    ] {
+        let simplified = expr.simplify()?;
+        assert!(
+            simplified.child_iter().all(|ch| ch.size() == 16),
+            "{expr:?} was narrowed to {simplified:?}"
+        );
+    }
+
+    // The simplified form must still agree with the original at x = 0.
+    let simplified = ctx.ult(&wide, &c)?.simplify()?;
+    let at_zero = simplified.replace(&x, &ctx.bvv(BitVec::from((0u64, 8)))?)?;
+    assert_eq!(at_zero.simplify()?, ctx.false_()?);
+
+    Ok(())
+}
+
 #[test]
 fn test_zero_ext_cmp_unequal_inner_widths_not_rewritten() -> Result<()> {
     let ctx = Context::new();
