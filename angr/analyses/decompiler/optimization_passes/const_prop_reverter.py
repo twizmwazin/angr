@@ -202,8 +202,8 @@ class ConstPropOptReverter(OptimizationPass):
                     continue
 
                 state_vals = list(state_load_vals.values())
-                # the symbolic variable MUST resolve to only a single value
-                if len(state_vals) != 1:
+                # the symbolic variable MUST resolve to only a single value, whichever definitions it comes from
+                if len(state_vals) != 1 or len({v.clear_annotations().hash() for v in state_vals[0]}) != 1:
                     continue
 
                 state_val = next(iter(state_vals[0]))
