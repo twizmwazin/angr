@@ -403,21 +403,10 @@ class LiveDefinitions:
         """
         Return the concrete value contained by the stack pointer.
         """
-        assert self.arch.sp_offset is not None
-        sp_values: MultiValues = self.registers.load(self.arch.sp_offset, size=self.arch.bytes)
-        sp_v = sp_values.one_value()
-        if sp_v is None:
-            # multiple values of sp exists. still return a value if there is only one value (maybe with different
-            # definitions)
-            values = [v for v in next(iter(sp_values.values())) if self.get_stack_offset(v) is not None]
-            assert len({self.get_stack_offset(v) for v in values}) == 1
-            result = self.get_stack_address(values[0])
-            assert result is not None
-            return result
-
-        result = self.get_stack_address(sp_v)
-        assert result is not None
-        return result
+        # several values of sp (maybe with different definitions) must agree on the offset
+        offset = self.get_sp_offset()
+        assert offset is not None
+        return self.stack_offset_to_stack_addr(offset)
 
     def get_sp_offset(self) -> int | None:
         """
