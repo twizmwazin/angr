@@ -114,6 +114,17 @@ impl PySolver {
             unsat_core: self.unsat_core,
         })
     }
+    /// The AST behind a `Bool` or `BV` Python expression, if it is one.
+    fn bool_or_bv_ast(expr: &Bound<'_, PyAny>) -> Option<AstRef<'static>> {
+        if let Ok(bool_expr) = expr.cast::<Bool>() {
+            Some(bool_expr.get().inner.clone())
+        } else if let Ok(bv_expr) = expr.cast::<BV>() {
+            Some(bv_expr.get().inner.clone())
+        } else {
+            None
+        }
+    }
+
     /// Extract the `exact` Python kwarg into an `Option<bool>`.
     fn extract_exact(exact: Option<Bound<PyAny>>) -> Option<bool> {
         exact.and_then(|e| e.extract::<bool>().ok())
@@ -126,11 +137,16 @@ impl PySolver {
     /// When `exact` is `Some(true)` and this is a Hybrid solver, the closure
     /// receives only the exact (Z3) backend. When `Some(false)`, only the
     /// approximate (VSA) backend. Otherwise the full hybrid dispatch is used.
-    fn with_extra_constraints<T>(
+    ///
+    /// `f` runs detached from the Python interpreter (see [`Self::detached`]),
+    /// so it must work on plain Rust values: take the `AstRef`s out of the
+    /// Python arguments before calling this, and wrap results afterwards.
+    fn with_extra_constraints<T: Send>(
         &mut self,
+        py: Python<'_>,
         extra_constraints: Option<Vec<CoerceBool>>,
         exact: Option<bool>,
-        f: impl FnOnce(&mut DynSolver) -> Result<T, ClaripyError>,
+        f: impl FnOnce(&mut DynSolver) -> Result<T, ClaripyError> + Send,
     ) -> Result<T, ClaripyError> {
         let asts: Vec<AstRef<'static>> = extra_constraints
             .into_iter()
@@ -139,24 +155,48 @@ impl PySolver {
             .collect();
         let has_extra = !asts.is_empty();
         let needs_sub_solver = exact.is_some() && matches!(&self.inner, DynSolver::Hybrid(_));
+        let inner = &mut self.inner;
 
-        if has_extra || needs_sub_solver {
-            let mut solver = match (exact, &self.inner) {
-                (Some(true), DynSolver::Hybrid(h)) => {
-                    DynSolver::Z3(h.inner().inner().exact().clone())
+        Self::detached(py, move || {
+            if has_extra || needs_sub_solver {
+                let mut solver = match (exact, &*inner) {
+                    (Some(true), DynSolver::Hybrid(h)) => {
+                        DynSolver::Z3(h.inner().inner().exact().clone())
+                    }
+                    (Some(false), DynSolver::Hybrid(h)) => {
+                        DynSolver::Vsa(h.inner().inner().approximate().clone())
+                    }
+                    _ => inner.clone(),
+                };
+                for constraint in &asts {
+                    solver.add(constraint)?;
                 }
-                (Some(false), DynSolver::Hybrid(h)) => {
-                    DynSolver::Vsa(h.inner().inner().approximate().clone())
-                }
-                _ => self.inner.clone(),
-            };
-            for constraint in &asts {
-                solver.add(constraint)?;
+                f(&mut solver)
+            } else {
+                f(inner)
             }
-            f(&mut solver)
-        } else {
-            f(&mut self.inner)
-        }
+        })
+    }
+
+    /// Run solver work with the Python interpreter detached (the GIL released),
+    /// so other Python threads keep running while Z3 grinds.
+    ///
+    /// The `Send` bounds keep `Python`-bound values out of `f`. What does
+    /// cross is sound to use detached:
+    /// - `AstRef`s and solvers are `Send`; the core never calls into Python.
+    ///   User annotations are held as `Arc<Py<..>>` whose identity is a
+    ///   precomputed hash, so they are compared, hashed and cloned without
+    ///   touching the object, and pyo3 defers a detached final drop.
+    /// - `detach` stays on the calling OS thread, so the thread-local Z3
+    ///   context and solver cache are the ones this thread always uses.
+    /// - No Rust lock is held across the boundary, and the core's locks
+    ///   (interning tables) are never held while waiting for the interpreter.
+    ///
+    /// The solver stays mutably borrowed meanwhile: another thread that
+    /// touches the *same* solver object during the query gets pyo3's
+    /// "already borrowed" error instead of waiting for it.
+    fn detached<T: Send>(py: Python<'_>, f: impl FnOnce() -> T + Send) -> T {
+        py.detach(f)
     }
 }
 
@@ -196,12 +236,12 @@ impl PySolver {
     }
 
     fn blank_copy<'py>(slf: &Bound<'py, Self>) -> Result<Bound<'py, PySolver>, ClaripyError> {
-        let solver = slf.borrow().blank_copy_solver()?;
+        let solver = slf.try_borrow().map_err(PyErr::from)?.blank_copy_solver()?;
         Self::wrap_like(slf, solver)
     }
 
     fn branch<'py>(slf: &Bound<'py, Self>) -> Result<Bound<'py, PySolver>, ClaripyError> {
-        let this = slf.borrow();
+        let this = slf.try_borrow().map_err(PyErr::from)?;
         let solver = PySolver {
             inner: this.inner.clone(),
             timeout: this.timeout,
@@ -215,7 +255,7 @@ impl PySolver {
     /// group, like claripy's `constrained_frontend.split()`. Each returned
     /// solver is a blank copy of this one holding one group's constraints.
     fn split<'py>(slf: &Bound<'py, Self>) -> Result<Vec<Bound<'py, PySolver>>, ClaripyError> {
-        let this = slf.borrow();
+        let this = slf.try_borrow().map_err(PyErr::from)?;
         let constraints = this.inner.constraints()?;
 
         // Group constraints by shared variables (transitively).
@@ -284,7 +324,7 @@ impl PySolver {
             let mut options = Vec::new();
 
             // Process self first
-            let self_constraints = slf.borrow().constraints(py)?;
+            let self_constraints = slf.try_borrow().map_err(PyErr::from)?.constraints(py)?;
             let mut self_and_args: Vec<Bound<PyAny>> = vec![merge_conditions[0].clone().into_any()];
             self_and_args.extend(self_constraints.into_iter().map(|c| c.into_any()));
             let self_and_expr = and(py, self_and_args)?;
@@ -292,7 +332,7 @@ impl PySolver {
 
             // Process others
             for (other, condition) in others.iter().zip(merge_conditions.iter().skip(1)) {
-                let other_constraints = other.borrow().constraints(py)?;
+                let other_constraints = other.try_borrow().map_err(PyErr::from)?.constraints(py)?;
                 let mut other_and_args: Vec<Bound<PyAny>> = vec![condition.clone().into_any()];
                 other_and_args.extend(other_constraints.into_iter().map(|c| c.into_any()));
                 let other_and_expr = and(py, other_and_args)?;
@@ -309,7 +349,7 @@ impl PySolver {
 
         Ok((
             matches!(
-                slf.borrow().inner,
+                slf.try_borrow().map_err(PyErr::from)?.inner,
                 DynSolver::Z3(..)
                     | DynSolver::Z3Cacheless(..)
                     | DynSolver::Hybrid(..)
@@ -367,8 +407,9 @@ impl PySolver {
         Ok(added)
     }
 
-    fn simplify(&mut self) -> Result<(), ClaripyError> {
-        self.inner.simplify()?;
+    fn simplify(&mut self, py: Python<'_>) -> Result<(), ClaripyError> {
+        let inner = &mut self.inner;
+        Self::detached(py, || inner.simplify())?;
         Ok(())
     }
 
@@ -392,6 +433,7 @@ impl PySolver {
     #[pyo3(signature = (extra_constraints = None, exact = None))]
     fn satisfiable<'py>(
         &mut self,
+        py: Python<'py>,
         extra_constraints: Option<Vec<CoerceBool>>,
         exact: Option<Bound<'py, PyAny>>,
     ) -> Result<bool, ClaripyError> {
@@ -404,14 +446,18 @@ impl PySolver {
                 .flatten()
                 .map(|c| c.0)
                 .collect();
-            return Ok(self.inner.satisfiable_with_extra(&asts)?);
+            let inner = &mut self.inner;
+            return Ok(Self::detached(py, || inner.satisfiable_with_extra(&asts))?);
         }
-        self.with_extra_constraints(extra_constraints, exact, |solver| Ok(solver.satisfiable()?))
+        self.with_extra_constraints(py, extra_constraints, exact, |solver| {
+            Ok(solver.satisfiable()?)
+        })
     }
 
     #[pyo3(signature = (extra_constraints = None))]
     fn unsat_core(
         &mut self,
+        py: Python<'_>,
         extra_constraints: Option<Vec<CoerceBool>>,
     ) -> Result<Vec<usize>, ClaripyError> {
         let extras: Vec<AstRef<'static>> = extra_constraints
@@ -420,7 +466,8 @@ impl PySolver {
             .map(|c| c.0.clone())
             .collect();
         if extras.is_empty() {
-            return Ok(self.inner.unsat_core()?);
+            let inner = &mut self.inner;
+            return Ok(Self::detached(py, || inner.unsat_core())?);
         }
         // The core names positions in `constraints` followed by the extra
         // constraints. The extras are added to a copy of this solver, and a
@@ -428,7 +475,7 @@ impl PySolver {
         // the copy's indices back to that order.
         let mut order = self.inner.constraints()?;
         order.extend(extras);
-        self.with_extra_constraints(extra_constraints, None, |solver| {
+        self.with_extra_constraints(py, extra_constraints, None, |solver| {
             let local = solver.constraints()?;
             solver
                 .unsat_core()?
@@ -459,13 +506,12 @@ impl PySolver {
     ) -> Result<Vec<Bound<'py, Base>>, ClaripyError> {
         let exact = Self::extract_exact(exact);
         let ast = expr.get().ast();
-        self.with_extra_constraints(extra_constraints, exact, |solver| {
-            solver
-                .eval_n(&ast, n)?
-                .into_iter()
-                .map(|sol| Base::from_ast(py, sol))
-                .collect()
-        })
+        self.with_extra_constraints(py, extra_constraints, exact, |solver| {
+            Ok(solver.eval_n(&ast, n)?)
+        })?
+        .into_iter()
+        .map(|sol| Base::from_ast(py, sol))
+        .collect()
     }
 
     #[pyo3(signature = (expr, n, extra_constraints = None, exact = None))]
@@ -542,7 +588,7 @@ impl PySolver {
         let exact = Self::extract_exact(exact);
 
         let rows: Vec<Vec<AstRef<'static>>> = self
-            .with_extra_constraints(extra_constraints, exact, |solver| {
+            .with_extra_constraints(py, extra_constraints, exact, |solver| {
                 solver.batch_eval_n(&asts, n).map_err(ClaripyError::from)
             })
             .map_err(PyErr::from)?;
@@ -580,6 +626,7 @@ impl PySolver {
     #[pyo3(signature = (expr, value, extra_constraints = None, exact = None))]
     fn solution(
         &mut self,
+        py: Python<'_>,
         expr: CoerceBase,
         value: Bound<PyAny>,
         extra_constraints: Option<Vec<Bound<Bool>>>,
@@ -598,40 +645,41 @@ impl PySolver {
             }
         }
 
+        let value = match expr.ast_type() {
+            AstType::Bool => value
+                .extract::<CoerceBool>()
+                .map(|v| v.0)
+                .map_err(|_| cannot_coerce(&value, "bool"))?,
+            AstType::BitVec(_) => value
+                .extract::<CoerceBV>()
+                .map_err(|_| cannot_coerce(&value, "bv"))?
+                .unpack_like(&expr)?,
+            AstType::Float(_) => value
+                .extract::<CoerceFP>()
+                .map_err(|_| cannot_coerce(&value, "float"))?
+                .unpack_like(&expr)?,
+            AstType::String => value
+                .extract::<CoerceString>()
+                .map(|v| v.0)
+                .map_err(|_| cannot_coerce(&value, "string"))?,
+        };
+
         self.with_extra_constraints(
+            py,
             extra_constraints.map(|v| {
                 v.into_iter()
                     .map(|c| CoerceBool(c.get().inner.clone()))
                     .collect()
             }),
             exact,
-            |solver| {
-                let value = match expr.ast_type() {
-                    AstType::Bool => value
-                        .extract::<CoerceBool>()
-                        .map(|v| v.0)
-                        .map_err(|_| cannot_coerce(&value, "bool"))?,
-                    AstType::BitVec(_) => value
-                        .extract::<CoerceBV>()
-                        .map_err(|_| cannot_coerce(&value, "bv"))?
-                        .unpack_like(&expr)?,
-                    AstType::Float(_) => value
-                        .extract::<CoerceFP>()
-                        .map_err(|_| cannot_coerce(&value, "float"))?
-                        .unpack_like(&expr)?,
-                    AstType::String => value
-                        .extract::<CoerceString>()
-                        .map(|v| v.0)
-                        .map_err(|_| cannot_coerce(&value, "string"))?,
-                };
-                Ok(solver.has_true(&solver.context().eq_(&expr, &value)?)?)
-            },
+            |solver| Ok(solver.has_true(&solver.context().eq_(&expr, &value)?)?),
         )
     }
 
     #[pyo3(signature = (expr, extra_constraints = None, exact = None))]
     fn is_true<'py>(
         &mut self,
+        py: Python<'py>,
         expr: Bound<'py, PyAny>,
         extra_constraints: Option<Vec<CoerceBool>>,
         exact: Option<Bound<'py, PyAny>>,
@@ -645,30 +693,26 @@ impl PySolver {
             return Ok(py_int != 0);
         }
 
-        self.with_extra_constraints(extra_constraints, exact, |solver| {
+        let ast = Self::bool_or_bv_ast(&expr).ok_or_else(|| {
+            ClaripyError::TypeError(
+                "is_true: expression must be a boolean, integer, or bitvector".to_string(),
+            )
+        })?;
+
+        self.with_extra_constraints(py, extra_constraints, exact, |solver| {
             // Handle different expression types
-            if let Ok(bool_expr) = expr.cast::<Bool>() {
-                match bool_expr.get().inner.op() {
-                    AstOp::BoolV(b) => Ok(*b),
-                    _ => Ok(solver.is_true(&bool_expr.get().inner)?),
-                }
-            } else if let Ok(bv_expr) = expr.cast::<BV>() {
+            match ast.op() {
+                AstOp::BoolV(b) => Ok(*b),
                 // For bitvectors, check if it's concrete and non-zero
-                if let AstOp::BVV(bv) = bv_expr.get().inner.op() {
-                    Ok(!bv.is_zero())
-                } else {
+                AstOp::BVV(bv) => Ok(!bv.is_zero()),
+                _ if matches!(ast.ast_type(), AstType::Bool) => Ok(solver.is_true(&ast)?),
+                _ => {
                     // For symbolic BVs, check if it can be non-zero
-                    let zero = solver
-                        .context()
-                        .bvv(BitVec::from((0, bv_expr.get().inner.size())))?;
-                    let eq_zero = solver.context().eq_(&bv_expr.get().inner, &zero)?;
+                    let zero = solver.context().bvv(BitVec::from((0, ast.size())))?;
+                    let eq_zero = solver.context().eq_(&ast, &zero)?;
                     let is_zero = solver.is_true(&eq_zero)?;
                     Ok(!is_zero)
                 }
-            } else {
-                Err(ClaripyError::TypeError(
-                    "is_true: expression must be a boolean, integer, or bitvector".to_string(),
-                ))
             }
         })
     }
@@ -676,6 +720,7 @@ impl PySolver {
     #[pyo3(signature = (expr, extra_constraints = None, exact = None))]
     fn is_false<'py>(
         &mut self,
+        py: Python<'py>,
         expr: Bound<'py, PyAny>,
         extra_constraints: Option<Vec<CoerceBool>>,
         exact: Option<Bound<'py, PyAny>>,
@@ -689,26 +734,24 @@ impl PySolver {
             return Ok(py_int == 0);
         }
 
-        self.with_extra_constraints(extra_constraints, exact, |solver| {
+        let ast = Self::bool_or_bv_ast(&expr).ok_or_else(|| {
+            ClaripyError::TypeError(
+                "is_false: expression must be a boolean, integer, or bitvector".to_string(),
+            )
+        })?;
+
+        self.with_extra_constraints(py, extra_constraints, exact, |solver| {
             // Handle different expression types
-            if let Ok(bool_expr) = expr.cast::<Bool>() {
-                Ok(solver.is_false(&bool_expr.get().inner)?)
-            } else if let Ok(bv_expr) = expr.cast::<BV>() {
+            match ast.op() {
+                _ if matches!(ast.ast_type(), AstType::Bool) => Ok(solver.is_false(&ast)?),
                 // For bitvectors, check if it's concrete and zero
-                if let AstOp::BVV(bv) = bv_expr.get().inner.op() {
-                    Ok(bv.is_zero())
-                } else {
+                AstOp::BVV(bv) => Ok(bv.is_zero()),
+                _ => {
                     // For symbolic BVs, check if it must be zero
-                    let zero = solver
-                        .context()
-                        .bvv(BitVec::from((0, bv_expr.get().inner.size())))?;
-                    let eq_zero = solver.context().eq_(&bv_expr.get().inner, &zero)?;
+                    let zero = solver.context().bvv(BitVec::from((0, ast.size())))?;
+                    let eq_zero = solver.context().eq_(&ast, &zero)?;
                     Ok(solver.is_true(&eq_zero)?)
                 }
-            } else {
-                Err(ClaripyError::TypeError(
-                    "is_false: expression must be a boolean, integer, or bitvector".to_string(),
-                ))
             }
         })
     }
@@ -716,43 +759,49 @@ impl PySolver {
     #[pyo3(signature = (expr, extra_constraints = None, exact = None))]
     fn has_true<'py>(
         &mut self,
+        py: Python<'py>,
         expr: Bound<Bool>,
         extra_constraints: Option<Vec<CoerceBool>>,
         exact: Option<Bound<'py, PyAny>>,
     ) -> Result<bool, ClaripyError> {
         let exact = Self::extract_exact(exact);
-        self.with_extra_constraints(extra_constraints, exact, |solver| {
-            Ok(solver.has_true(&expr.get().inner)?)
+        let ast = expr.get().inner.clone();
+        self.with_extra_constraints(py, extra_constraints, exact, |solver| {
+            Ok(solver.has_true(&ast)?)
         })
     }
 
     #[pyo3(signature = (expr, extra_constraints = None, exact = None))]
     fn has_false<'py>(
         &mut self,
+        py: Python<'py>,
         expr: Bound<Bool>,
         extra_constraints: Option<Vec<CoerceBool>>,
         exact: Option<Bound<'py, PyAny>>,
     ) -> Result<bool, ClaripyError> {
         let exact = Self::extract_exact(exact);
-        self.with_extra_constraints(extra_constraints, exact, |solver| {
-            Ok(solver.has_false(&expr.get().inner)?)
+        let ast = expr.get().inner.clone();
+        self.with_extra_constraints(py, extra_constraints, exact, |solver| {
+            Ok(solver.has_false(&ast)?)
         })
     }
 
     #[pyo3(signature = (expr, extra_constraints = None, exact = None, signed = false))]
     fn min<'py>(
         &mut self,
+        py: Python<'py>,
         expr: Bound<'py, BV>,
         extra_constraints: Option<Vec<CoerceBool>>,
         exact: Option<Bound<'py, PyAny>>,
         signed: bool,
     ) -> Result<BigInt, ClaripyError> {
         let exact = Self::extract_exact(exact);
-        self.with_extra_constraints(extra_constraints, exact, |solver| {
+        let ast = expr.get().inner.clone();
+        self.with_extra_constraints(py, extra_constraints, exact, |solver| {
             let result = if signed {
-                solver.min_signed(&expr.get().inner)?
+                solver.min_signed(&ast)?
             } else {
-                solver.min_unsigned(&expr.get().inner)?
+                solver.min_unsigned(&ast)?
             };
 
             if let AstOp::BVV(bv) = result.op() {
@@ -768,17 +817,19 @@ impl PySolver {
     #[pyo3(signature = (expr, extra_constraints = None, exact = None, signed = false))]
     fn max<'py>(
         &mut self,
+        py: Python<'py>,
         expr: Bound<'py, BV>,
         extra_constraints: Option<Vec<CoerceBool>>,
         exact: Option<Bound<'py, PyAny>>,
         signed: bool,
     ) -> Result<BigInt, ClaripyError> {
         let exact = Self::extract_exact(exact);
-        self.with_extra_constraints(extra_constraints, exact, |solver| {
+        let ast = expr.get().inner.clone();
+        self.with_extra_constraints(py, extra_constraints, exact, |solver| {
             let result = if signed {
-                solver.max_signed(&expr.get().inner)?
+                solver.max_signed(&ast)?
             } else {
-                solver.max_unsigned(&expr.get().inner)?
+                solver.max_unsigned(&ast)?
             };
 
             if let AstOp::BVV(bv) = result.op() {
