@@ -2339,15 +2339,15 @@ impl StridedInterval {
             (
                 StridedInterval::Normal {
                     bits: bits1,
+                    stride: s_stride,
                     lower_bound: s_lb,
                     upper_bound: s_ub,
-                    ..
                 },
                 StridedInterval::Normal {
                     bits: bits2,
+                    stride: o_stride,
                     lower_bound: o_lb,
                     upper_bound: o_ub,
-                    ..
                 },
             ) => {
                 let bits = max(*bits1, *bits2);
@@ -2362,15 +2362,53 @@ impl StridedInterval {
                     return StridedInterval::top(bits);
                 }
 
-                // Use Warren's algorithms for tighter bounds
-                let min_val = min_xor(s_lb, s_ub, o_lb, o_ub, bits);
-                let max_val = max_xor(s_lb, s_ub, o_lb, o_ub, bits);
+                // A stride that is a multiple of 2**t leaves the low t bits of
+                // an operand the same in all of its values, wrapping included,
+                // as 2**t divides 2**bits. A constant, whose stride is zero,
+                // fixes all of its bits, so t comes from the other operand.
+                // Those bits are then fixed in the result, which gives it a
+                // stride of 2**t.
+                let t = StridedInterval::ntz(&gcd(s_stride, o_stride));
+                let low_mask = (BigUint::one() << t) - BigUint::one();
+                let high_mask = max_int(bits) ^ &low_mask;
+                let low_bits = (s_lb ^ o_lb) & &low_mask;
 
-                // Calculate stride - XOR can have complex stride patterns
-                // For simplicity, use GCD of strides or 1 if that's too conservative
-                let stride = BigUint::one();
+                // Warren's bounds are for ranges that do not wrap: split a
+                // wrapping operand at the south pole into the two ranges that
+                // bound its values. Only the high bits are left to bound.
+                let split = |lb: &BigUint, ub: &BigUint| {
+                    if lb <= ub {
+                        vec![(lb & &high_mask, ub & &high_mask)]
+                    } else {
+                        vec![
+                            (lb & &high_mask, high_mask.clone()),
+                            (BigUint::zero(), ub & &high_mask),
+                        ]
+                    }
+                };
 
-                StridedInterval::new(bits, stride, min_val, max_val)
+                // The bounds of the high bits over every pair of ranges.
+                let mut bounds: Option<(BigUint, BigUint)> = None;
+                for (u_lb, u_ub) in &split(s_lb, s_ub) {
+                    for (v_lb, v_ub) in &split(o_lb, o_ub) {
+                        let low = min_xor(u_lb, u_ub, v_lb, v_ub, bits);
+                        let high = max_xor(u_lb, u_ub, v_lb, v_ub, bits);
+                        bounds = Some(match bounds {
+                            Some((min_val, max_val)) => (min(min_val, low), max(max_val, high)),
+                            None => (low, high),
+                        });
+                    }
+                }
+                let Some((min_val, max_val)) = bounds else {
+                    return StridedInterval::top(bits);
+                };
+
+                StridedInterval::new(
+                    bits,
+                    BigUint::one() << t,
+                    min_val | &low_bits,
+                    max_val | &low_bits,
+                )
             }
         }
     }
@@ -3662,6 +3700,126 @@ mod si_bitwise_op_tests {
         let (_, upper) = result.get_unsigned_bounds();
         // XOR of [0,15] and [0,15] can produce at most 15 (0b1111)
         assert!(upper <= BigUint::from(15u32));
+    }
+
+    #[test]
+    fn test_bitxor_is_sound() {
+        // The members as a bit set, by direct enumeration: lower_bound,
+        // lower_bound + stride, ... for as long as the offset stays within the
+        // (wrapping) distance from lower_bound to upper_bound.
+        fn concretize(si: &StridedInterval) -> u32 {
+            let StridedInterval::Normal {
+                bits,
+                stride,
+                lower_bound,
+                upper_bound,
+            } = si
+            else {
+                return 0;
+            };
+            let modulus = 1u32 << bits;
+            let stride = u32::try_from(stride).unwrap();
+            let lower = u32::try_from(lower_bound).unwrap();
+            let upper = u32::try_from(upper_bound).unwrap();
+            let span = (upper + modulus - lower) % modulus;
+            let mut members = 1 << lower;
+            let mut offset = stride;
+            while stride != 0 && offset <= span {
+                members |= 1 << ((lower + offset) % modulus);
+                offset += stride;
+            }
+            members
+        }
+
+        // Empty and every stride[lower, upper], wrapping ones included. At 3
+        // bits that is every combination; at 4 bits, to keep the number of
+        // pairs down, only those whose upper bound is a member.
+        fn universe(bits: u32) -> Vec<(StridedInterval, u32)> {
+            let modulus = 1u32 << bits;
+            let mut all = vec![StridedInterval::empty(bits)];
+            for stride in 0..modulus {
+                for lower in 0..modulus {
+                    for span in 0..modulus {
+                        let on_stride = stride == 0 || span % stride == 0;
+                        if (stride == 0) != (span == 0) || (bits > 3 && !on_stride) {
+                            continue;
+                        }
+                        all.push(StridedInterval::new(
+                            bits,
+                            BigUint::from(stride),
+                            BigUint::from(lower),
+                            BigUint::from((lower + span) % modulus),
+                        ));
+                    }
+                }
+            }
+            all.into_iter()
+                .map(|si| {
+                    let members = concretize(&si);
+                    (si, members)
+                })
+                .collect()
+        }
+
+        let si = |stride: u32, lower: u32, upper: u32| {
+            StridedInterval::new(
+                8,
+                BigUint::from(stride),
+                BigUint::from(lower),
+                BigUint::from(upper),
+            )
+        };
+
+        // The extremes of an XOR are not at the corners of the ranges: 1 ^ 2
+        // is 3, above every XOR of 0 and 2.
+        assert_eq!(si(1, 0, 2).bitxor(&si(1, 0, 2)), si(1, 0, 3));
+        assert_eq!(si(1, 4, 7).bitxor(&si(1, 4, 7)), si(1, 0, 3));
+        // The low bits that the strides fix are fixed in the result.
+        assert_eq!(si(4, 1, 13).bitxor(&si(8, 2, 10)), si(4, 3, 15));
+        assert_eq!(
+            si(4, 1, 13).bitxor(&StridedInterval::constant(8, 6u32)),
+            si(4, 3, 15)
+        );
+        // A wrapping operand: 1[254, 1] ^ 1 has 254 ^ 1 = 255 and 1 ^ 1 = 0.
+        let result = si(1, 254, 1).bitxor(&StridedInterval::constant(8, 1u32));
+        for value in [255u32, 254, 1, 0] {
+            assert!(result.contains_value(&BigUint::from(value)), "{value}");
+        }
+
+        // Every pair of small intervals: the result has the XOR of every pair
+        // of their values. At 3 bits each pair is tried in both orders; at 4
+        // bits, where bitxor is what takes the time, in one order, alternating.
+        for bits in [3, 4] {
+            let all = universe(bits);
+            let values: Vec<Vec<u32>> = all
+                .iter()
+                .map(|(_, members)| (0..1 << bits).filter(|v| members & (1 << v) != 0).collect())
+                .collect();
+            for (i, (a, _)) in all.iter().enumerate() {
+                for (j, (b, _)) in all.iter().enumerate().skip(i) {
+                    let mut expected = 0u32;
+                    for x in &values[i] {
+                        for y in &values[j] {
+                            expected |= 1 << (x ^ y);
+                        }
+                    }
+                    let orders = [(a, b), (b, a)];
+                    let orders = match (bits, (i + j) % 2) {
+                        (3, _) => &orders[..],
+                        (_, 0) => &orders[..1],
+                        _ => &orders[1..],
+                    };
+                    for (a, b) in orders {
+                        let result = a.bitxor(b);
+                        assert_eq!(
+                            expected & !concretize(&result),
+                            0,
+                            "{a:?} bitxor {b:?} is {result:?}"
+                        );
+                    }
+                }
+            }
+        }
     }
 
     #[test]

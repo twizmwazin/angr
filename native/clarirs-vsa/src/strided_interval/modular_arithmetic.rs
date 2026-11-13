@@ -156,22 +156,56 @@ pub(crate) fn max_and(a: &BigUint, b: &BigUint, c: &BigUint, d: &BigUint, bits: 
     b & d
 }
 
-/// Compute minimum XOR value for ranges [a, b] and [c, d]
-/// Simplified approach: try all corner combinations
-pub(crate) fn min_xor(a: &BigUint, b: &BigUint, c: &BigUint, d: &BigUint, _bits: u32) -> BigUint {
-    // For XOR, the minimum comes from one of the corners
-    let candidates = vec![a ^ c, a ^ d, b ^ c, b ^ d];
+/// Warren's min_xor algorithm - computes minimum possible value of XOR operation
+pub(crate) fn min_xor(a: &BigUint, b: &BigUint, c: &BigUint, d: &BigUint, bits: u32) -> BigUint {
+    let mut a = a.clone();
+    let mut c = c.clone();
+    let mut m = BigUint::one() << (bits - 1);
+    let max_val = (BigUint::one() << bits) - 1u32;
 
-    candidates.into_iter().min().unwrap()
+    while !m.is_zero() {
+        // (~a) & c & m != 0
+        if ((&max_val ^ &a) & &c & &m) != BigUint::zero() {
+            // temp = (a | m) & -m
+            let temp = (&a | &m) & ((&max_val ^ &m) + 1u32);
+            if temp <= *b {
+                a = temp;
+            }
+        } else if ((&a) & (&max_val ^ &c) & &m) != BigUint::zero() {
+            // temp = (c | m) & -m
+            let temp = (&c | &m) & ((&max_val ^ &m) + 1u32);
+            if temp <= *d {
+                c = temp;
+            }
+        }
+        m >>= 1;
+    }
+
+    a ^ c
 }
 
-/// Compute maximum XOR value for ranges [a, b] and [c, d]
-/// Simplified approach: try all corner combinations
-pub(crate) fn max_xor(a: &BigUint, b: &BigUint, c: &BigUint, d: &BigUint, _bits: u32) -> BigUint {
-    // For XOR, the maximum comes from one of the corners
-    let candidates = vec![a ^ c, a ^ d, b ^ c, b ^ d];
+/// Warren's max_xor algorithm - computes maximum possible value of XOR operation
+pub(crate) fn max_xor(a: &BigUint, b: &BigUint, c: &BigUint, d: &BigUint, bits: u32) -> BigUint {
+    let mut b = b.clone();
+    let mut d = d.clone();
+    let mut m = BigUint::one() << (bits - 1);
 
-    candidates.into_iter().max().unwrap()
+    while !m.is_zero() {
+        if (&b & &d & &m) != BigUint::zero() {
+            let temp = (&b - &m) | (&m - 1u32);
+            if temp >= *a {
+                b = temp;
+            } else {
+                let temp = (&d - &m) | (&m - 1u32);
+                if temp >= *c {
+                    d = temp;
+                }
+            }
+        }
+        m >>= 1;
+    }
+
+    b ^ d
 }
 
 /// Helper to convert unsigned BigUint to signed BigInt
@@ -198,6 +232,30 @@ pub(crate) fn to_unsigned(v: &BigInt, bits: u32) -> BigUint {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_min_max_xor_are_exact() {
+        // Every pair of 4-bit ranges [a, b] and [c, d], against the XOR of
+        // every pair of their values. The extremes are not at the corners:
+        // [0, 2] ^ [0, 2] reaches 1 ^ 2 = 3.
+        let big = |value: u32| BigUint::from(value);
+        assert_eq!(max_xor(&big(0), &big(2), &big(0), &big(2), 8), big(3));
+        assert_eq!(min_xor(&big(4), &big(7), &big(5), &big(6), 8), big(0));
+        for a in 0u32..16 {
+            for b in a..16 {
+                for c in 0u32..16 {
+                    for d in c..16 {
+                        let xors = (a..=b).flat_map(|x| (c..=d).map(move |y| x ^ y));
+                        let low = xors.clone().min().unwrap();
+                        let high = xors.max().unwrap();
+                        let (a, b, c, d) = (big(a), big(b), big(c), big(d));
+                        assert_eq!(min_xor(&a, &b, &c, &d, 4), big(low), "{a} {b} {c} {d}");
+                        assert_eq!(max_xor(&a, &b, &c, &d, 4), big(high), "{a} {b} {c} {d}");
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn test_to_unsigned_beyond_the_width() {
