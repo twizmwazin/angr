@@ -1661,11 +1661,11 @@ class SimEngineVRAIL(
         self.state.add_type_constraint(typevars.Subtype(ft, typevar))
         return RichR(self.state.top(expr.bits), typevar=typevar)
 
-    _handle_binop_AddF = _handle_binop_Default
-    _handle_binop_SubF = _handle_binop_Default
+    _handle_binop_AddF = _handle_binop_Add
+    _handle_binop_SubF = _handle_binop_Sub
     _handle_binop_SubV = _handle_binop_Default
-    _handle_binop_MulF = _handle_binop_Default
-    _handle_binop_DivF = _handle_binop_Default
+    _handle_binop_MulF = _handle_binop_Mul
+    _handle_binop_DivF = _handle_binop_Div
     _handle_binop_DivV = _handle_binop_Default
     _handle_binop_AddV = _handle_binop_Default
     _handle_binop_MulV = _handle_binop_Default

@@ -34,11 +34,11 @@ def _f(cap: str, off: int) -> PLoad:
 
 
 def _mul(name: str, x: PLoad, y: PLoad) -> PBinOp:
-    return PBinOp("Mul", (x, y), commutative=True, name=name)
+    return PBinOp("MulF", (x, y), commutative=True, name=name)
 
 
 def _add(name: str, x: PBinOp, y: PBinOp) -> PBinOp:
-    return PBinOp("Add", (x, y), commutative=True, name=name)
+    return PBinOp("AddF", (x, y), commutative=True, name=name)
 
 
 def _all_fp(bindings: dict[str, Expression]) -> bool:

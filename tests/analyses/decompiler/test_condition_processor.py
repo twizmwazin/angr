@@ -71,8 +71,8 @@ class TestConditionProcessor(TestCase):
         # a float-valued Const must go through the bit-pattern conversion instead of being handed to claripy as-is
         arch = archinfo.ArchAMD64()
         cp = ConditionProcessor(arch, ailment.Manager())
-        for op in ("Add", "Mul"):
-            expr = BinaryOp(0, op, [_vvar(1, 64, 16), Const(2, 1.0, 64)], False, bits=64, floating_point=True)
+        for op in ("AddF", "MulF"):
+            expr = BinaryOp(0, op, [_vvar(1, 64, 16), Const(2, 1.0, 64)], False, bits=64)
             ast = cp.claripy_ast_from_ail_condition(expr)
             assert isinstance(ast, claripy.ast.BV) and ast.size() == 64
 

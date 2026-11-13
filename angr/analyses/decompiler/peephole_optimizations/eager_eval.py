@@ -102,9 +102,6 @@ class EagerEvaluation(PeepholeOptimizationExprBase):
             if op0.likes(op1):
                 # x + x => 2 * x
                 # the Mul takes over expr.idx; VariableMap keys variables by idx, so the new constant needs its own
-                if expr.floating_point:
-                    count = Const(self.manager.next_atom(), 2.0, op0.bits, **expr.tags)
-                    return BinaryOp(expr.idx, "Mul", [op0, count], expr.signed, floating_point=True, **expr.tags)
                 count = Const(self.manager.next_atom(), 2, op0.bits, **expr.tags)
                 return BinaryOp(expr.idx, "Mul", [op0, count], expr.signed, **expr.tags)
 
@@ -263,7 +260,6 @@ class EagerEvaluation(PeepholeOptimizationExprBase):
             and op1.is_int
             and isinstance(op0, BinaryOp)
             and op0.op == "Mul"
-            and not op0.floating_point
             and isinstance(op0.operands[1], Const)
             and op0.operands[1].is_int
         ):

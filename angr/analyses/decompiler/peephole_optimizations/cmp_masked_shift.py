@@ -89,7 +89,6 @@ class CmpMaskedShift(PeepholeOptimizationExprBase):
                 ),
                 False,
                 bits=expr.bits,
-                floating_point=expr.floating_point,
                 rounding_mode=expr.rounding_mode,
                 **expr.tags,
             )
@@ -116,7 +115,6 @@ class CmpMaskedShift(PeepholeOptimizationExprBase):
             ),
             expr.signed,
             bits=expr.bits,
-            floating_point=expr.floating_point,
             rounding_mode=expr.rounding_mode,
             **expr.tags,
         )

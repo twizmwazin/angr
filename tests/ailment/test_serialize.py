@@ -156,23 +156,21 @@ class TestSerialize(unittest.TestCase):
     def test_binary_op_floating_point_rounding_mode(self):
         b = BinaryOp(
             3,
-            "FAdd",
+            "AddF",
             [Const(0, 1.0, 64), Const(0, 2.0, 64)],
             False,
-            floating_point=True,
             rounding_mode=RoundingMode.RM_NearestTiesEven,
         )
         b2 = roundtrip(b)
-        assert b2.floating_point
+        assert b2.op == "AddF" and b2.floating_point
         assert b2.rounding_mode == RoundingMode.RM_NearestTiesEven
 
     def test_binary_op_non_default_rounding_mode(self):
         b = BinaryOp(
             4,
-            "FAdd",
+            "AddF",
             [Const(0, 1.0, 64), Const(0, 2.0, 64)],
             False,
-            floating_point=True,
             rounding_mode=RoundingMode.RM_TowardsZero,
         )
         b2 = roundtrip(b)

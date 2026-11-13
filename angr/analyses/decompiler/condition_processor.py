@@ -976,12 +976,12 @@ class ConditionProcessor:
                 if negated_tags is not None and negated_tags.get("floating_point") is True:
                     cond_tags = {**cond_tags, "floating_point": True}
             if cond_tags.get("floating_point") is True:
-                # claripy has no FP flavor of these operators; restore the flag on the rebuilt expression
+                # claripy has no FP flavor of these operators; restore the FP op on the rebuilt expression
                 cond_tags = {k: v for k, v in cond_tags.items() if k != "floating_point"}
                 r = _mapping[cond.op](cond, cond_tags)
-                if isinstance(r, ailment.Expr.BinaryOp) and r.op in _FP_FLAGGED_OPS and not r.floating_point:
+                if isinstance(r, ailment.Expr.BinaryOp) and r.op in _FP_FLAGGED_OPS:
                     r = ailment.Expr.BinaryOp(
-                        r.idx, r.op, r.operands, r.signed, bits=r.bits, floating_point=True, **r.tags
+                        r.idx, ailment.float_op(r.op), r.operands, r.signed, bits=r.bits, **r.tags
                     )
                 return r
             return _mapping[cond.op](cond, cond_tags)
@@ -1124,6 +1124,14 @@ class ConditionProcessor:
         if lambda_expr is None:
             # fall back to op
             lambda_expr = _ail2claripy_op_mapping.get(condition.op)
+        if (
+            lambda_expr is None
+            and isinstance(condition, (ailment.Expr.UnaryOp, ailment.Expr.BinaryOp))
+            and condition.floating_point
+        ):
+            # claripy has no FP flavor of these operators: an FP op converts like its integer counterpart, and the
+            # annotation below restores it on the way back
+            lambda_expr = _ail2claripy_op_mapping.get(ailment.int_op(condition.op))
         if lambda_expr is None:
             # fall back to the catch-all option
             l.debug(

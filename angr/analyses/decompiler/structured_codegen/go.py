@@ -135,6 +135,7 @@ from .base import (
     VariableFieldNode,
     VariableNode,
     register_display_name,
+    source_op,
 )
 from .c import _float32_repr
 from .utils import first_stmt_addr
@@ -5687,11 +5688,12 @@ class GoStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializa
             if isinstance(type_, SimTypePointer) and not isinstance(type_.pts_to, SimTypeBottom):
                 data_type = type_.pts_to
 
-        if (expr.op in _GO_MATH_PREDICATES or expr.op == "IsFinite") or (
-            expr.op in _GO_MATH_UNOPS and expr.operand.bits in (32, 64)
+        expr_op = source_op(expr.op)
+        if (expr_op in _GO_MATH_PREDICATES or expr_op == "IsFinite") or (
+            expr_op in _GO_MATH_UNOPS and expr.operand.bits in (32, 64)
         ):
             # vector operands are left alone
-            return self._math_unop(expr.op, expr.operand, expr.tags)
+            return self._math_unop(expr_op, expr.operand, expr.tags)
 
         operand = self._handle(expr.operand, lvalue=expr.op == "Reference", type_=data_type, ref=ref)
 
@@ -5699,7 +5701,7 @@ class GoStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializa
             # cancel out
             return operand.operand
         return GoUnaryOp(
-            expr.op,
+            expr_op,
             operand,
             tags=expr.tags,
             codegen=self,
@@ -5759,25 +5761,27 @@ class GoStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializa
 
         if expr.op == "CmpUN":
             return self._unordered(expr)
-        if expr.floating_point and expr.op in {"CmpEQ", "CmpNE"} and expr.operands[0].likes(expr.operands[1]):
+        if expr.op in {"CmpEQF", "CmpNEF"} and expr.operands[0].likes(expr.operands[1]):
             # the self-compare is the NaN test
             isnan = self._math_call("IsNaN", expr.operands[0], expr.tags)
-            return isnan if expr.op == "CmpNE" else GoUnaryOp("Not", isnan, tags=expr.tags, codegen=self)
+            return isnan if expr.op == "CmpNEF" else GoUnaryOp("Not", isnan, tags=expr.tags, codegen=self)
         if expr.op == "Round" and (round_op := _go_round_unop(expr.operands[0])) is not None:
             return self._math_call(round_op, expr.operands[1], expr.tags)
 
+        # Go operators do not tell integer from floating-point arithmetic
+        expr_op = source_op(expr.op)
         lhs = self._handle(expr.operands[0])
         rhs = self._handle(expr.operands[1], likely_signed=expr.op not in {"And", "Or"})
         if isinstance(rhs, GoConstant) and expr.op in {"Shl", "Shr", "Sar", "Rol", "Ror"}:
             # a shift count is a number, never a rune
             rhs.fmt_char = False
-        if expr.op in _GO_CMP_SWAP and isinstance(lhs, GoConstant) and not isinstance(rhs, GoConstant):
+        if expr_op in _GO_CMP_SWAP and isinstance(lhs, GoConstant) and not isinstance(rhs, GoConstant):
             # `0x10 > x` reads as `x < 0x10`
             lhs, rhs = rhs, lhs
-            op = _GO_CMP_SWAP[expr.op]
+            op = _GO_CMP_SWAP[expr_op]
         else:
-            op = expr.op
-        if expr.op.startswith("Cmp"):
+            op = expr_op
+        if expr_op.startswith("Cmp"):
             # `x > 0` with a nilable-typed zero on one side and an integer on the other is an integer comparison
             for const, other in ((lhs, rhs), (rhs, lhs)):
                 if (
@@ -5797,7 +5801,7 @@ class GoStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializa
             codegen=self,
             collapsed=expr.depth > self.binop_depth_cutoff,
         )
-        if expr.op in {"Div", "Mod"}:
+        if expr_op in {"Div", "Mod"}:
             r.signed = expr.signed
         return r
 

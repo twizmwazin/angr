@@ -12,7 +12,7 @@ This peephole recognizes the pattern and collapses it to an ITE.
 
 from __future__ import annotations
 
-from angr.ailment.expression import ITE, BinaryOp, Const, Expression, Extract, UnaryOp, VirtualVariable
+from angr.ailment.expression import ITE, BinaryOp, Const, Expression, Extract, UnaryOp, VirtualVariable, int_op
 from angr.ailment.statement import Assignment
 from angr.ailment.utils import is_lsb_extract
 
@@ -87,7 +87,7 @@ class SSEBitwiseSelect(PeepholeOptimizationExprBase):
         # scalar comparison operands must keep their width: Extract(8, a) != Extract(8, b) is not a != b
         if isinstance(cond, BinaryOp) and all(op.bits > 64 for op in cond.operands):
             narrow_ops = [n(op, out_bits, ref_expr) for op in cond.operands]
-            cond = BinaryOp(cond.idx, cond.op, narrow_ops, False, floating_point=cond.floating_point, **cond.tags)
+            cond = BinaryOp(cond.idx, cond.op, narrow_ops, False, **cond.tags)
         return ITE(
             ref_expr.idx, cond, n(ite.iftrue, out_bits, ref_expr), n(ite.iffalse, out_bits, ref_expr), **ref_expr.tags
         )
@@ -191,19 +191,20 @@ class SSEBitwiseSelect(PeepholeOptimizationExprBase):
                 negated = True
 
         # Now expr should be a CmpF variant.  Lower vector comparisons
-        # (CmpLTV, CmpGEV, etc.) to scalar (CmpLT, CmpGE) since we're
+        # (CmpLTFV, CmpGEFV, etc.) to scalar (CmpLTF, CmpGEF) since we're
         # extracting a scalar boolean condition for the ITE.
         vector_to_scalar = {
-            "CmpLTV": "CmpLT",
-            "CmpLEV": "CmpLE",
-            "CmpGTV": "CmpGT",
-            "CmpGEV": "CmpGE",
-            "CmpEQV": "CmpEQ",
-            "CmpNEV": "CmpNE",
+            "CmpLTV": "CmpLTF",
+            "CmpLEV": "CmpLEF",
+            "CmpGTV": "CmpGTF",
+            "CmpGEV": "CmpGEF",
+            "CmpEQV": "CmpEQF",
+            "CmpNEV": "CmpNEF",
         }
         cmp_ops = set(vector_to_scalar.keys())
-        if isinstance(expr, BinaryOp) and expr.op in cmp_ops:
-            op = expr.op
+        # the mask may come from an integer lane compare as well; either way the selected values are floats
+        if isinstance(expr, BinaryOp) and int_op(expr.op) in cmp_ops:
+            op = int_op(expr.op)
             if negated:
                 negate_map = {
                     "CmpLTV": "CmpGEV",
@@ -216,6 +217,6 @@ class SSEBitwiseSelect(PeepholeOptimizationExprBase):
                 op = negate_map.get(op, op)
             # Lower to scalar
             scalar_op = vector_to_scalar.get(op, op)
-            return BinaryOp(expr.idx, scalar_op, list(expr.operands), False, floating_point=True, **expr.tags)
+            return BinaryOp(expr.idx, scalar_op, list(expr.operands), False, **expr.tags)
 
         return None

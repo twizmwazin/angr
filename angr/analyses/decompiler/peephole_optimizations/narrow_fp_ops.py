@@ -56,7 +56,6 @@ class NarrowFPOperations(PeepholeOptimizationExprBase):
             expr.op,
             [expr.operands[0].operand, expr.operands[1].operand],
             expr.signed,
-            floating_point=True,
             bits=expr.bits if is_cmp else w0,
             **expr.tags,
         )

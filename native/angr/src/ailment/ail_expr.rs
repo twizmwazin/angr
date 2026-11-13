@@ -28,6 +28,7 @@ use pyo3::types::{PyBytes, PyDict, PyList, PyNone, PyString, PyTuple};
 use crate::ailment::ail_stmt::{AilStatement, Statement};
 use crate::ailment::const_value::ConstValue;
 use crate::ailment::enums::{ConvertType, ExpressionKind, RoundingMode, VirtualVariableCategory};
+use crate::ailment::ops::is_float_op;
 use crate::ailment::tags::{Tags, TagsView};
 use crate::ailment::{CachedHash, CmpMode, hash_of};
 use indexmap::IndexMap;
@@ -231,7 +232,6 @@ pub enum ExprInner {
     UnaryOp {
         op: String,
         operand: Arc<AilExpression>,
-        floating_point: bool,
     },
     Convert {
         operand: Arc<AilExpression>,
@@ -255,7 +255,6 @@ pub enum ExprInner {
         op: String,
         operands: [Arc<AilExpression>; 2],
         signed: bool,
-        floating_point: bool,
         rounding_mode: Option<RoundingModeOrExpr>,
         vector_count: Option<i64>,
         vector_size: Option<i64>,
@@ -827,15 +826,9 @@ impl Hash for AilExpression {
                 category.hash(h);
                 oident.hash(h);
             }
-            ExprInner::UnaryOp {
-                op,
-                operand,
-                floating_point,
-                ..
-            } => {
+            ExprInner::UnaryOp { op, operand, .. } => {
                 op.hash(h);
                 operand.cached_hash_or_compute().hash(h);
-                floating_point.hash(h);
                 bits.hash(h);
             }
             ExprInner::Convert {
@@ -876,7 +869,6 @@ impl Hash for AilExpression {
                 op,
                 operands,
                 signed,
-                floating_point,
                 rounding_mode,
                 ..
             } => {
@@ -885,7 +877,6 @@ impl Hash for AilExpression {
                 operands[1].cached_hash_or_compute().hash(h);
                 bits.hash(h);
                 signed.hash(h);
-                floating_point.hash(h);
                 rounding_mode.hash(h);
             }
             ExprInner::Load { addr, endness, .. } => {
@@ -1197,11 +1188,7 @@ impl AilExpression {
             }
         };
         match &self.inner {
-            ExprInner::UnaryOp {
-                op,
-                operand,
-                floating_point,
-            } => {
+            ExprInner::UnaryOp { op, operand } => {
                 let (c, r) = walk(operand);
                 if !c {
                     return (false, self.clone());
@@ -1211,7 +1198,6 @@ impl AilExpression {
                     self.rebuilt(ExprInner::UnaryOp {
                         op: op.clone(),
                         operand: r,
-                        floating_point: *floating_point,
                     }),
                 )
             }
@@ -1269,7 +1255,6 @@ impl AilExpression {
                 op,
                 operands,
                 signed,
-                floating_point,
                 rounding_mode,
                 vector_count,
                 vector_size,
@@ -1285,7 +1270,6 @@ impl AilExpression {
                         op: op.clone(),
                         operands: [rl, rr],
                         signed: *signed,
-                        floating_point: *floating_point,
                         rounding_mode: rounding_mode.clone(),
                         vector_count: *vector_count,
                         vector_size: *vector_size,
@@ -1808,14 +1792,9 @@ impl AilExpression {
                     .map(|vec| vec.iter().map(|b| recurse(b)).collect::<PyResult<Vec<_>>>())
                     .transpose()?,
             },
-            ExprInner::UnaryOp {
-                op,
-                operand,
-                floating_point,
-            } => ExprInner::UnaryOp {
+            ExprInner::UnaryOp { op, operand } => ExprInner::UnaryOp {
                 op: op.clone(),
                 operand: recurse(operand)?,
-                floating_point: *floating_point,
             },
             ExprInner::Convert {
                 operand,
@@ -1853,7 +1832,6 @@ impl AilExpression {
                 op,
                 operands,
                 signed,
-                floating_point,
                 rounding_mode,
                 vector_count,
                 vector_size,
@@ -1861,7 +1839,6 @@ impl AilExpression {
                 op: op.clone(),
                 operands: [recurse(&operands[0])?, recurse(&operands[1])?],
                 signed: *signed,
-                floating_point: *floating_point,
                 rounding_mode: rounding_mode.clone(),
                 vector_count: *vector_count,
                 vector_size: *vector_size,
@@ -2147,16 +2124,13 @@ impl AilExpression {
                 ExprInner::UnaryOp {
                     op: a_op,
                     operand: a_op_,
-                    floating_point: a_fp,
                 },
                 ExprInner::UnaryOp {
                     op: b_op,
                     operand: b_op_,
-                    floating_point: b_fp,
                 },
             ) => {
                 a_op == b_op
-                    && a_fp == b_fp
                     && self.header.bits == other.header.bits
                     && a_op_.cmp_ail::<MODE>(b_op_)
             }
@@ -2221,7 +2195,6 @@ impl AilExpression {
                     op: op_a,
                     operands: ops_a,
                     signed: s_a,
-                    floating_point: fp_a,
                     rounding_mode: rm_a,
                     ..
                 },
@@ -2229,14 +2202,12 @@ impl AilExpression {
                     op: op_b,
                     operands: ops_b,
                     signed: s_b,
-                    floating_point: fp_b,
                     rounding_mode: rm_b,
                     ..
                 },
             ) => {
                 op_a == op_b
                     && s_a == s_b
-                    && fp_a == fp_b
                     && self.header.bits == other.header.bits
                     && RoundingModeOrExpr::opt_cmp_ail::<MODE>(rm_a, rm_b)
                     && ops_a[0].cmp_ail::<MODE>(&ops_b[0])
@@ -2827,13 +2798,12 @@ impl Expression {
     }
 
     #[staticmethod]
-    #[pyo3(signature = (idx, op, operand, *, bits=None, floating_point=false, **kwargs))]
+    #[pyo3(signature = (idx, op, operand, *, bits=None, **kwargs))]
     fn _new_unary_op(
         idx: i64,
         op: String,
         operand: AilExpression,
         bits: Option<u32>,
-        floating_point: bool,
         kwargs: Option<Tags>,
     ) -> PyResult<Self> {
         let tags = kwargs.unwrap_or_default();
@@ -2844,7 +2814,6 @@ impl Expression {
             inner: ExprInner::UnaryOp {
                 op,
                 operand: Arc::new(operand),
-                floating_point,
             },
         }))
     }
@@ -2914,8 +2883,7 @@ impl Expression {
     #[staticmethod]
     #[pyo3(signature = (
         idx, op, operands, signed=false, *,
-        bits=None, floating_point=false,
-        rounding_mode=None,
+        bits=None, rounding_mode=None,
         vector_count=None, vector_size=None, **kwargs
     ))]
     #[allow(clippy::too_many_arguments)]
@@ -2925,7 +2893,6 @@ impl Expression {
         operands: [AilExpression; 2],
         signed: bool,
         bits: Option<u32>,
-        floating_point: bool,
         rounding_mode: Option<RoundingModeOrExpr>,
         vector_count: Option<i64>,
         vector_size: Option<i64>,
@@ -2944,7 +2911,6 @@ impl Expression {
                 op,
                 operands: [Arc::new(lhs_ail), Arc::new(rhs_ail)],
                 signed,
-                floating_point,
                 rounding_mode,
                 vector_count,
                 vector_size,
@@ -3922,13 +3888,8 @@ impl Expression {
             ExprInner::VEXCCallExpression { callee, .. } => Ok(callee.clone()),
             ExprInner::Let { .. } => Ok("let".to_string()),
             ExprInner::UnaryOp { op, .. } => Ok(op.clone()),
-            ExprInner::BinaryOp {
-                op,
-                signed,
-                floating_point,
-                ..
-            } => {
-                if *signed && !*floating_point {
+            ExprInner::BinaryOp { op, signed, .. } => {
+                if *signed && !is_float_op(op) {
                     Ok(format!("{op}s"))
                 } else {
                     Ok(op.clone())
@@ -4490,12 +4451,12 @@ impl Expression {
         }
     }
 
-    /// BinaryOp.floating_point
+    /// UnaryOp/BinaryOp: whether ``op`` is a floating-point operation. Derived from the op name
+    /// (``AddF``, ``CmpEQF``, ``Sqrt``, ...); integer and floating-point operations are distinct ops.
     #[getter]
     fn floating_point(&self) -> PyResult<bool> {
         match &self.expr.inner {
-            ExprInner::BinaryOp { floating_point, .. }
-            | ExprInner::UnaryOp { floating_point, .. } => Ok(*floating_point),
+            ExprInner::BinaryOp { op, .. } | ExprInner::UnaryOp { op, .. } => Ok(is_float_op(op)),
             _ => Err(PyAttributeError::new_err(
                 "no 'floating_point' on this Expression",
             )),
@@ -5515,7 +5476,7 @@ const EXPR_VARIANTS: &[&str] = &[
 ];
 #[rustfmt::skip]
 const EXPR_FIELD_COUNTS: &[usize] = &[
-    1, 1, 1, 1, 1, 4, 3, 8, 5, 7, 5, 3, 6, 2, 2, 3, 2, 1, 2, 2, 3, 3, 3, 4, 1, 2, 1, 5,
+    1, 1, 1, 1, 1, 4, 2, 8, 5, 6, 5, 3, 6, 2, 2, 3, 2, 1, 2, 2, 3, 3, 3, 4, 1, 2, 1, 5,
 ];
 
 impl Serialize for ExprInner {
@@ -5559,15 +5520,10 @@ impl Serialize for ExprInner {
                 tv.serialize_field(reg_vvars)?;
                 tv.end()
             }
-            ExprInner::UnaryOp {
-                op,
-                operand,
-                floating_point,
-            } => {
-                let mut tv = s.serialize_tuple_variant("ExprInner", 6, "UnaryOp", 3)?;
+            ExprInner::UnaryOp { op, operand } => {
+                let mut tv = s.serialize_tuple_variant("ExprInner", 6, "UnaryOp", 2)?;
                 tv.serialize_field(op)?;
                 tv.serialize_field(operand)?;
-                tv.serialize_field(floating_point)?;
                 tv.end()
             }
             ExprInner::Convert {
@@ -5610,16 +5566,14 @@ impl Serialize for ExprInner {
                 op,
                 operands,
                 signed,
-                floating_point,
                 rounding_mode,
                 vector_count,
                 vector_size,
             } => {
-                let mut tv = s.serialize_tuple_variant("ExprInner", 9, "BinaryOp", 7)?;
+                let mut tv = s.serialize_tuple_variant("ExprInner", 9, "BinaryOp", 6)?;
                 tv.serialize_field(op)?;
                 tv.serialize_field(operands)?;
                 tv.serialize_field(signed)?;
-                tv.serialize_field(floating_point)?;
                 tv.serialize_field(rounding_mode)?;
                 tv.serialize_field(vector_count)?;
                 tv.serialize_field(vector_size)?;
@@ -5854,7 +5808,6 @@ impl<'de> Deserialize<'de> for ExprInner {
                     6 => ExprInner::UnaryOp {
                         op: next(&mut seq)?,
                         operand: next(&mut seq)?,
-                        floating_point: next(&mut seq)?,
                     },
                     7 => ExprInner::Convert {
                         operand: next(&mut seq)?,
@@ -5877,7 +5830,6 @@ impl<'de> Deserialize<'de> for ExprInner {
                         op: next(&mut seq)?,
                         operands: next(&mut seq)?,
                         signed: next(&mut seq)?,
-                        floating_point: next(&mut seq)?,
                         rounding_mode: next(&mut seq)?,
                         vector_count: next(&mut seq)?,
                         vector_size: next(&mut seq)?,

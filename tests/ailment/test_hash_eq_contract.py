@@ -167,19 +167,13 @@ class TestHashEqContract(unittest.TestCase):
     def test_binop_rounding_mode(self):
         """``BinaryOp`` carries a rounding mode too, and it is significant."""
         x, y = eu.Const(1, 5, 32), eu.Const(2, 7, 32)
-        a = eu.BinaryOp(
-            ROOT, "Add", (x, y), False, bits=32, floating_point=True, rounding_mode=RoundingMode.RM_NearestTiesEven
-        )
-        b = eu.BinaryOp(
-            ROOT, "Add", (x, y), False, bits=32, floating_point=True, rounding_mode=RoundingMode.RM_TowardsZero
-        )
+        a = eu.BinaryOp(ROOT, "AddF", (x, y), False, bits=32, rounding_mode=RoundingMode.RM_NearestTiesEven)
+        b = eu.BinaryOp(ROOT, "AddF", (x, y), False, bits=32, rounding_mode=RoundingMode.RM_TowardsZero)
         assert not a.likes(b) and not a.matches(b), "differing rounding modes are not alike"
         assert a != b
         _assert_contract("BinaryOp/rounding_mode", a, b)
 
-        same = eu.BinaryOp(
-            ROOT, "Add", (x, y), False, bits=32, floating_point=True, rounding_mode=RoundingMode.RM_NearestTiesEven
-        )
+        same = eu.BinaryOp(ROOT, "AddF", (x, y), False, bits=32, rounding_mode=RoundingMode.RM_NearestTiesEven)
         assert a == same and hash(a) == hash(same)
 
     def test_rounding_mode_as_expression(self):

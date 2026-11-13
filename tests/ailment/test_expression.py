@@ -485,18 +485,18 @@ class TestConvertFPTypes(unittest.TestCase):
 
 
 class TestBinaryOpFloatingPoint(unittest.TestCase):
-    """Tests for floating_point flag on BinaryOp expressions."""
+    """Tests for floating-point BinaryOp expressions, which are separate ops (Add / AddF)."""
 
-    def test_binaryop_floating_point_flag(self):
+    def test_binaryop_floating_point_op(self):
         a = ailment.expression.Const(None, 42, 64)
         b = ailment.expression.Const(None, 43, 64)
-        op = ailment.expression.BinaryOp(None, "Fadd", [a, b], False, floating_point=True)
+        op = ailment.expression.BinaryOp(None, "AddF", [a, b], False)
         assert op.floating_point is True
 
-    def test_binaryop_floating_point_preserved_in_tags(self):
+    def test_binaryop_floating_point_preserved_by_copy(self):
         a = ailment.expression.Const(None, 42, 64)
         b = ailment.expression.Const(None, 43, 64)
-        op = ailment.expression.BinaryOp(None, "Fadd", [a, b], False, floating_point=True)
+        op = ailment.expression.BinaryOp(None, "AddF", [a, b], False)
         op_copy = op.copy()
         assert op_copy.floating_point is True
 
@@ -506,12 +506,38 @@ class TestBinaryOpFloatingPoint(unittest.TestCase):
         op = ailment.expression.BinaryOp(None, "Add", [a, b], False)
         assert op.floating_point is False
 
+    def test_floating_point_is_not_a_constructor_argument(self):
+        a = ailment.expression.Const(None, 42, 64)
+        b = ailment.expression.Const(None, 43, 64)
+        with self.assertRaises(TypeError):
+            ailment.expression.BinaryOp(None, "Add", [a, b], False, floating_point=True)
+        with self.assertRaises(TypeError):
+            ailment.expression.UnaryOp(None, "Neg", a, floating_point=True)
+
+    def test_float_op_names(self):
+        for int_name, float_name in (("Add", "AddF"), ("CmpEQ", "CmpEQF"), ("Neg", "NegF"), ("AddV", "AddFV")):
+            assert not ailment.is_float_op(int_name)
+            assert ailment.is_float_op(float_name)
+            assert ailment.float_op(int_name) == float_name
+            assert ailment.float_op(float_name) == float_name
+            assert ailment.int_op(float_name) == int_name
+            assert ailment.int_op(int_name) == int_name
+        # ops that only exist on floating-point values keep their plain name
+        for op in ("Sqrt", "SqrtV", "CmpUN", "SignBit"):
+            assert ailment.is_float_op(op)
+            assert ailment.float_op(op) == op
+            assert ailment.int_op(op) == op
+        # CmpF yields an integer condition code
+        assert not ailment.is_float_op("CmpF")
+        assert ailment.float_op("CmpF") == "CmpF"
+        assert ailment.int_op("CmpF") == "CmpF"
+
     def test_negate_applies_de_morgan_over_comparisons(self):
         mgr = ailment.Manager()
         a = Register(0, 0, 32)
         b = Register(1, 8, 32)
         c = Const(2, 0, 32)
-        le = ailment.expression.BinaryOp(3, "CmpLE", [a, c], False, bits=1, floating_point=True)
+        le = ailment.expression.BinaryOp(3, "CmpLEF", [a, c], False, bits=1)
         ge = ailment.expression.BinaryOp(4, "CmpGE", [a, b], True, bits=1)
         disj = ailment.expression.BinaryOp(5, "LogicalOr", [le, ge], False, bits=1)
 
@@ -520,7 +546,7 @@ class TestBinaryOpFloatingPoint(unittest.TestCase):
         assert isinstance(neg, ailment.expression.BinaryOp)
         assert neg.op == "LogicalAnd"
         gt, lt = neg.operands
-        assert gt.op == "CmpGT" and gt.floating_point is True and gt.operands[0] == a and gt.operands[1] == c
+        assert gt.op == "CmpGTF" and gt.operands[0] == a and gt.operands[1] == c
         assert lt.op == "CmpLT" and lt.signed is True and lt.operands[0] == a and lt.operands[1] == b
 
         # nested: !((a <= c || a >= b) && !a) => (a > c && a < b) || a

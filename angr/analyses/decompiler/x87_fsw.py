@@ -86,12 +86,12 @@ _UNKNOWN: _KnownBits = (0, 0)
 
 # outcomes for which a float comparison of the CmpF operands holds; CmpNE holds when unordered, as in C
 _FP_CMP_TRUTH: dict[str, frozenset[int]] = {
-    "CmpEQ": frozenset({CMPF_EQ}),
-    "CmpNE": frozenset({CMPF_LT, CMPF_GT, CMPF_UN}),
-    "CmpLT": frozenset({CMPF_LT}),
-    "CmpLE": frozenset({CMPF_LT, CMPF_EQ}),
-    "CmpGT": frozenset({CMPF_GT}),
-    "CmpGE": frozenset({CMPF_GT, CMPF_EQ}),
+    "CmpEQF": frozenset({CMPF_EQ}),
+    "CmpNEF": frozenset({CMPF_LT, CMPF_GT, CMPF_UN}),
+    "CmpLTF": frozenset({CMPF_LT}),
+    "CmpLEF": frozenset({CMPF_LT, CMPF_EQ}),
+    "CmpGTF": frozenset({CMPF_GT}),
+    "CmpGEF": frozenset({CMPF_GT, CMPF_EQ}),
     "CmpUN": frozenset({CMPF_UN}),
 }
 _INT_ORDER_CMPS: dict[str, Callable[[int, int], bool]] = {
@@ -100,15 +100,15 @@ _INT_ORDER_CMPS: dict[str, Callable[[int, int], bool]] = {
     "CmpGT": lambda a, b: a > b,
     "CmpGE": lambda a, b: a >= b,
 }
-_FP_CMP_MIRROR = {"CmpLT": "CmpGT", "CmpLE": "CmpGE", "CmpGT": "CmpLT", "CmpGE": "CmpLE"}
+_FP_CMP_MIRROR = {"CmpLTF": "CmpGTF", "CmpLEF": "CmpGEF", "CmpGTF": "CmpLTF", "CmpGEF": "CmpLEF"}
 
 _ORDERED_PREDICATES: dict[frozenset[int], str] = {
-    frozenset({CMPF_LT}): "CmpLT",
-    frozenset({CMPF_GT}): "CmpGT",
-    frozenset({CMPF_EQ}): "CmpEQ",
-    frozenset({CMPF_LT, CMPF_EQ}): "CmpLE",
-    frozenset({CMPF_GT, CMPF_EQ}): "CmpGE",
-    frozenset({CMPF_LT, CMPF_GT}): "CmpNE",
+    frozenset({CMPF_LT}): "CmpLTF",
+    frozenset({CMPF_GT}): "CmpGTF",
+    frozenset({CMPF_EQ}): "CmpEQF",
+    frozenset({CMPF_LT, CMPF_EQ}): "CmpLEF",
+    frozenset({CMPF_GT, CMPF_EQ}): "CmpGEF",
+    frozenset({CMPF_LT, CMPF_GT}): "CmpNEF",
 }
 
 
@@ -406,7 +406,7 @@ class _KnownBitsEvaluator:
         if expr.op == "CmpF":
             return self._source_value(SOURCE_CMPF, (expr.operands[0], expr.operands[1]), mask)
 
-        if self.fp_compare_leaves and expr.floating_point and not expr.vector_count and expr.op in _FP_CMP_TRUTH:
+        if self.fp_compare_leaves and not expr.vector_count and expr.op in _FP_CMP_TRUTH:
             return self._fp_compare_value(expr, mask)
 
         if expr.floating_point or expr.vector_count:
@@ -552,7 +552,7 @@ _FXAM_PREDICATES: dict[frozenset[int], str] = {
     frozenset({FXAM_INF}): "IsInf",
     frozenset({FXAM_NORMAL, FXAM_ZERO, FXAM_DENORMAL}): "IsFinite",
     frozenset({FXAM_NORMAL}): "IsNormal",
-    frozenset({FXAM_ZERO}): "CmpEQ",
+    frozenset({FXAM_ZERO}): "CmpEQF",
 }
 
 
@@ -589,10 +589,10 @@ def fxam_predicate(
         op = _FXAM_PREDICATES.get(FXAM_CLASSES - positive)
         if op is None:
             return None
-    if op == "CmpEQ":
+    if op == "CmpEQF":
         zero = Const(ail_manager.next_atom(), 0.0, x.bits, **tags)
         # x != 0.0 is exactly the complement (NaN != 0.0 holds)
-        return BinaryOp(idx, "CmpNE" if negate else "CmpEQ", [x, zero], False, floating_point=True, bits=bits, **tags)
+        return BinaryOp(idx, "CmpNEF" if negate else "CmpEQF", [x, zero], False, bits=bits, **tags)
     if not negate:
         return UnaryOp(idx, op, x, bits=bits, **tags)
     pred = UnaryOp(ail_manager.next_atom(), op, x, bits=bits, **tags)
@@ -635,7 +635,7 @@ def fp_predicate_from_outcomes(
             return unordered
         return UnaryOp(idx, "Not", unordered, bits=bits, **tags)
 
-    return BinaryOp(idx, _ORDERED_PREDICATES[ordered], [a, b], False, floating_point=True, bits=bits, **tags)
+    return BinaryOp(idx, _ORDERED_PREDICATES[ordered], [a, b], False, bits=bits, **tags)
 
 
 def fold_fp_logic(
@@ -708,8 +708,8 @@ def lower_cmpf_value(expr: Expression, ail_manager: Manager) -> Expression | Non
             cond = _unordered(a, b, ail_manager.next_atom(), 1, tags)
             assert cond is not None
         else:
-            op = "CmpEQ" if o == CMPF_EQ else "CmpLT"
-            cond = BinaryOp(ail_manager.next_atom(), op, [a, b], False, floating_point=True, bits=1, **tags)
+            op = "CmpEQF" if o == CMPF_EQ else "CmpLTF"
+            cond = BinaryOp(ail_manager.next_atom(), op, [a, b], False, bits=1, **tags)
         if isinstance(result, Const) and result.value == 0 and v == 1:
             # c ? 1 : 0 -> c
             result = cond if expr.bits == 1 else Convert(ail_manager.next_atom(), 1, expr.bits, False, cond, **tags)
@@ -729,7 +729,7 @@ def _unordered(
         return None
     if len(terms) == 1:
         return UnaryOp(idx, "IsNaN", terms[0], bits=bits, **tags)
-    return BinaryOp(idx, "CmpUN", terms, False, floating_point=True, bits=bits, **tags)
+    return BinaryOp(idx, "CmpUN", terms, False, bits=bits, **tags)
 
 
 def _strip_fp_widening(expr: Expression) -> Expression:

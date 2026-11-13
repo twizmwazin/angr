@@ -87,7 +87,6 @@ class CmpSubConst(PeepholeOptimizationExprBase):
             (var, new_const),
             expr.signed,
             bits=expr.bits,
-            floating_point=expr.floating_point,
             rounding_mode=expr.rounding_mode,
             **expr.tags,
         )

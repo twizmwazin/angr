@@ -14,7 +14,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from angr.ailment import Block
-from angr.ailment.expression import BinaryOp, Expression
+from angr.ailment.expression import BinaryOp, Expression, int_op
 from angr.ailment.statement import Assignment, Statement
 from angr.analyses.decompiler.structurer_nodes import (
     BaseNode,
@@ -198,7 +198,7 @@ class RegionLoopCounterNaming(RegionNamingBase):
 
         # Check for comparison operations
         comparison_ops = {"CmpLT", "CmpLE", "CmpGT", "CmpGE", "CmpNE", "CmpEQ"}
-        if condition.op not in comparison_ops:
+        if int_op(condition.op) not in comparison_ops:
             return None
 
         # Try to extract variables from the comparison

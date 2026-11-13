@@ -135,7 +135,7 @@ class SSEMoveMask(PeepholeOptimizationExprBase):
 
     def _sign_bit(self, expr: BinaryOp, vec: Expression, lane_bytes: int) -> Convert:
         lane = lane0(vec, lane_bytes * 8, self.manager)
-        sign = UnaryOp(self.manager.next_atom(), "SignBit", lane, bits=1, floating_point=True, **expr.tags)
+        sign = UnaryOp(self.manager.next_atom(), "SignBit", lane, bits=1, **expr.tags)
         return Convert(expr.idx, 1, expr.bits, False, sign, **expr.tags)
 
     def _lane0_sign(self, expr: BinaryOp) -> Expression | None:

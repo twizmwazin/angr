@@ -238,9 +238,7 @@ class Expression:
         **tags: Any,
     ) -> Expression: ...
     @staticmethod
-    def _new_unary_op(
-        idx: int, op: str, operand: Expression, bits: int | None = ..., floating_point: bool = ..., **tags: Any
-    ) -> Expression: ...
+    def _new_unary_op(idx: int, op: str, operand: Expression, bits: int | None = ..., **tags: Any) -> Expression: ...
     @staticmethod
     def _new_convert(
         idx: int,
@@ -271,7 +269,6 @@ class Expression:
         signed: bool = ...,
         *,
         bits: int | None = ...,
-        floating_point: bool = ...,
         rounding_mode: RoundingMode | Expression | None = ...,
         vector_count: int | None = ...,
         vector_size: int | None = ...,
@@ -589,6 +586,15 @@ class VEXIRSBConverter:
 def _vexop_debug(op_int: int) -> dict[str, Any] | None:
     """Classify a VEX op integer via the Rust port; ``None`` if unsupported."""
 
+def is_float_op(op: str) -> bool:
+    """Whether ``op`` names a floating-point operation (``AddF``, ``CmpEQF``, ``Sqrt``, ``AddFV``, ...)."""
+
+def float_op(op: str) -> str:
+    """The floating-point counterpart of an op name (``Add`` -> ``AddF``, ``AddV`` -> ``AddFV``)."""
+
+def int_op(op: str) -> str:
+    """The integer counterpart of an op name (``AddF`` -> ``Add``, ``AddFV`` -> ``AddV``)."""
+
 # ---------------------------------------------------------------------------
 # Expression variant marker classes
 # ---------------------------------------------------------------------------
@@ -766,14 +772,13 @@ class UnaryOp(Op):
     """UnaryOp.operands (single-element list, legacy quirk)"""
     @property
     def floating_point(self) -> bool:
-        """UnaryOp.floating_point"""
+        """Whether ``op`` is a floating-point operation (derived from the op name: ``NegF``, ``Sqrt``, ...)"""
     def __init__(
         self,
         idx: int | None,
         op: str,
         operand: Expression,
         bits: int | None = ...,
-        floating_point: bool = ...,
         **tags: Any,
     ) -> None: ...
 
@@ -786,7 +791,7 @@ class BinaryOp(Op):
         """BinaryOp.signed"""
     @property
     def floating_point(self) -> bool:
-        """BinaryOp.floating_point"""
+        """Whether ``op`` is a floating-point operation (derived from the op name: ``AddF``, ``CmpEQF``, ...)"""
     @property
     def rounding_mode(self) -> RoundingMode | Expression | None:
         """BinaryOp.rounding_mode"""
@@ -804,7 +809,6 @@ class BinaryOp(Op):
         signed: bool = ...,
         *,
         bits: int | None = ...,
-        floating_point: bool = ...,
         rounding_mode: RoundingMode | Expression | None = ...,
         vector_count: int | None = ...,
         vector_size: int | None = ...,

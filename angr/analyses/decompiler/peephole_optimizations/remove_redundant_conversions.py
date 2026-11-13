@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 import struct
 
-from angr.ailment.expression import BinaryOp, Call, Const, Convert, Insert, Reinterpret, UnaryOp
+from angr.ailment.expression import BinaryOp, Call, Const, Convert, Insert, Reinterpret, UnaryOp, float_op, int_op
 from angr.ailment.utils import is_lsb_overwrite
 from angr.analyses.decompiler.variable_map import variable_map_of
 from angr.sim_type import SimTypeFloat
@@ -70,7 +70,7 @@ class RemoveRedundantConversions(PeepholeOptimizationExprBase):
                             **expr.operands[0].tags,
                         )
 
-                elif expr.op in {
+                elif int_op(expr.op) in {
                     "CmpEQ",
                     "CmpNE",
                     "CmpGT",
@@ -89,11 +89,10 @@ class RemoveRedundantConversions(PeepholeOptimizationExprBase):
                             return None
                         return BinaryOp(
                             expr.idx,
-                            expr.op,
+                            float_op(expr.op),
                             (expr.operands[0].operand, con),
                             expr.signed,
                             bits=1,
-                            floating_point=True,
                             **expr.tags,
                         )
                     if 0 <= expr.operands[1].value <= ((1 << from_bits) - 1) or (
@@ -108,7 +107,6 @@ class RemoveRedundantConversions(PeepholeOptimizationExprBase):
                             (expr.operands[0].operand, con),
                             expr.signed,
                             bits=1,
-                            floating_point=expr.floating_point,
                             **expr.tags,
                         )
 
@@ -265,7 +263,6 @@ class RemoveRedundantConversions(PeepholeOptimizationExprBase):
                     operand_expr.op,
                     inner_conv.operand,
                     bits=expr.to_bits,
-                    floating_point=operand_expr.floating_point,
                     ins_addr=operand_expr.tags.get("ins_addr"),
                 )
         if isinstance(operand_expr, BinaryOp) and not (
@@ -280,6 +277,10 @@ class RemoveRedundantConversions(PeepholeOptimizationExprBase):
                 "Mod",
                 "Add",
                 "Sub",
+                "MulF",
+                "DivF",
+                "AddF",
+                "SubF",
             }:
                 op0, op1 = operand_expr.operands
                 if (

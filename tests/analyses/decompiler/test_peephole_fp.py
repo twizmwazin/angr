@@ -31,6 +31,7 @@ from angr.ailment.expression import (
     VEXCCallExpression,
     VirtualVariable,
     VirtualVariableCategory,
+    float_op,
 )
 from angr.ailment.manager import Manager
 from angr.ailment.statement import Assignment, ConditionalJump, Store
@@ -169,7 +170,7 @@ class TestRemoveRedundantConversions(unittest.TestCase):
         widened = Convert(2, 32, 64, False, x, from_type=Convert.TYPE_FP, to_type=Convert.TYPE_FP)
         (zero_bits,) = struct.unpack("<Q", struct.pack("<d", 0.0))
         result = self._opt(BinaryOp(3, "CmpEQ", [widened, Const(4, zero_bits, 64)], False))
-        assert isinstance(result, BinaryOp) and result.op == "CmpEQ" and result.floating_point
+        assert isinstance(result, BinaryOp) and result.op == "CmpEQF"
         assert result.operands[0].likes(x) and result.operands[1].bits == 32 and result.operands[1].value == 0
         (tenth_bits,) = struct.unpack("<Q", struct.pack("<d", 0.1))
         assert self._opt(BinaryOp(5, "CmpEQ", [widened, Const(6, tenth_bits, 64)], False)) is None
@@ -261,18 +262,17 @@ class TestSSEScalarLowering(unittest.TestCase):
         b = Const(2, 43, 64)
         conv_a = Convert(3, 64, 128, False, a, from_type=Convert.TYPE_INT, to_type=Convert.TYPE_INT)
         conv_b = Convert(4, 64, 128, False, b, from_type=Convert.TYPE_INT, to_type=Convert.TYPE_INT)
-        mulv = BinaryOp(5, "MulV", [conv_a, conv_b], False, floating_point=True, bits=128)
+        mulv = BinaryOp(5, "MulFV", [conv_a, conv_b], False, bits=128)
         zero = Const(6, 0, 64)
         extract = Extract(7, 64, mulv, zero, "Iend_LE")
         result = self._opt(extract)
         assert result is not None
         assert isinstance(result, BinaryOp)
-        assert result.op == "Mul"
-        assert result.floating_point is True
+        assert result.op == "MulF"
         assert result.bits == 64
 
     def test_extract_neg_conv(self):
-        """Extract(Neg(Conv(64->128, x)), 64@0) -> Neg(x, fp=True)."""
+        """Extract(Neg(Conv(64->128, x)), 64@0) -> NegF(x)."""
         x = Const(1, 42, 64)
         conv = Convert(2, 64, 128, False, x, from_type=Convert.TYPE_INT, to_type=Convert.TYPE_INT)
         neg = UnaryOp(3, "Neg", conv, bits=128)
@@ -281,10 +281,9 @@ class TestSSEScalarLowering(unittest.TestCase):
         result = self._opt(extract)
         assert result is not None
         assert isinstance(result, UnaryOp)
-        assert result.op == "Neg"
+        assert result.op == "NegF"
         assert result.operand == x
         assert result.bits == 64
-        assert result.floating_point is True
 
     def test_extract_lane_wise_convert(self):
         """Extract(ConvV(I32StoF32x4, Conv(32->128, x)), 32@0) -> Convert(I32->F32, x)."""
@@ -366,19 +365,19 @@ class TestSSEBitwiseSelect(unittest.TestCase):
         return opt.optimize(expr)
 
     def test_select_branch_order(self):
-        """(~mask & A) | (B & mask) with mask = CmpLTV(0, x) -> ITE(0 < x, B, A)."""
+        """(~mask & A) | (B & mask) with mask = CmpLTFV(0, x) -> ITE(0 < x, B, A)."""
         x = Const(1, 42, 64)
         zero = Const(2, 0, 64)
         a = Const(3, 10, 64)
         b = Const(4, 20, 64)
-        mask = BinaryOp(5, "CmpLTV", [zero, x], False, floating_point=True, bits=64)
+        mask = BinaryOp(5, "CmpLTFV", [zero, x], False, bits=64)
         not_mask = UnaryOp(6, "BitwiseNeg", mask, bits=64)
         arm_a = BinaryOp(7, "And", [not_mask, a], False, bits=64)
         arm_b = BinaryOp(8, "And", [b, mask], False, bits=64)
         expr = BinaryOp(9, "Or", [arm_a, arm_b], False, bits=64)
         result = self._opt(expr)
         assert isinstance(result, ITE)
-        assert isinstance(result.cond, BinaryOp) and result.cond.op == "CmpLT"
+        assert isinstance(result.cond, BinaryOp) and result.cond.op == "CmpLTF"
         assert result.iftrue == b
         assert result.iffalse == a
 
@@ -400,7 +399,7 @@ class TestSSEBitwiseSelect(unittest.TestCase):
 
         a = VirtualVariable(1, 10, 64, category=VirtualVariableCategory.REGISTER, oident=72)
         b = VirtualVariable(2, 11, 64, category=VirtualVariableCategory.REGISTER, oident=88)
-        ne = BinaryOp(3, "CmpNE", [a, b], False, floating_point=True)
+        ne = BinaryOp(3, "CmpNEF", [a, b], False)
         ite = ITE(4, ne, Const(5, 0, 32), Const(6, 1, 32), bits=32)
         result = self._opt(Extract(7, 8, ite, Const(8, 0, 32), "Iend_LE"))
         assert isinstance(result, ITE) and result.bits == 8
@@ -533,11 +532,11 @@ class TestSSEVectorLaneLowering(unittest.TestCase):
         assert r.operands[1] == t
 
     def test_cmpeqsd_mask_to_condition(self):
-        """Extract(CmpEQV(0, y), 16@0) -> ITE(0 == lane0(y), 0xffff, 0); the mask test folds to the condition."""
-        cmp = self._vec("CmpEQV", Const(None, 0, 128), self.y, floating_point=True)
+        """Extract(CmpEQFV(0, y), 16@0) -> ITE(0 == lane0(y), 0xffff, 0); the mask test folds to the condition."""
+        cmp = self._vec("CmpEQFV", Const(None, 0, 128), self.y)
         r = self.opt.optimize(self._lsb(16, cmp))
         assert isinstance(r, ITE) and r.bits == 16
-        assert isinstance(r.cond, BinaryOp) and r.cond.op == "CmpEQ" and r.cond.floating_point
+        assert isinstance(r.cond, BinaryOp) and r.cond.op == "CmpEQF"
         assert isinstance(r.iftrue, Const) and r.iftrue.value == 0xFFFF
         assert isinstance(r.iffalse, Const) and r.iffalse.value == 0
         # pextrw eax, xmm, 0 ; cmp eax, 0 ; ja  ->  the condition itself
@@ -549,12 +548,12 @@ class TestSSEVectorLaneLowering(unittest.TestCase):
         assert isinstance(masked, ITE) and isinstance(masked.iftrue, Const) and masked.iftrue.value == 0xFF
 
     def test_mulpd_lane0_is_scalar_fp_mul(self):
-        mul = self._vec("MulV", self.x, self.y, signed=True, floating_point=True)
+        mul = self._vec("MulFV", self.x, self.y, signed=True)
         r = self.opt.optimize(self._lsb(64, mul))
-        assert isinstance(r, BinaryOp) and r.op == "Mul" and r.bits == 64 and r.floating_point
+        assert isinstance(r, BinaryOp) and r.op == "MulF" and r.bits == 64
 
     def test_reads_above_lane0_are_left_alone(self):
-        mul = self._vec("MulV", self.x, self.y, signed=True, floating_point=True)
+        mul = self._vec("MulFV", self.x, self.y, signed=True)
         assert self.opt.optimize(self._lsb(128, mul)) is None
         assert self.opt.optimize(Extract(None, 64, mul, Const(None, 8, 64), "Iend_LE")) is None
 
@@ -610,7 +609,7 @@ if __name__ == "__main__":
 
 
 def _cmpf(a, b):
-    return BinaryOp(None, "CmpF", [a, b], False, bits=32, floating_point=True)
+    return BinaryOp(None, "CmpF", [a, b], False, bits=32)
 
 
 def _fsw_ah(cmpf, ftop):
@@ -760,7 +759,7 @@ class TestX87StatusWord(unittest.TestCase):
         self.eflags = Tmp(None, 4, 32)
 
     def _assert_cmp(self, result, op, a=None, b=None):
-        assert isinstance(result, BinaryOp) and result.op == op and result.floating_point, result
+        assert isinstance(result, BinaryOp) and result.op == float_op(op), result
         assert result.operands[0].likes(a or self.a) and result.operands[1].likes(b or self.b)
 
     def test_test_ah_0x41_je_is_gt(self):
@@ -817,7 +816,7 @@ class TestX87StatusWord(unittest.TestCase):
         result = self.opt.optimize(_bit(masked, 2))
         assert isinstance(result, Convert) and result.from_bits == 1
         pred = result.operand
-        assert isinstance(pred, BinaryOp) and pred.op == "CmpUN" and pred.floating_point
+        assert isinstance(pred, BinaryOp) and pred.op == "CmpUN"
         assert pred.operands[0].likes(self.a) and pred.operands[1].likes(self.b)
         # a constant operand cannot be NaN
         masked = BinaryOp(None, "And", [_cmpf(self.a, Const(None, 0.0, 64)), Const(None, 0x45, 32)], False, bits=32)
@@ -832,7 +831,7 @@ class TestX87StatusWord(unittest.TestCase):
         assert isinstance(result, Const) and result.value == 1
 
     def test_propagated_constant_into_unordered(self):
-        un = BinaryOp(None, "CmpUN", [Const(None, 0.0, 64), self.b], False, floating_point=True, bits=1)
+        un = BinaryOp(None, "CmpUN", [Const(None, 0.0, 64), self.b], False, bits=1)
         result = self.opt.optimize(un)
         assert isinstance(result, UnaryOp) and result.op == "IsNaN" and result.operand.likes(self.b)
         r = self.opt.optimize(UnaryOp(None, "IsNaN", Const(None, 1.5, 64), bits=1))
@@ -844,7 +843,7 @@ class TestX87StatusWord(unittest.TestCase):
         assert isinstance(r, Const) and r.value == 1
 
     def _fp(self, op, a, b):
-        return BinaryOp(None, op, [a, b], False, floating_point=True, bits=1)
+        return BinaryOp(None, float_op(op), [a, b], False, bits=1)
 
     def test_redundant_unordered_guard(self):
         # ucomisd; sete; setnp; and: (a == b) & !isunordered(a, b) is a == b
@@ -880,19 +879,19 @@ class TestX87StatusWord(unittest.TestCase):
             None, "LogicalAnd", [self._fp("CmpLT", self.a, self.b), UnaryOp(None, "Not", nan_a, bits=1)], False, bits=1
         )
         result = self.opt.optimize(expr)
-        assert isinstance(result, BinaryOp) and result.op == "CmpLT" and result.floating_point, result
+        assert isinstance(result, BinaryOp) and result.op == "CmpLTF", result
         result = self.opt.optimize(
             BinaryOp(None, "LogicalOr", [nan_a, self._fp("CmpLT", self.a, self.b)], False, bits=1)
         )
-        assert isinstance(result, BinaryOp) and result.op == "CmpLT" and result.floating_point, result
+        assert isinstance(result, BinaryOp) and result.op == "CmpLTF", result
         # the unordered outcome of a comparison of the same operands is folded away (IDA-like, source-like)
         result = self.opt.optimize(BinaryOp(None, "LogicalOr", [self._fp("CmpEQ", self.a, self.b), un], False, bits=1))
-        assert isinstance(result, BinaryOp) and result.op == "CmpEQ" and result.floating_point, result
+        assert isinstance(result, BinaryOp) and result.op == "CmpEQF", result
         not_lt = UnaryOp(None, "Not", self._fp("CmpLT", self.a, self.b), bits=1)
         result = self.opt.optimize(
             BinaryOp(None, "LogicalAnd", [not_lt, UnaryOp(None, "Not", un, bits=1)], False, bits=1)
         )
-        assert isinstance(result, BinaryOp) and result.op == "CmpGE" and result.floating_point, result
+        assert isinstance(result, BinaryOp) and result.op == "CmpGEF", result
 
     def test_ftop_bits_block_the_fold(self):
         # test ah, 0x08 reads the ftop bits: not a CmpF test
@@ -914,15 +913,15 @@ class TestFPLogicFold(unittest.TestCase):
         self.opt = _make_peephole(X87CmpF)
         self.a = Tmp(None, 1, 64)
         self.b = Tmp(None, 2, 64)
-        self.un = BinaryOp(None, "CmpUN", [self.a, self.b], False, bits=1, floating_point=True)
+        self.un = BinaryOp(None, "CmpUN", [self.a, self.b], False, bits=1)
         self.nan_a = UnaryOp(None, "IsNaN", self.a, bits=1)
         self.zero = Const(None, 0.0, 64)
 
     def _cmp(self, op, a=None, b=None):
-        return BinaryOp(None, op, [a or self.a, b or self.b], False, bits=1, floating_point=True)
+        return BinaryOp(None, float_op(op), [a or self.a, b or self.b], False, bits=1)
 
     def _assert_cmp(self, result, op, b=None):
-        assert isinstance(result, BinaryOp) and result.op == op and result.floating_point, result
+        assert isinstance(result, BinaryOp) and result.op == float_op(op), result
         assert result.operands[0].likes(self.a) and result.operands[1].likes(b or self.b), result
 
     def test_ite_ne_or_unordered(self):
@@ -1021,10 +1020,10 @@ class TestX87Fxam(unittest.TestCase):
         self._assert_unary(self._masked_cmp("CmpEQ", 0x45, 0x05), "IsInf")
         self._assert_unary(self._masked_cmp("CmpEQ", 0x45, 0x04), "IsNormal")
         zero = self._masked_cmp("CmpEQ", 0x45, 0x40)
-        assert isinstance(zero, BinaryOp) and zero.op == "CmpEQ" and zero.floating_point, zero
+        assert isinstance(zero, BinaryOp) and zero.op == "CmpEQF", zero
         assert zero.operands[0].likes(self.x) and zero.operands[1].value == 0.0
         nonzero = self._masked_cmp("CmpNE", 0x45, 0x40)
-        assert isinstance(nonzero, BinaryOp) and nonzero.op == "CmpNE" and nonzero.floating_point, nonzero
+        assert isinstance(nonzero, BinaryOp) and nonzero.op == "CmpNEF", nonzero
 
     def test_bit_tests(self):
         # test ah, 1 (C0): NaN or infinity; test ah, 2 (C1): the sign
@@ -1135,7 +1134,7 @@ class TestCmpFValueLowering(unittest.TestCase):
             if cond_op == "IsNaN":
                 assert isinstance(cond, UnaryOp) and cond.op == "IsNaN" and cond.operand.likes(operands[0]), cond
             else:
-                assert isinstance(cond, BinaryOp) and cond.op == cond_op and cond.floating_point, cond
+                assert isinstance(cond, BinaryOp) and cond.op == float_op(cond_op), cond
                 assert all(x.likes(y) for x, y in zip(cond.operands, operands, strict=True)), cond
             assert isinstance(expr.iftrue, Const) and expr.iftrue.value == value, expr
             expr = expr.iffalse
@@ -1147,7 +1146,7 @@ class TestCmpFValueLowering(unittest.TestCase):
             assert isinstance(expr, Convert) and expr.from_bits == 1, expr
             assert (
                 isinstance(expr.operand, BinaryOp)
-                and expr.operand.op == cond_op
+                and expr.operand.op == float_op(cond_op)
                 and all(x.likes(y) for x, y in zip(expr.operand.operands, operands, strict=True))
             ), expr
 
@@ -1248,7 +1247,7 @@ class TestX86FPConditionCCall(unittest.TestCase):
     def _assert_cmp(self, result, op):
         assert isinstance(result, Convert) and result.from_bits == 1 and result.to_bits == 32, result
         pred = result.operand
-        assert isinstance(pred, BinaryOp) and pred.op == op and pred.floating_point, pred
+        assert isinstance(pred, BinaryOp) and pred.op == float_op(op), pred
         assert pred.operands[0].likes(self.a) and pred.operands[1].likes(self.b)
 
     def test_test_ah_5_jp_is_ge(self):
@@ -1329,7 +1328,7 @@ class TestX86FPConditionCCall(unittest.TestCase):
             result = X87CmpF(proj, proj.kb, ail_manager=mgr, func_addr=0x400000).optimize(carry)
             assert isinstance(result, Convert) and result.from_bits == 1 and result.to_bits == bits, result
             pred = result.operand
-            assert isinstance(pred, BinaryOp) and pred.op == "CmpLT" and pred.floating_point, pred
+            assert isinstance(pred, BinaryOp) and pred.op == "CmpLTF", pred
             assert pred.operands[0].likes(self.a) and pred.operands[1].likes(self.b)
 
 
@@ -1405,7 +1404,7 @@ class TestSimplifyMaskedInsert(unittest.TestCase):
         assert self.opt.optimize(self._and(self.base, 0xF)) is None
 
     def test_fp_value_is_not_converted(self):
-        fp = UnaryOp(None, "Neg", Tmp(None, 3, 32), bits=32, floating_point=True)
+        fp = UnaryOp(None, "NegF", Tmp(None, 3, 32), bits=32)
         ins = Insert(None, Tmp(None, 4, 64), Const(None, 0, 64), fp, "Iend_LE")
         assert self.opt.optimize(self._and(ins, 0xFF)) is None
 
@@ -1447,7 +1446,7 @@ class TestFPExactIdentities(unittest.TestCase):
 
     @staticmethod
     def _fp(idx, op, a, b, bits=64):
-        return BinaryOp(idx, op, [a, b], True, floating_point=True, bits=bits)
+        return BinaryOp(idx, float_op(op), [a, b], True, bits=bits)
 
     def test_mul_one(self):
         x = Tmp(1, 0, 64)
@@ -1489,7 +1488,7 @@ class TestFswEvaluatorMemo(unittest.TestCase):
     def test_shared_definitions_evaluate_in_linear_time(self):
 
         a, b = self._vv(100, 64), self._vv(101, 64)
-        defs: dict[int, Expression] = {0: BinaryOp(None, "CmpF", [a, b], False, bits=32, floating_point=True)}
+        defs: dict[int, Expression] = {0: BinaryOp(None, "CmpF", [a, b], False, bits=32)}
         for i in range(1, 16):  # (x | x) | (x | x) keeps the value; 4^15 paths without memoization, depth 45
             half = BinaryOp(None, "Or", [self._vv(i - 1), self._vv(i - 1)], False, bits=32)
             defs[i] = BinaryOp(None, "Or", [half, half], False, bits=32)
@@ -1504,7 +1503,7 @@ class TestFswEvaluatorMemo(unittest.TestCase):
     def test_node_budget_gives_up_on_huge_expressions(self):
 
         a, b = self._vv(100, 64), self._vv(101, 64)
-        defs: dict[int, Expression] = {0: BinaryOp(None, "CmpF", [a, b], False, bits=32, floating_point=True)}
+        defs: dict[int, Expression] = {0: BinaryOp(None, "CmpF", [a, b], False, bits=32)}
         expr: Expression = self._vv(0)
         for i in range(1, 400):
             defs[i] = Const(None, i, 32)
@@ -1518,13 +1517,13 @@ class TestFswEvaluatorTmpCopies(unittest.TestCase):
     def test_fp_compare_through_tmp_copy(self):
         x = VirtualVariable(1, 10, 32, category=VirtualVariableCategory.REGISTER, oident=196)
         widened = Convert(2, 32, 64, False, x, from_type=Convert.TYPE_FP, to_type=Convert.TYPE_FP)
-        cmpf = BinaryOp(3, "CmpF", [widened, Const(4, 0.0, 64)], False, bits=32, floating_point=True)
+        cmpf = BinaryOp(3, "CmpF", [widened, Const(4, 0.0, 64)], False, bits=32)
         lt_bits = BinaryOp(
             5, "And", [BinaryOp(6, "Shr", [cmpf, Const(7, 5, 8)], False, bits=32), Const(8, 3, 32)], False, bits=32
         )
         # x < 0.0 with x read through a tmp copy
         t30 = Tmp(9, 30, 32)
-        lt = BinaryOp(10, "CmpLT", [t30, Const(11, 0, 32)], False, bits=1, floating_point=True)
+        lt = BinaryOp(10, "CmpLTF", [t30, Const(11, 0, 32)], False, bits=1)
         expr = BinaryOp(12, "Or", [lt_bits, Convert(13, 1, 32, False, lt)], False, bits=32)
 
         assert evaluate_over_fsw([expr], fp_compare_leaves=True) is None

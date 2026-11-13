@@ -8,18 +8,18 @@ from .base import PeepholeOptimizationExprBase
 _CMPF_VALUES = (0x45, 0x01, 0x00, 0x40)
 _UN, _LT, _GT, _EQ = range(4)
 
-# outcomes for which the test holds => (comparison, negated)
+# outcomes for which the test holds => (float comparison, negated)
 _TRUTH_TO_CMP: dict[frozenset[int], tuple[str, bool]] = {
-    frozenset({_LT}): ("CmpLT", False),
-    frozenset({_LT, _EQ}): ("CmpLE", False),
-    frozenset({_GT}): ("CmpGT", False),
-    frozenset({_GT, _EQ}): ("CmpGE", False),
-    frozenset({_EQ}): ("CmpEQ", False),
-    frozenset({_UN, _LT, _GT}): ("CmpNE", False),
-    frozenset({_UN, _GT, _EQ}): ("CmpLT", True),
-    frozenset({_UN, _GT}): ("CmpLE", True),
-    frozenset({_UN, _LT, _EQ}): ("CmpGT", True),
-    frozenset({_UN, _LT}): ("CmpGE", True),
+    frozenset({_LT}): ("CmpLTF", False),
+    frozenset({_LT, _EQ}): ("CmpLEF", False),
+    frozenset({_GT}): ("CmpGTF", False),
+    frozenset({_GT, _EQ}): ("CmpGEF", False),
+    frozenset({_EQ}): ("CmpEQF", False),
+    frozenset({_UN, _LT, _GT}): ("CmpNEF", False),
+    frozenset({_UN, _GT, _EQ}): ("CmpLTF", True),
+    frozenset({_UN, _GT}): ("CmpLEF", True),
+    frozenset({_UN, _LT, _EQ}): ("CmpGTF", True),
+    frozenset({_UN, _LT}): ("CmpGEF", True),
 }
 
 _BINOPS = {
@@ -81,7 +81,7 @@ class CmpFFlagTests(PeepholeOptimizationExprBase):
         if mapped is None:
             return None
         op, negated = mapped
-        r = BinaryOp(expr.idx, op, list(cmpf.operands), False, floating_point=True, bits=1, **expr.tags)
+        r = BinaryOp(expr.idx, op, list(cmpf.operands), False, bits=1, **expr.tags)
         if negated:
             r = UnaryOp(self.manager.next_atom(), "Not", r, bits=1, **expr.tags)
         return r

@@ -769,11 +769,10 @@ class SimEngineRDAIL(SimEngineNostmtAIL[ReachingDefinitionsState, MultiValues, N
     _handle_binop_MulV = _handle_binop_Default
     _handle_binop_MulHiV = _handle_binop_Default
     _handle_binop_Mod = _handle_binop_Default
-    _handle_binop_AddF = _handle_binop_Default
-    _handle_binop_DivF = _handle_binop_Default
+    _handle_binop_AddF = _handle_binop_Add
+    _handle_binop_DivF = _handle_binop_Div
     _handle_binop_DivV = _handle_binop_Default
-    _handle_binop_MulF = _handle_binop_Default
-    _handle_binop_SubF = _handle_binop_Default
+    _handle_binop_SubF = _handle_binop_Sub
     _handle_binop_SubV = _handle_binop_Default
     _handle_binop_InterleaveLOV = _handle_binop_Default
     _handle_binop_InterleaveHIV = _handle_binop_Default
@@ -814,6 +813,8 @@ class SimEngineRDAIL(SimEngineNostmtAIL[ReachingDefinitionsState, MultiValues, N
             r = MultiValues(self.state.top(bits))
 
         return r
+
+    _handle_binop_MulF = _handle_binop_Mul
 
     @ail_binop_handler
     def _handle_binop_Mull(self, expr):
