@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from typing import TYPE_CHECKING, Any, Self, overload
 
 import archinfo
@@ -148,6 +148,42 @@ class ReachingDefinitionsState:
 
     def is_top(self, *args):
         return self.live_definitions.is_top(*args)
+
+    def binop(
+        self,
+        expr0: MultiValues,
+        expr1: MultiValues,
+        bits: int,
+        op: Callable[[claripy.ast.BV, claripy.ast.BV], claripy.ast.BV],
+        rop: Callable[[claripy.ast.BV, claripy.ast.BV], claripy.ast.BV] | None = None,
+        ok: tuple[Callable[[claripy.ast.BV], bool], Callable[[claripy.ast.BV], bool]] | None = None,
+    ) -> MultiValues:
+        """
+        Apply a binary operation to two operands of which at most one has several values. The result is TOP when both
+        have several values, when the several values are not one piece, or when a value fails `ok`.
+
+        :param op:  The operation on a value of each operand.
+        :param rop: The operation when the second operand has several values, taking its value first. Defaults to op
+                    with its arguments swapped.
+        :param ok:  For each operand, what its values must be for the operation to apply. An operand with one value
+                    is only checked when the other operand has one value too.
+        """
+        v0, v1 = expr0.one_value(), expr1.one_value()
+        ok0, ok1 = ok or (None, None)
+        if v0 is not None and v1 is not None:
+            if (ok0 is None or ok0(v0)) and (ok1 is None or ok1(v1)):
+                return MultiValues(op(v0, v1))
+        elif v1 is not None:
+            # each value of the first operand with the value of the second
+            values = expr0[0] if expr0.count() == 1 and 0 in expr0 else None
+            if values is not None and (ok0 is None or all(ok0(v) for v in values)):
+                return MultiValues({0: {op(v, v1) for v in values}})
+        elif v0 is not None:
+            # the value of the first operand with each value of the second
+            values = expr1[0] if expr1.count() == 1 and 0 in expr1 else None
+            if values is not None and (ok1 is None or all(ok1(v) for v in values)):
+                return MultiValues({0: {op(v0, v) if rop is None else rop(v, v0) for v in values}})
+        return MultiValues(self.top(bits))
 
     def heap_address(self, offset: int | HeapAddress) -> claripy.ast.BV:
         return self.live_definitions.heap_address(offset)

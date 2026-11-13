@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import operator
 from collections.abc import Iterable
 from itertools import chain
 from typing import TYPE_CHECKING
@@ -620,94 +621,29 @@ class SimEngineRDVEX(
     def _handle_binop_Add(self, expr: pyvex.expr.Binop) -> MultiValues:
         expr0, expr1 = self._expr(expr.args[0]), self._expr(expr.args[1])
         bits = expr.result_size(self.tyenv)
+        several0, several1 = expr0.one_value() is None, expr1.one_value() is None
 
-        r = None
-        expr0_v = expr0.one_value()
-        expr1_v = expr1.one_value()
+        def _add(e0: claripy.ast.BV, e1: claripy.ast.BV) -> claripy.ast.BV:
+            # a value of the operand with several values is sign-extended to the width of the other operand
+            if several0:
+                e0 = e0.sign_extend(e1.size() - e0.size())
+            elif several1:
+                e1 = e1.sign_extend(e0.size() - e1.size())
+            return e0 + e1
 
-        if expr0_v is not None and expr1_v is not None:
-            # adding two single values together
-            r = MultiValues(expr0_v + expr1_v)
-        elif expr0_v is None and expr1_v is not None:
-            # adding a single value to a multivalue
-            if expr0.count() == 1 and 0 in expr0:
-                vs = {v.sign_extend(expr1_v.size() - v.size()) + expr1_v for v in expr0[0]}
-                r = MultiValues({0: vs})
-        elif expr0_v is not None and expr1_v is None:
-            # adding a single value to a multivalue
-            if expr1.count() == 1 and 0 in expr1:
-                vs = {expr0_v + v.sign_extend(expr0_v.size() - v.size()) for v in expr1[0]}
-                r = MultiValues({0: vs})
-        else:
-            # we do not support addition between two real multivalues
-            r = MultiValues(self.state.top(bits))
-
-        if r is None:
-            r = MultiValues(self.state.top(bits))
-
-        return r
+        return self.state.binop(expr0, expr1, bits, _add)
 
     @binop_handler
     def _handle_binop_Sub(self, expr: pyvex.expr.Binop) -> MultiValues:
         expr0, expr1 = self._expr(expr.args[0]), self._expr(expr.args[1])
         bits = expr.result_size(self.tyenv)
-
-        r = None
-        expr0_v = expr0.one_value()
-        expr1_v = expr1.one_value()
-
-        if expr0_v is not None and expr1_v is not None:
-            # subtracting a single value from another single value
-            r = MultiValues(expr0_v - expr1_v)
-        elif expr0_v is None and expr1_v is not None:
-            # subtracting a single value from a multivalue
-            if expr0.count() == 1 and 0 in expr0:
-                vs = {v - expr1_v for v in expr0[0]}
-                r = MultiValues({0: vs})
-        elif expr0_v is not None and expr1_v is None:
-            # subtracting a single value from a multivalue
-            if expr1.count() == 1 and 0 in expr1:
-                vs = {expr0_v - v for v in expr1[0]}
-                r = MultiValues({0: vs})
-        else:
-            # we do not support addition between two real multivalues
-            r = MultiValues(self.state.top(bits))
-
-        if r is None:
-            r = MultiValues(self.state.top(bits))
-
-        return r
+        return self.state.binop(expr0, expr1, bits, operator.sub)
 
     @binop_handler
     def _handle_binop_Mul(self, expr: pyvex.expr.Binop) -> MultiValues:
         expr0, expr1 = self._expr(expr.args[0]), self._expr(expr.args[1])
         bits = expr.result_size(self.tyenv)
-
-        r = None
-        expr0_v = expr0.one_value()
-        expr1_v = expr1.one_value()
-
-        if expr0_v is None and expr1_v is None:
-            # we do not support multiplication between two real multivalues
-            r = MultiValues(self.state.top(bits))
-        elif expr0_v is None and expr1_v is not None:
-            # multiplying a single value to a multivalue
-            if expr0.count() == 1 and 0 in expr0:
-                vs = {v * expr1_v for v in expr0[0]}  # type: ignore
-                r = MultiValues({0: vs})
-        elif expr0_v is not None and expr1_v is None:
-            # multiplying a single value to a multivalue
-            if expr1.count() == 1 and 0 in expr1:
-                vs = {v * expr0_v for v in expr1[0]}  # type: ignore
-                r = MultiValues({0: vs})
-        else:
-            # multiplying two single values together
-            r = MultiValues(expr0_v * expr1_v)  # type: ignore
-
-        if r is None:
-            r = MultiValues(self.state.top(bits))
-
-        return r
+        return self.state.binop(expr0, expr1, bits, operator.mul, rop=operator.mul)
 
     @binop_handler
     def _handle_binop_Mull(self, expr: pyvex.expr.Binop) -> MultiValues:
@@ -764,104 +700,35 @@ class SimEngineRDVEX(
     def _handle_binop_And(self, expr: pyvex.expr.Binop) -> MultiValues:
         expr0, expr1 = self._expr(expr.args[0]), self._expr(expr.args[1])
         bits = expr.result_size(self.tyenv)
-
-        r = None
-        expr0_v = expr0.one_value()
-        expr1_v = expr1.one_value()
-
-        if expr0_v is not None and expr1_v is not None:
-            # bitwise-and two single values together
-            r = MultiValues(expr0_v & expr1_v)
-        elif expr0_v is None and expr1_v is not None:
-            # bitwise-and a single value with a multivalue
-            if expr0.count() == 1 and 0 in expr0:
-                vs = {v & expr1_v for v in expr0[0]}
-                r = MultiValues({0: vs})
-        elif expr0_v is not None and expr1_v is None:
-            # bitwise-and a single value to a multivalue
-            if expr1.count() == 1 and 0 in expr1:
-                vs = {v & expr0_v for v in expr1[0]}
-                r = MultiValues({0: vs})
-        else:
-            # we do not support addition between two real multivalues
-            r = MultiValues(self.state.top(bits))
-
-        if r is None:
-            r = MultiValues(self.state.top(bits))
-
-        return r
+        return self.state.binop(expr0, expr1, bits, operator.and_, rop=operator.and_)
 
     @binop_handler
     def _handle_binop_Xor(self, expr: pyvex.expr.Binop) -> MultiValues:
         expr0, expr1 = self._expr(expr.args[0]), self._expr(expr.args[1])
         bits = expr.result_size(self.tyenv)
 
-        r = None
-        expr0_v = expr0.one_value()
-        expr1_v = expr1.one_value()
-
+        expr0_v, expr1_v = expr0.one_value(), expr1.one_value()
         if expr0_v is not None and expr1_v is not None:
             if expr0_v.concrete and expr1_v.concrete:
-                # bitwise-xor two single values together
-                r = MultiValues(expr0_v ^ expr1_v)
-        elif expr0_v is None and expr1_v is not None:
-            # bitwise-xor a single value with a multivalue
-            if expr0.count() == 1 and 0 in expr0:
-                vs = {v.sign_extend(expr1_v.size() - v.size()) ^ expr1_v for v in expr0[0]}
-                r = MultiValues({0: vs})
-        elif expr0_v is not None and expr1_v is None:
-            # bitwise-xor a single value to a multivalue
-            if expr1.count() == 1 and 0 in expr1:
-                vs = {v.sign_extend(expr0_v.size() - v.size()) ^ expr0_v for v in expr1[0]}
-                r = MultiValues({0: vs})
-        else:
-            # we do not support xor between two real multivalues
-            r = MultiValues(self.state.top(bits))
+                return MultiValues(expr0_v ^ expr1_v)
+            return MultiValues(self.state.top(bits))
 
-        if r is None:
-            r = MultiValues(self.state.top(bits))
+        def _xor(v: claripy.ast.BV, single: claripy.ast.BV) -> claripy.ast.BV:
+            # a value of the operand with several values is sign-extended to the width of the other operand
+            return v.sign_extend(single.size() - v.size()) ^ single
 
-        return r
+        return self.state.binop(expr0, expr1, bits, _xor, rop=_xor)
 
     @binop_handler
     def _handle_binop_Or(self, expr: pyvex.expr.Binop) -> MultiValues:
         expr0, expr1 = self._expr(expr.args[0]), self._expr(expr.args[1])
         bits = expr.result_size(self.tyenv)
-
-        r = None
-        expr0_v = expr0.one_value()
-        expr1_v = expr1.one_value()
-
-        if expr0_v is not None and expr1_v is not None:
-            # bitwise-and two single values together
-            r = MultiValues(expr0_v | expr1_v)
-        elif expr0_v is None and expr1_v is not None:
-            # bitwise-or a single value with a multivalue
-            if expr0.count() == 1 and 0 in expr0:
-                vs = {v | expr1_v for v in expr0[0]}
-                r = MultiValues({0: vs})
-        elif expr0_v is not None and expr1_v is None:
-            # bitwise-or a single value to a multivalue
-            if expr1.count() == 1 and 0 in expr1:
-                vs = {v | expr0_v for v in expr1[0]}
-                r = MultiValues({0: vs})
-        else:
-            # we do not support or between two real multivalues
-            r = MultiValues(self.state.top(bits))
-
-        if r is None:
-            r = MultiValues(self.state.top(bits))
-
-        return r
+        return self.state.binop(expr0, expr1, bits, operator.or_, rop=operator.or_)
 
     @binop_handler
     def _handle_binop_Sar(self, expr: pyvex.expr.Binop) -> MultiValues:
         expr0, expr1 = self._expr(expr.args[0]), self._expr(expr.args[1])
         bits = expr.result_size(self.tyenv)
-
-        r = None
-        expr0_v = expr0.one_value()
-        expr1_v = expr1.one_value()
 
         def _shift_sar(e0: claripy.ast.BV, e1: claripy.ast.BV):
             # convert e1 to an integer to prevent claripy from complaining "args' lengths must all be equal"
@@ -875,36 +742,12 @@ class SimEngineRDVEX(
             head = claripy.BVV(0, bits) if claripy.is_true(e0 >> bits - 1 == 0) else (1 << e1_int) - 1 << bits - e1_int
             return head | (e0 >> e1_int)
 
-        if expr0_v is not None and expr1_v is not None:
-            # subtracting a single value from another single value
-            r = MultiValues(_shift_sar(expr0_v, expr1_v))
-        elif expr0_v is None and expr1_v is not None:
-            # shifting a single value by a multivalue
-            if expr0.count() == 1 and 0 in expr0:
-                vs = {_shift_sar(v, expr1_v) for v in expr0[0]}
-                r = MultiValues({0: vs})
-        elif expr0_v is not None and expr1_v is None:
-            # shifting a multivalue by a single value
-            if expr1.count() == 1 and 0 in expr1:
-                vs = {_shift_sar(expr0_v, v) for v in expr1[0]}
-                r = MultiValues({0: vs})
-        else:
-            # we do not support shifting between two real multivalues
-            r = MultiValues(self.state.top(bits))
-
-        if r is None:
-            r = MultiValues(self.state.top(bits))
-
-        return r
+        return self.state.binop(expr0, expr1, bits, _shift_sar)
 
     @binop_handler
     def _handle_binop_Shr(self, expr: pyvex.expr.Binop) -> MultiValues:
         expr0, expr1 = self._expr(expr.args[0]), self._expr(expr.args[1])
         bits = expr.result_size(self.tyenv)
-
-        r = None
-        expr0_v = expr0.one_value()
-        expr1_v = expr1.one_value()
 
         def _shift_shr(e0, e1):
             if e1.symbolic:
@@ -916,36 +759,12 @@ class SimEngineRDVEX(
 
             return claripy.LShR(e0, e1)
 
-        if expr0_v is None and expr1_v is None:
-            # we do not support shifting between two real multivalues
-            r = MultiValues(self.state.top(bits))
-        elif expr0_v is None and expr1_v is not None:
-            # shifting a single value by a multivalue
-            if expr0.count() == 1 and 0 in expr0:
-                vs = {_shift_shr(v, expr1_v) for v in expr0[0]}
-                r = MultiValues({0: vs})
-        elif expr0_v is not None and expr1_v is None:
-            # shifting a multivalue by a single value
-            if expr1.count() == 1 and 0 in expr1:
-                vs = {_shift_shr(expr0_v, v) for v in expr1[0]}
-                r = MultiValues({0: vs})
-        else:
-            # shifting a single value from another single value
-            r = MultiValues(_shift_shr(expr0_v, expr1_v))
-
-        if r is None:
-            r = MultiValues(self.state.top(bits))
-
-        return r
+        return self.state.binop(expr0, expr1, bits, _shift_shr)
 
     @binop_handler
     def _handle_binop_Shl(self, expr: pyvex.expr.Binop) -> MultiValues:
         expr0, expr1 = self._expr(expr.args[0]), self._expr(expr.args[1])
         bits = expr.result_size(self.tyenv)
-
-        r = None
-        expr0_v = expr0.one_value()
-        expr1_v = expr1.one_value()
 
         def _shift_shl(e0, e1):
             # convert e1 to an integer to prevent claripy from complaining "args' lengths must all be equal"
@@ -954,27 +773,7 @@ class SimEngineRDVEX(
             e1 = e1.concrete_value
             return e0 << e1
 
-        if expr0_v is None and expr1_v is None:
-            # we do not support shifting between two real multivalues
-            r = MultiValues(self.state.top(bits))
-        elif expr0_v is None and expr1_v is not None:
-            # shifting left a single value by a multivalue
-            if expr0.count() == 1 and 0 in expr0:
-                vs = {_shift_shl(v, expr1_v) for v in expr0[0]}
-                r = MultiValues({0: vs})
-        elif expr0_v is not None and expr1_v is None:
-            # shifting left a multivalue by a single value
-            if expr1.count() == 1 and 0 in expr1:
-                vs = {_shift_shl(expr0_v, v) for v in expr1[0]}
-                r = MultiValues({0: vs})
-        else:
-            # subtracting a single value from another single value
-            r = MultiValues(_shift_shl(expr0_v, expr1_v))
-
-        if r is None:
-            r = MultiValues(self.state.top(bits))
-
-        return r
+        return self.state.binop(expr0, expr1, bits, _shift_shl)
 
     @binop_handler
     def _handle_binop_CmpEQ(self, expr: pyvex.expr.Binop) -> MultiValues:

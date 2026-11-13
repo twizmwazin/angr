@@ -29,6 +29,10 @@ from .subject import SubjectType
 l = logging.getLogger(name=__name__)
 
 
+def _concrete(value: claripy.ast.BV) -> bool:
+    return value.concrete
+
+
 class SimEngineRDAIL(SimEngineNostmtAIL[ReachingDefinitionsState, MultiValues, None, ReachingDefinitionsState]):
     def __init__(
         self,
@@ -54,6 +58,9 @@ class SimEngineRDAIL(SimEngineNostmtAIL[ReachingDefinitionsState, MultiValues, N
         some of which might be top
         """
         return False
+
+    def _concrete_or_stack_address(self, value: claripy.ast.BV) -> bool:
+        return value.concrete or self.state.is_stack_address(value)
 
     def _top(self, bits) -> MultiValues:
         return MultiValues(self.state.top(bits))
@@ -683,76 +690,23 @@ class SimEngineRDAIL(SimEngineNostmtAIL[ReachingDefinitionsState, MultiValues, N
 
     @ail_binop_handler
     def _handle_binop_Add(self, expr) -> MultiValues:
-        expr0, expr1 = self._expr(expr.operands[0]), self._expr(expr.operands[1])
+        expr0 = self._expr(expr.operands[0])
+        expr1 = self._expr(expr.operands[1])
         bits = expr.bits
         if expr.floating_point:
             return self._fp_op(bits, operator.add, expr0, expr1)
-
-        r: MultiValues | None = None
-        expr0_v = expr0.one_value()
-        expr1_v = expr1.one_value()
-
-        if expr0_v is not None and expr1_v is not None:
-            # adding two single values together
-            if (expr0_v.concrete or self.state.is_stack_address(expr0_v)) and expr1_v.concrete:
-                r = MultiValues(expr0_v + expr1_v)  # type: ignore
-        elif expr0_v is None and expr1_v is not None:
-            # adding a single value to a multivalue
-            if (
-                expr0.count() == 1
-                and 0 in expr0
-                and all(v.concrete or self.state.is_stack_address(v) for v in expr0[0])
-            ):
-                vs = {v + expr1_v for v in expr0[0]}  # type: ignore
-                r = MultiValues({0: vs})
-        elif expr0_v is not None and expr1_v is None:
-            # adding a single value to a multivalue
-            if expr1.count() == 1 and 0 in expr1 and all(v.concrete for v in expr1[0]):
-                vs = {v + expr0_v for v in expr1[0]}  # type: ignore
-                r = MultiValues({0: vs})
-        else:
-            r = MultiValues(self.state.top(bits))
-
-        if r is None:
-            r = MultiValues(self.state.top(bits))
-
-        return r
+        return self.state.binop(
+            expr0, expr1, bits, operator.add, rop=operator.add, ok=(self._concrete_or_stack_address, _concrete)
+        )
 
     @ail_binop_handler
     def _handle_binop_Sub(self, expr) -> MultiValues:
-        expr0, expr1 = self._expr(expr.operands[0]), self._expr(expr.operands[1])
+        expr0 = self._expr(expr.operands[0])
+        expr1 = self._expr(expr.operands[1])
         bits = expr.bits
         if expr.floating_point:
             return self._fp_op(bits, operator.sub, expr0, expr1)
-
-        r: MultiValues | None = None
-        expr0_v = expr0.one_value()
-        expr1_v = expr1.one_value()
-
-        if expr0_v is not None and expr1_v is not None:
-            if (expr0_v.concrete or self.state.is_stack_address(expr0_v)) and expr1_v.concrete:
-                r = MultiValues(expr0_v - expr1_v)  # type: ignore
-        elif expr0_v is None and expr1_v is not None:
-            # subtracting a single value from a multivalue
-            if (
-                expr0.count() == 1
-                and 0 in expr0
-                and all(v.concrete or self.state.is_stack_address(v) for v in expr0[0])
-            ):
-                vs = {v - expr1_v for v in expr0[0]}  # type: ignore
-                r = MultiValues({0: vs})
-        elif expr0_v is not None and expr1_v is None:
-            # subtracting a single value from a multivalue
-            if expr1.count() == 1 and 0 in expr1 and all(v.concrete for v in expr1[0]):
-                vs = {expr0_v - v for v in expr1[0]}  # type: ignore
-                r = MultiValues({0: vs})
-        else:
-            r = MultiValues(self.state.top(bits))
-
-        if r is None:
-            r = MultiValues(self.state.top(bits))
-
-        return r
+        return self.state.binop(expr0, expr1, bits, operator.sub, ok=(self._concrete_or_stack_address, _concrete))
 
     @ail_binop_handler
     def _handle_binop_Default(self, expr) -> MultiValues:
@@ -841,34 +795,12 @@ class SimEngineRDAIL(SimEngineNostmtAIL[ReachingDefinitionsState, MultiValues, N
         expr1 = self._expr(expr.operands[1])
         bits = expr.bits
 
-        r: MultiValues | None = None
-        expr0_v = expr0.one_value()
         expr1_v = expr1.one_value()
-
-        if expr0_v is not None and expr1_v is not None:
-            if expr0_v.concrete and expr1_v.concrete:
-                r = MultiValues(claripy.LShR(expr0_v, expr1_v.concrete_value))
-        elif expr0_v is None and expr1_v is not None:
-            # each value in expr0 >> expr1_v
-            if expr0.count() == 1 and 0 in expr0 and all(v.concrete for v in expr0[0]) and expr1_v.concrete:
-                vs = {
-                    (claripy.LShR(v, expr1_v.concrete_value) if v.concrete else self.state.top(bits)) for v in expr0[0]
-                }
-                r = MultiValues({0: vs})
-        elif expr0_v is not None and expr1_v is None:
-            # expr0_v >> each value in expr1
-            if expr1.count() == 1 and 0 in expr1 and all(v.concrete for v in expr1[0]):
-                vs = {
-                    (claripy.LShR(expr0_v, v.concrete_value) if v.concrete else self.state.top(bits)) for v in expr1[0]
-                }
-                r = MultiValues({0: vs})
-        else:
-            r = MultiValues(self.state.top(bits))
-
-        if r is None:
-            r = MultiValues(self.state.top(bits))
-
-        return r
+        if expr1_v is not None and not expr1_v.concrete:
+            return MultiValues(self.state.top(bits))
+        return self.state.binop(
+            expr0, expr1, bits, lambda e0, e1: claripy.LShR(e0, e1.concrete_value), ok=(_concrete, _concrete)
+        )
 
     @ail_binop_handler
     def _handle_binop_Sar(self, expr) -> MultiValues:
@@ -876,132 +808,50 @@ class SimEngineRDAIL(SimEngineNostmtAIL[ReachingDefinitionsState, MultiValues, N
         expr1 = self._expr(expr.operands[1])
         bits = expr.bits
 
-        r: MultiValues | None = None
-        expr0_v = expr0.one_value()
         expr1_v = expr1.one_value()
-
-        if expr0_v is not None and expr1_v is not None:
-            if expr0_v.concrete and expr1_v.concrete:
-                r = MultiValues(expr0_v >> expr1_v.concrete_value)
-        elif expr0_v is None and expr1_v is not None:
-            # each value in expr0 >> expr1_v
-            if expr0.count() == 1 and 0 in expr0 and all(v.concrete for v in expr0[0]) and expr1_v.concrete:
-                vs = {
-                    (claripy.LShR(v, expr1_v.concrete_value) if v.concrete else self.state.top(bits)) for v in expr0[0]
-                }
-                r = MultiValues({0: vs})
-        elif expr0_v is not None and expr1_v is None:
-            # expr0_v >> each value in expr1
-            if expr1.count() == 1 and 0 in expr1 and all(v.concrete for v in expr1[0]):
-                vs = {
-                    (claripy.LShR(expr0_v, v.concrete_value) if v.concrete else self.state.top(bits)) for v in expr1[0]
-                }
-                r = MultiValues({0: vs})
-        else:
-            r = MultiValues(self.state.top(bits))
-
-        if r is None:
-            r = MultiValues(self.state.top(bits))
-
-        return r
+        if expr1_v is not None and not expr1_v.concrete:
+            return MultiValues(self.state.top(bits))
+        if expr0.one_value() is not None and expr1_v is not None:
+            return self.state.binop(
+                expr0, expr1, bits, lambda e0, e1: e0 >> e1.concrete_value, ok=(_concrete, _concrete)
+            )
+        # FIXME: several values are shifted logically
+        return self.state.binop(
+            expr0, expr1, bits, lambda e0, e1: claripy.LShR(e0, e1.concrete_value), ok=(_concrete, _concrete)
+        )
 
     @ail_binop_handler
-    def _handle_binop_Shl(self, expr):
+    def _handle_binop_Shl(self, expr) -> MultiValues:
         expr0 = self._expr(expr.operands[0])
         expr1 = self._expr(expr.operands[1])
         bits = expr.bits
 
-        r: MultiValues | None = None
-        expr0_v = expr0.one_value()
         expr1_v = expr1.one_value()
-
-        if expr0_v is not None and expr1_v is not None:
-            if expr0_v.concrete and expr1_v.concrete:
-                r = MultiValues(expr0_v << expr1_v.concrete_value)
-        elif expr0_v is None and expr1_v is not None:
-            # each value in expr0 << expr1_v
-            if expr0.count() == 1 and 0 in expr0 and all(v.concrete for v in expr0[0]) and expr1_v.concrete:
-                vs = {((v << expr1_v.concrete_value) if v.concrete else self.state.top(bits)) for v in expr0[0]}
-                r = MultiValues({0: vs})
-        elif expr0_v is not None and expr1_v is None:
-            # expr0_v >> each value in expr1
-            if expr1.count() == 1 and 0 in expr1 and all(v.concrete for v in expr1[0]):
-                vs = {((expr0_v << v.concrete_value) if v.concrete else self.state.top(bits)) for v in expr1[0]}
-                r = MultiValues({0: vs})
-        else:
-            r = MultiValues(self.state.top(bits))
-
-        if r is None:
-            r = MultiValues(self.state.top(bits))
-
-        return r
+        if expr1_v is not None and not expr1_v.concrete:
+            return MultiValues(self.state.top(bits))
+        return self.state.binop(expr0, expr1, bits, lambda e0, e1: e0 << e1.concrete_value, ok=(_concrete, _concrete))
 
     _handle_binop_Rol = _handle_binop_Default
     _handle_binop_Ror = _handle_binop_Default
 
     @ail_binop_handler
-    def _handle_binop_And(self, expr):
+    def _handle_binop_And(self, expr) -> MultiValues:
         expr0 = self._expr(expr.operands[0])
         expr1 = self._expr(expr.operands[1])
         bits = expr.bits
 
-        r: MultiValues | None = None
         expr0_v = expr0.one_value()
-        expr1_v = expr1.one_value()
-
-        if expr0_v is not None and expr1_v is not None:
+        if expr0_v is not None and expr1.one_value() is not None and self.state.is_stack_address(expr0_v):
             # special handling for stack alignment
-            if self.state.is_stack_address(expr0_v):
-                r = MultiValues(expr0_v)
-            else:
-                if expr0_v.concrete and expr1_v.concrete:
-                    r = MultiValues(expr0_v & expr1_v)
-        elif expr0_v is None and expr1_v is not None:
-            # expr1_v & each value in expr0
-            if expr0.count() == 1 and 0 in expr0 and all(v.concrete for v in expr0[0]):
-                r = MultiValues({0: {v & expr1_v for v in expr0[0]}})
-        elif expr0_v is not None and expr1_v is None:
-            # expr0_v & each value in expr1
-            if expr1.count() == 1 and 0 in expr1 and all(v.concrete for v in expr1[0]):
-                r = MultiValues({0: {expr0_v & v for v in expr1[0]}})
-        else:
-            r = MultiValues(self.state.top(bits))
-
-        if r is None:
-            r = MultiValues(self.state.top(bits))
-
-        return r
+            return MultiValues(expr0_v)
+        return self.state.binop(expr0, expr1, bits, operator.and_, ok=(_concrete, _concrete))
 
     @ail_binop_handler
-    def _handle_binop_Or(self, expr):
-        expr0: MultiValues = self._expr(expr.operands[0])
-        expr1: MultiValues = self._expr(expr.operands[1])
+    def _handle_binop_Or(self, expr) -> MultiValues:
+        expr0 = self._expr(expr.operands[0])
+        expr1 = self._expr(expr.operands[1])
         bits = expr.bits
-
-        r: MultiValues | None = None
-        expr0_v = expr0.one_value()
-        expr1_v = expr1.one_value()
-
-        if expr0_v is not None and expr1_v is not None:
-            if expr0_v.concrete and expr1_v.concrete:
-                r = MultiValues(expr0_v | expr1_v)
-        elif expr0_v is None and expr1_v is not None:
-            # expr1_v | each value in expr0
-            if expr0.count() == 1 and 0 in expr0 and all(v.concrete for v in expr0[0]):
-                vs = {v | expr1_v for v in expr0[0]}
-                r = MultiValues({0: vs})
-        elif expr0_v is not None and expr1_v is None:
-            # expr0_v | each value in expr1
-            if expr1.count() == 1 and 0 in expr1 and all(v.concrete for v in expr1[0]):
-                vs = {expr0_v | v for v in expr1[0]}
-                r = MultiValues({0: vs})
-        else:
-            r = MultiValues(self.state.top(bits))
-
-        if r is None:
-            r = MultiValues(self.state.top(bits))
-
-        return r
+        return self.state.binop(expr0, expr1, bits, operator.or_, ok=(_concrete, _concrete))
 
     @ail_binop_handler
     def _handle_binop_LogicalAnd(self, expr) -> MultiValues:
@@ -1047,35 +897,11 @@ class SimEngineRDAIL(SimEngineNostmtAIL[ReachingDefinitionsState, MultiValues, N
         return MultiValues(claripy.If(expr0_v != 0, expr1_v, expr0_v))
 
     @ail_binop_handler
-    def _handle_binop_Xor(self, expr):
-        expr0: MultiValues = self._expr(expr.operands[0])
-        expr1: MultiValues = self._expr(expr.operands[1])
+    def _handle_binop_Xor(self, expr) -> MultiValues:
+        expr0 = self._expr(expr.operands[0])
+        expr1 = self._expr(expr.operands[1])
         bits = expr.bits
-
-        r: MultiValues | None = None
-        expr0_v = expr0.one_value()
-        expr1_v = expr1.one_value()
-
-        if expr0_v is not None and expr1_v is not None:
-            if expr0_v.concrete and expr1_v.concrete:
-                r = MultiValues(expr0_v ^ expr1_v)
-        elif expr0_v is None and expr1_v is not None:
-            # expr1_v ^ each value in expr0
-            if expr0.count() == 1 and 0 in expr0 and all(v.concrete for v in expr0[0]):
-                vs = {v ^ expr1_v for v in expr0[0]}
-                r = MultiValues({0: vs})
-        elif expr0_v is not None and expr1_v is None:
-            # expr0_v ^ each value in expr1
-            if expr1.count() == 1 and 0 in expr1 and all(v.concrete for v in expr1[0]):
-                vs = {expr0_v ^ v for v in expr1[0]}
-                r = MultiValues({0: vs})
-        else:
-            r = MultiValues(self.state.top(bits))
-
-        if r is None:
-            r = MultiValues(self.state.top(bits))
-
-        return r
+        return self.state.binop(expr0, expr1, bits, operator.xor, ok=(_concrete, _concrete))
 
     @ail_binop_handler
     def _handle_binop_Carry(self, expr) -> MultiValues:
@@ -1103,29 +929,7 @@ class SimEngineRDAIL(SimEngineNostmtAIL[ReachingDefinitionsState, MultiValues, N
         expr0 = self._expr(expr.operands[0])
         expr1 = self._expr(expr.operands[1])
         bits = expr.bits
-
-        r: MultiValues | None = None
-        expr0_v = expr0.one_value()
-        expr1_v = expr1.one_value()
-
-        if expr0_v is not None and expr1_v is not None:
-            if expr0_v.concrete and expr1_v.concrete:
-                r = MultiValues(claripy.Concat(expr0_v, expr1_v))
-        elif expr0_v is None and expr1_v is not None:
-            # concatenate expr1_v with each value in expr0
-            if expr0.count() == 1 and 0 in expr0 and all(v.concrete for v in expr0[0]):
-                r = MultiValues({0: {claripy.Concat(v, expr1_v) for v in expr0[0]}})
-        elif expr0_v is not None and expr1_v is None:
-            # concatenate expr0_v with each value in expr1
-            if expr1.count() == 1 and 0 in expr1 and all(v.concrete for v in expr1[0]):
-                r = MultiValues({0: {claripy.Concat(expr0_v, v) for v in expr1[0]}})
-        else:
-            r = MultiValues(self.state.top(bits))
-
-        if r is None:
-            r = MultiValues(self.state.top(bits))
-
-        return r
+        return self.state.binop(expr0, expr1, bits, claripy.Concat, ok=(_concrete, _concrete))
 
     @ail_binop_handler
     def _handle_binop_Cmp(self, expr) -> MultiValues:
