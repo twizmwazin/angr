@@ -2652,79 +2652,118 @@ impl StridedInterval {
         }
     }
 
+    /// Rotates left by every amount in `other`, or right when `right` is set.
+    ///
+    /// A rotation is not monotone, so the rotated bounds say nothing about the
+    /// values in between: rol([0x7f, 0x81], 1) holds rol(0x80, 1) = 1, which is
+    /// below both rol(0x7f, 1) = 0xfe and rol(0x81, 1) = 3. The result is exact
+    /// when the bits that rotate out are the same for every value, and top
+    /// otherwise.
+    fn rotate(&self, other: &Self, right: bool) -> Self {
+        let (
+            StridedInterval::Normal {
+                bits,
+                stride,
+                lower_bound,
+                upper_bound,
+            },
+            StridedInterval::Normal {
+                bits: o_bits,
+                stride: o_stride,
+                lower_bound: o_lb,
+                upper_bound: o_ub,
+            },
+        ) = (self, other)
+        else {
+            return Self::empty(self.bits());
+        };
+        let bits = *bits;
+        let width = BigUint::from(bits);
+
+        // Every rotation amount, as a left rotation below the width.
+        let o_steps = if o_stride.is_zero() {
+            BigUint::zero()
+        } else {
+            modular_sub(o_ub, o_lb, *o_bits) / o_stride
+        };
+        let mut amounts: Vec<u32> = Vec::new();
+        if o_steps >= width {
+            amounts.extend(0..bits);
+        } else {
+            let mut amount = o_lb.clone();
+            for _ in 0..=o_steps.to_u32().unwrap_or(bits) {
+                let rot = (&amount % &width).to_u32().unwrap_or(0);
+                let rot = if right { (bits - rot) % bits } else { rot };
+                if !amounts.contains(&rot) {
+                    amounts.push(rot);
+                }
+                amount = modular_add(&amount, o_stride, *o_bits);
+            }
+        }
+
+        let rotate_value = |value: &BigUint, rot: u32| -> BigUint {
+            ((value << rot) | (value >> (bits - rot))) & max_int(bits)
+        };
+
+        // The join of the rotations: (stride, lower bound, upper bound).
+        let mut acc: Option<(BigUint, BigUint, BigUint)> = None;
+        for &rot in &amounts {
+            let piece = if rot == 0 {
+                if lower_bound > upper_bound && amounts.len() > 1 {
+                    return Self::top(bits);
+                }
+                (stride.clone(), lower_bound.clone(), upper_bound.clone())
+            } else if lower_bound == upper_bound {
+                let rotated = rotate_value(lower_bound, rot);
+                (BigUint::zero(), rotated.clone(), rotated)
+            } else if lower_bound < upper_bound
+                && (lower_bound >> (bits - rot)) == (upper_bound >> (bits - rot))
+            {
+                // The top `rot` bits are the same for every value, so the
+                // rotation is x -> (x << rot) + constant without overflow.
+                (
+                    stride << rot,
+                    rotate_value(lower_bound, rot),
+                    rotate_value(upper_bound, rot),
+                )
+            } else {
+                return Self::top(bits);
+            };
+
+            acc = Some(match acc {
+                None => piece,
+                Some((g, lo, hi)) => {
+                    // The pieces share the stride that divides each of their
+                    // strides and the distance between their lower bounds.
+                    let diff = if piece.1 >= lo {
+                        &piece.1 - &lo
+                    } else {
+                        &lo - &piece.1
+                    };
+                    let mut g = g;
+                    for step in [&piece.0, &diff] {
+                        if !step.is_zero() {
+                            g = gcd(&g, step);
+                        }
+                    }
+                    (g, lo.min(piece.1), hi.max(piece.2))
+                }
+            });
+        }
+
+        match acc {
+            Some((g, lo, hi)) => Self::new(bits, g, lo, hi),
+            None => Self::top(bits),
+        }
+    }
+
     /// Rotates bits left with another interval as the rotation amount
     pub fn rotate_left(&self, other: &Self) -> Result<Self, ClarirsError> {
         match (self, other) {
             (StridedInterval::Empty { bits }, _) | (_, StridedInterval::Empty { bits }) => {
                 Ok(Self::empty(*bits))
             }
-            (
-                StridedInterval::Normal {
-                    bits,
-                    lower_bound: s_lb,
-                    upper_bound: s_ub,
-                    ..
-                },
-                StridedInterval::Normal {
-                    lower_bound: o_lb,
-                    upper_bound: o_ub,
-                    ..
-                },
-            ) => {
-                // Simple case: both are constants
-                if self.is_integer()
-                    && other.is_integer()
-                    && let Some(rot) = o_lb.to_u32()
-                {
-                    let rot = rot % *bits;
-                    if rot == 0 {
-                        return Ok(self.clone());
-                    }
-                    let left_part = s_lb << rot;
-                    let right_part = s_lb >> (*bits - rot);
-                    let rotated = (left_part | right_part) & max_int(*bits);
-                    return Ok(Self::constant(*bits, rotated));
-                }
-
-                // Improved: compute union for min and max rotation amounts
-                if let (Some(min_rot), Some(max_rot)) = (o_lb.to_u32(), o_ub.to_u32()) {
-                    // If rotation range is small enough, compute union
-                    let min_rot = min_rot % *bits;
-                    let max_rot = max_rot % *bits;
-
-                    // Helper to compute rotate_left for specific amount
-                    let compute_rotate = |val: &BigUint, rot: u32| -> BigUint {
-                        if rot == 0 {
-                            val.clone()
-                        } else {
-                            let left_part = val << rot;
-                            let right_part = val >> (*bits - rot);
-                            (left_part | right_part) & max_int(*bits)
-                        }
-                    };
-
-                    // Compute rotations for corners
-                    let min_val_min_rot = compute_rotate(s_lb, min_rot);
-                    let min_val_max_rot = compute_rotate(s_lb, max_rot);
-                    let max_val_min_rot = compute_rotate(s_ub, min_rot);
-                    let max_val_max_rot = compute_rotate(s_ub, max_rot);
-
-                    let lower = min_val_min_rot
-                        .clone()
-                        .min(min_val_max_rot.clone())
-                        .min(max_val_min_rot.clone())
-                        .min(max_val_max_rot.clone());
-                    let upper = min_val_min_rot
-                        .max(min_val_max_rot)
-                        .max(max_val_min_rot)
-                        .max(max_val_max_rot);
-
-                    return Ok(Self::range(*bits, lower, upper));
-                }
-
-                // Fallback to top for complex cases
-                Ok(Self::top(*bits))
-            }
+            _ => Ok(self.rotate(other, false)),
         }
     }
 
@@ -2734,72 +2773,7 @@ impl StridedInterval {
             (StridedInterval::Empty { bits }, _) | (_, StridedInterval::Empty { bits }) => {
                 Ok(Self::empty(*bits))
             }
-            (
-                StridedInterval::Normal {
-                    bits,
-                    lower_bound: s_lb,
-                    upper_bound: s_ub,
-                    ..
-                },
-                StridedInterval::Normal {
-                    lower_bound: o_lb,
-                    upper_bound: o_ub,
-                    ..
-                },
-            ) => {
-                // Simple case: both are constants
-                if self.is_integer()
-                    && other.is_integer()
-                    && let Some(rot) = o_lb.to_u32()
-                {
-                    let rot = rot % *bits;
-                    if rot == 0 {
-                        return Ok(self.clone());
-                    }
-                    let right_part = s_lb >> rot;
-                    let left_part = s_lb << (*bits - rot);
-                    let rotated = (left_part | right_part) & max_int(*bits);
-                    return Ok(Self::constant(*bits, rotated));
-                }
-
-                // Improved: compute union for min and max rotation amounts
-                if let (Some(min_rot), Some(max_rot)) = (o_lb.to_u32(), o_ub.to_u32()) {
-                    let min_rot = min_rot % *bits;
-                    let max_rot = max_rot % *bits;
-
-                    // Helper to compute rotate_right for specific amount
-                    let compute_rotate = |val: &BigUint, rot: u32| -> BigUint {
-                        if rot == 0 {
-                            val.clone()
-                        } else {
-                            let right_part = val >> rot;
-                            let left_part = val << (*bits - rot);
-                            (left_part | right_part) & max_int(*bits)
-                        }
-                    };
-
-                    // Compute rotations for corners
-                    let min_val_min_rot = compute_rotate(s_lb, min_rot);
-                    let min_val_max_rot = compute_rotate(s_lb, max_rot);
-                    let max_val_min_rot = compute_rotate(s_ub, min_rot);
-                    let max_val_max_rot = compute_rotate(s_ub, max_rot);
-
-                    let lower = min_val_min_rot
-                        .clone()
-                        .min(min_val_max_rot.clone())
-                        .min(max_val_min_rot.clone())
-                        .min(max_val_max_rot.clone());
-                    let upper = min_val_min_rot
-                        .max(min_val_max_rot)
-                        .max(max_val_min_rot)
-                        .max(max_val_max_rot);
-
-                    return Ok(Self::range(*bits, lower, upper));
-                }
-
-                // Fallback to top for complex cases
-                Ok(Self::top(*bits))
-            }
+            _ => Ok(self.rotate(other, true)),
         }
     }
 
@@ -3762,6 +3736,109 @@ mod si_shift_op_tests {
         // Should contain both original (rot=0) and rotated by 1
         assert!(result.contains_value(&BigUint::from(0b10000001u32)));
         assert!(result.contains_value(&BigUint::from(0b11000000u32)));
+    }
+
+    #[test]
+    fn test_rotate_is_sound() {
+        // The values of an interval, as a bit set, by direct enumeration.
+        fn concretize(si: &StridedInterval) -> u32 {
+            let StridedInterval::Normal {
+                bits,
+                stride,
+                lower_bound,
+                upper_bound,
+            } = si
+            else {
+                return 0;
+            };
+            let modulus = 1u32 << *bits;
+            let stride = stride.to_u32().unwrap();
+            let lb = lower_bound.to_u32().unwrap();
+            let ub = upper_bound.to_u32().unwrap();
+            let span = (ub + modulus - lb) % modulus;
+            let steps = span.checked_div(stride).unwrap_or(0);
+            (0..=steps).fold(0, |set, i| set | 1 << ((lb + i * stride) % modulus))
+        }
+
+        // A rotation is not monotone: rol(0x80, 1) = 1 is below the rotation
+        // of both bounds, and ror(0x80, 7) is the same value.
+        let val = StridedInterval::range(8, 0x7fu32, 0x81u32);
+        let result = val
+            .rotate_left(&StridedInterval::constant(8, 1u32))
+            .unwrap();
+        for expected in [0xfeu32, 0x01, 0x03] {
+            assert!(result.contains_value(&BigUint::from(expected)));
+        }
+        let result = val
+            .rotate_right(&StridedInterval::constant(8, 7u32))
+            .unwrap();
+        for expected in [0xfeu32, 0x01, 0x03] {
+            assert!(result.contains_value(&BigUint::from(expected)));
+        }
+
+        // Constants stay exact.
+        let val = StridedInterval::constant(8, 0x81u32);
+        let rot = StridedInterval::constant(8, 9u32);
+        assert_eq!(
+            val.rotate_left(&rot).unwrap(),
+            StridedInterval::constant(8, 0x03u32)
+        );
+        assert_eq!(
+            val.rotate_right(&rot).unwrap(),
+            StridedInterval::constant(8, 0xc0u32)
+        );
+
+        // So does an interval whose rotated-out bits are constant.
+        let val = StridedInterval::new(8, 2u32, 0x41u32, 0x4fu32);
+        let rot = StridedInterval::constant(8, 2u32);
+        assert_eq!(
+            val.rotate_left(&rot).unwrap(),
+            StridedInterval::new(8, 8u32, 0x05u32, 0x3du32)
+        );
+
+        // Exhaustive at 4 bits: every interval, wrapping ones included, rotated
+        // by every interval of stride 1 to 3 whose bounds are 0 to 5 or 15
+        // (the amount only matters modulo 4).
+        const BITS: u32 = 4;
+        let mut values = Vec::new();
+        let mut amounts = Vec::new();
+        for stride in 0u32..16 {
+            for lb in 0u32..16 {
+                for ub in 0u32..16 {
+                    if (stride == 0) != (lb == ub) {
+                        continue;
+                    }
+                    let si = StridedInterval::new(BITS, stride, lb, ub);
+                    let set = concretize(&si);
+                    if stride <= 3 && [lb, ub].iter().all(|b| *b <= 5 || *b == 15) {
+                        amounts.push((si.clone(), set));
+                    }
+                    values.push((si, set));
+                }
+            }
+        }
+
+        let rol = |x: u32, k: u32| ((x << (k % BITS)) | (x >> ((BITS - k % BITS) % BITS))) & 0xf;
+        for (val, val_set) in &values {
+            for (amount, amount_set) in &amounts {
+                let left = concretize(&val.rotate_left(amount).unwrap());
+                let right = concretize(&val.rotate_right(amount).unwrap());
+                for x in (0..16u32).filter(|x| val_set >> x & 1 == 1) {
+                    for k in (0..16u32).filter(|k| amount_set >> k & 1 == 1) {
+                        let expected = rol(x, k);
+                        assert!(
+                            left >> expected & 1 == 1,
+                            "rol({val:?}, {amount:?}) dropped rol({x}, {k}) = {expected}"
+                        );
+                        let expected = rol(x, BITS - k % BITS);
+                        assert!(
+                            right >> expected & 1 == 1,
+                            "ror({val:?}, {amount:?}) dropped ror({x}, {k}) = {expected}"
+                        );
+                    }
+                }
+            }
+        }
     }
 }
 
