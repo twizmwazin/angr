@@ -1554,6 +1554,96 @@ mod tests {
     }
 
     #[test]
+    fn test_replacement_solver_conflicting_equalities_are_unsat() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let mut solver = ReplacementSolver::new(Z3Solver::new(&ctx));
+
+        let x = ctx.bvs("x", 8)?;
+        let five = ctx.bvv(BitVec::from((5, 8)))?;
+        let six = ctx.bvv(BitVec::from((6, 8)))?;
+
+        solver.add(&ctx.eq_(&x, &five)?)?;
+        assert!(solver.satisfiable()?);
+        assert_eq!(solver.eval(&x)?, five);
+        assert!(!solver.satisfiable_with_extra(&[ctx.eq_(&x, &six)?])?);
+
+        // The second equality must not replace x -> 5 and vanish as `6 == 6`.
+        solver.add(&ctx.eq_(&x, &six)?)?;
+        assert!(!solver.satisfiable()?);
+        assert!(matches!(solver.eval(&x), Err(ClarirsError::Unsat)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_replacement_solver_conflicting_not_is_unsat() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let x = ctx.bvs("x", 8)?;
+        let five = ctx.bvv(BitVec::from((5, 8)))?;
+        let b = ctx.bools("b")?;
+
+        // b == true, then Not(b).
+        let mut solver = ReplacementSolver::new(Z3Solver::new(&ctx));
+        solver.add(&ctx.eq_(&b, &ctx.true_()?)?)?;
+        solver.add(&ctx.not(&b)?)?;
+        assert!(!solver.satisfiable()?);
+
+        // Not(b), then b == true.
+        let mut solver = ReplacementSolver::new(Z3Solver::new(&ctx));
+        solver.add(&ctx.not(&b)?)?;
+        solver.add(&ctx.eq_(&b, &ctx.true_()?)?)?;
+        assert!(!solver.satisfiable()?);
+
+        // Not(x == 5), then x == 5, and the other way around.
+        let eq = ctx.eq_(&x, &five)?;
+        let mut solver = ReplacementSolver::new(Z3Solver::new(&ctx));
+        solver.add(&ctx.not(&eq)?)?;
+        solver.add(&eq)?;
+        assert!(!solver.satisfiable()?);
+
+        let mut solver = ReplacementSolver::new(Z3Solver::new(&ctx));
+        solver.add(&eq)?;
+        solver.add(&ctx.not(&eq)?)?;
+        assert!(!solver.satisfiable()?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_replacement_solver_sees_constraints_older_than_replacement() -> Result<(), ClarirsError>
+    {
+        let ctx = Context::new();
+        let mut solver = ReplacementSolver::new(Z3Solver::new(&ctx));
+
+        let x = ctx.bvs("x", 8)?;
+        let five = ctx.bvv(BitVec::from((5, 8)))?;
+        let ten = ctx.bvv(BitVec::from((10, 8)))?;
+
+        // x > 10 reaches the inner solver before x -> 5 exists, so the
+        // equality has to reach it as `x == 5`, not as `5 == 5`.
+        solver.add(&ctx.ugt(&x, &ten)?)?;
+        solver.add(&ctx.eq_(&x, &five)?)?;
+        assert!(!solver.satisfiable()?);
+
+        // The inner solver pins x on its own, so the value survives the
+        // replacements being dropped.
+        let mut solver = ReplacementSolver::new(Z3Solver::new(&ctx));
+        solver.add(&ctx.eq_(&x, &five)?)?;
+        solver.clear_replacements();
+        assert_eq!(solver.eval_n(&x, 2)?, vec![five.clone()]);
+
+        // clear() forgets the extracted replacement along with the constraint.
+        solver.add(&ctx.eq_(&x, &five)?)?;
+        solver.clear()?;
+        assert!(solver.replacements().is_empty());
+        solver.add(&ctx.ugt(&x, &ten)?)?;
+        assert!(solver.satisfiable()?);
+        assert_ne!(solver.eval(&x)?, five);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_unsat_core_simple() -> Result<(), ClarirsError> {
         let ctx = Context::new();
         let mut solver = Z3Solver::new_with_options(&ctx, None, true);
