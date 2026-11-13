@@ -724,45 +724,36 @@ impl StridedInterval {
                 }
             }
 
-            // Fall back to splitting into non-wrapping parts
-            let self_parts = if self_wraps {
-                if let StridedInterval::Normal {
+            // Fall back to splitting into non-wrapping parts. The part that
+            // starts over from zero stays on the stride of the part before it:
+            // its first value is one stride past the last value below 2**bits,
+            // which is zero only if the stride happens to line up.
+            let split = |si: &Self| match si {
+                StridedInterval::Normal {
+                    bits,
                     stride,
                     lower_bound,
                     upper_bound,
-                    bits,
-                    ..
-                } = self
-                {
-                    vec![
-                        Self::new(*bits, stride.clone(), lower_bound.clone(), max_int(*bits)),
-                        Self::new(*bits, stride.clone(), BigUint::zero(), upper_bound.clone()),
-                    ]
-                } else {
-                    vec![self.clone()]
+                } if upper_bound < lower_bound => {
+                    let max_value = max_int(*bits);
+                    let high_last = &max_value - (&max_value - lower_bound) % stride;
+                    let low_first = modular_add(&high_last, stride, *bits);
+                    let mut parts = vec![Self::new(
+                        *bits,
+                        stride.clone(),
+                        lower_bound.clone(),
+                        high_last,
+                    )];
+                    if &low_first <= upper_bound {
+                        let low_last = upper_bound - (upper_bound - &low_first) % stride;
+                        parts.push(Self::new(*bits, stride.clone(), low_first, low_last));
+                    }
+                    parts
                 }
-            } else {
-                vec![self.clone()]
+                _ => vec![si.clone()],
             };
-            let other_parts = if other_wraps {
-                if let StridedInterval::Normal {
-                    stride,
-                    lower_bound,
-                    upper_bound,
-                    bits,
-                    ..
-                } = other
-                {
-                    vec![
-                        Self::new(*bits, stride.clone(), lower_bound.clone(), max_int(*bits)),
-                        Self::new(*bits, stride.clone(), BigUint::zero(), upper_bound.clone()),
-                    ]
-                } else {
-                    vec![other.clone()]
-                }
-            } else {
-                vec![other.clone()]
-            };
+            let self_parts = split(self);
+            let other_parts = split(other);
 
             // Collect non-empty partial intersections
             let mut parts: Vec<Self> = Vec::new();
@@ -782,60 +773,45 @@ impl StridedInterval {
                 return parts.into_iter().next().unwrap();
             }
 
-            // For two non-wrapping parts, try to construct a wrapping SI directly
-            // instead of using union (which may lose precision)
-            if parts.len() == 2 {
-                let (p_lo_0, p_hi_0) = parts[0].get_unsigned_bounds();
-                let (p_lo_1, p_hi_1) = parts[1].get_unsigned_bounds();
-                // If one part is near MAX and other near 0, create wrapping SI
-                if p_hi_0 == max_int(self.bits()) || p_lo_1 == BigUint::zero() {
-                    let stride = match (&parts[0], &parts[1]) {
-                        (
-                            StridedInterval::Normal { stride: s0, .. },
-                            StridedInterval::Normal { stride: s1, .. },
-                        ) => {
-                            if s0.is_zero() && s1.is_zero() {
-                                BigUint::one()
-                            } else if s0.is_zero() {
-                                s1.clone()
-                            } else if s1.is_zero() {
-                                s0.clone()
-                            } else {
-                                gcd(s0, s1)
-                            }
-                        }
-                        _ => BigUint::one(),
-                    };
-                    return Self::new(self.bits(), stride, p_lo_0, p_hi_1);
+            // The parts do not wrap and do not overlap. Join them into the
+            // interval that runs from the first value of one part around to
+            // the last value of the part before it, choosing the starting
+            // part that makes that the shortest: this is a wrapping interval
+            // when the parts sit at both ends of the range. The stride has to
+            // divide the stride of every part and the offset of every part
+            // from the start, or the parts would be on different phases.
+            let bits = self.bits();
+            let mut parts: Vec<(BigUint, BigUint, Self)> = parts
+                .into_iter()
+                .map(|part| {
+                    let (lower, upper) = part.get_unsigned_bounds();
+                    (lower, upper, part)
+                })
+                .collect();
+            parts.sort_by(|a, b| a.0.cmp(&b.0));
+            let count = parts.len();
+            let (span, start) = (0..count)
+                .map(|start| {
+                    let last = &parts[(start + count - 1) % count].1;
+                    (modular_sub(last, &parts[start].0, bits), start)
+                })
+                .min()
+                .unwrap();
+            let new_lower = parts[start].0.clone();
+            let mut new_stride = BigUint::zero();
+            for (lower, _, part) in &parts {
+                let offset = modular_sub(lower, &new_lower, bits);
+                if !offset.is_zero() {
+                    new_stride = gcd(&new_stride, &offset);
                 }
-                if p_hi_1 == max_int(self.bits()) || p_lo_0 == BigUint::zero() {
-                    let stride = match (&parts[0], &parts[1]) {
-                        (
-                            StridedInterval::Normal { stride: s0, .. },
-                            StridedInterval::Normal { stride: s1, .. },
-                        ) => {
-                            if s0.is_zero() && s1.is_zero() {
-                                BigUint::one()
-                            } else if s0.is_zero() {
-                                s1.clone()
-                            } else if s1.is_zero() {
-                                s0.clone()
-                            } else {
-                                gcd(s0, s1)
-                            }
-                        }
-                        _ => BigUint::one(),
-                    };
-                    return Self::new(self.bits(), stride, p_lo_1, p_hi_0);
+                if let StridedInterval::Normal { stride, .. } = part
+                    && !stride.is_zero()
+                {
+                    new_stride = gcd(&new_stride, stride);
                 }
             }
-
-            // Fallback: use union (may lose precision)
-            let mut result = Self::empty(self.bits());
-            for p in parts {
-                result = result.union(&p);
-            }
-            return result;
+            let new_upper = modular_add(&new_lower, &span, bits);
+            return Self::new(bits, new_stride, new_lower, new_upper);
         }
 
         // Check if ranges overlap
@@ -914,29 +890,60 @@ impl StridedInterval {
             }
         }
 
-        let (gcd, s_stride, o_stride) = match (self, other) {
-            (
-                StridedInterval::Normal {
-                    stride: s_stride, ..
-                },
-                StridedInterval::Normal {
-                    stride: o_stride, ..
-                },
-            ) => {
-                let gcd = gcd(s_stride, o_stride);
-                (gcd, s_stride, o_stride)
-            }
-            _ => (BigUint::zero(), &BigUint::zero(), &BigUint::zero()),
+        // Neither interval wraps and both strides are non-zero. A common value
+        // x has x = self_min (mod s_stride) and x = other_min (mod o_stride):
+        // solve the two congruences for the smallest one.
+        let (
+            StridedInterval::Normal {
+                stride: s_stride, ..
+            },
+            StridedInterval::Normal {
+                stride: o_stride, ..
+            },
+        ) = (self, other)
+        else {
+            return Self::empty(self.bits());
         };
-        let new_stride = if gcd.is_zero() {
+        let g = gcd(s_stride, o_stride);
+
+        // x = self_min + s_stride * t, with s_stride * t = distance (mod
+        // o_stride), where distance is other_min - self_min reduced modulo
+        // o_stride. That has a solution only if g divides the distance.
+        let distance = if other_min >= self_min {
+            (&other_min - &self_min) % o_stride
+        } else {
+            (o_stride - (&self_min - &other_min) % o_stride) % o_stride
+        };
+        if !(&distance % &g).is_zero() {
+            return Self::empty(self.bits());
+        }
+        let modulus = o_stride / &g;
+        let t = if modulus.is_one() {
             BigUint::zero()
         } else {
-            (s_stride * o_stride) / &gcd
+            // s_stride / g and o_stride / g are coprime, so the inverse exists.
+            match (s_stride / &g).modinv(&modulus) {
+                Some(inverse) => (&distance / &g * inverse) % &modulus,
+                None => return Self::new(self.bits(), BigUint::one(), self_min, self_max),
+            }
         };
 
-        // Find the smallest value >= lower_bound that satisfies both intervals
-        let new_lower = max(self_min, other_min);
-        let new_upper = min(self_max, other_max);
+        // The common values are one lcm apart, starting from the smallest one
+        // that is at least self_min. Move up to the first that is not below
+        // either lower bound, and stop at the last that is not above either
+        // upper bound.
+        let new_stride = s_stride / &g * o_stride;
+        let lower_limit = max(self_min.clone(), other_min);
+        let upper_limit = min(self_max, other_max);
+        let mut new_lower = self_min + s_stride * t;
+        if new_lower < lower_limit {
+            let steps = (&lower_limit - &new_lower + &new_stride - BigUint::one()) / &new_stride;
+            new_lower += steps * &new_stride;
+        }
+        if new_lower > upper_limit {
+            return Self::empty(self.bits());
+        }
+        let new_upper = &upper_limit - (&upper_limit - &new_lower) % &new_stride;
 
         Self::new(self.bits(), new_stride, new_lower, new_upper)
     }
@@ -3403,6 +3410,107 @@ mod si_set_op_tests {
         let b = StridedInterval::range(32, 30u32, 40u32);
         let result = a.intersection(&b);
         assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_intersection_is_sound() {
+        // The members as a bit set, by direct enumeration: lower_bound,
+        // lower_bound + stride, ... for as long as the offset stays within the
+        // (wrapping) distance from lower_bound to upper_bound.
+        fn concretize(si: &StridedInterval) -> u32 {
+            let StridedInterval::Normal {
+                bits,
+                stride,
+                lower_bound,
+                upper_bound,
+            } = si
+            else {
+                return 0;
+            };
+            let modulus = 1u32 << bits;
+            let stride = u32::try_from(stride).unwrap();
+            let lower = u32::try_from(lower_bound).unwrap();
+            let upper = u32::try_from(upper_bound).unwrap();
+            let span = (upper + modulus - lower) % modulus;
+            let mut members = 1 << lower;
+            let mut offset = stride;
+            while stride != 0 && offset <= span {
+                members |= 1 << ((lower + offset) % modulus);
+                offset += stride;
+            }
+            members
+        }
+
+        // Empty and every stride[lower, upper], wrapping ones included. At 3
+        // bits that is every combination; at 4 bits, to keep the number of
+        // pairs down, only those whose upper bound is a member.
+        fn universe(bits: u32) -> Vec<(StridedInterval, u32)> {
+            let modulus = 1u32 << bits;
+            let mut all = vec![StridedInterval::empty(bits)];
+            for stride in 0..modulus {
+                for lower in 0..modulus {
+                    for span in 0..modulus {
+                        let on_stride = stride == 0 || span % stride == 0;
+                        if (stride == 0) != (span == 0) || (bits > 3 && !on_stride) {
+                            continue;
+                        }
+                        all.push(StridedInterval::new(
+                            bits,
+                            BigUint::from(stride),
+                            BigUint::from(lower),
+                            BigUint::from((lower + span) % modulus),
+                        ));
+                    }
+                }
+            }
+            all.into_iter()
+                .map(|si| {
+                    let members = concretize(&si);
+                    (si, members)
+                })
+                .collect()
+        }
+
+        let si = |stride: u32, lower: u32, upper: u32| {
+            StridedInterval::new(
+                8,
+                BigUint::from(stride),
+                BigUint::from(lower),
+                BigUint::from(upper),
+            )
+        };
+
+        // 2[0, 10] and 3[3, 12] have the value 6 in common and nothing else:
+        // the lcm of the strides is not enough, the result has to start on a
+        // value that is on both strides.
+        let six = StridedInterval::constant(8, 6u32);
+        assert_eq!(si(2, 0, 10).intersection(&si(3, 3, 12)), six);
+        assert_eq!(si(3, 3, 12).intersection(&si(2, 0, 10)), six);
+        assert_eq!(si(4, 1, 29).intersection(&si(6, 3, 33)), si(12, 9, 21));
+        // Different phases of the same stride have nothing in common.
+        assert!(si(2, 0, 10).intersection(&si(2, 1, 11)).is_empty());
+        // 3[251, 5] is 251, 254, 1, 4: the part after the wrap starts at 1.
+        assert_eq!(si(3, 251, 5).intersection(&si(1, 0, 10)), si(3, 1, 4));
+        // Parts on both sides of the wrap are joined on a common phase:
+        // 3[250, 7] is 250, 253, 0, 3, 6 and 2[247, 5] is the odd values from
+        // 247 to 5, so they share 253 and 3.
+        assert_eq!(si(3, 250, 7).intersection(&si(2, 247, 5)), si(6, 253, 3));
+
+        // Every pair of small intervals: the intersection has every value that
+        // is in both.
+        for bits in [3, 4] {
+            let all = universe(bits);
+            for (a, a_members) in &all {
+                for (b, b_members) in &all {
+                    let intersection = a.intersection(b);
+                    assert_eq!(
+                        (a_members & b_members) & !concretize(&intersection),
+                        0,
+                        "{a:?} intersection {b:?} is {intersection:?}"
+                    );
+                }
+            }
+        }
     }
 }
 
