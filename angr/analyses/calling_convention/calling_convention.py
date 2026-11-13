@@ -184,8 +184,8 @@ class CallingConventionAnalysis(Analysis):
         self.prototype_libname: str | None = None
         self.proto_from_symbol: bool = False
 
-        if self._cfg is None and "CFGFast" in self.kb.cfgs:
-            self._cfg = self.kb.cfgs["CFGFast"]
+        if self._cfg is None:
+            self._cfg = self.kb.cfgs.get_most_accurate()
 
         if self._function is not None:
             # caller function analysis mode

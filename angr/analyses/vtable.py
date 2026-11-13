@@ -26,7 +26,7 @@ class VtableFinder(Analysis):
     """
 
     def __init__(self):
-        if "CFGFast" not in self.project.kb.cfgs:
+        if self.project.kb.cfgs.get_most_accurate() is None:
             # populate knowledge base
             self.project.analyses[CFGFast].prep()(cross_references=True)
 

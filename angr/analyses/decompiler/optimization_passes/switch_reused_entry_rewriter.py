@@ -47,7 +47,10 @@ class SwitchReusedEntryRewriter(OptimizationPass):
         self._scratch["node_idx"] = next(self.node_idx)
 
     def _check(self):
-        jumptables = self.kb.cfgs.get_most_accurate().jump_tables
+        cfg = self.kb.cfgs.get_most_accurate()
+        if cfg is None:
+            return False, None
+        jumptables = cfg.jump_tables
         switch_jump_block_addrs = {
             jumptable.addr
             for jumptable in jumptables.values()

@@ -440,9 +440,9 @@ class CFBlanket(Analysis):
 
         :return: None
         """
-        if "CFGFast" not in self.kb.cfgs:
+        cfg_model = self.kb.cfgs.get_most_accurate()
+        if cfg_model is None:
             return
-        cfg_model = self.kb.cfgs["CFGFast"]
 
         for addr, memory_data in cfg_model.memory_data.items():
             memory_data: MemoryData

@@ -141,7 +141,7 @@ class StaticObjectFinder(Analysis):
         self._analyze()
 
     def _analyze(self):
-        if "CFGFast" not in self.project.kb.cfgs:
+        if self.project.kb.cfgs.get_most_accurate() is None:
             self.project.analyses[CFGFast].prep()(cross_references=True)
         all_functions = self.project.kb.functions
         # this is the addr where all the this pointers returned by new() will be pointing to

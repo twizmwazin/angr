@@ -73,6 +73,7 @@ class RecursiveStructurer(Analysis):
         """
         root: RegionOverlay = self._region
         manager = root.manager
+        jump_tables = self._get_jump_tables()
         checkpoint = manager.checkpoint()
 
         try:
@@ -109,7 +110,7 @@ class RecursiveStructurer(Analysis):
                         case_entry_to_switch_head=self._case_entry_to_switch_head,
                         func=self.function,
                         parent_region=parent_region,
-                        jump_tables=self.kb.cfgs["CFGFast"].jump_tables,
+                        jump_tables=jump_tables,
                         ail_manager=self.ail_manager,
                         **self.structurer_options,
                     )
@@ -172,6 +173,12 @@ class RecursiveStructurer(Analysis):
 
         self.result = self.cond_proc.remove_claripy_bool_asts(self.result)
 
+    def _get_jump_tables(self) -> dict:
+        # do not index kb.cfgs by name: the CFG may be stored under another identifier (CFGFast_0, CFGEmulated), and
+        # indexing a missing identifier inserts an empty CFG model into the knowledge base
+        cfg_model = self.kb.cfgs.get_most_accurate()
+        return cfg_model.jump_tables if cfg_model is not None else {}
+
     def _get_switch_case_entries(self) -> dict[int, int]:
         if self.function is None:
             return {}
@@ -179,7 +186,7 @@ class RecursiveStructurer(Analysis):
         entries = {}
         func_block_addrs = self.function.block_addrs_set
 
-        jump_tables = self.kb.cfgs["CFGFast"].jump_tables
+        jump_tables = self._get_jump_tables()
         for jump_table_head_addr, jumptable in jump_tables.items():
             if jump_table_head_addr not in func_block_addrs:
                 continue
