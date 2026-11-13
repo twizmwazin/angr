@@ -1392,7 +1392,7 @@ class SimEngineNoexprAIL[StateType, DataType_co, StmtDataType, ResultType](
 
     @ail_binop_handler
     def _handle_binop_AddF(self, expr: ailment.expression.BinaryOp) -> DataType_co | None:
-        return self._handle_binop_Add(expr)
+        pass
 
     @ail_binop_handler
     def _handle_binop_AddV(self, expr: ailment.expression.BinaryOp) -> DataType_co | None:
@@ -1404,7 +1404,7 @@ class SimEngineNoexprAIL[StateType, DataType_co, StmtDataType, ResultType](
 
     @ail_binop_handler
     def _handle_binop_SubF(self, expr: ailment.expression.BinaryOp) -> DataType_co | None:
-        return self._handle_binop_Sub(expr)
+        pass
 
     @ail_binop_handler
     def _handle_binop_SubV(self, expr: ailment.expression.BinaryOp) -> DataType_co | None:
@@ -1420,7 +1420,7 @@ class SimEngineNoexprAIL[StateType, DataType_co, StmtDataType, ResultType](
 
     @ail_binop_handler
     def _handle_binop_MulF(self, expr: ailment.expression.BinaryOp) -> DataType_co | None:
-        return self._handle_binop_Mul(expr)
+        pass
 
     @ail_binop_handler
     def _handle_binop_MulV(self, expr: ailment.expression.BinaryOp) -> DataType_co | None:
@@ -1436,7 +1436,7 @@ class SimEngineNoexprAIL[StateType, DataType_co, StmtDataType, ResultType](
 
     @ail_binop_handler
     def _handle_binop_DivF(self, expr: ailment.expression.BinaryOp) -> DataType_co | None:
-        return self._handle_binop_Div(expr)
+        pass
 
     @ail_binop_handler
     def _handle_binop_DivV(self, expr: ailment.expression.BinaryOp) -> DataType_co | None:

@@ -572,11 +572,11 @@ class InlinedStringTransformationAILEngine(
             return a.sign_extend(xt) * b.sign_extend(xt)
         return a.zero_extend(xt) * b.zero_extend(xt)
 
-    _handle_binop_AddF = _handle_binop_Add
+    _handle_binop_AddF = _handle_binop_Default
     _handle_binop_AddV = _handle_binop_Default
     _handle_binop_Carry = _handle_binop_Default
     _handle_binop_CmpF = _handle_binop_Default
-    _handle_binop_DivF = _handle_binop_Div
+    _handle_binop_DivF = _handle_binop_Default
     _handle_binop_DivV = _handle_binop_Default
     _handle_binop_InterleaveLOV = _handle_binop_Default
     _handle_binop_InterleaveHIV = _handle_binop_Default
@@ -592,12 +592,12 @@ class InlinedStringTransformationAILEngine(
     _handle_binop_CmpGTV = _handle_binop_Default
     _handle_binop_CmpLEV = _handle_binop_Default
     _handle_binop_CmpLTV = _handle_binop_Default
-    _handle_binop_MulF = _handle_binop_Mul
+    _handle_binop_MulF = _handle_binop_Default
     _handle_binop_MulV = _handle_binop_Default
     _handle_binop_MulHiV = _handle_binop_Default
     _handle_binop_SBorrow = _handle_binop_Default
     _handle_binop_SCarry = _handle_binop_Default
-    _handle_binop_SubF = _handle_binop_Sub
+    _handle_binop_SubF = _handle_binop_Default
     _handle_binop_SubV = _handle_binop_Default
     _handle_binop_MinV = _handle_binop_Default
     _handle_binop_MaxV = _handle_binop_Default

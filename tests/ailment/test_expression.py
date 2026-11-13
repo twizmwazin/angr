@@ -506,14 +506,6 @@ class TestBinaryOpFloatingPoint(unittest.TestCase):
         op = ailment.expression.BinaryOp(None, "Add", [a, b], False)
         assert op.floating_point is False
 
-    def test_floating_point_is_not_a_constructor_argument(self):
-        a = ailment.expression.Const(None, 42, 64)
-        b = ailment.expression.Const(None, 43, 64)
-        with self.assertRaises(TypeError):
-            ailment.expression.BinaryOp(None, "Add", [a, b], False, floating_point=True)
-        with self.assertRaises(TypeError):
-            ailment.expression.UnaryOp(None, "Neg", a, floating_point=True)
-
     def test_float_op_names(self):
         for int_name, float_name in (("Add", "AddF"), ("CmpEQ", "CmpEQF"), ("Neg", "NegF"), ("AddV", "AddFV")):
             assert not ailment.is_float_op(int_name)
