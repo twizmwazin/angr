@@ -8,23 +8,18 @@ use pyo3::types::{PyDict, PyTuple, PyType};
 
 use crate::claripy::prelude::*;
 
-/// `module:class` of each user-defined annotation class seen, keyed by the type object's
-/// address; the type is kept alive so the address cannot be reused.
-static PY_ANNOTATION_TYPE_NAMES: LazyLock<PyAnnotationTypeNames> = LazyLock::new(DashMap::new);
+/// Per user-defined annotation class, keyed by the address of its type object.
+static PY_ANNOTATION_CLASSES: LazyLock<DashMap<usize, Arc<UserClass>>> =
+    LazyLock::new(DashMap::new);
 
-type PyAnnotationTypeNames = DashMap<usize, (Py<PyType>, Arc<str>)>;
-
-fn py_annotation_type_name(ty: &Bound<'_, PyType>) -> PyResult<Arc<str>> {
-    let key = ty.as_ptr() as usize;
-    if let Some(entry) = PY_ANNOTATION_TYPE_NAMES.get(&key) {
-        return Ok(entry.1.clone());
-    }
-    let py = ty.py();
-    let module_name = ty.getattr(intern!(py, "__module__"))?.extract::<String>()?;
-    let class_name = ty.getattr(intern!(py, "__name__"))?.extract::<String>()?;
-    let name: Arc<str> = format!("{module_name}:{class_name}").into();
-    PY_ANNOTATION_TYPE_NAMES.insert(key, (ty.clone().unbind(), name.clone()));
-    Ok(name)
+struct UserClass {
+    /// The class itself, kept alive so its address is not reused.
+    ty: Py<PyType>,
+    /// `module:class`.
+    name: Arc<str>,
+    /// The class attributes of the same names.
+    eliminatable: bool,
+    relocatable: bool,
 }
 
 /// `claripy.annotation.Annotation`
@@ -96,26 +91,38 @@ impl PyAnnotation {
             Annotation::new(AnnotationType::Uninitialized, false, true)
         } else {
             // User-defined annotation: hold on to the Python object itself.
-            let py = slf.py();
-            let eliminatable = slf
-                .getattr(intern!(py, "eliminatable"))
-                .and_then(|v| v.extract::<bool>())
-                .unwrap_or(true);
-            let relocatable = slf
-                .getattr(intern!(py, "relocatable"))
-                .and_then(|v| v.extract::<bool>())
-                .unwrap_or(false);
-            let name = py_annotation_type_name(&slf.get_type())?;
+            let ty = slf.get_type();
+            let key = ty.as_ptr() as usize;
+            let class = match PY_ANNOTATION_CLASSES.get(&key) {
+                Some(entry) => {
+                    debug_assert!(entry.ty.bind(ty.py()).is(&ty));
+                    entry.clone()
+                }
+                None => {
+                    let py = ty.py();
+                    let flag = |name| ty.getattr(name).and_then(|v| v.extract::<bool>());
+                    let module_name = ty.getattr(intern!(py, "__module__"))?.extract::<String>()?;
+                    let class_name = ty.getattr(intern!(py, "__name__"))?.extract::<String>()?;
+                    let class = Arc::new(UserClass {
+                        name: format!("{module_name}:{class_name}").into(),
+                        eliminatable: flag(intern!(py, "eliminatable")).unwrap_or(true),
+                        relocatable: flag(intern!(py, "relocatable")).unwrap_or(false),
+                        ty: ty.clone().unbind(),
+                    });
+                    PY_ANNOTATION_CLASSES.insert(key, class.clone());
+                    class
+                }
+            };
             // Identify the annotation by the object's hash, not the object.
             let obj_hash = slf.hash()? as i64;
             Annotation::new(
                 AnnotationType::PyAnnotation {
-                    name,
+                    name: class.name.clone(),
                     object: Ignored(Arc::new(slf.clone().into_any().unbind())),
                     obj_hash,
                 },
-                eliminatable,
-                relocatable,
+                class.eliminatable,
+                class.relocatable,
             )
         };
 
