@@ -2874,58 +2874,60 @@ impl StridedInterval {
 
         match self {
             StridedInterval::Normal {
+                bits,
                 stride,
                 lower_bound,
                 upper_bound,
-                ..
             } => {
-                // First shift right by low_bit
+                let new_bits = high_bit - low_bit + 1;
+
+                // First shift right by low_bit. The values still form one
+                // interval that starts at shifted_lower and goes up by
+                // `distance`, over the top of the shifted range when the
+                // interval wraps.
                 let shifted_lower = lower_bound >> low_bit;
                 let shifted_upper = upper_bound >> low_bit;
-
-                // Then mask to only keep the bits we want
-                let mask = (BigUint::one() << (high_bit - low_bit + 1)) - BigUint::one();
-                let new_lower = &shifted_lower & &mask;
-                let new_upper = &shifted_upper & &mask;
-
-                // Compute new stride - preserve if possible
-                let new_stride = if stride.is_zero() {
-                    BigUint::zero()
+                let distance = if lower_bound <= upper_bound {
+                    &shifted_upper - &shifted_lower
                 } else {
-                    // Check if stride is preserved after extraction
-                    let shift_divisor = BigUint::one() << low_bit;
-
-                    // If stride is divisible by 2^low_bit, we can preserve it
-                    if stride % &shift_divisor == BigUint::zero() {
-                        let preserved_stride = stride / &shift_divisor;
-                        // Make sure the preserved stride doesn't exceed the new range
-                        let range = if new_upper >= new_lower {
-                            &new_upper - &new_lower
-                        } else {
-                            BigUint::zero()
-                        };
-                        if preserved_stride <= range {
-                            preserved_stride
-                        } else {
-                            BigUint::one()
-                        }
-                    } else {
-                        // Find GCD to get the best stride we can preserve
-                        let gcd = gcd(stride, &shift_divisor);
-                        if gcd > BigUint::one() {
-                            let candidate = &gcd / &shift_divisor;
-                            if candidate.is_zero() {
-                                BigUint::one()
-                            } else {
-                                candidate
-                            }
-                        } else {
-                            BigUint::one()
-                        }
-                    }
+                    (BigUint::one() << (*bits - low_bit)) + &shifted_upper - &shifted_lower
                 };
 
-                Self::new(high_bit - low_bit + 1, new_stride, new_lower, new_upper)
+                // The shift keeps a stride that it divides exactly. The carry
+                // out of the dropped bits is uneven for any other stride.
+                let new_stride = if (stride % (BigUint::one() << low_bit)).is_zero() {
+                    stride >> low_bit
+                } else {
+                    BigUint::one()
+                };
+                if new_stride.is_zero() {
+                    let mask = max_int(new_bits);
+                    return Self::constant(new_bits, shifted_lower & mask);
+                }
+                let distance = (&distance / &new_stride) * &new_stride;
+
+                // Then drop the bits above high_bit, which is a reduction
+                // modulo 2**new_bits. The two bounds cannot be masked on their
+                // own: 16-bit [0x0010, 0x0110] spans more than 2**8 values, so
+                // its low byte is anything and not the constant 0x10.
+                let modulus = BigUint::one() << new_bits;
+                if distance < modulus {
+                    // Less than once around the circle: a (possibly wrapping)
+                    // interval with the same stride.
+                    let new_lower = &shifted_lower % &modulus;
+                    let new_upper = (&shifted_lower + &distance) % &modulus;
+                    if new_stride.is_one() && distance == max_int(new_bits) {
+                        return Self::top(new_bits);
+                    }
+                    return Self::new(new_bits, new_stride, new_lower, new_upper);
+                }
+
+                // At least once around the circle: only the residue modulo
+                // gcd(stride, 2**new_bits) is left.
+                let g = gcd(&new_stride, &modulus);
+                let new_lower = &shifted_lower % &g;
+                let new_upper = &new_lower + ((max_int(new_bits) - &new_lower) / &g) * &g;
+                Self::new(new_bits, g, new_lower, new_upper)
             }
             StridedInterval::Empty { .. } => Self::empty(high_bit - low_bit + 1),
         }
@@ -2966,6 +2968,16 @@ impl StridedInterval {
                     return Self::constant(bits1 + bits2, new_value);
                 }
 
+                // A wrapping low part holds both 0 and the maximum, so its
+                // bounds are not the extremes of the low bits: treat it as the
+                // full range. 0 .. [250, 5] is not [5, 250].
+                let full_low = (BigUint::one(), BigUint::zero(), max_int(*bits2));
+                let (stride2, lb2, ub2) = if lb2 <= ub2 {
+                    (stride2, lb2, ub2)
+                } else {
+                    (&full_low.0, &full_low.1, &full_low.2)
+                };
+
                 // Improved stride computation
                 let new_stride = if stride1.is_zero() && stride2.is_zero() {
                     BigUint::zero()
@@ -2981,19 +2993,11 @@ impl StridedInterval {
                     gcd(&high_contribution, stride2)
                 };
 
-                // General case - compute all corner combinations
-                let a = lb1 << bits2;
-                let b = ub1 << bits2;
-                let c = lb2;
-                let d = ub2;
-
-                let ac = &a | c;
-                let ad = &a | d;
-                let bc = &b | c;
-                let bd = &b | d;
-
-                let new_lower = ac.clone().min(ad.clone()).min(bc.clone()).min(bd.clone());
-                let new_upper = ac.max(ad).max(bc).max(bd);
+                // General case. The low part does not wrap, so the result runs
+                // from (lb1, lb2) to (ub1, ub2), and it wraps exactly when the
+                // high part does.
+                let new_lower = (lb1 << bits2) | lb2;
+                let new_upper = (ub1 << bits2) | ub2;
 
                 Self::new(bits1 + bits2, new_stride, new_lower, new_upper)
             }
@@ -3788,6 +3792,79 @@ mod si_bitvector_ext_op_tests {
     }
 
     #[test]
+    fn test_extract_is_sound() {
+        // The values of an interval by direct enumeration.
+        fn concretize(si: &StridedInterval) -> Vec<bool> {
+            let mut set = vec![false; 1 << si.bits()];
+            if let StridedInterval::Normal {
+                bits,
+                stride,
+                lower_bound,
+                upper_bound,
+            } = si
+            {
+                let modulus = 1u32 << *bits;
+                let stride = stride.to_u32().unwrap();
+                let lb = lower_bound.to_u32().unwrap();
+                let ub = upper_bound.to_u32().unwrap();
+                let span = (ub + modulus - lb) % modulus;
+                for i in 0..=span.checked_div(stride).unwrap_or(0) {
+                    set[((lb + i * stride) % modulus) as usize] = true;
+                }
+            }
+            set
+        }
+
+        // The range spans more than 2**8 values, so the low byte is anything.
+        let si = StridedInterval::range(16, 0x0010u32, 0x0110u32);
+        assert!(si.extract(7, 0).is_top());
+
+        // A range that crosses a multiple of 2**8 wraps in the low byte.
+        let si = StridedInterval::range(16, 0x01f0u32, 0x0210u32);
+        assert_eq!(
+            si.extract(7, 0),
+            StridedInterval::range(8, 0xf0u32, 0x10u32)
+        );
+
+        // Exact results stay exact.
+        let si = StridedInterval::new(16, 0x200u32, 0x1234u32, 0x1834u32);
+        assert_eq!(
+            si.extract(15, 8),
+            StridedInterval::new(8, 2u32, 0x12u32, 0x18u32)
+        );
+        assert_eq!(si.extract(7, 0), StridedInterval::constant(8, 0x34u32));
+
+        // Exhaustive at 5 bits: every interval, wrapping ones included, and
+        // every bit range.
+        const BITS: u32 = 5;
+        for stride in 0u32..32 {
+            for lb in 0u32..32 {
+                for ub in 0u32..32 {
+                    if (stride == 0) != (lb == ub) {
+                        continue;
+                    }
+                    let si = StridedInterval::new(BITS, stride, lb, ub);
+                    let set = concretize(&si);
+                    for high in 0..BITS {
+                        for low in 0..=high {
+                            let result = si.extract(high, low);
+                            assert_eq!(result.bits(), high - low + 1);
+                            let result = concretize(&result);
+                            for x in (0..32u32).filter(|x| set[*x as usize]) {
+                                let expected = (x >> low) & ((1 << (high - low + 1)) - 1);
+                                assert!(
+                                    result[expected as usize],
+                                    "{si:?}[{high}:{low}] dropped {x}[{high}:{low}] = {expected}"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn test_concat_with_strides() {
         // Test: concatenating intervals with strides
         let high = StridedInterval::new(
@@ -3804,5 +3881,89 @@ mod si_bitvector_ext_op_tests {
         assert!(result.contains_value(&BigUint::from(0x0Fu32)));
         assert!(result.contains_value(&BigUint::from(0x2Fu32)));
         assert!(result.contains_value(&BigUint::from(0x4Fu32)));
+    }
+
+    #[test]
+    fn test_concat_is_sound() {
+        // The values of an interval by direct enumeration.
+        fn concretize(si: &StridedInterval) -> Vec<bool> {
+            let mut set = vec![false; 1 << si.bits()];
+            if let StridedInterval::Normal {
+                bits,
+                stride,
+                lower_bound,
+                upper_bound,
+            } = si
+            {
+                let modulus = 1u32 << *bits;
+                let stride = stride.to_u32().unwrap();
+                let lb = lower_bound.to_u32().unwrap();
+                let ub = upper_bound.to_u32().unwrap();
+                let span = (ub + modulus - lb) % modulus;
+                for i in 0..=span.checked_div(stride).unwrap_or(0) {
+                    set[((lb + i * stride) % modulus) as usize] = true;
+                }
+            }
+            set
+        }
+
+        // The values of every interval of the given width.
+        fn all_intervals(bits: u32) -> Vec<(StridedInterval, Vec<u32>)> {
+            let size = 1u32 << bits;
+            let mut intervals = Vec::new();
+            for stride in 0..size {
+                for lb in 0..size {
+                    for ub in 0..size {
+                        if (stride == 0) != (lb == ub) {
+                            continue;
+                        }
+                        let si = StridedInterval::new(bits, stride, lb, ub);
+                        let set = concretize(&si);
+                        let values = (0..size).filter(|x| set[*x as usize]).collect();
+                        intervals.push((si, values));
+                    }
+                }
+            }
+            intervals
+        }
+
+        // A wrapping low part: [250, 5] holds 0 and 255, not only [5, 250].
+        let high = StridedInterval::constant(8, 0u32);
+        let low = StridedInterval::range(8, 250u32, 5u32);
+        let result = high.concat(&low);
+        for expected in [250u32, 255, 0, 5] {
+            assert!(result.contains_value(&BigUint::from(expected)));
+        }
+
+        // A wrapping high part gives a wrapping result.
+        let high = StridedInterval::range(8, 0xffu32, 0x01u32);
+        let low = StridedInterval::range(8, 0x10u32, 0x20u32);
+        assert_eq!(
+            high.concat(&low),
+            StridedInterval::range(16, 0xff10u32, 0x0120u32)
+        );
+
+        // Exhaustive: every 3-bit interval with every 4-bit interval, wrapping
+        // ones included, in both orders.
+        let narrow = all_intervals(3);
+        let wide = all_intervals(4);
+        for (highs, lows) in [(&narrow, &wide), (&wide, &narrow)] {
+            for (high, high_values) in highs {
+                for (low, low_values) in lows {
+                    let result = high.concat(low);
+                    assert_eq!(result.bits(), 7);
+                    let result = concretize(&result);
+                    for x in high_values {
+                        for y in low_values {
+                            let expected = (x << low.bits()) | y;
+                            assert!(
+                                result[expected as usize],
+                                "{high:?} .. {low:?} dropped {x} .. {y} = {expected}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
     }
 }
