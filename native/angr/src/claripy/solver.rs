@@ -119,6 +119,25 @@ impl PySolver {
         exact.and_then(|e| e.extract::<bool>().ok())
     }
 
+    /// Convert the concrete bound a solver returned for `min`/`max` into a
+    /// Python integer. Every solver returns the bound as a BVV; a signed query
+    /// reads it as two's complement (like claripy, and like `vsa.min`/`vsa.max`),
+    /// so a negative bound comes back negative rather than as its unsigned
+    /// bit pattern.
+    fn bound_to_int(
+        bound: &AstRef<'static>,
+        signed: bool,
+        method: &str,
+    ) -> Result<BigInt, ClaripyError> {
+        match bound.op() {
+            AstOp::BVV(bv) if signed => Ok(bv.to_bigint()),
+            AstOp::BVV(bv) => Ok(BigInt::from(bv.to_biguint())),
+            _ => Err(ClaripyError::TypeError(format!(
+                "{method}: expression must be a bitvector"
+            ))),
+        }
+    }
+
     /// Calls `f` with a mutable reference to a solver that includes the given
     /// extra constraints. When no extra constraints are provided, `f` receives
     /// `&mut self.inner` directly, avoiding a clone.
@@ -755,13 +774,7 @@ impl PySolver {
                 solver.min_unsigned(&expr.get().inner)?
             };
 
-            if let AstOp::BVV(bv) = result.op() {
-                Ok(BigInt::from(bv.to_biguint()))
-            } else {
-                Err(ClaripyError::TypeError(
-                    "max: expression must be a bitvector".to_string(),
-                ))
-            }
+            Self::bound_to_int(&result, signed, "min")
         })
     }
 
@@ -781,13 +794,7 @@ impl PySolver {
                 solver.max_unsigned(&expr.get().inner)?
             };
 
-            if let AstOp::BVV(bv) = result.op() {
-                Ok(BigInt::from(bv.to_biguint()))
-            } else {
-                Err(ClaripyError::TypeError(
-                    "max: expression must be a bitvector".to_string(),
-                ))
-            }
+            Self::bound_to_int(&result, signed, "max")
         })
     }
 
