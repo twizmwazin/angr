@@ -27,6 +27,7 @@ from angr.ailment.expression import (
     UnaryOp,
     VirtualVariable,
     VirtualVariableCategory,
+    float_op,
 )
 from angr.ailment.manager import Manager
 from angr.ailment.statement import Assignment
@@ -142,22 +143,20 @@ class TestPeepholeOptimizations(unittest.TestCase):
         opt = EagerEvaluation(proj, proj.kb, manager)
         x = Register(manager.next_atom(), 0, 32)
 
-        def mul_div(multiplier, divisor, *, mul_floating_point=False, div_floating_point=False):
+        def mul_div(multiplier, divisor, *, mul_op="Mul", div_op="Div"):
             mul = BinaryOp(
                 manager.next_atom(),
-                "Mul",
+                mul_op,
                 [x, Const(manager.next_atom(), multiplier, 32)],
                 False,
                 bits=32,
-                floating_point=mul_floating_point,
             )
             return BinaryOp(
                 manager.next_atom(),
-                "Div",
+                div_op,
                 [mul, Const(manager.next_atom(), divisor, 32)],
                 False,
                 bits=32,
-                floating_point=div_floating_point,
             )
 
         # (x * 6) / 8 -> (x * 3) / 4
@@ -173,22 +172,9 @@ class TestPeepholeOptimizations(unittest.TestCase):
                 assert opt.optimize(mul_div(multiplier, divisor)) is None
 
         # Integer-valued constants do not make floating-point Mul or Div cancellable by an integer GCD.
-        for mul_floating_point, div_floating_point in ((True, False), (False, True), (True, True)):
-            with self.subTest(
-                mul_floating_point=mul_floating_point,
-                div_floating_point=div_floating_point,
-            ):
-                assert (
-                    opt.optimize(
-                        mul_div(
-                            6,
-                            8,
-                            mul_floating_point=mul_floating_point,
-                            div_floating_point=div_floating_point,
-                        )
-                    )
-                    is None
-                )
+        for mul_op, div_op in (("MulF", "Div"), ("Mul", "DivF"), ("MulF", "DivF")):
+            with self.subTest(mul_op=mul_op, div_op=div_op):
+                assert opt.optimize(mul_div(6, 8, mul_op=mul_op, div_op=div_op)) is None
 
     def test_eager_eval_skips_floating_point_binary_operations(self):
         proj = angr.load_shellcode(b"\x90", "AMD64")
@@ -197,10 +183,10 @@ class TestPeepholeOptimizations(unittest.TestCase):
         x = Register(manager.next_atom(), 0, 32)
 
         for op, operands, bits in (
-            ("Mul", (x, Const(manager.next_atom(), 1, 32)), 32),
-            ("Add", (x, Const(manager.next_atom(), 0, 32)), 32),
-            ("Add", (x, Const(manager.next_atom(), -1, 32)), 32),
-            ("CmpEQ", (x, x), 1),
+            ("MulF", (x, Const(manager.next_atom(), 1, 32)), 32),
+            ("AddF", (x, Const(manager.next_atom(), 0, 32)), 32),
+            ("AddF", (x, Const(manager.next_atom(), -1, 32)), 32),
+            ("CmpEQF", (x, x), 1),
         ):
             with self.subTest(op=op, operands=operands):
                 expr = BinaryOp(
@@ -209,7 +195,6 @@ class TestPeepholeOptimizations(unittest.TestCase):
                     operands,
                     False,
                     bits=bits,
-                    floating_point=True,
                 )
                 assert opt.optimize(expr) is None
 
@@ -786,13 +771,13 @@ class TestPeepholeBlockContextFixpoint(unittest.TestCase):
         out = opt.optimize(BinaryOp(manager.next_atom(), "CmpEQ", [test, c(1)], False, bits=1))
         assert isinstance(out, UnaryOp) and out.op == "Not"
         inner = out.operand
-        assert isinstance(inner, BinaryOp) and inner.op == "CmpGT" and inner.floating_point
+        assert isinstance(inner, BinaryOp) and inner.op == "CmpGTF"
         assert inner.operands[0].likes(x)
 
         # ucomisd + jb: CmpF & 1 == 0 is "not (unordered or less)" -> a >= b
         bit0 = BinaryOp(manager.next_atom(), "And", [cmpf, c(1)], False, bits=32)
         out = opt.optimize(BinaryOp(manager.next_atom(), "CmpEQ", [bit0, c(0)], False, bits=1))
-        assert isinstance(out, BinaryOp) and out.op == "CmpGE" and out.floating_point
+        assert isinstance(out, BinaryOp) and out.op == "CmpGEF"
 
         # a test that is not a function of the CmpF outcome alone is left alone
         other = BinaryOp(manager.next_atom(), "And", [cmpf, Register(manager.next_atom(), 16, 32)], False, bits=32)
@@ -807,7 +792,7 @@ class TestPeepholeBlockContextFixpoint(unittest.TestCase):
             return Const(manager.next_atom(), v, bits)
 
         def fp_cmp(op, a, b):
-            return BinaryOp(manager.next_atom(), op, [a, b], False, floating_point=True, bits=1)
+            return BinaryOp(manager.next_atom(), float_op(op), [a, b], False, bits=1)
 
         x = Register(manager.next_atom(), 128, 32)
         y = Register(manager.next_atom(), 132, 32)
@@ -823,7 +808,7 @@ class TestPeepholeBlockContextFixpoint(unittest.TestCase):
             bits=1,
         )
         out = opt.optimize(flags)
-        assert isinstance(out, BinaryOp) and out.op == "CmpLE" and out.floating_point
+        assert isinstance(out, BinaryOp) and out.op == "CmpLEF"
         assert out.operands[0].likes(x) and out.operands[1].likes(y)
 
         # the operands may be widened to double and the constant spelled as float bits (255.0f)
@@ -836,14 +821,14 @@ class TestPeepholeBlockContextFixpoint(unittest.TestCase):
             bits=1,
         )
         out = opt.optimize(mixed)
-        assert isinstance(out, BinaryOp) and out.op == "CmpLE" and out.floating_point
+        assert isinstance(out, BinaryOp) and out.op == "CmpLEF"
 
         # bls: C clear or Z set, as rewritten from armg_calculate_condition(LS | COPY)
         lt_or_eq = BinaryOp(
             manager.next_atom(), "LogicalOr", [fp_cmp("CmpLT", x, y), fp_cmp("CmpEQ", x, y)], False, bits=1
         )
         out = opt.optimize(lt_or_eq)
-        assert isinstance(out, BinaryOp) and out.op == "CmpLE" and out.floating_point
+        assert isinstance(out, BinaryOp) and out.op == "CmpLEF"
 
         # an explicit NaN test cannot be folded into an ordered comparison
         nan_or_lt = BinaryOp(
@@ -917,7 +902,7 @@ class TestPeepholeBlockContextFixpoint(unittest.TestCase):
         assert opt.optimize(ls, block=block_b, block_defs=BlockDefs(block_b.statements)) is None
         defs = BlockDefs(block_b.statements, all_defs=GraphVVarDefs(graph))
         out = opt.optimize(ls, block=block_b, block_defs=defs)
-        assert isinstance(out, BinaryOp) and out.op == "CmpLE" and out.floating_point
+        assert isinstance(out, BinaryOp) and out.op == "CmpLEF"
         assert out.operands[0].likes(x) and out.operands[1].likes(y)
 
         # a second definition of the FPSCR vvar (out of SSA) must not be looked through

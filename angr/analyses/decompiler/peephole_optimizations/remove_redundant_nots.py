@@ -26,7 +26,6 @@ class RemoveRedundantNots(PeepholeOptimizationExprBase):
                     inner.operands,
                     inner.signed,
                     bits=inner.bits,
-                    floating_point=inner.floating_point,
                     rounding_mode=inner.rounding_mode,
                     vector_count=inner.vector_count,
                     vector_size=inner.vector_size,

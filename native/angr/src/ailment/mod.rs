@@ -16,6 +16,7 @@ pub mod const_value;
 pub mod convert_vex;
 pub mod enums;
 pub mod manager;
+pub mod ops;
 pub mod tags;
 pub mod vex_ffi;
 pub mod vexop;
@@ -56,6 +57,24 @@ fn _vexop_debug(py: Python<'_>, op_int: u32) -> PyResult<Option<Py<PyDict>>> {
     }
 }
 
+/// Whether `op` names a floating-point operation (`AddF`, `CmpEQF`, `Sqrt`, `AddFV`, ...).
+#[pyfunction]
+fn is_float_op(op: &str) -> bool {
+    ops::is_float_op(op)
+}
+
+/// The floating-point counterpart of an op name (`Add` -> `AddF`, `AddV` -> `AddFV`).
+#[pyfunction]
+fn float_op(op: &str) -> String {
+    ops::float_op(op)
+}
+
+/// The integer counterpart of an op name (`AddF` -> `Add`, `AddFV` -> `AddV`).
+#[pyfunction]
+fn int_op(op: &str) -> String {
+    ops::int_op(op)
+}
+
 pub fn ailment(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Tags
     m.add_class::<tags::TagsView>()?;
@@ -86,6 +105,11 @@ pub fn ailment(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // Debug helper (vexop classifier parity testing).
     m.add_function(wrap_pyfunction!(_vexop_debug, m)?)?;
+
+    // Operator naming helpers.
+    m.add_function(wrap_pyfunction!(is_float_op, m)?)?;
+    m.add_function(wrap_pyfunction!(float_op, m)?)?;
+    m.add_function(wrap_pyfunction!(int_op, m)?)?;
 
     Ok(())
 }

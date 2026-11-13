@@ -42,7 +42,7 @@ Address = tuple[int, int]
 
 _OP_CLASSES: dict[str, str] = {}
 for _cls, _ops in {
-    "ARITH": ("Add", "Sub", "Mul", "Mull", "Div", "DivMod", "Mod", "Neg"),
+    "ARITH": ("Add", "Sub", "Mul", "Mull", "Div", "DivMod", "Mod", "Neg", "AddF", "SubF", "MulF", "DivF", "NegF"),
     "LOGIC": ("Xor", "And", "Or", "Not", "BitwiseNeg", "LogicalAnd", "LogicalOr", "LogicalNot"),
     "SHIFT": ("Shl", "Shr", "Sar", "Rol", "Ror"),
     "CMP": (
@@ -56,6 +56,12 @@ for _cls, _ops in {
         "CmpLEs",
         "CmpGTs",
         "CmpGEs",
+        "CmpEQF",
+        "CmpNEF",
+        "CmpLTF",
+        "CmpLEF",
+        "CmpGTF",
+        "CmpGEF",
     ),
 }.items():
     for _op in _ops:

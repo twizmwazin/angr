@@ -600,17 +600,17 @@ class TestX87MathOps(unittest.TestCase):
 
     def test_f2xm1_and_fyl2x(self):
         # f2xm1: 2^x - 1
-        sub = self._only(self._x87("d9f0"), ailment.Expr.BinaryOp, lambda e: e.op == "Sub")
+        sub = self._only(self._x87("d9f0"), ailment.Expr.BinaryOp, lambda e: e.op == "SubF")
         assert isinstance(sub.operands[0], ailment.Expr.UnaryOp) and sub.operands[0].op == "Exp2"
         assert isinstance(sub.operands[1], ailment.Expr.Const) and sub.operands[1].value == 1.0
         # fyl2x: y * log2(x); fyl2xp1: y * log2(x + 1)
-        mul = self._only(self._x87("d9f1"), ailment.Expr.BinaryOp, lambda e: e.op == "Mul")
+        mul = self._only(self._x87("d9f1"), ailment.Expr.BinaryOp, lambda e: e.op == "MulF")
         assert mul.floating_point
         assert isinstance(mul.operands[1], ailment.Expr.UnaryOp) and mul.operands[1].op == "Log2"
-        mul = self._only(self._x87("d9f9"), ailment.Expr.BinaryOp, lambda e: e.op == "Mul")
+        mul = self._only(self._x87("d9f9"), ailment.Expr.BinaryOp, lambda e: e.op == "MulF")
         log2 = mul.operands[1]
         assert isinstance(log2, ailment.Expr.UnaryOp) and log2.op == "Log2"
-        assert isinstance(log2.operand, ailment.Expr.BinaryOp) and log2.operand.op == "Add"
+        assert isinstance(log2.operand, ailment.Expr.BinaryOp) and log2.operand.op == "AddF"
 
     def test_sse_sqrt_and_unordered_compare(self):
         # sqrtpd xmm0, xmm0 ; ret -> Iop_Sqrt64Fx2(rm, x)
@@ -641,9 +641,9 @@ class TestPackedFPOps(unittest.TestCase):
             if isinstance(stmt, ailment.Stmt.Assignment) and isinstance(stmt.src, ailment.Expr.BinaryOp)
         ]
         mul, cmp, sub = binops[:3]
-        assert mul.op == "MulV" and mul.floating_point and (mul.vector_count, mul.vector_size) == (2, 64)
+        assert mul.op == "MulFV" and (mul.vector_count, mul.vector_size) == (2, 64)
         assert mul.rounding_mode == RoundingMode.RM_NearestTiesEven
-        assert cmp.op == "CmpEQV" and cmp.floating_point and (cmp.vector_count, cmp.vector_size) == (2, 64)
+        assert cmp.op == "CmpEQFV" and (cmp.vector_count, cmp.vector_size) == (2, 64)
         assert sub.op == "SubV" and not sub.floating_point and (sub.vector_count, sub.vector_size) == (2, 64)
 
 
@@ -657,10 +657,10 @@ class TestFusedMultiplyAdd(unittest.TestCase):
     @staticmethod
     def _fma(arch_name: str, block_hex: str, op: str, bits: int) -> ailment.Expr.BinaryOp:
         srcs = TestX87MathOps._assignments(arch_name, block_hex)
-        outer = TestX87MathOps._only(srcs, ailment.Expr.BinaryOp, lambda e: e.op == op and e.floating_point)
+        outer = TestX87MathOps._only(srcs, ailment.Expr.BinaryOp, lambda e: e.op == op)
         assert outer.bits == bits
         mul = outer.operands[0]
-        assert isinstance(mul, ailment.Expr.BinaryOp) and mul.op == "Mul" and mul.floating_point
+        assert isinstance(mul, ailment.Expr.BinaryOp) and mul.op == "MulF"
         assert mul.bits == bits
         assert mul.rounding_mode == outer.rounding_mode
         assert len({str(e) for e in (*mul.operands, outer.operands[1])}) == 3
@@ -668,29 +668,29 @@ class TestFusedMultiplyAdd(unittest.TestCase):
 
     def test_amd64_vfmadd(self):
         # vfmadd213sd xmm0, xmm1, xmm2 ; ret -> MAddF64(0, xmm1, xmm0, xmm2)
-        outer = self._fma("AMD64", "c4e2f1a9c2c3", "Add", 64)
+        outer = self._fma("AMD64", "c4e2f1a9c2c3", "AddF", 64)
         assert outer.rounding_mode == RoundingMode.RM_NearestTiesEven
         # vfmadd213ss
-        self._fma("AMD64", "c4e271a9c2c3", "Add", 32)
+        self._fma("AMD64", "c4e271a9c2c3", "AddF", 32)
 
     def test_ppc64_fmadd_fmsub(self):
         # fmadd f1, f1, f12, f0 ; blr: the rounding mode is a tmp derived from fpround
-        outer = self._fma("PPC64", "fc21033a4e800020", "Add", 64)
+        outer = self._fma("PPC64", "fc21033a4e800020", "AddF", 64)
         assert isinstance(outer.rounding_mode, ailment.Expr.Expression)
         # fmsub f1, f1, f12, f0 ; blr
-        self._fma("PPC64", "fc21033c4e800020", "Sub", 64)
+        self._fma("PPC64", "fc21033c4e800020", "SubF", 64)
 
     def test_aarch64_fmadd_fmsub(self):
         # fmadd d0, d0, d1, d2 ; ret / fmsub d0, d0, d1, d2 ; ret / fmadd s0, s0, s1, s2 ; ret
-        self._fma("AARCH64", "0008411fc0035fd6", "Add", 64)
-        self._fma("AARCH64", "0088411fc0035fd6", "Sub", 64)
-        self._fma("AARCH64", "0008011fc0035fd6", "Add", 32)
+        self._fma("AARCH64", "0008411fc0035fd6", "AddF", 64)
+        self._fma("AARCH64", "0088411fc0035fd6", "SubF", 64)
+        self._fma("AARCH64", "0008011fc0035fd6", "AddF", 32)
 
     def test_s390x_madbr_msdbr_maebr(self):
         # madbr / msdbr / maebr %f4, %f0, %f2 ; br %r14
-        self._fma("S390X", "b31e400207fe", "Add", 64)
-        self._fma("S390X", "b31f400207fe", "Sub", 64)
-        self._fma("S390X", "b30e400207fe", "Add", 32)
+        self._fma("S390X", "b31e400207fe", "AddF", 64)
+        self._fma("S390X", "b31f400207fe", "SubF", 64)
+        self._fma("S390X", "b30e400207fe", "AddF", 32)
 
 
 class TestPPCSinglePrecisionOps(unittest.TestCase):
@@ -718,7 +718,7 @@ class TestPPCSinglePrecisionOps(unittest.TestCase):
         # fmuls f1, f1, f2 ; stfs f1, -0x10(r1) ; blr
         srcs = TestX87MathOps._assignments("PPC64", "ec2100b2d021fff04e800020")
         (mul,) = self._f32_rounded(srcs)
-        assert isinstance(mul, ailment.Expr.BinaryOp) and mul.op == "Mul" and mul.floating_point and mul.bits == 64
+        assert isinstance(mul, ailment.Expr.BinaryOp) and mul.op == "MulF" and mul.bits == 64
         trunc = TestX87MathOps._only(
             srcs, ailment.Expr.Convert, lambda e: (e.from_bits, e.to_bits) == (64, 32) and e.rounding_mode is None
         )
@@ -729,13 +729,13 @@ class TestPPCSinglePrecisionOps(unittest.TestCase):
         srcs = TestX87MathOps._assignments("PPC64", "ec21102aec211028ec2110244e800020")
         ops = self._f32_rounded(srcs)
         assert all(isinstance(e, ailment.Expr.BinaryOp) and e.floating_point and e.bits == 64 for e in ops)
-        assert [e.op for e in ops if isinstance(e, ailment.Expr.BinaryOp)] == ["Add", "Sub", "Div"]
+        assert [e.op for e in ops if isinstance(e, ailment.Expr.BinaryOp)] == ["AddF", "SubF", "DivF"]
 
     def test_fmadds_frsp(self):
         # fmadds f1, f1, f12, f0 ; blr
         (add,) = self._f32_rounded(TestX87MathOps._assignments("PPC64", "ec21033a4e800020"))
-        assert isinstance(add, ailment.Expr.BinaryOp) and add.op == "Add" and add.floating_point
-        assert isinstance(add.operands[0], ailment.Expr.BinaryOp) and add.operands[0].op == "Mul"
+        assert isinstance(add, ailment.Expr.BinaryOp) and add.op == "AddF"
+        assert isinstance(add.operands[0], ailment.Expr.BinaryOp) and add.operands[0].op == "MulF"
         # frsp f1, f1 ; blr
         (x,) = self._f32_rounded(TestX87MathOps._assignments("PPC64", "fc2008184e800020"))
         assert isinstance(x, ailment.Expr.Tmp) and x.bits == 64

@@ -2677,8 +2677,7 @@ class AILSimplifier(Analysis):
         src = stmt.src
         return (
             isinstance(src, BinaryOp)
-            and src.floating_point
-            and src.op in {"Add", "Sub", "Mul", "Div"}
+            and src.op in {"AddF", "SubF", "MulF", "DivF"}
             and all(isinstance(op, Const) and isinstance(op.value, float) for op in src.operands)
             # a copy propagated from another instruction is not the original op
             and src.tags.get("ins_addr") == stmt.tags.get("ins_addr")

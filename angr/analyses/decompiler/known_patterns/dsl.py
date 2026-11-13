@@ -39,7 +39,7 @@ from angr.ailment.expression import (
 from angr.ailment.statement import Assignment, ConditionalJump, Return, SideEffectStatement, Statement, Store
 
 # ops for which operand order is irrelevant; commutative matching tries both orders
-COMMUTATIVE_OPS = frozenset({"Add", "Mul", "And", "Or", "Xor", "CmpEQ", "CmpNE"})
+COMMUTATIVE_OPS = frozenset({"Add", "Mul", "And", "Or", "Xor", "CmpEQ", "CmpNE", "AddF", "MulF", "CmpEQF", "CmpNEF"})
 
 
 #: Indices for expressions synthesized without a finder. Starts high enough that

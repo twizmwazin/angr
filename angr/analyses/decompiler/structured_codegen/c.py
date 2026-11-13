@@ -110,6 +110,7 @@ from .base import (
     VariableFieldNode,
     VariableNode,
     register_display_name,
+    source_op,
     variable_display_name,
     vector_convert_name,
 )
@@ -3974,7 +3975,7 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
             info = vector_op_intrinsic(expr)
             assert expr.vector_size is not None
             # no exact intrinsic: keep the AIL op name, e.g. CmpGTV(a, b) for an unsigned compare
-            name, swap, lane = info if info is not None else (expr.op, False, expr.vector_size)
+            name, swap, lane = info if info is not None else (source_op(expr.op), False, expr.vector_size)
             operands = expr.operands[::-1] if swap else expr.operands
             args = [
                 self._sse_operand(op, kind, lane) if op.bits == VECTOR_BITS else self._handle(op) for op in operands
@@ -5639,10 +5640,10 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
         if expr.op == "Reference" and isinstance(operand, CUnaryOp) and operand.op == "Dereference":
             # cancel out
             return operand.operand
-        if expr.op in {"Neg", "Not"} and not expr.floating_point:
+        if expr.op in {"Neg", "Not"}:
             operand = self._fp_operand_bits(operand, expr.operand.bits)
         return CUnaryOp(
-            expr.op,
+            source_op(expr.op),
             operand,
             tags=expr.tags,
             codegen=self,
@@ -5707,10 +5708,10 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
         if sse is not None:
             return sse
 
-        if expr.floating_point and expr.op in {"CmpEQ", "CmpNE"} and expr.operands[0].likes(expr.operands[1]):
+        if expr.op in {"CmpEQF", "CmpNEF"} and expr.operands[0].likes(expr.operands[1]):
             # the self-compare is the NaN test
             isnan = self._handle(Expr.Call(expr.idx, "isnan", args=[expr.operands[0]], bits=expr.bits, **expr.tags))
-            if expr.op == "CmpNE":
+            if expr.op == "CmpNEF":
                 return isnan
             return CUnaryOp("Not", isnan, tags=expr.tags, codegen=self)
 
@@ -5741,14 +5742,14 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
             rhs = self._fp_operand_bits(rhs, expr.operands[1].bits)
 
         cmp_signed = None
-        if expr.op in _ORDER_CMP_OPS and not expr.floating_point:
+        if expr.op in _ORDER_CMP_OPS:
             cmp_signed = expr.signed
             bits = expr.operands[0].bits
             lhs = self._compare_operand(lhs, bits, cmp_signed)
             rhs = self._compare_operand(rhs, bits, cmp_signed)
 
         return CBinaryOp(
-            expr.op,
+            source_op(expr.op),
             lhs,
             rhs,
             signed=cmp_signed,

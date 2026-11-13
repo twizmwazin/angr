@@ -77,16 +77,13 @@ class RemoveRedundantReinterprets(PeepholeOptimizationExprBase):
         if not changed:
             return None
         if isinstance(expr, UnaryOp):
-            return UnaryOp(
-                expr.idx, expr.op, operands[0], bits=expr.bits, floating_point=expr.floating_point, **expr.tags
-            )
+            return UnaryOp(expr.idx, expr.op, operands[0], bits=expr.bits, **expr.tags)
         return BinaryOp(
             expr.idx,
             expr.op,
             operands,
             expr.signed,
             bits=expr.bits,
-            floating_point=expr.floating_point,
             rounding_mode=expr.rounding_mode,
             vector_count=expr.vector_count,
             vector_size=expr.vector_size,

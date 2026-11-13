@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from angr.rustylib.ailment import ConvertType, VirtualVariableCategory
+from angr.rustylib.ailment import ConvertType, VirtualVariableCategory, float_op, int_op, is_float_op
 
 if TYPE_CHECKING:
     # Static typing story: at runtime every marker below produces (and
@@ -244,10 +244,10 @@ else:
             op,
             operand,
             bits=None,
-            floating_point=False,
             **tags,
         ) -> _Expression:
-            return _Expression._new_unary_op(idx, op, operand, bits=bits, floating_point=floating_point, **tags)
+            _reject_floating_point_flag(tags)
+            return _Expression._new_unary_op(idx, op, operand, bits=bits, **tags)
 
     class Convert(metaclass=_AilMarkerMeta):
         """Marker for ``Expression`` instances whose variant is ``Convert``."""
@@ -303,6 +303,12 @@ else:
         ) -> _Expression:
             return _Expression._new_reinterpret(idx, from_bits, from_type, to_bits, to_type, operand, **tags)
 
+    def _reject_floating_point_flag(tags):
+        # integer and floating-point operations are distinct ops (Add / AddF); without this check a stale
+        # floating_point=True would silently turn into a tag
+        if "floating_point" in tags:
+            raise TypeError("floating_point is not an argument: use the floating-point op (e.g. float_op(op))")
+
     _BINOP_FIXED_BITS = {
         "CmpF": 32,
         "CmpEQ": 1,
@@ -311,6 +317,12 @@ else:
         "CmpGE": 1,
         "CmpLE": 1,
         "CmpGT": 1,
+        "CmpEQF": 1,
+        "CmpNEF": 1,
+        "CmpLTF": 1,
+        "CmpGEF": 1,
+        "CmpLEF": 1,
+        "CmpGTF": 1,
         "CmpUN": 1,
         "ExpCmpNE": 1,
         "Carry": 8,
@@ -342,6 +354,12 @@ else:
             "CmpGE": "CmpLT",
             "CmpLE": "CmpGT",
             "CmpGT": "CmpLE",
+            "CmpEQF": "CmpNEF",
+            "CmpNEF": "CmpEQF",
+            "CmpLTF": "CmpGEF",
+            "CmpGEF": "CmpLTF",
+            "CmpLEF": "CmpGTF",
+            "CmpGTF": "CmpLEF",
         }
 
         def __new__(  # type: ignore[misc]
@@ -352,12 +370,12 @@ else:
             signed=False,
             *,
             bits=None,
-            floating_point=False,
             rounding_mode=None,
             vector_count=None,
             vector_size=None,
             **tags,
         ) -> _Expression:
+            _reject_floating_point_flag(tags)
             if bits is None:
                 bits = _binop_bits_for(op, operands)
             return _Expression._new_binary_op(
@@ -366,7 +384,6 @@ else:
                 operands,
                 signed,
                 bits=bits,
-                floating_point=floating_point,
                 rounding_mode=rounding_mode,
                 vector_count=vector_count,
                 vector_size=vector_size,
@@ -720,7 +737,6 @@ def negate(expr: Expression, manager) -> Expression:
                 expr.operands,
                 signed=expr.signed,
                 bits=expr.bits,
-                floating_point=expr.floating_point,
                 rounding_mode=expr.rounding_mode,
                 **dict(expr.tags),
             )
@@ -771,5 +787,8 @@ __all__ = [
     "VEXCCallExpression",
     "VirtualVariable",
     "VirtualVariableCategory",
+    "float_op",
+    "int_op",
+    "is_float_op",
     "negate",
 ]

@@ -37,7 +37,6 @@ class RemoveRedundantShiftsAroundComparators(PeepholeOptimizationExprBase):
                     [op0.operands[0], op1.operands[0]],
                     expr.signed,
                     bits=expr.bits,
-                    floating_point=expr.floating_point,
                     rounding_mode=expr.rounding_mode,
                     **expr.tags,
                 )
@@ -83,7 +82,6 @@ class RemoveRedundantShiftsAroundComparators(PeepholeOptimizationExprBase):
                             [new_cmp_0, new_cmp_1],
                             expr.signed,
                             bits=expr.bits,
-                            floating_point=expr.floating_point,
                             rounding_mode=expr.rounding_mode,
                             **expr.tags,
                         )

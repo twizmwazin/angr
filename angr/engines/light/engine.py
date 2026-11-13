@@ -696,6 +696,12 @@ class SimEngineLightAIL[StateType, DataType_co, StmtDataType, ResultType](
             "PermV": self._handle_binop_PermV,
             "Set": self._handle_binop_Set,
         }
+        # A floating-point op (NegF, CmpEQF, AddFV, ...) without a handler of its own goes to the handler of its
+        # integer counterpart.
+        for handlers in (self._unop_handlers, self._binop_handlers):
+            for op, handler in list(handlers.items()):
+                if not ailment.is_float_op(op):
+                    handlers.setdefault(ailment.float_op(op), handler)
         self._validate_op_handlers()
         super().__init__(*args, **kwargs)
 
@@ -1386,7 +1392,7 @@ class SimEngineNoexprAIL[StateType, DataType_co, StmtDataType, ResultType](
 
     @ail_binop_handler
     def _handle_binop_AddF(self, expr: ailment.expression.BinaryOp) -> DataType_co | None:
-        pass
+        return self._handle_binop_Add(expr)
 
     @ail_binop_handler
     def _handle_binop_AddV(self, expr: ailment.expression.BinaryOp) -> DataType_co | None:
@@ -1398,7 +1404,7 @@ class SimEngineNoexprAIL[StateType, DataType_co, StmtDataType, ResultType](
 
     @ail_binop_handler
     def _handle_binop_SubF(self, expr: ailment.expression.BinaryOp) -> DataType_co | None:
-        pass
+        return self._handle_binop_Sub(expr)
 
     @ail_binop_handler
     def _handle_binop_SubV(self, expr: ailment.expression.BinaryOp) -> DataType_co | None:
@@ -1414,7 +1420,7 @@ class SimEngineNoexprAIL[StateType, DataType_co, StmtDataType, ResultType](
 
     @ail_binop_handler
     def _handle_binop_MulF(self, expr: ailment.expression.BinaryOp) -> DataType_co | None:
-        pass
+        return self._handle_binop_Mul(expr)
 
     @ail_binop_handler
     def _handle_binop_MulV(self, expr: ailment.expression.BinaryOp) -> DataType_co | None:
@@ -1430,7 +1436,7 @@ class SimEngineNoexprAIL[StateType, DataType_co, StmtDataType, ResultType](
 
     @ail_binop_handler
     def _handle_binop_DivF(self, expr: ailment.expression.BinaryOp) -> DataType_co | None:
-        pass
+        return self._handle_binop_Div(expr)
 
     @ail_binop_handler
     def _handle_binop_DivV(self, expr: ailment.expression.BinaryOp) -> DataType_co | None:

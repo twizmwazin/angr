@@ -12,7 +12,7 @@ import logging
 from collections import defaultdict
 
 from angr import ailment
-from angr.ailment.expression import BinaryOp, Const, UnaryOp
+from angr.ailment.expression import BinaryOp, Const, UnaryOp, int_op
 from angr.ailment.statement import Assignment, ConditionalJump
 from angr.sim_variable import SimVariable
 
@@ -194,7 +194,7 @@ class BooleanNaming(ClinicNamingBase):
     def _is_comparison_op(op: str) -> bool:
         """Check if an operation is a comparison."""
         comparison_ops = {"CmpEQ", "CmpNE", "CmpLT", "CmpLE", "CmpGT", "CmpGE"}
-        return op in comparison_ops
+        return int_op(op) in comparison_ops
 
     def _init_candidate(self, var: SimVariable) -> None:
         """Initialize a candidate entry if not exists."""

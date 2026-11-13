@@ -416,7 +416,6 @@ class SimEngineDephiRewriting(SimEngineNostmtAIL[None, Expression | None, Statem
                 ],
                 expr.signed,
                 bits=expr.bits,
-                floating_point=expr.floating_point,
                 rounding_mode=expr.rounding_mode,
                 vector_count=expr.vector_count,
                 vector_size=expr.vector_size,
@@ -433,7 +432,6 @@ class SimEngineDephiRewriting(SimEngineNostmtAIL[None, Expression | None, Statem
                 expr.op,
                 expr.operands[0] if new_op0 is None else new_op0,
                 bits=expr.bits,
-                floating_point=expr.floating_point,
                 **expr.tags,
             )
         return None

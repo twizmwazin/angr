@@ -609,15 +609,15 @@ class PurityEngineAIL(SimEngineLightAIL[StateType, DataType_co, StmtDataType, Re
     def _handle_binop_default(self, expr: ailment.expression.BinaryOp) -> DataType_co:
         return self._expr_noconst(expr.operands[0]) | self._expr_noconst(expr.operands[1])
 
-    _handle_binop_AddF = _handle_binop_default
+    _handle_binop_AddF = _handle_binop_Add
     _handle_binop_AddV = _handle_binop_default
-    _handle_binop_SubF = _handle_binop_default
+    _handle_binop_SubF = _handle_binop_Sub
     _handle_binop_SubV = _handle_binop_default
     _handle_binop_Mull = _handle_binop_default
-    _handle_binop_MulF = _handle_binop_default
+    _handle_binop_MulF = _handle_binop_Mul
     _handle_binop_MulHiV = _handle_binop_default
     _handle_binop_MulV = _handle_binop_default
-    _handle_binop_DivF = _handle_binop_default
+    _handle_binop_DivF = _handle_binop_Div
     _handle_binop_DivV = _handle_binop_default
     _handle_binop_CmpF = _handle_binop_default
     _handle_binop_CmpORD = _handle_binop_default

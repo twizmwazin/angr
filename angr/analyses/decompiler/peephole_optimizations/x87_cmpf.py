@@ -27,7 +27,7 @@ from angr.utils.ail import BlockDefs
 from .base import PeepholeOptimizationExprBase
 
 _GUARD_CHAIN_OPS = frozenset({"And", "Or", "LogicalAnd", "LogicalOr"})
-_FP_COMPARISONS = frozenset({"CmpEQ", "CmpNE", "CmpLT", "CmpLE", "CmpGT", "CmpGE"})
+_FP_COMPARISONS = frozenset({"CmpEQF", "CmpNEF", "CmpLTF", "CmpLEF", "CmpGTF", "CmpGEF"})
 
 
 class _FswContext(NamedTuple):
@@ -94,11 +94,11 @@ class X87CmpF(PeepholeOptimizationExprBase):
         cond = expr.cond
         if not (isinstance(expr.iftrue, Const) and expr.iftrue.value == 0):
             return None
-        if isinstance(cond, BinaryOp) and cond.op == "CmpNE" and cond.floating_point:
+        if isinstance(cond, BinaryOp) and cond.op == "CmpNEF":
             # the two bit tests were already folded: ITE(a != b, 0, !(isnan(a) || isnan(b)))
             a, b = cond.operands
             if self._is_ordered_check(expr.iffalse, a, b, vvar_defs or {}):
-                return BinaryOp(expr.idx, "CmpEQ", [a, b], False, floating_point=True, bits=8, **expr.tags)
+                return BinaryOp(expr.idx, "CmpEQF", [a, b], False, bits=8, **expr.tags)
             return None
         if not (
             isinstance(cond, BinaryOp)
@@ -155,7 +155,7 @@ class X87CmpF(PeepholeOptimizationExprBase):
 
         # Match! Replace with CmpEQ
         # Use 8 bits to match the Extract(8bits@0) that typically wraps this.
-        return BinaryOp(expr.idx, "CmpEQ", list(bit6_cmpf), False, floating_point=True, bits=8, **expr.tags)
+        return BinaryOp(expr.idx, "CmpEQF", list(bit6_cmpf), False, bits=8, **expr.tags)
 
     @staticmethod
     def _is_ordered_check(expr, a, b, vvar_defs: dict) -> bool:
@@ -216,9 +216,9 @@ class X87CmpF(PeepholeOptimizationExprBase):
                 is_le = (expr.op == "CmpEQ" and const_val == 1) or (expr.op == "CmpNE" and const_val == 0)
                 is_gt = (expr.op == "CmpEQ" and const_val == 0) or (expr.op == "CmpNE" and const_val == 1)
                 if is_le:
-                    return BinaryOp(expr.idx, "CmpLE", list(cmpf_operands), False, floating_point=True, **expr.tags)
+                    return BinaryOp(expr.idx, "CmpLEF", list(cmpf_operands), False, **expr.tags)
                 if is_gt:
-                    return BinaryOp(expr.idx, "CmpGT", list(cmpf_operands), False, floating_point=True, **expr.tags)
+                    return BinaryOp(expr.idx, "CmpGTF", list(cmpf_operands), False, **expr.tags)
 
         # Pattern 2: (CmpF(a,b) & 0x45) == 0  ->  CmpGT
         # Pattern 3: (CmpF(a,b) & 0x45) != 0  ->  CmpLE
@@ -226,16 +226,16 @@ class X87CmpF(PeepholeOptimizationExprBase):
             cmpf_operands = self._match_masked_cmpf(expr.operands[0], 0x45, vd)
             if cmpf_operands is not None:
                 if expr.op == "CmpEQ":
-                    return BinaryOp(expr.idx, "CmpGT", list(cmpf_operands), False, floating_point=True, **expr.tags)
-                return BinaryOp(expr.idx, "CmpLE", list(cmpf_operands), False, floating_point=True, **expr.tags)
+                    return BinaryOp(expr.idx, "CmpGTF", list(cmpf_operands), False, **expr.tags)
+                return BinaryOp(expr.idx, "CmpLEF", list(cmpf_operands), False, **expr.tags)
 
         # Pattern 4: (CmpF(a,b) & 0x45) == 0x40  ->  CmpEQ
         # Pattern 5: (CmpF(a,b) & 0x45) != 0x40  ->  CmpNE
         if expr.op in ("CmpEQ", "CmpNE") and isinstance(expr.operands[1], Const) and expr.operands[1].value == 0x40:
             cmpf_operands = self._match_masked_cmpf(expr.operands[0], 0x45, vd)
             if cmpf_operands is not None:
-                op = "CmpEQ" if expr.op == "CmpEQ" else "CmpNE"
-                return BinaryOp(expr.idx, op, list(cmpf_operands), False, floating_point=True, **expr.tags)
+                op = "CmpEQF" if expr.op == "CmpEQ" else "CmpNEF"
+                return BinaryOp(expr.idx, op, list(cmpf_operands), False, **expr.tags)
 
         return self._optimize_by_evaluation(expr, vd, ctx or _FswContext({}, None))
 
@@ -289,15 +289,15 @@ class X87CmpF(PeepholeOptimizationExprBase):
             if not (isinstance(inner, BinaryOp) and inner.floating_point):
                 continue
             a, b = inner.operands
-            if inner.op == "CmpUN" or (inner.op in ("CmpEQ", "CmpNE") and a.likes(b)):
+            if inner.op == "CmpUN" or (inner.op in ("CmpEQF", "CmpNEF") and a.likes(b)):
                 # isunordered(a, b); a != a is isnan(a), a == a is !isnan(a)
-                tests_nan = (inner.op != "CmpEQ") != negated
+                tests_nan = (inner.op != "CmpEQF") != negated
                 if tests_nan != is_and:
                     guards.append((i, a, None if a.likes(b) else b))
                 continue
             if inner.op not in _FP_COMPARISONS:
                 continue
-            true_if_unordered = (inner.op == "CmpNE") != negated
+            true_if_unordered = (inner.op == "CmpNEF") != negated
             if true_if_unordered != is_and:
                 cmp_pairs.append((a, b))
         if not cmp_pairs or not guards:

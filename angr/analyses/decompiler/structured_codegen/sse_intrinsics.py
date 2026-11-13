@@ -56,15 +56,15 @@ _INT_INTRINSICS[("QNarrowBinV", 16, True)] = ("_mm_packs_epi32", True)
 _INT_INTRINSICS[("QNarrowBinV", 16, False)] = ("_mm_packus_epi32", True)
 
 _FP_INTRINSICS: dict[str, str] = {
-    "AddV": "add",
-    "SubV": "sub",
-    "MulV": "mul",
-    "DivV": "div",
-    "MaxV": "max",
-    "MinV": "min",
-    "CmpEQV": "cmpeq",
-    "CmpLTV": "cmplt",
-    "CmpLEV": "cmple",
+    "AddFV": "add",
+    "SubFV": "sub",
+    "MulFV": "mul",
+    "DivFV": "div",
+    "MaxFV": "max",
+    "MinFV": "min",
+    "CmpEQFV": "cmpeq",
+    "CmpLTFV": "cmplt",
+    "CmpLEFV": "cmple",
     "CmpUNV": "cmpunord",
 }
 

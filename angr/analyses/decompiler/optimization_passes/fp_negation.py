@@ -85,13 +85,13 @@ class _SignFlipRewriter(AILBlockRewriter):
             if isinstance(xored, Convert) and xored.to_bits > xored.from_bits:
                 inner = xored.operand
                 if inner.bits == expr.bits and self._is_fp(inner):
-                    return UnaryOp(expr.idx, "Neg", inner, floating_point=True, **expr.tags)
+                    return UnaryOp(expr.idx, "NegF", inner, **expr.tags)
 
         # Scalar form: (x ^ sign_mask)  =>  Neg(x), for FP x of matching width.
         if isinstance(expr, BinaryOp):
             xored = self._match_xor_sign(expr)
             if xored is not None and xored.bits == expr.bits and self._is_fp(xored):
-                return UnaryOp(expr.idx, "Neg", xored, floating_point=True, **expr.tags)
+                return UnaryOp(expr.idx, "NegF", xored, **expr.tags)
 
         return None
 

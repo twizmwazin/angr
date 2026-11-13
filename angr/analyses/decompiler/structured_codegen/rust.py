@@ -104,6 +104,7 @@ from .base import (
     VariableFieldNode,
     VariableNode,
     register_display_name,
+    source_op,
     variable_display_name,
     vector_convert_name,
 )
@@ -4372,7 +4373,7 @@ class RustStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis):
 
     def _handle_Expr_UnaryOp(self, expr, **kwargs):
         return RustUnaryOp(
-            expr.op,
+            source_op(expr.op),
             self._handle(expr.operand),
             tags=expr.tags,
             codegen=self,
@@ -4390,7 +4391,7 @@ class RustStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis):
         rhs = self._handle(expr.operands[1])
 
         return RustBinaryOp(
-            expr.op,
+            source_op(expr.op),
             lhs,
             rhs,
             tags=expr.tags,

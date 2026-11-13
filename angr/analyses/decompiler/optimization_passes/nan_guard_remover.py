@@ -8,7 +8,7 @@ from angr.analyses.decompiler.x87_fsw import const_is_nan
 from .optimization_pass import OptimizationPass, OptimizationPassStage
 
 # float comparisons that are false when the operands are unordered
-_ORDERED_CMPS = frozenset({"CmpEQ", "CmpLT", "CmpLE", "CmpGT", "CmpGE"})
+_ORDERED_CMPS = frozenset({"CmpEQF", "CmpLTF", "CmpLEF", "CmpGTF", "CmpGEF"})
 
 
 class NaNGuardRemover(OptimizationPass):
@@ -68,16 +68,13 @@ class NaNGuardRemover(OptimizationPass):
             negated = not negated
         if isinstance(cond, UnaryOp) and cond.op == "IsNaN":
             terms = [cond.operand]
-        elif isinstance(cond, BinaryOp) and cond.floating_point and cond.op == "CmpUN":
+        elif isinstance(cond, BinaryOp) and cond.op == "CmpUN":
             terms = list(cond.operands)
         elif (
-            isinstance(cond, BinaryOp)
-            and cond.floating_point
-            and cond.op in {"CmpEQ", "CmpNE"}
-            and cond.operands[0].likes(cond.operands[1])
+            isinstance(cond, BinaryOp) and cond.op in {"CmpEQF", "CmpNEF"} and cond.operands[0].likes(cond.operands[1])
         ):
             terms = [cond.operands[0]]
-            if cond.op == "CmpEQ":
+            if cond.op == "CmpEQF":
                 negated = not negated
         else:
             return None
@@ -124,7 +121,7 @@ class NaNGuardRemover(OptimizationPass):
             return False
         if cond.op in _ORDERED_CMPS:
             ordered = on_true
-        elif cond.op == "CmpNE":
+        elif cond.op == "CmpNEF":
             ordered = not on_true
         else:
             return False

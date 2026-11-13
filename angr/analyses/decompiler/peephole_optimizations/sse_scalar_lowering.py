@@ -1,31 +1,31 @@
 from __future__ import annotations
 
-from angr.ailment.expression import BinaryOp, Const, Convert, Extract, UnaryOp
+from angr.ailment.expression import BinaryOp, Const, Convert, Extract, UnaryOp, float_op
 from angr.ailment.utils import is_lsb_extract
 
 from .base import PeepholeOptimizationExprBase
 
 # VEX naming: scalar-in-vector ops have "F0x" in the op name (e.g. Add64F0x2,
-# Mul32F0x4).  In AIL they become BinaryOp("AddV", ..., floating_point=True)
+# Mul32F0x4).  In AIL they become BinaryOp("AddFV", ...)
 # or similar.  This pass lowers those patterns to proper scalar FP ops.
 #
 # Pattern (common in O0, where values are spilled to stack as N-bit integers
 # and widened to 128 bits before the SSE op):
 #
 #   Extract(
-#       BinaryOp("XxxV", Conv(N->128I, a), Conv(N->128I, b), fp=True),
+#       BinaryOp("XxxFV", Conv(N->128I, a), Conv(N->128I, b)),
 #       N bits @ 0
 #   )
-#   ->  BinaryOp("Xxx", a, b, bits=N, floating_point=True)
+#   ->  BinaryOp("XxxF", a, b, bits=N)
 #
 # Pattern (O1, where the XMM register value is used directly):
 #
-#   Extract(BinaryOp("XxxV", a128, b128, fp=True), N bits @ 0)
-#   ->  BinaryOp("Xxx", Extract(a128, N@0), Extract(b128, N@0), bits=N, fp=True)
+#   Extract(BinaryOp("XxxFV", a128, b128), N bits @ 0)
+#   ->  BinaryOp("XxxF", Extract(a128, N@0), Extract(b128, N@0), bits=N)
 #
 # Supported op mappings:
-#   AddV -> Add   SubV -> Sub   MulV -> Mul   DivV -> Div
-#   MaxV -> MaxF  MinV -> MinF
+#   AddFV -> AddF   SubFV -> SubF   MulFV -> MulF   DivFV -> DivF
+#   MaxFV -> MaxF   MinFV -> MinF
 #
 # Lane-wise conversions (cvtdq2ps, cvtps2dq, cvtps2pd, ...) used on a scalar
 # that was widened into lane 0 (movd/movss) are lowered the same way:
@@ -37,12 +37,12 @@ from .base import PeepholeOptimizationExprBase
 # all-zero lane to an all-zero lane.
 
 _V_TO_SCALAR: dict[str, str] = {
-    "AddV": "Add",
-    "SubV": "Sub",
-    "MulV": "Mul",
-    "DivV": "Div",
-    "MaxV": "MaxF",
-    "MinV": "MinF",
+    "AddFV": "AddF",
+    "SubFV": "SubF",
+    "MulFV": "MulF",
+    "DivFV": "DivF",
+    "MaxFV": "MaxF",
+    "MinFV": "MinF",
 }
 
 
@@ -185,29 +185,25 @@ class SSEScalarLowering(PeepholeOptimizationExprBase):
         if n_bits not in (32, 64):
             return None
 
-        # Pattern: Extract(UnaryOp(Conv(N->128, x)), N@0) -> UnaryOp(x, fp=True)
+        # Pattern: Extract(UnaryOp(Conv(N->128, x)), N@0) -> the floating-point UnaryOp(x)
         if isinstance(base, UnaryOp) and base.operand.bits > n_bits:
             operand = _unwrap_conv_or_extract(base.operand, n_bits, self.manager)
             if operand is not base.operand:
                 return UnaryOp(
                     expr.idx,
-                    base.op,
+                    float_op(base.op),
                     operand,
-                    floating_point=True,
                     bits=n_bits,
                     **expr.tags,
                 )
             return None
 
-        # Pattern: Extract(BinaryOp("XxxV", ..., fp=True), N@0) -> scalar op
+        # Pattern: Extract(BinaryOp("XxxFV", ...), N@0) -> scalar op
         if not isinstance(base, BinaryOp):
             return None
 
         scalar_op = _V_TO_SCALAR.get(base.op)
         if scalar_op is None:
-            return None
-
-        if not base.floating_point:
             return None
 
         if len(base.operands) != 2:
@@ -221,7 +217,6 @@ class SSEScalarLowering(PeepholeOptimizationExprBase):
             scalar_op,
             [a, b],
             False,
-            floating_point=True,
             bits=n_bits,
             **expr.tags,
         )

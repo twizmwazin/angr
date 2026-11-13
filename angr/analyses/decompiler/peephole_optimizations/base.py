@@ -188,6 +188,12 @@ class PeepholeOptimizationExprBase:
             "CmpLEs",
             "CmpGTs",
             "CmpGEs",
+            "CmpEQF",
+            "CmpNEF",
+            "CmpLTF",
+            "CmpLEF",
+            "CmpGTF",
+            "CmpGEF",
         }:
             return True
         return bool(isinstance(ail_expr, UnaryOp) and ail_expr.op == "Not")
