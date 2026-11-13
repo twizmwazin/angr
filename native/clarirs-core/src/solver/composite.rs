@@ -44,6 +44,13 @@ impl<'c, S: Solver<'c>> CompositeSolver<'c, S> {
         }
     }
 
+    /// The solver every new child is cloned from. Reconfigure it (together
+    /// with the existing [`children_mut`](Self::children_mut)) to change the
+    /// options of children created later.
+    pub fn template_mut(&mut self) -> &mut S {
+        &mut self.template
+    }
+
     /// Iterate over the child solvers (one per independent constraint set).
     pub fn children_mut(&mut self) -> impl Iterator<Item = &mut S> {
         self.children.values_mut()

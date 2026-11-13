@@ -36,6 +36,14 @@ fn next_solver_id() -> u64 {
     NEXT_SOLVER_ID.fetch_add(1, Ordering::Relaxed)
 }
 
+/// A z3 parameter set holding only `timeout` (milliseconds). z3 reads
+/// `u32::MAX` as "no timeout", which is what clears a previously set one.
+fn timeout_params(timeout: Option<u32>) -> Result<RcParamSet, ClarirsError> {
+    let mut params = RcParamSet::new()?;
+    params.set_u32("timeout", timeout.unwrap_or(u32::MAX))?;
+    Ok(params)
+}
+
 #[derive(Debug)]
 pub struct Z3Solver<'c> {
     ctx: &'c Context<'c>,
@@ -103,6 +111,37 @@ impl<'c> Z3Solver<'c> {
             tracking_vars: HashMap::new(),
             cache_id: next_solver_id(),
         }
+    }
+
+    /// The timeout, in milliseconds, applied to each z3 query (`None`: no timeout).
+    pub fn timeout(&self) -> Option<u32> {
+        self.timeout
+    }
+
+    /// Change the timeout applied to the z3 queries made from now on.
+    ///
+    /// The live incremental z3 solver (if this thread has one) is updated in
+    /// place, so it keeps its assertions, learned state and last verdict. If
+    /// that fails it is dropped and rebuilt with the new timeout on next use,
+    /// as are the ones cached on other threads.
+    pub fn set_timeout(&mut self, timeout: Option<u32>) {
+        if self.timeout == timeout {
+            return;
+        }
+        self.timeout = timeout;
+        SOLVER_CACHE.with(|cell| {
+            let mut map = cell.borrow_mut();
+            let Some(cached) = map.get_mut(&self.cache_id) else {
+                return;
+            };
+            let updated = timeout_params(timeout).and_then(|p| cached.solver.set_params(p));
+            match updated {
+                Ok(()) => cached.timeout = timeout,
+                Err(_) => {
+                    map.remove(&self.cache_id);
+                }
+            }
+        });
     }
 
     /// Get the unsat core from the last unsatisfiable check.
@@ -305,6 +344,10 @@ impl<'c> Z3Solver<'c> {
 
     fn mk_filled_optimize(&self) -> Result<RcOptimize, ClarirsError> {
         let mut z3_optimize = RcOptimize::new()?;
+        // Bound min/max queries by this solver's timeout, like `check()`.
+        if self.timeout.is_some() {
+            z3_optimize.set_params(timeout_params(self.timeout)?)?;
+        }
 
         for assertion in &self.assertions {
             let converted = assertion.to_z3()?;
@@ -646,6 +689,113 @@ mod tests {
             assert!(cache.get(&x.hash()).is_none());
             assert!(cache.get(&constraint.hash()).is_none());
         });
+        Ok(())
+    }
+
+    /// Add the factoring of the product of two primes just below 2^28 to
+    /// `solver`: far too slow for a 1 ms timeout, quick without one. Returns
+    /// the smaller factor's variable.
+    fn add_factoring_problem<'c>(
+        ctx: &'c Context<'c>,
+        solver: &mut Z3Solver<'c>,
+        name: &str,
+    ) -> Result<AstRef<'c>, ClarirsError> {
+        let (p, q) = (268435367u64, 268435399u64);
+        let x = ctx.bvs(format!("{name}_x"), 28)?;
+        let y = ctx.bvs(format!("{name}_y"), 28)?;
+        let product = ctx.mul(&ctx.zero_ext(&x, 28)?, &ctx.zero_ext(&y, 28)?)?;
+        let one = ctx.bvv(BitVec::from((1, 28)))?;
+        solver.add(&ctx.eq_(&product, &ctx.bvv(BitVec::from((p * q, 56)))?)?)?;
+        solver.add(&ctx.ugt(&x, &one)?)?;
+        solver.add(&ctx.ugt(&y, &one)?)?;
+        solver.add(&ctx.ule(&x, &y)?)?;
+        Ok(x)
+    }
+
+    #[test]
+    fn test_set_timeout_before_first_check() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let mut solver = Z3Solver::new(&ctx);
+        assert_eq!(solver.timeout(), None);
+        solver.set_timeout(Some(1));
+        assert_eq!(solver.timeout(), Some(1));
+        add_factoring_problem(&ctx, &mut solver, "before")?;
+        assert!(matches!(
+            solver.satisfiable(),
+            Err(ClarirsError::SolverUnknown(_))
+        ));
+        // Clones (branches) keep the timeout.
+        assert_eq!(solver.clone().timeout(), Some(1));
+        assert!(matches!(
+            solver.clone().satisfiable(),
+            Err(ClarirsError::SolverUnknown(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn test_set_timeout_updates_live_solver() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let mut solver = Z3Solver::new(&ctx);
+        let warm = ctx.bvs("live_warm", 8)?;
+        solver.add(&ctx.ugt(&warm, &ctx.bvv(BitVec::from((3, 8)))?)?)?;
+        // Build the incremental z3 solver, without a timeout.
+        assert!(solver.satisfiable()?);
+
+        solver.set_timeout(Some(1));
+        // The live solver was reconfigured in place, not thrown away: it
+        // still holds the verdict of the check above.
+        SOLVER_CACHE.with(|cell| {
+            let map = cell.borrow();
+            let cached = map.get(&solver.cache_id).expect("solver still cached");
+            assert_eq!(cached.timeout, Some(1));
+            assert_eq!(cached.last_check, Some(Z3_L_TRUE));
+        });
+
+        let x = add_factoring_problem(&ctx, &mut solver, "live")?;
+        assert!(matches!(
+            solver.satisfiable(),
+            Err(ClarirsError::SolverUnknown(_))
+        ));
+        assert!(matches!(
+            solver.satisfiable_with_extra(&[ctx.neq(&x, &ctx.bvv(BitVec::from((5, 28)))?)?]),
+            Err(ClarirsError::SolverUnknown(_))
+        ));
+        assert!(matches!(
+            solver.eval(&x),
+            Err(ClarirsError::SolverUnknown(_))
+        ));
+
+        // Clearing the timeout lets the same live solver finish.
+        solver.set_timeout(None);
+        assert_eq!(solver.timeout(), None);
+        assert!(solver.satisfiable()?);
+        assert_eq!(solver.eval(&x)?, ctx.bvv(BitVec::from((268435367, 28)))?);
+        Ok(())
+    }
+
+    #[test]
+    fn test_timeout_applies_to_optimize() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let mut solver = Z3Solver::new(&ctx);
+        let x = add_factoring_problem(&ctx, &mut solver, "opt")?;
+        solver.set_timeout(Some(1));
+        assert!(matches!(
+            solver.min_unsigned(&x),
+            Err(ClarirsError::SolverUnknown(_))
+        ));
+        assert!(matches!(
+            solver.max_unsigned(&x),
+            Err(ClarirsError::SolverUnknown(_))
+        ));
+        assert!(matches!(
+            solver.min_signed(&x),
+            Err(ClarirsError::SolverUnknown(_))
+        ));
+        assert!(matches!(
+            solver.max_signed(&x),
+            Err(ClarirsError::SolverUnknown(_))
+        ));
         Ok(())
     }
 

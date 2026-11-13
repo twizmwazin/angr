@@ -108,6 +108,36 @@ impl DynSolver {
         }
     }
 
+    /// Set the timeout (in milliseconds) of every Z3 backend this solver
+    /// owns, so it applies to the queries made from now on. The concrete and
+    /// VSA solvers have no backend to time out.
+    pub(crate) fn set_timeout(&mut self, timeout: Option<u32>) {
+        // SimplificationMixin -> ConcreteEarlyResolutionMixin -> ModelCacheMixin -> Z3Solver
+        fn z3_of<'a>(solver: &'a mut WrappedZ3Solver<'static>) -> &'a mut Z3Solver<'static> {
+            solver.inner_mut().inner_mut().inner_mut()
+        }
+        match self {
+            DynSolver::Concrete(_) | DynSolver::Vsa(_) => {}
+            DynSolver::Z3(solver) => z3_of(solver).set_timeout(timeout),
+            // SimplificationMixin -> ConcreteEarlyResolutionMixin -> Z3Solver
+            DynSolver::Z3Cacheless(solver) => {
+                solver.inner_mut().inner_mut().set_timeout(timeout);
+            }
+            // SimplificationMixin -> ConcreteEarlyResolutionMixin -> HybridSolver
+            DynSolver::Hybrid(solver) => {
+                z3_of(solver.inner_mut().inner_mut().exact_mut()).set_timeout(timeout);
+            }
+            DynSolver::Replacement(solver) => z3_of(solver.inner_mut()).set_timeout(timeout),
+            // The template too, so children created later inherit the timeout.
+            DynSolver::Composite(composite) => {
+                z3_of(composite.template_mut()).set_timeout(timeout);
+                for child in composite.children_mut() {
+                    z3_of(child).set_timeout(timeout);
+                }
+            }
+        }
+    }
+
     /// Add a replacement (only supported for Replacement solver)
     pub(crate) fn add_replacement(
         &mut self,
