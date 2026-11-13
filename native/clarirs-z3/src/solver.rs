@@ -357,14 +357,19 @@ impl<'c> Solver<'c> for Z3Solver<'c> {
             .assertions
             .iter()
             .filter_map(|c| {
-                let simplified = c.simplify_z3().ok()?;
-                if simplified.is_true() {
-                    None
-                } else {
-                    Some(Ok(simplified))
-                }
+                // Simplification is best-effort. Not everything `to_z3` emits
+                // can be read back by `from_z3` (StrIsDigit, for one), and a
+                // constraint that fails the round trip must be kept as it is:
+                // dropping it would silently weaken the constraint set.
+                let simplified = c.simplify_z3().unwrap_or_else(|_| c.clone());
+                (!simplified.is_true()).then_some(simplified)
             })
-            .collect::<Result<Vec<_>, ClarirsError>>()?;
+            .collect();
+        // Tracking variables are keyed by assertion index and named after it,
+        // so the survivors are tracked under their new positions, which is
+        // also what `unsat_core` reports. Forget the ones past the new end.
+        let len = self.assertions.len();
+        self.tracking_vars.retain(|idx, _| *idx < len);
         // The assertion set changed in place; the cached solver is now stale.
         self.invalidate_cache();
         Ok(())
@@ -1607,6 +1612,79 @@ mod tests {
         assert!(!core.is_empty());
         assert!(core.contains(&0));
         assert!(core.contains(&1));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_simplify_keeps_constraints_it_cannot_round_trip() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let mut solver = Z3Solver::new(&ctx);
+
+        let s = ctx.strings("s")?;
+        // `to_z3` encodes StrIsDigit with integer comparisons that `from_z3`
+        // cannot convert back, so this constraint cannot be simplified by z3.
+        let is_digit = ctx.str_is_digit(&s)?;
+        assert!(is_digit.simplify_z3().is_err());
+
+        solver.add(&is_digit)?;
+        solver.add(&ctx.eq_(&s, &ctx.stringv("abc")?)?)?;
+        assert!(!solver.satisfiable()?);
+
+        solver.simplify()?;
+
+        // The constraint is kept unsimplified rather than dropped.
+        assert_eq!(solver.constraints()?.len(), 2);
+        assert!(solver.constraints()?.contains(&is_digit));
+        assert!(!solver.satisfiable()?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_simplify_drops_true_constraints() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let mut solver = Z3Solver::new(&ctx);
+
+        let x = ctx.bvs("x", 8)?;
+        let c = ctx.ult(&x, &ctx.bvv(BitVec::from((5, 8)))?)?;
+        solver.add(&ctx.eq_(&x, &x)?)?;
+        solver.add(&c)?;
+
+        solver.simplify()?;
+        assert_eq!(solver.constraints()?.len(), 1);
+        assert!(solver.satisfiable()?);
+        assert!(!solver.satisfiable_with_extra(&[ctx.eq_(&x, &ctx.bvv(BitVec::from((7, 8)))?)?])?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_unsat_core_after_simplify() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let mut solver = Z3Solver::new_with_options(&ctx, None, true);
+
+        let x = ctx.bvs("x", 8)?;
+        let ten = ctx.bvv(BitVec::from((10, 8)))?;
+        let five = ctx.bvv(BitVec::from((5, 8)))?;
+
+        solver.add(&ctx.eq_(&x, &x)?)?; // 0: true, removed by simplify
+        solver.add(&ctx.ugt(&x, &ten)?)?; // 1 -> 0
+        solver.add(&ctx.ugt(&x, &ctx.bvv(BitVec::from((0, 8)))?)?)?; // 2 -> 1
+        solver.simplify()?;
+        assert_eq!(solver.constraints()?.len(), 2);
+        // No tracking variable is left over for the removed position.
+        assert_eq!(solver.tracking_vars.len(), 2);
+
+        solver.add(&ctx.ult(&x, &five)?)?; // 2
+        assert!(!solver.satisfiable()?);
+
+        // The core indexes the constraints as they are now.
+        let mut core = solver.unsat_core()?;
+        core.sort();
+        assert!(core.contains(&0));
+        assert!(core.contains(&2));
+        assert!(core.iter().all(|idx| *idx < 3));
 
         Ok(())
     }
