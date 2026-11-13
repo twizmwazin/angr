@@ -194,6 +194,11 @@ impl<'c, S: Solver<'c>> Solver<'c> for CompositeSolver<'c, S> {
     }
 
     fn satisfiable_with_extra(&mut self, extra: &[AstRef<'c>]) -> Result<bool, ClarirsError> {
+        // A concretely-false constraint was added: nothing can make the
+        // solver satisfiable again, whichever children the extras touch.
+        if self.unsat {
+            return Ok(false);
+        }
         if extra.is_empty() {
             return self.satisfiable();
         }
@@ -289,11 +294,19 @@ impl<'c, S: Solver<'c>> Solver<'c> for CompositeSolver<'c, S> {
     }
 
     fn has_true(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+        // An unsat solver has no model, so no value is possible.
+        if self.unsat {
+            return Ok(false);
+        }
         let vars = expr.variables().clone();
         self.with_solver_for(&vars, |s| s.has_true(expr))
     }
 
     fn has_false(&mut self, expr: &AstRef<'c>) -> Result<bool, ClarirsError> {
+        // An unsat solver has no model, so no value is possible.
+        if self.unsat {
+            return Ok(false);
+        }
         let vars = expr.variables().clone();
         self.with_solver_for(&vars, |s| s.has_false(expr))
     }
@@ -364,6 +377,59 @@ mod tests {
         // clear() resets the unsat state.
         solver.clear().unwrap();
         assert!(solver.satisfiable().unwrap());
+    }
+
+    #[test]
+    fn test_composite_solver_unsat_flag_covers_every_query() -> Result<(), ClarirsError> {
+        let ctx = Context::new();
+        let template = ConcreteSolver::new(&ctx);
+        let mut solver = CompositeSolver::new(&ctx, template);
+
+        let x = ctx.bvs("x", 8)?;
+        let one = ctx.bvv(BitVec::from((1, 8)))?;
+        let nine = ctx.bvv(BitVec::from((9, 8)))?;
+
+        // A child for x exists, and the solver as a whole is unsat.
+        solver.add(&ctx.ult(&x, &nine)?)?;
+        solver.add(&ctx.false_()?)?;
+        assert!(!solver.satisfiable()?);
+
+        // Extras that touch one child, no child, and nothing symbolic at all
+        // must all agree with satisfiable().
+        let y = ctx.bvs("y", 8)?;
+        assert!(!solver.satisfiable_with_extra(&[ctx.eq_(&x, &one)?])?);
+        assert!(!solver.satisfiable_with_extra(&[ctx.eq_(&y, &one)?])?);
+        assert!(!solver.satisfiable_with_extra(&[ctx.eq_(&x, &y)?])?);
+        assert!(!solver.satisfiable_with_extra(&[ctx.true_()?])?);
+        assert!(!solver.satisfiable_with_extra(&[])?);
+
+        // No model, so nothing can be true or false, and there are no values.
+        assert!(!solver.has_true(&ctx.true_()?)?);
+        assert!(!solver.has_false(&ctx.false_()?)?);
+        assert!(
+            solver
+                .batch_eval_n(std::slice::from_ref(&one), 1)?
+                .is_empty()
+        );
+        assert!(matches!(solver.eval(&one), Err(ClarirsError::Unsat)));
+        assert!(matches!(
+            solver.min_unsigned(&one),
+            Err(ClarirsError::Unsat)
+        ));
+        assert!(matches!(
+            solver.max_unsigned(&one),
+            Err(ClarirsError::Unsat)
+        ));
+        assert!(matches!(solver.min_signed(&one), Err(ClarirsError::Unsat)));
+        assert!(matches!(solver.max_signed(&one), Err(ClarirsError::Unsat)));
+
+        // clear() resets the unsat state for these queries too.
+        solver.clear()?;
+        assert!(solver.satisfiable_with_extra(&[ctx.eq_(&x, &one)?])?);
+        assert!(solver.has_true(&ctx.true_()?)?);
+        assert!(solver.has_false(&ctx.false_()?)?);
+
+        Ok(())
     }
 
     #[test]
