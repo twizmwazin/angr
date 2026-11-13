@@ -13,16 +13,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from angr.ailment.expression import BinaryOp
-
 from .context import INTEL
 from .dsl import PBinOp, PConst, PLoad, PVVar
 from .pattern import KnownPattern, PatternParam
 from .templates import make_template
 
 if TYPE_CHECKING:
-    from angr.ailment.expression import Expression
-
     from .context import PatternContext
 
 _OPS = ("m0", "m1", "m2", "s0", "s1")
@@ -41,15 +37,6 @@ def _add(name: str, x: PBinOp, y: PBinOp) -> PBinOp:
     return PBinOp("AddF", (x, y), commutative=True, name=name)
 
 
-def _all_fp(bindings: dict[str, Expression]) -> bool:
-    for n in _OPS:
-        op = bindings[n]
-        assert isinstance(op, BinaryOp)
-        if not op.floating_point:
-            return False
-    return True
-
-
 def _build_dot3(_ctx: PatternContext) -> KnownPattern:
     return KnownPattern(
         name="vec_dot3",
@@ -62,7 +49,6 @@ def _build_dot3(_ctx: PatternContext) -> KnownPattern:
         ),
         params=(PatternParam("a"), PatternParam("b")),
         returnty="float",
-        where=_all_fp,
     )
 
 
@@ -78,7 +64,6 @@ def _build_length_sq(_ctx: PatternContext) -> KnownPattern:
         ),
         params=(PatternParam("a"),),
         returnty="float",
-        where=_all_fp,
     )
 
 

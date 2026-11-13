@@ -761,9 +761,6 @@ class UnaryOp(Op):
     """UnaryOp.operand"""
     operands: Any
     """UnaryOp.operands (single-element list, legacy quirk)"""
-    @property
-    def floating_point(self) -> bool:
-        """Whether ``op`` is a floating-point operation (derived from the op name: ``NegF``, ``Sqrt``, ...)"""
     def __init__(
         self,
         idx: int | None,
@@ -780,9 +777,6 @@ class BinaryOp(Op):
     @property
     def signed(self) -> bool:
         """BinaryOp.signed"""
-    @property
-    def floating_point(self) -> bool:
-        """Whether ``op`` is a floating-point operation (derived from the op name: ``AddF``, ``CmpEQF``, ...)"""
     @property
     def rounding_mode(self) -> RoundingMode | Expression | None:
         """BinaryOp.rounding_mode"""

@@ -38,8 +38,6 @@ class SbbMaskToITE(PeepholeOptimizationExprBase):
                 return ITE(expr.idx, expr.cond.operand, expr.iffalse, expr.iftrue, **expr.tags)
             return None
 
-        if expr.floating_point:
-            return None
         op0, op1 = expr.operands
 
         if expr.op == "CmpLT" and not expr.signed and op0.bits == 1 and isinstance(op1, Const) and op1.value == 1:

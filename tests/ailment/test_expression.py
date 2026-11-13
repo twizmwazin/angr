@@ -487,36 +487,19 @@ class TestConvertFPTypes(unittest.TestCase):
 class TestBinaryOpFloatingPoint(unittest.TestCase):
     """Tests for floating-point BinaryOp expressions, which are separate ops (Add / AddF)."""
 
-    def test_binaryop_floating_point_op(self):
+    def test_float_op_is_distinct_from_the_integer_op(self):
         a = ailment.expression.Const(None, 42, 64)
         b = ailment.expression.Const(None, 43, 64)
-        op = ailment.expression.BinaryOp(None, "AddF", [a, b], False)
-        assert op.floating_point is True
+        add = ailment.expression.BinaryOp(None, "Add", [a, b], False)
+        addf = ailment.expression.BinaryOp(None, "AddF", [a, b], False)
+        assert not add.likes(addf)
+        assert add != addf
+        assert addf.copy().op == "AddF"
 
-    def test_binaryop_floating_point_preserved_by_copy(self):
-        a = ailment.expression.Const(None, 42, 64)
-        b = ailment.expression.Const(None, 43, 64)
-        op = ailment.expression.BinaryOp(None, "AddF", [a, b], False)
-        op_copy = op.copy()
-        assert op_copy.floating_point is True
-
-    def test_binaryop_not_floating_point_by_default(self):
-        a = ailment.expression.Const(None, 42, 64)
-        b = ailment.expression.Const(None, 43, 64)
-        op = ailment.expression.BinaryOp(None, "Add", [a, b], False)
-        assert op.floating_point is False
-
-    def test_floating_point_is_derived_from_the_op(self):
-        a = ailment.expression.Const(None, 42, 64)
-        b = ailment.expression.Const(None, 43, 64)
-        for op in ("Add", "CmpEQ", "AddV", "CmpF", "Round"):
-            assert ailment.expression.BinaryOp(None, op, [a, b], False).floating_point is False, op
-        for op in ("AddF", "CmpEQF", "AddFV", "MaxF", "CmpUN", "CmpUNV", "Scale"):
-            assert ailment.expression.BinaryOp(None, op, [a, b], False).floating_point is True, op
-        for op in ("Neg", "Not", "Abs"):
-            assert ailment.expression.UnaryOp(None, op, a).floating_point is False, op
-        for op in ("NegF", "AbsF", "Sqrt", "SqrtV", "SignBit"):
-            assert ailment.expression.UnaryOp(None, op, a).floating_point is True, op
+    def test_float_ops(self):
+        assert {"AddF", "CmpEQF", "NegF", "AddFV", "Sqrt", "CmpUN"} <= ailment.expression.FLOAT_OPS
+        # integer ops, and CmpF, which yields an integer condition code
+        assert not {"Add", "CmpEQ", "Neg", "AddV", "CmpF"} & ailment.expression.FLOAT_OPS
 
     def test_negate_applies_de_morgan_over_comparisons(self):
         mgr = ailment.Manager()

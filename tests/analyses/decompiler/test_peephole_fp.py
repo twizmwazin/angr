@@ -526,7 +526,7 @@ class TestSSEVectorLaneLowering(unittest.TestCase):
         t = Tmp(3, 3, 64)
         sub = self._vec("SubV", Const(None, 0x3FF00000000000003FF0000000000000, 128), Convert(None, 64, 128, False, t))
         r = self.opt.optimize(Convert(None, 128, 64, False, sub))
-        assert isinstance(r, BinaryOp) and r.op == "Sub" and r.bits == 64 and not r.floating_point
+        assert isinstance(r, BinaryOp) and r.op == "Sub" and r.bits == 64
         assert isinstance(r.operands[0], Const) and r.operands[0].value == 0x3FF0000000000000
         assert r.operands[1] == t
 

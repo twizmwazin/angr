@@ -10,7 +10,7 @@ from typing import Literal, TypeGuard
 
 from angr.ailment import Block
 from angr.ailment.block_walker import AILBlockViewer
-from angr.ailment.expression import BinaryOp, Const, Convert, Expression, UnaryOp
+from angr.ailment.expression import FLOAT_OPS, BinaryOp, Const, Convert, Expression, UnaryOp
 from angr.ailment.manager import Manager
 from angr.ailment.statement import Assignment, Statement, Store
 from angr.analyses.decompiler.peephole_optimizations.sse_vector_lane_lowering import lower_lane0
@@ -87,7 +87,7 @@ def is_vector_op(expr: Expression) -> TypeGuard[BinaryOp]:
 
 
 def vector_op_kind(expr: BinaryOp) -> LaneKind:
-    if expr.floating_point:
+    if expr.op in FLOAT_OPS:
         return "float" if expr.vector_size == 32 else "double"
     return "int"
 
@@ -98,7 +98,7 @@ def vector_op_intrinsic(expr: BinaryOp) -> tuple[str, bool, int] | None:
     """
     lane = expr.vector_size
     assert lane is not None
-    if expr.floating_point:
+    if expr.op in FLOAT_OPS:
         name = _FP_INTRINSICS.get(expr.op)
         sfx = _FP_SUFFIX.get(lane)
         if name is None or sfx is None:

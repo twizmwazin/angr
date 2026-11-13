@@ -962,7 +962,7 @@ class SimEngineVRAIL(
             return True
         if isinstance(expr, ailment.Expr.Reinterpret) and expr.to_type == "F":
             return True
-        if isinstance(expr, (ailment.Expr.BinaryOp, ailment.Expr.UnaryOp)) and expr.floating_point:
+        if isinstance(expr, (ailment.Expr.BinaryOp, ailment.Expr.UnaryOp)) and expr.op in ailment.Expr.FLOAT_OPS:
             return True
         if isinstance(expr, ailment.Expr.Load) and (
             expr.tags.get("long_double_load") or expr.tags.get("data_type") in ("Ity_F32", "Ity_F64", "Ity_F128")
@@ -1660,8 +1660,8 @@ class SimEngineVRAIL(
     def _handle_binop_Default(self, expr):
         arg0, arg1 = expr.operands
 
-        r0 = self._operand(arg0, expr.floating_point)
-        r1 = self._operand(arg1, expr.floating_point)
+        r0 = self._operand(arg0, expr.op in ailment.Expr.FLOAT_OPS)
+        r1 = self._operand(arg1, expr.op in ailment.Expr.FLOAT_OPS)
 
         if expr.op in _FP_MATH_BINOPS:
             return self._fp_math_result(expr, (r0, r1))

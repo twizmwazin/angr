@@ -3,7 +3,7 @@ from __future__ import annotations
 from math import gcd
 
 from angr.ailment import ExpressionKind
-from angr.ailment.expression import ITE, BinaryOp, Const, Convert, StackBaseOffset, UnaryOp
+from angr.ailment.expression import FLOAT_OPS, ITE, BinaryOp, Const, Convert, StackBaseOffset, UnaryOp
 from angr.utils.bits import sign_extend
 
 from .base import PeepholeOptimizationExprBase
@@ -41,7 +41,7 @@ class EagerEvaluation(PeepholeOptimizationExprBase):
 
     def _optimize_binaryop(self, expr: BinaryOp):
         # The identities below assume integer arithmetic and are not generally valid under IEEE 754.
-        if expr.floating_point:
+        if expr.op in FLOAT_OPS:
             return None
 
         op0, op1 = expr.operands

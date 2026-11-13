@@ -13,6 +13,7 @@ _BOOL_OPS = frozenset(
     {"And", "Or", "Xor", "LogicalAnd", "LogicalOr", "CmpEQ", "CmpNE", "CmpLT", "CmpLE", "CmpGT", "CmpGE"}
 )
 _SOURCE_LOGIC_OPS = frozenset({"And", "Or", "LogicalAnd", "LogicalOr"})
+_FP_CMP_OPS = frozenset({"CmpEQF", "CmpNEF", "CmpLTF", "CmpLEF", "CmpGTF", "CmpGEF", "CmpUN"})
 
 
 class ARMCmpF(PeepholeOptimizationExprBase):
@@ -58,7 +59,7 @@ class ARMCmpF(PeepholeOptimizationExprBase):
         if isinstance(expr, Convert):
             if expr.from_bits == 1 or expr.from_type != Convert.TYPE_INT or expr.to_type != Convert.TYPE_INT:
                 return None
-        elif expr.op not in _BOOL_OPS or expr.floating_point:
+        elif expr.op not in _BOOL_OPS:
             return None
 
         defs = BlockDefs.of(block, block_defs)
@@ -83,8 +84,8 @@ class ARMCmpF(PeepholeOptimizationExprBase):
     def _is_fp_logic(expr: Expression) -> bool:
         """Whether expr only combines float comparisons and NaN tests with logical operators (no flag arithmetic)."""
         if isinstance(expr, BinaryOp):
-            if expr.floating_point:
-                return expr.op.startswith("Cmp")
+            if expr.op in _FP_CMP_OPS:
+                return True
             return expr.op in _SOURCE_LOGIC_OPS and all(ARMCmpF._is_fp_logic(o) for o in expr.operands)
         if isinstance(expr, UnaryOp):
             return expr.op == "IsNaN" or (expr.op == "Not" and ARMCmpF._is_fp_logic(expr.operand))

@@ -5720,7 +5720,7 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
             if round_op is not None:
                 return CUnaryOp(round_op, self._handle(expr.operands[1]), tags=expr.tags, codegen=self)
 
-        if expr.floating_point and expr.vector_count is None:
+        if expr.op in Expr.FLOAT_OPS and expr.vector_count is None:
             # an FP operation reads its operands as FP values of their own width; constants keep _fp_constant
             lhs = self._handle(expr.operands[0], type_=self._fp_operand_type(expr.operands[0]))
             rhs_type = None if expr.op == "Scale" else self._fp_operand_type(expr.operands[1])
@@ -5729,7 +5729,7 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
             lhs = self._handle(expr.operands[0])
             rhs = self._handle(expr.operands[1], likely_signed=expr.op not in {"And", "Or"})
 
-        if expr.floating_point:
+        if expr.op in Expr.FLOAT_OPS:
             scalar = expr.vector_count is None
             lhs = self._fp_view_of_int_lvalue(self._fp_constant(lhs, expr.operands[0], scalar), expr.operands[0].bits)
             if expr.op != "Scale":  # ldexp's exponent operand is an integer

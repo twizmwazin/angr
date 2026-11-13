@@ -41,7 +41,7 @@ class FPExactIdentities(PeepholeOptimizationExprBase):
     expr_classes = (BinaryOp,)
 
     def optimize(self, expr: BinaryOp, **kwargs):
-        if not expr.floating_point or len(expr.operands) != 2:
+        if len(expr.operands) != 2:
             return None
         lhs, rhs = expr.operands
         bits = expr.bits

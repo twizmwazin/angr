@@ -117,7 +117,7 @@ class NaNGuardRemover(OptimizationPass):
         while isinstance(cond, UnaryOp) and cond.op == "Not":
             cond = cond.operand
             on_true = not on_true
-        if not (isinstance(cond, BinaryOp) and cond.floating_point):
+        if not isinstance(cond, BinaryOp):
             return False
         if cond.op in _ORDERED_CMPS:
             ordered = on_true

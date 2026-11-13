@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any
 import archinfo
 
 from angr.ailment.expression import (
+    FLOAT_OPS,
     ITE,
     BinaryOp,
     Call,
@@ -409,7 +410,7 @@ class _KnownBitsEvaluator:
         if self.fp_compare_leaves and not expr.vector_count and expr.op in _FP_CMP_TRUTH:
             return self._fp_compare_value(expr, mask)
 
-        if expr.floating_point or expr.vector_count:
+        if expr.op in FLOAT_OPS or expr.vector_count:
             return _UNKNOWN
 
         lhs, rhs = expr.operands
