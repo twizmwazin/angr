@@ -543,6 +543,11 @@ impl RcOptimize {
         })
     }
 
+    pub fn set_params(&mut self, param: RcParamSet) -> Result<(), ClarirsError> {
+        Z3_CONTEXT.with(|&ctx| unsafe { Z3_optimize_set_params(ctx, self.0, *param) });
+        check_z3_error()
+    }
+
     pub fn assert(&mut self, ast: &RcAst) -> Result<(), ClarirsError> {
         Z3_CONTEXT.with(|&ctx| unsafe { Z3_optimize_assert(ctx, self.0, **ast) });
         check_z3_error()

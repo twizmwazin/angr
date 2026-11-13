@@ -15,7 +15,9 @@ use pyo3::types::PyTuple;
 #[derive(Debug)]
 pub struct PySolver {
     inner: DynSolver,
-    #[pyo3(get, set)]
+    /// Mirrors the timeout of the inner solver's Z3 backends; assign through
+    /// the Python `timeout` setter so both stay in step.
+    #[pyo3(get)]
     timeout: Option<u32>,
     #[pyo3(get, set)]
     unsat_core: bool,
@@ -174,6 +176,15 @@ impl PySolver {
             timeout,
             unsat_core: track,
         }))
+    }
+
+    /// Set the timeout (in milliseconds, `None` for no timeout) of the queries
+    /// made from now on. Unlike a plain attribute, this reaches the live
+    /// backend solver(s), not just the value handed to solvers created later.
+    #[setter]
+    fn set_timeout(&mut self, timeout: Option<u32>) {
+        self.timeout = timeout;
+        self.inner.set_timeout(timeout);
     }
 
     #[getter]
@@ -826,8 +837,8 @@ impl PySolver {
         // Get the constraints
         let constraints = self.constraints(py)?;
 
-        // Return a tuple of (solver_type, constraints, flag). The last element
-        // is per-type: auto_replace for the Replacement solver,
+        // Return a tuple of (solver_type, constraints, flag, timeout). The
+        // flag is per-type: auto_replace for the Replacement solver,
         // approximate_first for the Hybrid solver, unused otherwise.
         let flag = match &self.inner {
             DynSolver::Hybrid(..) => self.inner.approximate_first(),
@@ -839,6 +850,7 @@ impl PySolver {
                 solver_type.into_bound_py_any(py)?,
                 constraints.into_bound_py_any(py)?,
                 flag.into_bound_py_any(py)?,
+                self.timeout.into_bound_py_any(py)?,
             ],
         )?)
     }
@@ -857,6 +869,10 @@ impl PySolver {
         // Default to claripy's `True` for Replacement, `False` for Hybrid.
         let auto_replace = flag.unwrap_or(true);
         let approximate_first = flag.unwrap_or(false);
+        // The timeout was added later still; older state tuples lack it.
+        if let Ok(timeout) = state.get_item(3) {
+            self.timeout = timeout.extract()?;
+        }
 
         // Create a new solver based on the type
         self.inner = match solver_type.as_str() {
