@@ -154,14 +154,6 @@ class SimEngineRDVEX(
         data = self._expr(stmt.data)
 
         tmp_atom = Tmp(stmt.tmp, self.tyenv.sizeof(stmt.tmp) // self.arch.byte_width)
-        # if len(data.values) == 1 and 0 in data.values:
-        #     data_v = data.one_value()
-        #     if data_v is not None:
-        #         # annotate data with its definition
-        #         data = MultiValues({
-        #             0: {self.state.annotate_with_def(data_v, Definition(tmp_atom, self._codeloc()))
-        #                 }
-        #         })
         self.tmps[stmt.tmp] = data
 
         self.state.kill_and_add_definition(
