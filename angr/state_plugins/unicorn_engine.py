@@ -1025,14 +1025,14 @@ class Unicorn(SimStatePlugin, SupportsMerge):
             return self._concretize(d)
         if len(d.variables & self.never_concretize) > 0:
             return d
-        if d.variables.issubset(self.always_concretize) or self.state.solver.eval(self.state.ip) in self.concretize_at:
+        if d.variables.issubset(self.always_concretize) or self.state.addr in self.concretize_at:
             return self._concretize(d)
         return d
 
     def _report_symbolic_blocker(self, d, from_where):
         if options.UNICORN_THRESHOLD_CONCRETIZATION in self.state.options:
             if self.concretization_threshold_instruction is not None:
-                addr = self.state.solver.eval(self.state.ip)
+                addr = self.state.addr
                 count = self.symbolic_inst_counts.get(addr, 0)
                 l.debug("... inst count for %s: %d", addr, count)
                 self.symbolic_inst_counts[addr] = count + 1
@@ -1442,7 +1442,7 @@ class Unicorn(SimStatePlugin, SupportsMerge):
             _UC_NATIVE.uncache_pages_touching_region(self._uc_state, addr, length)
         self._uncache_regions = []
 
-        addr = self.state.solver.eval(self.state.ip)
+        addr = self.state.addr
         l.info("started emulation at %#x (%d steps)", addr, self.max_steps if step is None else step)
         self.time = time.time()
         self.errno = _UC_NATIVE.start(self._uc_state, addr, self.max_steps if step is None else step)
@@ -1490,7 +1490,7 @@ class Unicorn(SimStatePlugin, SupportsMerge):
             else:
                 raise SimUnicornError("Got STOP_NOSTART but steps > 0. This indicates a serious unicorn bug.")
 
-        addr = state.solver.eval(state.ip)
+        addr = state.addr
         l.info(
             "finished emulation at %#x after %d steps: %s",
             addr,

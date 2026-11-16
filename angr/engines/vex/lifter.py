@@ -140,7 +140,7 @@ class VEXLifter(SimEngine):
 
         # phase 1: parameter defaults
         if addr is None:
-            addr = state.solver.eval(state._ip)
+            addr = state.addr
         if size is not None:
             size = min(size, VEX_IRSB_MAX_SIZE)
         if size is None:

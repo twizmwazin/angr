@@ -793,7 +793,7 @@ class DDG(Analysis):
 
                 for successing_node in add_state_to_sucs:
                     if (state.history.jumpkind == "Ijk_Call" or state.history.jumpkind.startswith("Ijk_Sys")) and (
-                        state.ip.symbolic or successing_node.addr != state.solver.eval(state.ip)
+                        state.ip.symbolic or successing_node.addr != state.addr
                     ):
                         suc_new_defs = self._filter_defs_at_call_sites(new_defs)
                     else:

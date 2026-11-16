@@ -77,7 +77,7 @@ class CallTracingFilter:
             return REJECT
 
         try:
-            addr = call_target_state.solver.eval_one(ip)
+            addr = call_target_state.addr
         except (SimValueError, SimSolverModeError):
             self._skipped_targets.add(-1)
             l.debug("Rejecting target %s - cannot be concretized", ip)

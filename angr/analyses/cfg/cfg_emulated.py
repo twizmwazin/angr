@@ -953,7 +953,7 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
             elif isinstance(item, SimState):
                 # SimState
                 state = item.copy()  # pylint: disable=no-member
-                ip = state.solver.eval_one(state.ip)
+                ip = state.addr
                 self._reset_state_mode(state, "fastpath")
 
             else:
@@ -1420,7 +1420,7 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
             for src_, dst_ in self._base_graph.edges():
                 if src_.addr == addr:
                     basegraph_successor_addrs.add(dst_.addr)
-            successor_addrs = {s.solver.eval(s.ip) for s in successors}
+            successor_addrs = {s.addr for s in successors}
             extra_successor_addrs = basegraph_successor_addrs - successor_addrs
 
             if all_successors:  # make sure we have a base state to use
@@ -1604,7 +1604,7 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
             try:
                 l.debug(
                     "|    target: %#x %s [%s] %s",
-                    suc.solver.eval_one(suc.ip),
+                    suc.addr,
                     successor_status[suc],
                     exit_type_str,
                     jumpkind,
@@ -1772,7 +1772,7 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
 
         # Get target address
         try:
-            target_addr = state.solver.eval_one(state.ip)
+            target_addr = state.addr
         except (SimValueError, SimSolverModeError):
             # It cannot be concretized currently. Maybe we can handle it later, maybe it just cannot be concretized
             target_addr = None
@@ -2253,7 +2253,7 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
                 successors.append(suc)
 
             else:
-                ip_int = suc.solver.eval_one(suc.ip)
+                ip_int = suc.addr
 
                 if (
                     self._is_address_executable(ip_int)
@@ -2372,7 +2372,7 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
                         if legit_successor.history.jumpkind == "Ijk_Call":
                             should_resolve = False
                         else:
-                            concrete_target = legit_successor.solver.eval(legit_successor.ip)
+                            concrete_target = legit_successor.addr
                             if (
                                 self.project.loader.find_object_containing(concrete_target)
                                 is not self.project.loader.main_object
@@ -2477,9 +2477,7 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
                         successors = self._symbolically_back_traverse(sim_successors, artifacts, cfg_node)
 
                         # Remove successors whose IP doesn't make sense
-                        successors = [
-                            suc for suc in successors if self._is_address_executable(suc.solver.eval_one(suc.ip))
-                        ]
+                        successors = [suc for suc in successors if self._is_address_executable(suc.addr)]
 
                         # mark jump as resolved if we got successors
                         if successors:

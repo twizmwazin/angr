@@ -794,7 +794,7 @@ class VFG(ForwardAnalysis[SimState, VFGNode, VFGJob, BlockID, SimState], Analysi
         for succ in all_successors:
             if self._is_call_jumpkind(succ.history.jumpkind):
                 try:
-                    call_targets.append(succ.solver.eval_one(succ._ip))
+                    call_targets.append(succ.addr)
                     # finding one is enough!
                     break
                 except SimValueError:
@@ -864,7 +864,7 @@ class VFG(ForwardAnalysis[SimState, VFGNode, VFGJob, BlockID, SimState], Analysi
                 return self._handle_successor_multitargets(job, successor, all_successors)
 
         # Now there should be one single target for the successor
-        successor_addr = successor.solver.eval_one(successor.ip)
+        successor_addr = successor.addr
 
         # Get the fake ret successor
         fakeret_successor = None
@@ -1732,7 +1732,7 @@ class VFG(ForwardAnalysis[SimState, VFGNode, VFGJob, BlockID, SimState], Analysi
             try:
                 l.debug(
                     "-  successor: %#08x of %s [%s]",
-                    suc.solver.eval_one(suc.ip),
+                    suc.addr,
                     suc.history.jumpkind,
                     job.dbg_exit_status[suc],
                 )
@@ -1778,10 +1778,7 @@ class VFG(ForwardAnalysis[SimState, VFGNode, VFGJob, BlockID, SimState], Analysi
             # It should give us three exits: Ijk_Call, Ijk_Boring, and
             # Ijk_Ret. The last exit is simulated.
             # Notice: We assume the last exit is the simulated one
-            if fakeret_successor is None:
-                retn_target_addr = None
-            else:
-                retn_target_addr = fakeret_successor.solver.eval_one(fakeret_successor.ip)
+            retn_target_addr = None if fakeret_successor is None else fakeret_successor.addr
 
             # Create call stack
             new_call_stack = new_call_stack.call(addr, successor_ip, retn_target=retn_target_addr)

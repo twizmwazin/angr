@@ -1180,17 +1180,18 @@ class Function(Serializable):
         # process the nodes in a breadth-first order keeping track of which nodes have already been analyzed
         analyzed = set()
         q = [fresh_state]
-        analyzed.add(fresh_state.solver.eval(fresh_state.ip))
+        analyzed.add(fresh_state.addr)
         while len(q) > 0:
             state = q.pop()
+            curr_ip = state.addr
             # make sure its in this function
-            if state.solver.eval(state.ip) not in graph_addrs:
+            if curr_ip not in graph_addrs:
                 continue
             # don't trace into simprocedures
-            if self.project.is_hooked(state.solver.eval(state.ip)):
+            if self.project.is_hooked(curr_ip):
                 continue
             # don't trace outside of the binary
-            if not self.project.loader.main_object.contains_addr(state.solver.eval(state.ip)):
+            if not self.project.loader.main_object.contains_addr(curr_ip):
                 continue
             # don't trace unreachable blocks
             if state.history.jumpkind in {
@@ -1204,8 +1205,6 @@ class Function(Serializable):
             }:
                 continue
 
-            curr_ip = state.solver.eval(state.ip)
-
             # get runtime values from logs of successors
             successors = self.project.factory.successors(state)
             for succ in successors.flat_successors + successors.unsat_successors:
@@ -1218,7 +1217,7 @@ class Function(Serializable):
 
                 # add successors to the queue to analyze
                 if not succ.solver.symbolic(succ.ip):
-                    succ_ip = succ.solver.eval(succ.ip)
+                    succ_ip = succ.addr
                     if succ_ip in self and succ_ip not in analyzed:
                         analyzed.add(succ_ip)
                         q.insert(0, succ)

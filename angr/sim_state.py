@@ -838,7 +838,7 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
             new_state.add_constraints(new_state.regs.ip % 2 == 1, new_state.regs.ip % 2 != 0)
             return new_state.satisfiable()
 
-        concrete_ip = self.solver.eval(self.regs.ip)
+        concrete_ip = self.addr
         return concrete_ip % 2 == 1
 
 
