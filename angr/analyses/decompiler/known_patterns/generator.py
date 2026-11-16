@@ -126,7 +126,6 @@ class PatternGenerator:
         for start, elem in codegen.map_pos_to_node.items():
             key = id(elem.obj)
             end = start + elem.length
-            # a local's wrapper is rendered at its declaration too, which comes first: keep the use
             if key in self._cnode_span and getattr(elem.obj, "vvar_id", None) is None:
                 s0, e0 = self._cnode_span[key]
                 self._cnode_span[key] = (min(s0, start), max(e0, end))
@@ -160,7 +159,6 @@ class PatternGenerator:
         """The text extent of an AIL expression node = union of its own wrapper
         span and all descendants' spans (bottom-up; handles synthesized nodes
         that have no direct wrapper)."""
-        # not id(node): accessors hand out fresh wrappers, whose ids are reused once they are collected
         key = node
         if key in memo:
             return memo[key]
