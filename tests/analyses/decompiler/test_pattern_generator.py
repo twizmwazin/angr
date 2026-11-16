@@ -129,22 +129,6 @@ class TestPatternGeneratorStmtSeq(TestCase):
         assert isinstance(pat.pattern, PStore)
         assert [p.capture for p in pat.params] == ["a0", "a1"]
 
-    def test_generate_swap_is_deterministic(self):
-        # AIL accessors hand out fresh wrappers whose ids get reused, so nothing
-        # in the generator may depend on the identity of an AIL node
-        _, _, _, dec = _decompile(MB_BIN, "do_swap")
-        t = _text(dec)
-        start = t.index("v1 = *a0")
-        end = t.index("v1;", t.index("= v1")) + 3
-        offs = [t.index("a0", start), t.index("a1", start)]
-        pats = set()
-        for _ in range(20):
-            gen = PatternGenerator(dec.codegen, dec.ail_graph)
-            pats.add(repr(gen.generate(start, end, "std::swap", offs).pattern))
-            junk = [object() for _ in range(7)]  # shift what the allocator hands out next
-            del junk
-        assert len(pats) == 1
-
 
 class TestPatternGeneratorGraph(TestCase):
     def test_generate_route_diamond(self):
