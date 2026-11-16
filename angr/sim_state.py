@@ -756,10 +756,7 @@ class SimState[IPTypeConc, IPTypeSym](PluginHub[SimStatePlugin]):
             if self.solver.symbolic(stack_value):
                 concretized_value = f"SYMBOLIC - {stack_value!r}"
             else:
-                if len(self.solver.eval_upto(stack_value, 2)) == 2:
-                    concretized_value = repr(stack_value)
-                else:
-                    concretized_value = repr(stack_value)
+                concretized_value = repr(stack_value)
             strings.append(concretized_value)
 
         return " .. ".join(strings)

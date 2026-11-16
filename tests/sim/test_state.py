@@ -7,6 +7,7 @@ import gc
 import os
 import pickle
 import unittest
+from unittest import mock
 
 import cle
 
@@ -18,6 +19,25 @@ test_location = os.path.join(bin_location, "tests")
 
 
 class TestState(unittest.TestCase):
+    def test_dbg_print_stack(self):
+        s = SimState(project=minimal_project("AMD64"), mode="symbolic")
+        s.regs.sp = 0x7FFFFFF0
+        s.regs.bp = 0x7FFFFFF8
+        concrete = claripy.BVV(0x4142434445464748, 64)
+        symbolic = claripy.BVS("stack_var", 64)
+        s.memory.store(0x7FFFFFF0, concrete, endness=s.arch.memory_endness)
+        s.memory.store(0x7FFFFFF8, symbolic, endness=s.arch.memory_endness)
+
+        # printing concrete stack values must not involve the solver
+        with mock.patch.object(type(s.solver), "eval_upto", side_effect=AssertionError("unexpected solver call")):
+            out = s.dbg_print_stack()
+
+        lines = out.splitlines()
+        assert lines[0] == "SP = 0x7ffffff0, BP = 0x7ffffff8"
+        assert lines[1] == f"(sp){0x7FFFFFF0: 16x} | {concrete!r}"
+        assert lines[2] == f"(bp){0x7FFFFFF8: 16x} | SYMBOLIC - {symbolic!r}"
+        assert len(lines) == 3
+
     def test_state(self):
         s = SimState(project=minimal_project("AMD64"))
         s.registers.store("sp", 0x7FFFFFFFFFF0000)
