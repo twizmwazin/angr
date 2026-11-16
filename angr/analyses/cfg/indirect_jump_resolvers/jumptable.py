@@ -394,8 +394,8 @@ class JumpTableProcessor(
                     reg_offset += delta
                     return reg_offset
         elif expr.op == "__and__" and len(expr.args) == 2 and cast(claripy.ast.BV, expr.args[1]).op == "BVV":
-            # ignore all masking on SpOffsets
-            return JumpTableProcessor._extract_spoffset_from_expr(cast(claripy.ast.BV, expr.args[0]))
+            # ignore all masking on RegisterOffsets
+            return JumpTableProcessor._extract_regoffset_from_expr(cast(claripy.ast.BV, expr.args[0]))
         return None
 
     def _handle_stmt_WrTmp(self, stmt):
