@@ -1169,7 +1169,7 @@ class PcodeLifterEngineMixin(SimEngine):
         # phase 1: parameter defaults
         if addr is None:
             assert state is not None
-            addr = state.addr
+            addr = state.solver.eval(state._ip)
         if size is not None:
             size = min(size, IRSB_MAX_SIZE)
         if size is None:
