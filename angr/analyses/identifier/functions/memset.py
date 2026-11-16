@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 
-from angr.analyses.identifier.func import Func, TestData, rand_str
+from angr.analyses.identifier.func import Func, TestData, rand_bytes
 
 
 class memset(Func):
@@ -27,9 +27,9 @@ class memset(Func):
         # TODO we don't check the return val
         set_len = random.randint(1, 40)
         char = random.randint(0, 255)
-        result_buf = rand_str(set_len + 5)
+        result_buf = rand_bytes(set_len + 5)
         test_input = [result_buf, char, set_len]
-        test_output = [chr(char) * set_len + result_buf[-5:], None, None]
+        test_output = [bytes([char]) * set_len + result_buf[-5:], None, None]
         max_steps = 20
         return_val = None
         return TestData(test_input, test_output, return_val, max_steps)
