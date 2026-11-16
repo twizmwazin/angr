@@ -121,16 +121,13 @@ class PatternGenerator:
         self.ail_graph = ail_graph
         self._wildcards = 0
         self.text: str = codegen.text
-        # id(cnode) -> (min_start, max_end) merged over its text chunks
-        self._cnode_span: dict[int, tuple[int, int]] = {}
+        # id(cnode) -> the text chunks it renders as, in text order. The cnodes are owned by the codegen, so their
+        # ids are stable for as long as this generator is. That is not true of AIL nodes: an accessor such as
+        # ``stmt.src`` hands out a fresh wrapper on every call, and the id of a wrapper that has been collected is
+        # reused by the next one. Nothing here may be keyed by the id of an AIL node.
+        self._cnode_chunks: dict[int, list[tuple[int, int]]] = {}
         for start, elem in codegen.map_pos_to_node.items():
-            key = id(elem.obj)
-            end = start + elem.length
-            if key in self._cnode_span:
-                s0, e0 = self._cnode_span[key]
-                self._cnode_span[key] = (min(s0, start), max(e0, end))
-            else:
-                self._cnode_span[key] = (start, end)
+            self._cnode_chunks.setdefault(id(elem.obj), []).append((start, start + elem.length))
 
     #
     # public helpers
@@ -155,33 +152,57 @@ class PatternGenerator:
         cnodes = self.codegen.ailexpr2cnode
         return cnodes.get((node, True, False)) or cnodes.get((node, True, True))
 
-    def _node_span(self, node: Expression, memo: dict[int, tuple[int, int] | None]) -> tuple[int, int] | None:
+    @staticmethod
+    def _hull(spans: list[tuple[int, int]]) -> tuple[int, int] | None:
+        return (min(s for s, _ in spans), max(e for _, e in spans)) if spans else None
+
+    def _cnode_span(self, cnode: object, is_leaf: bool, anchor: tuple[int, int] | None) -> tuple[int, int] | None:
+        """The text extent of one wrapper: the hull of its chunks, which for an
+        operator or a call are the pieces of a single rendering.
+
+        A leaf is different. Its chunks are whole renderings of it, and it can
+        have several: a local variable's wrapper is rendered at its declaration
+        as well as where it is used. The one meant is the one nearest
+        ``anchor``."""
+        chunks = self._cnode_chunks.get(id(cnode))
+        if not chunks:
+            return None
+        if is_leaf and anchor is not None and len(chunks) > 1:
+            return min(chunks, key=lambda c: max(0, anchor[0] - c[1], c[0] - anchor[1]))
+        return self._hull(chunks)
+
+    def _node_span(self, node: Expression, anchor: tuple[int, int] | None = None) -> tuple[int, int] | None:
         """The text extent of an AIL expression node = union of its own wrapper
         span and all descendants' spans (bottom-up; handles synthesized nodes
-        that have no direct wrapper)."""
-        key = id(node)
-        if key in memo:
-            return memo[key]
-        memo[key] = None  # guard against cycles
+        that have no direct wrapper). ``anchor`` is the stretch of text the node
+        is being looked for in; see :meth:`_cnode_span`."""
         spans: list[tuple[int, int]] = []
+        children = [child for _, child in _iter_expr_children(node)]
         cnode = self._cnode_of(node)
-        if cnode is not None and id(cnode) in self._cnode_span:
-            spans.append(self._cnode_span[id(cnode)])
-        for _, child in _iter_expr_children(node):
-            cs = self._node_span(child, memo)
+        if cnode is not None:
+            own = self._cnode_span(cnode, not children, anchor)
+            if own is not None:
+                spans.append(own)
+        for child in children:
+            cs = self._node_span(child, anchor)
             if cs is not None:
                 spans.append(cs)
-        result = (min(s for s, _ in spans), max(e for _, e in spans)) if spans else None
-        memo[key] = result
-        return result
+        return self._hull(spans)
 
-    def _stmt_span(self, stmt: Statement, memo: dict[int, tuple[int, int] | None]) -> tuple[int, int] | None:
+    def _stmt_span(self, stmt: Statement) -> tuple[int, int] | None:
+        """The text extent of a statement's expressions (its own punctuation,
+        the trailing semicolon in particular, is not part of it)."""
+        # where the statement itself is rendered tells its variables apart from their declarations
+        cnode = self.codegen.ailexpr2cnode.get((stmt, False, False))
+        anchor = self._hull(self._cnode_chunks.get(id(cnode), [])) if cnode is not None else None
         spans = []
-        for _, root in _iter_stmt_subexprs(stmt):
-            cs = self._node_span(root, memo)
+        for path, root in _iter_stmt_subexprs(stmt):
+            if len(path) != 1:
+                continue  # _node_span covers the descendants of each root
+            cs = self._node_span(root, anchor)
             if cs is not None:
                 spans.append(cs)
-        return (min(s for s, _ in spans), max(e for _, e in spans)) if spans else None
+        return self._hull(spans)
 
     #
     # generation entry point
@@ -217,7 +238,8 @@ class PatternGenerator:
         if len(set(arg_varids)) != len(arg_varids):
             raise PatternGenerationError("duplicate argument variables in arg_offsets")
 
-        const_promote = {id(c) for c in self._consts_at(const_arg_offsets)}
+        # AIL nodes compare by value and idx, so a constant reached again through its parent is still found
+        const_promote = set(self._consts_at(const_arg_offsets))
 
         # classify: how many graph basic blocks does the selection touch?
         n_blocks = 0
@@ -241,8 +263,6 @@ class PatternGenerator:
             )
 
         rendered_stmts = self._rendered_statements()
-        memo: dict[int, tuple[int, int] | None] = {}
-
         # patternable statements (Assignment/Store) fully inside the selection.
         # Return / side-effect statements are not patternable: a selection that
         # lands on a return's expression is treated as an expression selection.
@@ -250,7 +270,7 @@ class PatternGenerator:
         for s in rendered_stmts:
             if not isinstance(s, (Assignment, Store)):
                 continue
-            sp = self._stmt_span(s, memo)
+            sp = self._stmt_span(s)
             if sp is not None and start_offset <= sp[0] and sp[1] <= end_offset:  # pylint:disable=unsubscriptable-object
                 selected_stmts.append(s)
 
@@ -274,7 +294,6 @@ class PatternGenerator:
         return self._generate_expr(
             start_offset,
             end_offset,
-            memo,
             call_name,
             arg_varids,
             const_promote,
@@ -321,7 +340,7 @@ class PatternGenerator:
     #
 
     def _gen_expr(
-        self, expr: Expression, capture_of: dict[int, str], const_promote: set[int], *, fuzzy: bool = False
+        self, expr: Expression, capture_of: dict[int, str], const_promote: set[Const], *, fuzzy: bool = False
     ) -> PatternExpr:
         """The pattern of ``expr``. In fuzzy mode a variable the selection does not
         capture and a constant that points at a string are wildcards: neither is part
@@ -335,7 +354,7 @@ class PatternGenerator:
                 return PAny()
             return PVVar(name=nm)
         if isinstance(expr, Const):
-            if id(expr) in const_promote:
+            if expr in const_promote:
                 return PConst(name=self._extra_name_of(expr))
             if fuzzy and self._is_string_pointer(expr):
                 # named, so that the outliner can hand each occurrence's own string to the call
@@ -366,7 +385,7 @@ class PatternGenerator:
         return PAny()
 
     def _gen_call(
-        self, call: Call, capture_of: dict[int, str], const_promote: set[int], *, fuzzy: bool = False
+        self, call: Call, capture_of: dict[int, str], const_promote: set[Const], *, fuzzy: bool = False
     ) -> PCall | None:
         """The PCall of ``call``, or None when the callee has no name to match by."""
         names = self._callee_names(call)
@@ -401,7 +420,7 @@ class PatternGenerator:
         return md is not None and md.sort == MemoryDataSort.String
 
     def _gen_stmt(
-        self, stmt: Statement, capture_of: dict[int, str], const_promote: set[int], *, fuzzy: bool = False
+        self, stmt: Statement, capture_of: dict[int, str], const_promote: set[Const], *, fuzzy: bool = False
     ) -> PatternStmt:
         if isinstance(stmt, Assignment):
             if isinstance(stmt.src, Call):
@@ -437,15 +456,15 @@ class PatternGenerator:
     # capture / param plumbing
     #
 
-    _extra_names: dict[int, str]
+    _extra_names: dict[Const, str]
 
     def _extra_name_of(self, const: Const) -> str:
         names = getattr(self, "_extra_names", None)
         if names is None:
             names = self._extra_names = {}
-        if id(const) not in names:
-            names[id(const)] = f"c{len(names)}"
-        return names[id(const)]
+        if const not in names:
+            names[const] = f"c{len(names)}"
+        return names[const]
 
     @staticmethod
     def _leaf_vvar_ids(expr: Expression) -> list[int]:
@@ -513,7 +532,6 @@ class PatternGenerator:
         self,
         start,
         end,
-        memo,
         call_name,
         arg_varids,
         const_promote,
@@ -531,7 +549,7 @@ class PatternGenerator:
         root = None
         best_width = -1
         for ex in self._rendered_expressions():
-            sp = self._node_span(ex, memo)
+            sp = self._node_span(ex, (start, end))
             if sp is not None and start <= sp[0] and sp[1] <= end:
                 width = sp[1] - sp[0]
                 if width > best_width:
@@ -634,8 +652,7 @@ class PatternGenerator:
         default_enabled,
     ) -> KnownPattern:
         # order by text position
-        memo: dict[int, tuple[int, int] | None] = {}
-        selected_stmts = sorted(selected_stmts, key=lambda s: (self._stmt_span(s, memo) or (0, 0))[0])
+        selected_stmts = sorted(selected_stmts, key=lambda s: (self._stmt_span(s) or (0, 0))[0])
         capture_of = self._stmt_captures(selected_stmts, arg_varids)
         stmt_pats = tuple(self._gen_stmt(s, capture_of, const_promote) for s in selected_stmts)
         pattern = stmt_pats[0] if len(stmt_pats) == 1 else PStmtSeq(stmt_pats)
@@ -731,7 +748,7 @@ class PatternGenerator:
         blocks: list[Block],
         block_stmts: dict[Block, list[Statement]],
         capture_of: dict[int, str],
-        const_promote: set[int],
+        const_promote: set[Const],
         render: Callable[[Statement, dict[int, str], set[int]], PatternStmt],
     ) -> PGraphPat:
         """The PGraphPat of ``blocks``: one labeled block each, internal edges between
@@ -871,7 +888,7 @@ class PatternGenerator:
             True,
         )
 
-    def _gen_stmt_lenient(self, stmt: Statement, capture_of: dict[int, str], const_promote: set[int]) -> PatternStmt:
+    def _gen_stmt_lenient(self, stmt: Statement, capture_of: dict[int, str], const_promote: set[Const]) -> PatternStmt:
         """:meth:`_gen_stmt` in fuzzy mode, with a wildcard statement for what the DSL cannot say."""
         try:
             return self._gen_stmt(stmt, capture_of, const_promote, fuzzy=True)
