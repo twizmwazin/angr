@@ -22,6 +22,14 @@ test_location = os.path.join(bin_location, "tests")
 
 
 class TestAILExec(unittest.TestCase):
+    def test_top_roundtrip(self):
+        engine = object.__new__(SimEngineAILSimState)
+        top = engine._top(32)
+        assert engine._is_top(top)
+        assert not engine._is_top(claripy.BVS("not_top", 32))
+        assert not engine._is_top(claripy.BVV(0, 32))
+        assert not engine._is_top(top + 1)
+
     def test_vector_convert_is_lane_wise(self):
         class _Engine(SimEngineAILSimState):
             value: claripy.ast.Bits
