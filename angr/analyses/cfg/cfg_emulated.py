@@ -2792,7 +2792,7 @@ class CFGEmulated(ForwardAnalysis, CFGBase):  # pylint: disable=abstract-method
             )
 
         # Find number of instructions of start block
-        func = self.project.kb.functions.get(function_addr)
+        func = self.project.kb.functions.function(addr=function_addr)
         start_block = func._get_block(function_addr)
         num_instr = start_block.instructions - 1
 

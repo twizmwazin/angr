@@ -593,12 +593,11 @@ class FactCollector(Analysis):
             func: Function | None = None
             if isinstance(node, (HookNode, FuncNode)):
                 # attempt to convert it into a function
-                if self.kb.functions.contains_addr(node.addr):
-                    func = self.kb.functions.get_by_addr(node.addr)
-                else:
+                func = self.kb.functions.function(addr=node.addr)
+                if func is None:
                     continue
-            if is_tailcall and self.kb.functions.contains_addr(node.addr):
-                tail_func = self.kb.functions.get_by_addr(node.addr)
+            tail_func = self.kb.functions.function(addr=node.addr) if is_tailcall else None
+            if tail_func is not None:
                 self._tailcall_pops |= self._tailcall_callee_pops(state, tail_func)
                 if (
                     func is None
@@ -714,9 +713,9 @@ class FactCollector(Analysis):
             if (
                 data.get("type") == "transition"
                 and data.get("outside", False)
-                and self.kb.functions.contains_addr(dst.addr)
+                and (dst_func := self.kb.functions.function(addr=dst.addr)) is not None
             ):
-                pops |= self._continuation_pops(self.kb.functions.get_by_addr(dst.addr), depth - 1, visited)
+                pops |= self._continuation_pops(dst_func, depth - 1, visited)
         return pops
 
     def _ret_pops(self, func: Function) -> set[int]:
@@ -1029,9 +1028,8 @@ class FactCollector(Analysis):
                 func = None
                 if isinstance(node, (FuncNode, HookNode)):
                     # attempt to convert it into a function
-                    if self.kb.functions.contains_addr(node.addr):
-                        func = self.kb.functions.get_by_addr(node.addr)
-                    else:
+                    func = self.kb.functions.function(addr=node.addr)
+                    if func is None:
                         continue
                 if func is not None:
                     func_proto = self._callee_proto(func)
@@ -1068,9 +1066,9 @@ class FactCollector(Analysis):
                 if len(func_succs) == 1:
                     succ = func_succs[0]
                     func_succ: Function | None = None
-                    if isinstance(succ, (BlockNode, HookNode, FuncNode)) and self.kb.functions.contains_addr(succ.addr):
+                    if isinstance(succ, (BlockNode, HookNode, FuncNode)):
                         # attempt to convert it into a function
-                        func_succ = self.kb.functions.get_by_addr(succ.addr)
+                        func_succ = self.kb.functions.function(addr=succ.addr)
                     if func_succ is not None and func_succ.name != "_security_check_cookie":
                         succ_proto = self._callee_proto(func_succ)
                         if (
@@ -1224,9 +1222,9 @@ class FactCollector(Analysis):
     def _ret64_callee(self, func: Function, call_block_addr: int) -> bool:
         """Whether the call at the end of ``call_block_addr`` in ``func`` returns a value wider than a word."""
         target = func.get_call_target(call_block_addr)
-        if target is None or not self.kb.functions.contains_addr(target):
+        callee = self.kb.functions.function(addr=target) if target is not None else None
+        if callee is None:
             return False
-        callee = self.kb.functions.get_by_addr(target)
         callee_proto = self._callee_proto(callee)
         if callee_proto is None or callee_proto.returnty is None:
             return False
@@ -1304,9 +1302,9 @@ class FactCollector(Analysis):
                 continue
             seen_targets.add(target)
             for caller_addr in list(funcs.callgraph.predecessors(target)):
-                if not funcs.contains_addr(caller_addr):
+                caller = funcs.function(addr=caller_addr)
+                if caller is None:
                     continue
-                caller = funcs.get_by_addr(caller_addr)
                 if caller_addr != target:
                     for callsite in caller.get_call_sites():
                         if caller.get_call_target(callsite) != target:

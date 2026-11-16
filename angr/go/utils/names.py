@@ -33,8 +33,9 @@ def call_target_name(project, call: Call) -> str | None:
         return target
     if isinstance(target, Const):
         addr = target.value_int
-        if project.kb.functions.contains_addr(addr):
-            return project.kb.functions.get_by_addr(addr).name
+        func = project.kb.functions.function(addr=addr)
+        if func is not None:
+            return func.name
         sym = project.loader.find_symbol(addr)
         if sym is not None:
             return sym.name

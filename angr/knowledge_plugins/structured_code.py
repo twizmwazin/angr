@@ -113,7 +113,7 @@ class SpillingDecompilationDict(collections.abc.MutableMapping):
             blob,
             project=self._kb._project,  # pylint:disable=protected-access
             kb=self._kb,
-            function=self._kb.functions.get(addr),
+            function=self._kb.functions.function(addr=addr),
         )
         self._spilled.discard(key)
         self[key] = cache

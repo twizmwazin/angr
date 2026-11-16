@@ -78,9 +78,8 @@ class X86GccGetPcSimplifier(OptimizationPass):
                 and isinstance(block.statements[-1].expr.target, ailment.Expr.Const)
             ):
                 call_func_addr = block.statements[-1].expr.target.value
-                try:
-                    call_func = self.kb.functions.get_by_addr(call_func_addr)
-                except KeyError:
+                call_func = self.kb.functions.function(addr=call_func_addr)
+                if call_func is None:
                     continue
                 if "get_pc" in call_func.info:
                     results.append(

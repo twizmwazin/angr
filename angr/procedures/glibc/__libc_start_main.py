@@ -231,7 +231,7 @@ class __libc_start_main(angr.SimProcedure):
                     succ_and_jks = caller_node.successors_and_jumpkinds()
                     if len(succ_and_jks) == 1 and succ_and_jks[0][1] == "Ijk_Call":
                         # get_pc
-                        getpc_func = cfg.functions.get_by_addr(succ_and_jks[0][0].addr)
+                        getpc_func = cfg.functions.function(addr=succ_and_jks[0][0].addr)
                         if getpc_func is not None and "get_pc" in getpc_func.info:
                             # GCC-generated x86-pie binary confirmed.
                             # initialize the specified register with the block address

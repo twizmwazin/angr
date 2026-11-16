@@ -729,7 +729,7 @@ def get_basic_blocks(
     _require_cfg(session)
 
     addr = _parse_address(function_address)
-    func = session.project.kb.functions.get(addr)
+    func = session.project.kb.functions.function(addr=addr)
 
     if func is None:
         raise FunctionNotFoundError(f"Function not found at {function_address}")
@@ -799,7 +799,7 @@ def get_callgraph(
     func_manager = session.project.kb.functions
     nodes = []
     for addr in cg.nodes():
-        func = func_manager.get(addr)
+        func = func_manager.function(addr=addr)
         if func:
             nodes.append(
                 {

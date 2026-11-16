@@ -192,7 +192,7 @@ class StructuredCodeManagerSerializer:
                     db_cache.blob,
                     project=kb._project,  # pylint:disable=protected-access
                     kb=kb,
-                    function=kb.functions.get(db_cache.func_addr),
+                    function=kb.functions.function(addr=db_cache.func_addr),
                 )
                 manager.cached[(db_cache.func_addr, db_cache.flavor)] = cache
 

@@ -1598,19 +1598,17 @@ class Clinic(Analysis, Serializable):
         attempted_funcs: set[int] = set()
 
         for node in self.function.transition_graph:
-            if (
-                isinstance(node, BlockNode)
-                and node.addr != self.function.addr
-                and self.kb.functions.contains_addr(node.addr)
-            ):
+            if isinstance(node, BlockNode) and node.addr != self.function.addr:
                 # tail jumps
-                target_func = self.kb.functions.get_by_addr(node.addr)
-            elif isinstance(node, FuncNode) and self.kb.functions.contains_addr(node.addr):
+                target_func = self.kb.functions.function(addr=node.addr)
+            elif isinstance(node, FuncNode):
                 # removing a function does not rewrite its callers' transition graphs, so a FuncNode
                 # outlives the function it names
-                target_func = self.kb.functions.get_by_addr(node.addr)
+                target_func = self.kb.functions.function(addr=node.addr)
             else:
                 # TODO: Enable call-site analysis for indirect calls
+                continue
+            if target_func is None:
                 continue
 
             if target_func.addr in attempted_funcs:
@@ -1919,10 +1917,9 @@ class Clinic(Analysis, Serializable):
                     data.get("type") != "call"
                     or not isinstance(dst, FuncNode)
                     or self._is_unresolvable_call_target(dst.addr)
-                    or not self.kb.functions.contains_addr(dst.addr)
+                    or (callee := self.kb.functions.function(addr=dst.addr)) is None
                 ):
                     continue
-                callee = self.kb.functions.get_by_addr(dst.addr)
                 if (
                     callee.returning is False
                     or callee.is_simprocedure
@@ -2266,13 +2263,15 @@ class Clinic(Analysis, Serializable):
                 continue
 
             for slot_name, target in slots:
-                if not isinstance(target, ailment.Const) or not self.kb.functions.contains_addr(target.value):
+                if not isinstance(target, ailment.Const):
                     continue
                 if target.value == self.function.addr:
                     # a jump back to the current function is a loop back edge, not a call to other functions
                     continue
 
-                target_func = self.kb.functions.get_by_addr(target.value)
+                target_func = self.kb.functions.function(addr=target.value)
+                if target_func is None:
+                    continue
 
                 ret_reg_offset = self.project.arch.ret_offset
                 if target_func.returning and ret_reg_offset is not None:
@@ -2346,9 +2345,9 @@ class Clinic(Analysis, Serializable):
             else:
                 continue
 
-            if not self.kb.functions.contains_addr(target):
+            target_func = self.kb.functions.function(addr=target)
+            if target_func is None:
                 continue
-            target_func = self.kb.functions.get_by_addr(target)
             if target_func.name == "_security_check_cookie" and self.project.arch.name in {"X86", "AMD64"}:
                 block.statements[-1] = self._make_single_reg_arg_call(last_stmt)
 
@@ -5597,11 +5596,7 @@ class Clinic(Analysis, Serializable):
                 and isinstance(last_stmt.expr, ailment.Expr.Call)
                 and isinstance(last_stmt.expr.target, ailment.Expr.Const)
             ):
-                func = (
-                    self.project.kb.functions.get_by_addr(last_stmt.expr.target.value)
-                    if self.project.kb.functions.contains_addr(last_stmt.expr.target.value)
-                    else None
-                )
+                func = self.project.kb.functions.function(addr=last_stmt.expr.target.value)
                 if func is not None and func.info.get("is_rust_probestack", False) is True:
                     # get rid of this call
                     node.statements = node.statements[:-1]
@@ -5641,11 +5636,7 @@ class Clinic(Analysis, Serializable):
                 and isinstance(last_stmt.expr, ailment.Expr.Call)
                 and isinstance(last_stmt.expr.target, ailment.Expr.Const)
             ):
-                func = (
-                    self.project.kb.functions.get_by_addr(last_stmt.expr.target.value)
-                    if self.project.kb.functions.contains_addr(last_stmt.expr.target.value)
-                    else None
-                )
+                func = self.project.kb.functions.function(addr=last_stmt.expr.target.value)
                 if func is not None and is_stack_probe(func):
                     # get rid of this call
                     self._remove_trailing_call(ail_graph, node)
@@ -6161,9 +6152,9 @@ class Clinic(Analysis, Serializable):
         default_arg_type = SimTypeLongLong if self.project.arch.bits == 64 else SimTypeInt
 
         for func_addr, protos in func_proto_candidates.items():
-            if not self.kb.functions.contains_addr(func_addr):
+            func = self.kb.functions.function(addr=func_addr)
+            if func is None:
                 continue
-            func = self.kb.functions.get_by_addr(func_addr)
             if func.is_prototype_groundtruth_for(self.flavor):
                 # already has a "good" prototype; don't overwrite it
                 continue

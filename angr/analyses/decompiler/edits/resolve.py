@@ -78,7 +78,7 @@ def resolve_function(
 
     if address is not None:
         addr = parse_address(address)
-        func = kb.functions.get(addr)
+        func = kb.functions.function(addr=addr)
         if func is None and containing:
             func = kb.functions.floor_func(addr)
             if func is not None and not (func.addr <= addr < func.addr + max(func.size, 1)):

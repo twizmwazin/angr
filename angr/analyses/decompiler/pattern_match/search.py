@@ -508,7 +508,7 @@ def _callee_names_fn(kb: KnowledgeBase | None) -> Callable[[Call], frozenset[str
         addr = target.value
         names = cache.get(addr)
         if names is None:
-            func = kb.functions.get_by_addr(addr) if kb.functions.contains_addr(addr) else None
+            func = kb.functions.function(addr=addr)
             names = frozenset(n for n in ((func.name, func.demangled_name) if func is not None else ()) if n)
             cache[addr] = names
         return names

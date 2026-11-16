@@ -3086,9 +3086,9 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
             # functions) treats them as ground truth. Provably non-returning SimProcedures and syscalls keep their
             # status.
             for func_addr in list(self.functions.nonreturning_func_addrs()):
-                if not self.functions.contains_addr(func_addr):
+                func = self.functions.function(addr=func_addr)
+                if func is None:
                     continue
-                func = self.functions.get_by_addr(func_addr)
                 if not func.is_simprocedure and not func.is_syscall:
                     func.returning = None
 
@@ -3146,9 +3146,9 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
             }
 
             for caller_addr in callers:
-                if not self.functions.contains_addr(caller_addr):
+                f = self.functions.function(addr=caller_addr)
+                if f is None:
                     continue
-                f = self.functions.get_by_addr(caller_addr)
 
                 callsites_to_functions = defaultdict(list)  # callsites to functions mapping
                 for src_addr, dst_addr in f.call_edge_addrs():
@@ -3290,8 +3290,10 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
                     if cfg_node is None:
                         continue
                     func_addr = cfg_node.function_address
-                    if func_addr not in tested_func_addrs and self.kb.functions.contains_addr(func_addr):
-                        func = self.kb.functions.get_by_addr(func_addr)
+                    if (
+                        func_addr not in tested_func_addrs
+                        and (func := self.kb.functions.function(addr=func_addr)) is not None
+                    ):
                         if not security_check_cookie_found and is_function_security_check_cookie(
                             func, self.project, security_cookie_addr
                         ):
@@ -3329,20 +3331,20 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
                             break
 
             # special handling: some binaries do not have SecurityCookie set, but still contain _security_init_cookie
-            if security_init_cookie_found is False and self.functions.contains_addr(self.project.entry):
-                start_func = self.functions.get_by_addr(self.project.entry)
+            start_func = (
+                self.functions.function(addr=self.project.entry) if security_init_cookie_found is False else None
+            )
+            if start_func is not None:
                 for callee in start_func.transition_graph:
                     if (
                         isinstance(callee, FuncNode)
                         and not security_init_cookie_found
-                        and self.kb.functions.contains_addr(callee.addr)
-                    ):
-                        callee_func = self.kb.functions.get_by_addr(callee.addr)
-                        if is_function_likely_security_init_cookie(callee_func):
-                            security_init_cookie_found = True
-                            callee_func.is_default_name = False
-                            callee_func.name = "_security_init_cookie"
-                            break
+                        and (callee_func := self.kb.functions.function(addr=callee.addr)) is not None
+                    ) and is_function_likely_security_init_cookie(callee_func):
+                        security_init_cookie_found = True
+                        callee_func.is_default_name = False
+                        callee_func.name = "_security_init_cookie"
+                        break
 
     def _post_process_string_references(self) -> None:
         """
@@ -7137,12 +7139,7 @@ class CFGFast(ForwardAnalysis[CFGNode, CFGNode, CFGJob, int, object], CFGBase): 
     def _go_runtime_function(self, addr: int, create: bool) -> Function | None:
         if not self._inside_regions(addr):
             return None
-        if create:
-            func = self.kb.functions.function(addr, create=True)
-        elif self.kb.functions.contains_addr(addr):
-            func = self.kb.functions.get_by_addr(addr)
-        else:
-            return None
+        func = self.kb.functions.function(addr=addr, create=create)
         if func is None or func.is_simprocedure:
             return None
         return func

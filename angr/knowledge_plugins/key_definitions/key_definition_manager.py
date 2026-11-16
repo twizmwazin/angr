@@ -50,9 +50,9 @@ class KeyDefinitionManager(KnowledgeBasePlugin):
 
     def get_model(self, func_addr: int):
         if func_addr not in self.model_by_funcaddr:
-            if not self._kb.functions.contains_addr(func_addr):
+            func = self._kb.functions.function(addr=func_addr)
+            if func is None:
                 return None
-            func = self._kb.functions[func_addr]
             if func.is_simprocedure or func.is_plt or func.is_alignment:
                 return None
             callsites = list(func.get_call_sites())

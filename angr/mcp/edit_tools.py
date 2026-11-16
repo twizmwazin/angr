@@ -456,7 +456,7 @@ def set_type(
     def post(session: ProjectSession, touched: set[int]) -> None:
         proj, kb, flavor = session.project, session.project.kb, session.flavor
         for addr in sorted(touched):
-            func = kb.functions.get(addr)
+            func = kb.functions.function(addr=addr)
             if func is None:
                 continue
 

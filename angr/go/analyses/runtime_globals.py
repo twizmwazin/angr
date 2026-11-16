@@ -77,9 +77,9 @@ def find_write_barrier(project: Project) -> int | None:
         if barrier not in callgraph:
             continue
         for caller in list(callgraph.predecessors(barrier))[:32]:
-            if not functions.contains_addr(caller):
+            func = functions.function(addr=caller)
+            if func is None:
                 continue
-            func = functions.get_by_addr(caller)
             for site in func.get_call_sites():
                 if func.get_call_target(site) != barrier:
                     continue

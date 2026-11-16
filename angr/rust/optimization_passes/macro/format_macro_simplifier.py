@@ -251,7 +251,7 @@ class FormatMacroSimplifier(OptimizationPass, CFAMixin, DFAMixin, SRDAMixin, SSA
                 arg_def_block, arg_def_stmt = self.get_def_block_and_stmt(arg_value)
                 fields = {}
                 target = arg_value.target
-                func = self.project.kb.functions.get(target.value, None) if isinstance(target, Const) else None
+                func = self.project.kb.functions.function(addr=target.value) if isinstance(target, Const) else None
                 clinic = self.project.kb.clinic_factory.get(func)
                 for block in clinic.graph.nodes:
                     for stmt in block.statements:

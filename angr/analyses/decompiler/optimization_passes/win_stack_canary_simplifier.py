@@ -173,9 +173,8 @@ class WinStackCanarySimplifier(OptimizationPass):
         ):
             # check if the target is alloca_probe
             callee_addr = call.target.value
-            if self.kb.functions.contains_addr(callee_addr) and is_stack_probe(
-                self.kb.functions.get_by_addr(callee_addr)
-            ):
+            callee = self.kb.functions.function(addr=callee_addr)
+            if callee is not None and is_stack_probe(callee):
                 second_block = self._get_block(first_block.addr + first_block.original_size)
                 if second_block is not None:
                     r = self._extract_canary_init_stmt_from_block(second_block)
@@ -471,13 +470,12 @@ class WinStackCanarySimplifier(OptimizationPass):
         for idx, stmt in enumerate(node.statements):
             if (call := stmt_is_simple_call(stmt)) is not None and isinstance(call.target, ailment.Expr.Const):
                 const_target = call.target.value
-                if self.kb.functions.contains_addr(const_target):
-                    func = self.kb.functions.get_by_addr(const_target)
-                    assert func is not None
-                    if func.name == "_security_check_cookie" or is_function_security_check_cookie(
-                        func, self.project, self._security_cookie_addr
-                    ):
-                        return idx
+                func = self.kb.functions.function(addr=const_target)
+                if func is not None and (
+                    func.name == "_security_check_cookie"
+                    or is_function_security_check_cookie(func, self.project, self._security_cookie_addr)
+                ):
+                    return idx
 
         return None
 

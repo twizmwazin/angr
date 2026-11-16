@@ -974,12 +974,12 @@ class JumpTableResolver(IndirectJumpResolver):
         self.deferred = False
         self._rejected_unmapped_table = False
 
-        if not cfg.kb.functions.contains_addr(func_addr):
+        func = cfg.kb.functions.function(addr=func_addr)
+        if func is None:
             # fix for angr issue #3768
             # the function must exist in the KB
             return False, None
 
-        func: Function = cfg.kb.functions[func_addr]
         self._max_targets = cfg._indirect_jump_target_limit
 
         # this is an indirect call if (1) the instruction is a call, or (2) the instruction is a tail jump (we detect
@@ -2684,21 +2684,15 @@ class JumpTableResolver(IndirectJumpResolver):
             state.inspect.add_breakpoint("mem_read", bss_memory_read_bp)
 
         if self.project.arch.name == "MIPS32":
-            try:
-                func = cfg.kb.functions.get_by_addr(func_addr)
-                if func.info and "gp" in func.info:
-                    state.regs._gp = func.info["gp"]
-            except KeyError:
-                pass
+            func = cfg.kb.functions.function(addr=func_addr)
+            if func is not None and func.info and "gp" in func.info:
+                state.regs._gp = func.info["gp"]
 
             # instrument all reads from gp and all writes to gp
             gp = None
-            try:
-                func = cfg.kb.functions.get_by_addr(func_addr)
-                if func.info and "gp" in func.info:
-                    gp = func.info["gp"]
-            except KeyError:
-                pass
+            func = cfg.kb.functions.function(addr=func_addr)
+            if func is not None and func.info and "gp" in func.info:
+                gp = func.info["gp"]
             if gp is not None:
                 mips_gp_hook = MIPSGPHook(self.project.arch.registers["gp"][0], gp)
                 mips_gp_read_bp = BP(when=BP_AFTER, enabled=True, action=mips_gp_hook.gp_register_read_hook)

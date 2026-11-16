@@ -157,8 +157,8 @@ class GoValueFuser(OptimizationPass):
         name = call_target_name(self.project, call)
         if name is None:
             return None
-        if isinstance(call.target, Const) and self.kb.functions.contains_addr(call.target.value_int):
-            func = self.kb.functions.get_by_addr(call.target.value_int)
+        func = self.kb.functions.function(addr=call.target.value_int) if isinstance(call.target, Const) else None
+        if func is not None:
             proto = func.get_prototype(Flavors.GO_FLAVOR)
             if isinstance(proto, GoSimTypeFunction):
                 return proto

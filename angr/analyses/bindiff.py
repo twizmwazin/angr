@@ -997,11 +997,11 @@ class BinDiff(Analysis):
         attributes = {}
         all_funcs = set(funcs.callgraph)
         for function_addr in funcs:
-            if not funcs.contains_addr(function_addr):
-                continue
             if exclude_func_addrs and function_addr in exclude_func_addrs:
                 continue
-            func = funcs.get_by_addr(function_addr)
+            func = funcs.function(addr=function_addr)
+            if func is None:
+                continue
             # skip syscalls and functions which are None in the cfg
             if func.is_syscall or func.is_alignment or func.is_plt:
                 continue

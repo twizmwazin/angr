@@ -46,9 +46,9 @@ class SyscallResolver(IndirectJumpResolver):
         return (True, [stub.addr]) if stub else (False, [])
 
     def _resolve_syscall_to_stub(self, cfg, addr: int, func_addr: int, block: Block) -> SimProcedure | None:
-        if not cfg.functions.contains_addr(func_addr):
+        func = cfg.functions.function(addr=func_addr)
+        if func is None:
             return None
-        func = cfg.functions.get_by_addr(func_addr)
 
         cv_manager = ConstantValueManager(self.project, cfg.kb, func, addr)
         constant_value_reg_read_bp = BP(when=BP_AFTER, enabled=True, action=cv_manager.reg_read_callback)

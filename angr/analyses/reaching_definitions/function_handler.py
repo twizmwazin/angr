@@ -363,7 +363,7 @@ class FunctionHandler:
         if data.symbol is None and data.address is not None:
             data.symbol = state.analysis.project.loader.find_symbol(data.address)
         if data.function is None and data.address is not None:
-            data.function = state.analysis.project.kb.functions.get(data.address, None)
+            data.function = state.analysis.project.kb.functions.function(addr=data.address)
         if data.name is None and data.function is not None:
             data.name = data.function.name
         if data.name is None and data.symbol is not None:

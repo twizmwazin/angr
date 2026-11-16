@@ -156,10 +156,9 @@ class RegisterSaveAreaSimplifier(OptimizationPass):
                         last_stmt = pred.statements[-1]
                         if isinstance(last_stmt.expr.target, ailment.Expr.Const):
                             callee_addr = last_stmt.expr.target.value
-                            if self.project.kb.functions.contains_addr(callee_addr):
-                                callee_func = self.project.kb.functions.get_by_addr(callee_addr)
-                                if callee_func.name == "_security_check_cookie":
-                                    ret_blocks.append(pred)
+                            callee_func = self.project.kb.functions.function(addr=callee_addr)
+                            if callee_func is not None and callee_func.name == "_security_check_cookie":
+                                ret_blocks.append(pred)
 
             for block in ret_blocks:
                 results = []

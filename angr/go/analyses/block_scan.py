@@ -76,8 +76,8 @@ def function_blocks(project: Project, addr: int, limit: int = 4096) -> tuple[lis
     function is known, else a bounded walk over direct jumps from the entry.
     """
     functions = project.kb.functions
-    if functions.contains_addr(addr):
-        func = functions.get_by_addr(addr)
+    func = functions.function(addr=addr)
+    if func is not None:
         graph = func.graph
         nodes = [n for n in graph.nodes if n.size is not None and n.addr in func.block_addrs_set]
         succs = {n.addr: [s.addr for s in graph.successors(n) if s.addr in func.block_addrs_set] for n in nodes}
@@ -202,8 +202,9 @@ def call_target(stmt) -> int | None:
 
 def callee_name(project: Project, addr: int) -> str | None:
     functions = project.kb.functions
-    if functions.contains_addr(addr):
-        return normalize_go_func_name(functions.get_by_addr(addr).name)
+    func = functions.function(addr=addr)
+    if func is not None:
+        return normalize_go_func_name(func.name)
     sym = project.loader.find_symbol(addr)
     return normalize_go_func_name(sym.name) if sym is not None else None
 

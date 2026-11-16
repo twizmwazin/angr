@@ -36,9 +36,9 @@ class RewriteCxxOperatorCalls(PeepholeOptimizationStmtBase):
         # are we calling a function that we deem as an overridden operator function?
         if isinstance(call_expr.target, Const):
             func_addr = call_expr.target.value
-            if not self.project.kb.functions.contains_addr(func_addr):
+            func = self.project.kb.functions.function(addr=func_addr)
+            if func is None:
                 return None
-            func = self.project.kb.functions[func_addr]
             if (
                 "operator=" in func.demangled_name
                 and isinstance(stmt, SideEffectStatement)

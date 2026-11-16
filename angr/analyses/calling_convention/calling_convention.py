@@ -437,11 +437,8 @@ class CallingConventionAnalysis(Analysis):
             )
             return None
 
-        try:
-            real_func = self.kb.functions.get_by_addr(successors[0].addr)
-        except KeyError:
-            # the real function does not exist for some reason
-            real_func = None
+        # the real function may not exist for some reason
+        real_func = self.kb.functions.function(addr=successors[0].addr)
 
         if real_func is not None:
             if real_func.calling_convention is None:
@@ -732,8 +729,8 @@ class CallingConventionAnalysis(Analysis):
             src, _, data = next(iter(in_edges))
             if (
                 data.get("jumpkind", "Ijk_Call") == "Ijk_Boring"
-                and self.kb.functions.contains_addr(src.function_address)
-                and self.kb.functions[src.function_address].is_plt
+                and (src_func := self.kb.functions.function(addr=src.function_address)) is not None
+                and src_func.is_plt
             ):
                 # find callers to the PLT stub instead
                 in_edges = self._cfg.graph.in_edges(src, data=True)
@@ -742,9 +739,9 @@ class CallingConventionAnalysis(Analysis):
             edge_type = data.get("jumpkind", "Ijk_Call")
             if not (edge_type == "Ijk_Call" or (edge_type == "Ijk_Boring" and self._cfg.graph.out_degree[src] == 1)):
                 continue
-            if not self.kb.functions.contains_addr(src.function_address):
+            caller = self.kb.functions.function(addr=src.function_address)
+            if caller is None:
                 continue
-            caller = self.kb.functions[src.function_address]
             if caller.is_simprocedure or caller.is_alignment:
                 # do not analyze SimProcedures or alignment stubs
                 continue
@@ -1429,7 +1426,7 @@ class CallingConventionAnalysis(Analysis):
             target = self._function.get_call_target(cs_addr)
             if target is None:
                 continue
-            callee = self.kb.functions.get(target)
+            callee = self.kb.functions.function(addr=target)
             callee_proto = callee.get_prototype(self._flavor) if callee is not None else None
             if callee_proto is None:
                 continue

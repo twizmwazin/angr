@@ -147,8 +147,7 @@ class SPropagator:
             the_func = self.func
         else:
             if self.func_addr is not None:
-                with contextlib.suppress(KeyError):
-                    the_func = self.kb.functions.get_by_addr(self.func_addr)
+                the_func = self.kb.functions.function(addr=self.func_addr)
         if the_func is not None:
             bp_as_gpr = the_func.info.get("bp_as_gpr", False)
         self._bp_as_gpr = bp_as_gpr

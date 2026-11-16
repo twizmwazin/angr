@@ -125,8 +125,8 @@ class SemanticNamingBase(ABC):
         target = call.target
 
         # Direct function address
-        if isinstance(target, Const) and self._functions.contains_addr(target.value_int):
-            func = self._functions.get_by_addr(target.value_int)
+        func = self._functions.function(addr=target.value_int) if isinstance(target, Const) else None
+        if func is not None:
             return func.name
         if isinstance(target, str):
             return target

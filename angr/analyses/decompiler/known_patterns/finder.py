@@ -1236,7 +1236,7 @@ class KnownPatternFinder(Analysis):
         if cached is not None:
             return cached
         names: set[str] = set()
-        func = self.kb.functions.get_by_addr(addr) if self.kb.functions.contains_addr(addr) else None
+        func = self.kb.functions.function(addr=addr)
         if func is not None:
             if func.name:
                 names.add(func.name)

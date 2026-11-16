@@ -1153,12 +1153,10 @@ class Procedure:
                     if (
                         isinstance(src, CodeNode)
                         and isinstance(dst, FuncNode)
-                        and self.project.kb.functions.contains_addr(dst.addr)
-                    ):
-                        dst_func = self.project.kb.functions.get_by_addr(dst.addr)
-                        if "get_pc" in dst_func.info:
-                            # found it!
-                            x86_getpc_retsites.add(src.addr + src.size)
+                        and (dst_func := self.project.kb.functions.function(addr=dst.addr)) is not None
+                    ) and "get_pc" in dst_func.info:
+                        # found it!
+                        x86_getpc_retsites.add(src.addr + src.size)
             for block_addr in self.function.block_addrs:
                 b = BasicBlock(
                     self.binary,
@@ -2342,9 +2340,9 @@ class Reassembler(Analysis):
                 if isinstance(node, FuncNode) and node.addr != self.cfg._unresolvable_call_target_addr
             ]
             callee_funcs = [
-                self.cfg.functions.get_by_addr(callee.addr)
+                callee_func
                 for callee in callees
-                if self.cfg.functions.contains_addr(callee.addr)
+                if (callee_func := self.cfg.functions.function(addr=callee.addr)) is not None
             ]
             # special handling for GCC-generated X86 PIE binaries
             non_getpc_callees = [callee for callee in callee_funcs if "get_pc" not in callee.info]
@@ -2367,10 +2365,8 @@ class Reassembler(Analysis):
                 new_labels = []
                 for rebased_addr, label in d.labels:
                     # check if this label belongs to a removed function
-                    if (
-                        self.cfg.functions.contains_addr(rebased_addr)
-                        and self.cfg.functions[rebased_addr].name in glibc_functions_blacklist
-                    ):
+                    func = self.cfg.functions.function(addr=rebased_addr)
+                    if func is not None and func.name in glibc_functions_blacklist:
                         # we need to remove this label...
                         continue
                     new_labels.append((rebased_addr, label))

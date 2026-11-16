@@ -88,11 +88,10 @@ class ConstantResolver(IndirectJumpResolver):
         :param jumpkind:    VEX jumpkind (Ijk_Boring or Ijk_Call)
         :return:            Bool tuple with replacement address
         """
-        if not cfg.functions.contains_addr(func_addr):
+        func = cfg.functions.function(addr=func_addr)
+        if func is None:
             #  the function does not exist
             return False, []
-
-        func = cfg.functions.get_by_addr(func_addr)
 
         vex_block = block.vex
         if isinstance(vex_block.next, pyvex.expr.RdTmp):

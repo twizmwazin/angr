@@ -637,7 +637,7 @@ class GoBuiltinRewriter(OptimizationPass, CFGTransformationMixin):
         ):
             return None
         code = closure.args[0].value_int
-        func = self.kb.functions.get_by_addr(code) if self.kb.functions.contains_addr(code) else None
+        func = self.kb.functions.function(addr=code)
         if func is None:
             return None
         m = _LOG_CLOSURE.match(normalize_go_func_name(func.name))
@@ -1075,8 +1075,10 @@ class GoBuiltinRewriter(OptimizationPass, CFGTransformationMixin):
 
     def _callee_prototype(self, call: Call) -> SimTypeFunction | None:
         proto = variable_map_of(self.manager).prototype(call)
-        if proto is None and isinstance(call.target, Const) and self.kb.functions.contains_addr(call.target.value_int):
-            proto = self.kb.functions.get_by_addr(call.target.value_int).get_prototype(Flavors.GO_FLAVOR)
+        if proto is None and isinstance(call.target, Const):
+            func = self.kb.functions.function(addr=call.target.value_int)
+            if func is not None:
+                proto = func.get_prototype(Flavors.GO_FLAVOR)
         if not isinstance(proto, GoSimTypeFunction):
             name = self.callee_name(call)
             with contextlib.suppress(Exception):

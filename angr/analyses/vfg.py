@@ -1902,9 +1902,8 @@ class VFG(ForwardAnalysis[SimState, VFGNode, VFGJob, BlockID, SimState], Analysi
 
         # we are entering a new function. now it's time to figure out how to optimally traverse the control flow
         # graph by generating the sorted merge points
-        try:
-            new_function = self.kb.functions[function_address]
-        except KeyError:
+        new_function = self.kb.functions.function(addr=function_address)
+        if new_function is None:
             # the function does not exist
             return []
 
@@ -1927,9 +1926,8 @@ class VFG(ForwardAnalysis[SimState, VFGNode, VFGJob, BlockID, SimState], Analysi
 
         # we are entering a new function. now it's time to figure out how to optimally traverse the control flow
         # graph by generating the sorted merge points
-        try:
-            new_function = self.kb.functions[function_address]
-        except KeyError:
+        new_function = self.kb.functions.function(addr=function_address)
+        if new_function is None:
             # the function does not exist
             return []
 
@@ -1953,9 +1951,8 @@ class VFG(ForwardAnalysis[SimState, VFGNode, VFGJob, BlockID, SimState], Analysi
         :rtype: list
         """
 
-        try:
-            function = self.kb.functions[function_address]
-        except KeyError:
+        function = self.kb.functions.function(addr=function_address)
+        if function is None:
             # the function does not exist
             return []
 

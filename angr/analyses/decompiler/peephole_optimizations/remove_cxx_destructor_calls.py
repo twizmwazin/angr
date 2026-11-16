@@ -26,9 +26,9 @@ class RemoveCxxDestructorCalls(PeepholeOptimizationStmtBase):
 
         if isinstance(stmt.expr.target, Const):
             func_addr = stmt.expr.target.value
-            if not self.project.kb.functions.contains_addr(func_addr):
+            func = self.project.kb.functions.function(addr=func_addr)
+            if func is None:
                 return None
-            func = self.project.kb.functions[func_addr]
             if "::~" in func.demangled_name and stmt.expr.args is not None:
                 # yes it is!
                 return ()

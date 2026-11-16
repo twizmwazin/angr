@@ -382,9 +382,9 @@ class PatternGenerator:
         if not isinstance(target, Const) or not isinstance(target.value, int):
             return frozenset()
         functions = self.codegen.kb.functions
-        if not functions.contains_addr(target.value):
+        func = functions.function(addr=target.value)
+        if func is None:
             return frozenset()
-        func = functions.get_by_addr(target.value)
         names = {n for n in (func.name, func.demangled_name) if n}
         return frozenset(names)
 

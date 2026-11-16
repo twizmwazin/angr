@@ -426,9 +426,9 @@ class VariableRecoveryFast(ForwardAnalysis, VariableRecoveryBase):  # pylint:dis
             function_nodes = [n for n in self.function.transition_graph.nodes() if isinstance(n, FuncNode)]
             # all nodes that end with a call must be in the _node_to_cc dict
             for func_node in function_nodes:
-                if not self.kb.functions.contains_addr(func_node.addr):
+                func = self.kb.functions.function(addr=func_node.addr)
+                if func is None:
                     continue
-                func = self.kb.functions.get_by_addr(func_node.addr)
                 for callsite_node in self.function.transition_graph.predecessors(func_node):
                     if func.calling_convention is None:
                         # l.warning("Unknown calling convention for %r.", func_node)

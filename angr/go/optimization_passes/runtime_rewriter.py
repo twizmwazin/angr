@@ -598,8 +598,9 @@ class GoRuntimeRewriter(OptimizationPass):
         name = call_target_name(self.project, call)
         if name is None:
             return None
-        if isinstance(call.target, Const) and self.kb.functions.contains_addr(call.target.value_int):
-            proto = self.kb.functions.get_by_addr(call.target.value_int).get_prototype(Flavors.GO_FLAVOR)
+        func = self.kb.functions.function(addr=call.target.value_int) if isinstance(call.target, Const) else None
+        if func is not None:
+            proto = func.get_prototype(Flavors.GO_FLAVOR)
             if isinstance(proto, GoSimTypeFunction):
                 return proto
         return self.kb.go_signatures.prototype(name)
@@ -1078,12 +1079,13 @@ class GoRuntimeRewriter(OptimizationPass):
         """
         proto = None
         name = callee_name(self.project, code)
-        if self.kb.functions.contains_addr(code):
-            func = self.kb.functions.get_by_addr(code)
-            if isinstance(
-                func.get_prototype(Flavors.GO_FLAVOR), GoSimTypeFunction
-            ) and not func.is_prototype_guessed_for(Flavors.GO_FLAVOR):
-                proto = func.get_prototype(Flavors.GO_FLAVOR)
+        func = self.kb.functions.function(addr=code)
+        if (
+            func is not None
+            and isinstance(func.get_prototype(Flavors.GO_FLAVOR), GoSimTypeFunction)
+            and not func.is_prototype_guessed_for(Flavors.GO_FLAVOR)
+        ):
+            proto = func.get_prototype(Flavors.GO_FLAVOR)
         if proto is None and name is not None:
             proto = self.kb.go_signatures.prototype(name)
         if proto is None:

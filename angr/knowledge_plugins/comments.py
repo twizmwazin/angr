@@ -215,7 +215,7 @@ class Comments(KnowledgeBasePlugin, dict):
             return out
         cfg = kb.cfgs.get_most_accurate()
         for caller_addr in callgraph.predecessors(addr):
-            caller = kb.functions.get_by_addr(caller_addr)
+            caller = kb.functions.function(addr=caller_addr)
             if caller is None:
                 continue
             for site in caller.get_call_sites():

@@ -232,9 +232,7 @@ def is_function_likely_security_init_cookie(func: Function) -> bool:
     """
 
     callees = {node.addr for node in func.transition_graph if isinstance(node, FuncNode)}
-    callee_funcs = [
-        func.project.kb.functions.get_by_addr(addr) for addr in callees if func.project.kb.functions.contains_addr(addr)
-    ]
+    callee_funcs = [callee for addr in callees if (callee := func.project.kb.functions.function(addr=addr)) is not None]
     callee_names = {callee.name for callee in callee_funcs}
     return bool(
         callee_names.issuperset(

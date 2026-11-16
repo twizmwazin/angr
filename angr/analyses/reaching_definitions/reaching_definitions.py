@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 import logging
 from collections import defaultdict
 from collections.abc import Iterable
@@ -186,8 +185,7 @@ class ReachingDefinitionsAnalysis(
             the_func = self.subject.content
         else:
             if self._func_addr is not None:
-                with contextlib.suppress(KeyError):
-                    the_func = self.kb.functions.get_by_addr(self._func_addr)
+                the_func = self.kb.functions.function(addr=self._func_addr)
         if the_func is not None:
             bp_as_gpr = the_func.info.get("bp_as_gpr", False)
 

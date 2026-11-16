@@ -85,9 +85,9 @@ class EagerStdStringEvalPass(OptimizationPass):
         callees = set(callgraph.successors(self._func.addr))
         string_construction_calls_found = False
         for callee_addr in callees:
-            if not self.kb.functions.contains_addr(callee_addr):
+            callee_func = self.kb.functions.function(addr=callee_addr)
+            if callee_func is None:
                 continue
-            callee_func = self.kb.functions.get_by_addr(callee_addr)
             demangled_name = callee_func.demangled_name
             if "std::basic_string" in demangled_name:
                 string_construction_calls_found = True
