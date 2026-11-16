@@ -218,8 +218,10 @@ class SimEngineFCPVEX(
                 # Try loading from the state
                 if self.base_state is not None:
                     data = self.base_state.memory.load(addr, size, endness=expr.endness)
-                    if not data.symbolic:
-                        return data.args[0]
+                    # a non-symbolic AST is not necessarily a leaf BVV; concrete_value is None if it is not concrete
+                    v = data.concrete_value
+                    if v is not None:
+                        return v
                 else:
                     try:
                         return self.project.loader.memory.unpack_word(addr, size=size, endness=expr.endness)

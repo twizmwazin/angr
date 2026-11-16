@@ -6,8 +6,11 @@ __package__ = __package__ or "tests.analyses"  # pylint:disable=redefined-builti
 
 import os
 import unittest
+from collections import defaultdict
 
 import angr
+from angr import claripy
+from angr.analyses.fcp.fcp import FCPState, SimEngineFCPVEX
 from angr.analyses.propagator.vex_vars import VEXReg
 from angr.codenode import HookNode
 from tests.common import bin_location
@@ -72,6 +75,37 @@ class TestFCP(unittest.TestCase):
             }
             assert "rax" not in regs_replaced  # caller saved
             assert regs_replaced["rdi"] == 0xFEDCBA90  # callee saved
+
+    def test_load_concrete_non_leaf_ast_from_base_state(self):
+        # a non-symbolic value loaded from the base state is not necessarily a leaf BVV
+        class NonRelocatableAnnotation(claripy.Annotation):
+            eliminatable = False
+            relocatable = False
+
+        # mov rax, qword ptr [0x700000]; ret
+        p = angr.load_shellcode(b"\x48\x8b\x04\x25\x00\x00\x70\x00\xc3", "AMD64")
+        base_state = p.factory.blank_state()
+        base_state.memory.store(
+            0x700000,
+            claripy.BVV(0x1122334455667788, 64).annotate(NonRelocatableAnnotation()),
+            endness="Iend_BE",
+        )
+        data = base_state.memory.load(0x700000, 8, endness="Iend_LE")
+        assert data.op != "BVV"
+        assert not data.symbolic
+
+        replacements = defaultdict(dict)
+        engine = SimEngineFCPVEX(p, False, replacements)
+        engine.base_state = base_state
+        engine.process(FCPState(), block=p.factory.block(0))
+
+        regs_replaced = {
+            p.arch.register_names[var.offset]: val
+            for block_replacements in replacements.values()
+            for var, val in block_replacements.items()
+            if isinstance(var, VEXReg)
+        }
+        assert regs_replaced["rax"] == 0x8877665544332211
 
 
 if __name__ == "__main__":
