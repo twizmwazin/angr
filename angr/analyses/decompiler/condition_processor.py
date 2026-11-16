@@ -13,6 +13,7 @@ from angr import ailment, claripy
 from angr.ailment.expression import StringLiteral
 from angr.block import Block, BlockNode
 from angr.errors import AngrRuntimeError
+from angr.rustylib.ailment import RoundingMode
 from angr.utils.ail import is_head_controlled_loop_block
 from angr.utils.graph import GraphUtils, dfs_preorder_nodes, dominates, inverted_idoms
 
@@ -115,11 +116,51 @@ def _cmp_with_unified_size(op: Callable) -> Callable:
     return _cmp
 
 
+_AIL_RM_TO_CLARIPY = {
+    RoundingMode.RM_NearestTiesEven: claripy.fp.RM.RM_NearestTiesEven,
+    RoundingMode.RM_TowardsNegativeInf: claripy.fp.RM.RM_TowardsNegativeInf,
+    RoundingMode.RM_TowardsPositiveInf: claripy.fp.RM.RM_TowardsPositiveInf,
+    RoundingMode.RM_TowardsZero: claripy.fp.RM.RM_TowardsZero,
+}
+
+
+def _ail_rounding_mode(claripy_rm) -> RoundingMode | None:
+    """The AIL rounding mode of a claripy one; None for the mode AIL has no name for (ties away from zero)."""
+    # claripy rounding modes are not hashable
+    for ail_rm, rm in _AIL_RM_TO_CLARIPY.items():
+        if rm == claripy_rm:
+            return ail_rm
+    return None
+
+
+def _fp_view(operand, conv: Callable, m, ins_addr: int) -> claripy.ast.FP | None:
+    """
+    The operand of a floating-point operation as a claripy float. AIL values are bit-vectors, so the operand is
+    viewed as a float of its width. None when claripy cannot express it.
+    """
+    if operand.bits not in _CLARIPY_FP_BITS:
+        # claripy has no floating-point sort of this width (x87 extended precision, binary128)
+        return None
+    if isinstance(operand, ailment.Expr.BinaryOp) and operand.op in _BITWISE_OPS:
+        # bit operations on an FP operand (fabs as x & 0x7fff...) must stay opaque: claripy would simplify them into
+        # integer extracts
+        bv = _dummy_bvs(operand, m)
+    else:
+        bv = conv(operand, nobool=True, ins_addr=ins_addr)
+    if not isinstance(bv, claripy.ast.BV) or bv.size() != operand.bits:
+        return None
+    # the bit pattern of a float operation is that operation
+    return bv.args[0] if bv.op == "fpToIEEEBV" else bv.raw_to_fp()
+
+
+def _is_fp_const(fp: claripy.ast.FP) -> bool:
+    return fp.op == "FPV" or (fp.op == "bvToFP" and fp.args[0].op == "BVV")
+
+
 def _fp_cmp(op: Callable, symmetric: bool = False) -> Callable:
     """
-    Build the conversion of a floating-point comparison into the claripy floating-point comparison ``op``. AIL
-    values are bit-vectors, so each operand is viewed as a float of its width for the comparison. A ``symmetric``
-    comparison gets its constant operand on the right, as claripy does for integer equalities.
+    Build the conversion of a floating-point comparison into the claripy floating-point comparison ``op``. A
+    ``symmetric`` comparison gets its constant operand on the right, as claripy does for integer equalities.
     """
 
     def _cmp(expr, conv: Callable, m, ins_addr: int, *args):  # pylint:disable=unused-argument
@@ -127,25 +168,60 @@ def _fp_cmp(op: Callable, symmetric: bool = False) -> Callable:
         if lhs.likes(rhs):
             # x != x is the NaN test; keep it as written
             return _dummy_bools(expr, m)
-        if lhs.bits != rhs.bits or lhs.bits not in _CLARIPY_FP_BITS:
-            # claripy has no floating-point sort of this width (x87 extended precision, binary128)
+        if lhs.bits != rhs.bits:
             return _dummy_bools(expr, m)
-        operands = []
-        for operand in (lhs, rhs):
-            if isinstance(operand, ailment.Expr.BinaryOp) and operand.op in _BITWISE_OPS:
-                # bit operations on an FP compare operand (fabs as x & 0x7fff...) must stay opaque: claripy would
-                # simplify them into integer extracts
-                bv = _dummy_bvs(operand, m)
-            else:
-                bv = conv(operand, nobool=True, ins_addr=ins_addr)
-            if not isinstance(bv, claripy.ast.BV) or bv.size() != operand.bits:
-                return _dummy_bools(expr, m)
-            operands.append(bv)
-        if symmetric and operands[0].op == "BVV" and operands[1].op != "BVV":
+        operands = [_fp_view(operand, conv, m, ins_addr) for operand in (lhs, rhs)]
+        if operands[0] is None or operands[1] is None:
+            return _dummy_bools(expr, m)
+        if symmetric and _is_fp_const(operands[0]) and not _is_fp_const(operands[1]):
             operands.reverse()
-        return op(*(bv.raw_to_fp() for bv in operands))
+        return op(*operands)
 
     return _cmp
+
+
+def _fp_arith(op: Callable) -> Callable:
+    """
+    Build the conversion of floating-point arithmetic into the claripy floating-point operation ``op``, which takes
+    a rounding mode first. The result is the bit pattern of the float. The expression stays opaque when claripy
+    cannot express it: an operand width without a float sort, or a rounding mode only known at run time.
+    """
+
+    def _arith(expr, conv: Callable, m, ins_addr: int, *args):  # pylint:disable=unused-argument
+        rm = expr.rounding_mode
+        if rm is None:
+            claripy_rm = claripy.fp.RM.default()
+        elif isinstance(rm, RoundingMode):
+            claripy_rm = _AIL_RM_TO_CLARIPY[rm]
+        else:
+            return _dummy_bvs(expr, m)
+        if any(operand.bits != expr.bits for operand in expr.operands):
+            return _dummy_bvs(expr, m)
+        operands = [_fp_view(operand, conv, m, ins_addr) for operand in expr.operands]
+        if any(operand is None for operand in operands):
+            return _dummy_bvs(expr, m)
+        r = op(claripy_rm, *operands).raw_to_bv()
+        # the expression is recovered as it is while claripy leaves the operation alone
+        m[r] = expr
+        return r
+
+    return _arith
+
+
+def _fp_unary(op: Callable) -> Callable:
+    """Build the conversion of a unary floating-point operation into the claripy floating-point operation ``op``."""
+
+    def _unary(expr, conv: Callable, m, ins_addr: int, *args):  # pylint:disable=unused-argument
+        if expr.operand.bits != expr.bits:
+            return _dummy_bvs(expr, m)
+        operand = _fp_view(expr.operand, conv, m, ins_addr)
+        if operand is None:
+            return _dummy_bvs(expr, m)
+        r = op(operand).raw_to_bv()
+        m[r] = expr
+        return r
+
+    return _unary
 
 
 _ail2claripy_op_mapping = {
@@ -220,13 +296,14 @@ _ail2claripy_op_mapping = {
     "Concat": lambda expr, conv, _, ia, *args: claripy.Concat(
         *[conv(operand, ins_addr=ia) for operand in expr.operands]
     ),
-    # floating-point arithmetic stays opaque: its operands, rounding mode and result are kept as they are
-    "AddF": lambda expr, _, m, *args: _dummy_bvs(expr, m),
-    "SubF": lambda expr, _, m, *args: _dummy_bvs(expr, m),
-    "MulF": lambda expr, _, m, *args: _dummy_bvs(expr, m),
-    "DivF": lambda expr, _, m, *args: _dummy_bvs(expr, m),
-    "NegF": lambda expr, _, m, *args: _dummy_bvs(expr, m),
-    "AbsF": lambda expr, _, m, *args: _dummy_bvs(expr, m),
+    "AddF": _fp_arith(claripy.fpAdd),
+    "SubF": _fp_arith(claripy.fpSub),
+    "MulF": _fp_arith(claripy.fpMul),
+    "DivF": _fp_arith(claripy.fpDiv),
+    "NegF": _fp_unary(claripy.fpNeg),
+    "AbsF": _fp_unary(claripy.fpAbs),
+    # MaxF and MinF follow the instruction they come from (SSE maxsd, IEEE maxNum), which claripy's fpMax and fpMin
+    # do not tell apart
     "MaxF": lambda expr, _, m, *args: _dummy_bvs(expr, m),
     "MinF": lambda expr, _, m, *args: _dummy_bvs(expr, m),
     # There are no corresponding claripy operations for the following operations
@@ -953,23 +1030,49 @@ class ConditionProcessor:
                     )
             return _binary_op_reduce(op, cond_.args, tags)
 
-        def _fp_operand(arg, tags):
-            # the bit-vector a floating-point operand is a view of
+        def _fp_value(arg, tags):
+            # the AIL expression (a bit-vector) of a claripy float
+            bits = arg.raw_to_bv()
+            if bits in self._condition_mapping:
+                return self._condition_mapping[bits]
             if arg.op == "bvToFP":
                 return self.convert_claripy_bool_ast(arg.args[0])
             if arg.op == "FPV":
                 return ailment.Expr.Const(self.ail_manager.next_atom(), arg.args[0], arg.size(), **tags)
+            if arg.op in _fp_binops:
+                lhs, rhs, rm = arg.args
+                return ailment.Expr.BinaryOp(
+                    self.ail_manager.next_atom(),
+                    _fp_binops[arg.op],
+                    (_fp_value(lhs, tags), _fp_value(rhs, tags)),
+                    False,
+                    bits=arg.size(),
+                    rounding_mode=_ail_rounding_mode(rm),
+                    **tags,
+                )
+            if arg.op in _fp_unops:
+                return ailment.Expr.UnaryOp(
+                    self.ail_manager.next_atom(),
+                    _fp_unops[arg.op],
+                    _fp_value(arg.args[0], tags),
+                    bits=arg.size(),
+                    **tags,
+                )
             raise NotImplementedError(
-                f"Floating-point operand {arg} has an unsupported operator {arg.op}. Consider implementing."
+                f"Floating-point value {arg} has an unsupported operator {arg.op}. Consider implementing."
             )
+
+        _fp_binops = {"fpAdd": "AddF", "fpSub": "SubF", "fpMul": "MulF", "fpDiv": "DivF"}
+        _fp_unops = {"fpNeg": "NegF", "fpAbs": "AbsF"}
 
         def _fp_cmp_reduce(op, cond_, tags):
             lhs, rhs = cond_.args
             return ailment.Expr.BinaryOp(
-                self.ail_manager.next_atom(), op, (_fp_operand(lhs, tags), _fp_operand(rhs, tags)), False, **tags
+                self.ail_manager.next_atom(), op, (_fp_value(lhs, tags), _fp_value(rhs, tags)), False, **tags
             )
 
         _mapping = {
+            "fpToIEEEBV": lambda cond_, tags: _fp_value(cond_.args[0], tags),
             "fpEQ": lambda cond_, tags: _fp_cmp_reduce("CmpEQF", cond_, tags),
             "fpLT": lambda cond_, tags: _fp_cmp_reduce("CmpLTF", cond_, tags),
             "fpLEQ": lambda cond_, tags: _fp_cmp_reduce("CmpLEF", cond_, tags),
