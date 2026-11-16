@@ -2214,10 +2214,7 @@ class Reassembler(Analysis):
             return False
         function = self.cfg.functions[func_addr]
         # traverse the graph and make sure there is only one call edge
-        calling_targets = []
-        for _, dst, data in function.transition_graph.edges(data=True):
-            if "type" in data and data["type"] == "call":
-                calling_targets.append(dst.addr)
+        calling_targets = [dst_addr for _, dst_addr in function.call_edge_addrs()]
 
         if len(calling_targets) != 1:
             return False

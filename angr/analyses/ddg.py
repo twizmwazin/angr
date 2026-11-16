@@ -1500,8 +1500,8 @@ class DDG(Analysis):
 
         block_addr_to_func = {}
         for func in self.kb.functions.values():
-            for block in func.blocks:
-                block_addr_to_func[block.addr] = func
+            for block_addr in func.block_addrs:
+                block_addr_to_func[block_addr] = func
 
         for src, dst, data in self.graph.edges(data=True):
             src_target_func = None

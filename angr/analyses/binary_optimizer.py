@@ -429,10 +429,9 @@ class BinaryOptimizer(Analysis):
 
         # find out all call instructions
         call_insns = set()
-        for src, _dst, data in function.transition_graph.edges(data=True):
-            if "type" in data and data["type"] == "call":
-                src_block = function._get_block(src.addr)
-                call_insns.add(src_block.instruction_addrs[-1])
+        for src_addr, _ in function.call_edge_addrs():
+            src_block = function.get_block(src_addr)
+            call_insns.add(src_block.instruction_addrs[-1])
 
         # there should be six esp variables + all call sites
         # push ebp (insn0 - read, insn0 - write) ; sub esp, 0xXX (insn2) ;

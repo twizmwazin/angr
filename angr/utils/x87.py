@@ -234,7 +234,7 @@ class X87StackModel:
         return depth
 
     def _tail_call_target(self, func: Function, node) -> int | None:
-        for _, dst, data in func.transition_graph.out_edges(node, data=True):
+        for dst, data in func.transition_out_edges(node):
             if (
                 data.get("type") == "transition"
                 and data.get("outside", False)

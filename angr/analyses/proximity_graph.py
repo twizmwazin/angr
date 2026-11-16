@@ -281,7 +281,7 @@ class ProximityGraphAnalysis(Analysis):
         for n_ in func.nodes:
             if isinstance(n_, FuncNode):
                 func_node = n_
-                for block, _, data in func.transition_graph.in_edges(func_node, data=True):
+                for block, data in func.transition_in_edges(func_node):
                     if "ins_addr" in data:
                         if self._expand_funcs and func_node.addr in self._expand_funcs:  # pylint:disable=unsupported-membership-test
                             node = FunctionProxiNode(func_node, ref_at={data["ins_addr"]})

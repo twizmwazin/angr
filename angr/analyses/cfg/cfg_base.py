@@ -2211,8 +2211,8 @@ class CFGBase(Analysis):
 
                 # does the first block transition to the next function?
                 transition_found = False
-                out_edges = list(func_0.transition_graph.out_edges(block_node, data=True))
-                for _, dst_node, data in out_edges:
+                out_edges = func_0.transition_out_edges(block_node)
+                for dst_node, data in out_edges:
                     if (
                         dst_node.addr == addr_1
                         and data.get("type", None) == "transition"
@@ -2251,10 +2251,10 @@ class CFGBase(Analysis):
                 # we only merge two CFG nodes if the first one does not end with a branch instruction and there are no
                 # other predecessors to CFG node addr_1
                 if len(func_0.block_addrs_set) == 1 and len(out_edges) == 1 and len(cfgnode_1_preds) <= 1:
-                    outedge_src, outedge_dst, outedge_data = out_edges[0]
+                    outedge_dst, outedge_data = out_edges[0]
                     if (
-                        outedge_src.addr == cfgnode_0.addr
-                        and outedge_src.size == cfgnode_0.size
+                        block_node.addr == cfgnode_0.addr
+                        and block_node.size == cfgnode_0.size
                         and outedge_dst.addr == cfgnode_1.addr
                         and cfgnode_0.addr + cfgnode_0.size == cfgnode_1.addr
                         and outedge_data.get("type", None) == "transition"

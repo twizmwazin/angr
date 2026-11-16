@@ -183,7 +183,7 @@ class CompleteCallingConventionsAnalysis(Analysis):
                     continue
 
                 if self._max_function_size is not None:
-                    func_size = sum(block.size for block in func.blocks if block.size is not None)
+                    func_size = func.size
                     if func_size > self._max_function_size:
                         _l.info(
                             "Skipping variable recovery for %r since its size (%d) is greater than the cutoff "

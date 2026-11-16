@@ -1630,7 +1630,7 @@ class Clinic(Analysis, Serializable):
                 continue
 
             call_sites = []
-            for pred, _, data in self.function.transition_graph.in_edges(node, data=True):
+            for pred, data in self.function.transition_in_edges(node):
                 if data.get("type", None) != "return":
                     call_sites.append(pred)
             # case 1: calling conventions and prototypes are available at every single call site
@@ -1687,11 +1687,7 @@ class Clinic(Analysis, Serializable):
 
                 # parse the call instruction address from the edge
                 callsite_ins_addr = None
-                edge_data = [
-                    data
-                    for src, dst, data in self.function.transition_graph.in_edges(node, data=True)
-                    if src is callsite
-                ]
+                edge_data = [data for src, data in self.function.transition_in_edges(node) if src is callsite]
                 if len(edge_data) == 1:
                     callsite_ins_addr = edge_data[0].get("ins_addr", None)
                 if callsite_ins_addr is None:
@@ -1914,7 +1910,7 @@ class Clinic(Analysis, Serializable):
         assumes at its call sites. Otherwise, a stack imbalance may be caused by a direct callee.
         """
         for node in self.function.transition_graph:
-            for _, dst, data in self.function.transition_graph.out_edges(node, data=True):
+            for dst, data in self.function.transition_out_edges(node):
                 if (
                     data.get("type") != "call"
                     or not isinstance(dst, FuncNode)

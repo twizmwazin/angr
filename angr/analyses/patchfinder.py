@@ -32,7 +32,7 @@ class OverlappingFunctionsAnalysis(Analysis):
         for func in self.project.kb.functions.values(meta_only=True):
             if func.is_alignment:
                 continue
-            func_max_addr = max((block.addr + block.size) for block in func.blocks)
+            func_max_addr = max((addr + (func.get_block_size(addr) or 0)) for addr in func.block_addrs)
             addr_to_func_max_addr[func.addr] = (func, func_max_addr)
 
         for idx, (addr, (_func, max_addr)) in enumerate(addr_to_func_max_addr.items()):

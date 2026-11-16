@@ -54,8 +54,10 @@ class CodeCaveAnalysis(Analysis):
         # Alignment functions
         for func in self.project.kb.functions.values():
             if func.is_alignment:
-                for block in func.blocks:
-                    self.codecaves.append(CodeCave(func, block.addr, block.size, CodeCaveClassification.ALIGNMENT))
+                for addr in func.block_addrs:
+                    self.codecaves.append(
+                        CodeCave(func, addr, func.get_block_size(addr) or 0, CodeCaveClassification.ALIGNMENT)
+                    )
 
         # Unreachable code
         for func in self.project.kb.functions.values():
@@ -67,8 +69,10 @@ class CodeCaveAnalysis(Analysis):
                 in_degree == 1
                 and self.project.kb.functions[next(self.project.kb.callgraph.predecessors(func.addr))].is_alignment
             ):
-                for block in func.blocks:
-                    self.codecaves.append(CodeCave(func, block.addr, block.size, CodeCaveClassification.UNREACHABLE))
+                for addr in func.block_addrs:
+                    self.codecaves.append(
+                        CodeCave(func, addr, func.get_block_size(addr) or 0, CodeCaveClassification.UNREACHABLE)
+                    )
 
             # FIXME: find dead blocks with argument propagation
             # FIXME: find dead blocks with external coverage info
