@@ -731,7 +731,7 @@ FLOAT_OPS: frozenset[str] = frozenset(
         "CmpGEF",
         "CmpUN",
         "SignBit",
-        # transcendental
+        # trigonometric, exponential and logarithmic functions
         "Sin",
         "Cos",
         "Tan",
