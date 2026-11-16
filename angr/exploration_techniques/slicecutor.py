@@ -98,7 +98,7 @@ class Slicecutor(ExplorationTechnique):
                 # drop all constraints
                 if suc.mode == "fastpath":
                     # dropping constraints and making the state satisfiable again under fastpath mode is easy
-                    suc.solver._solver.constraints = []
+                    suc.solver.reload_solver([])
                     suc._satisfiable = True
                     new_active.append(suc)
                     l.debug("Forced unsat at %#x to be sat again.", suc.addr)
