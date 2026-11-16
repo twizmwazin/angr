@@ -15,7 +15,17 @@ test_location = os.path.join(bin_location, "tests")
 
 class TestFindObjectsStatic(unittest.TestCase):
     def test_object_identification_x86_64(self):
+        self._test_object_identification_x86_64(with_calling_conventions=False)
+
+    def test_object_identification_x86_64_with_calling_conventions(self):
+        self._test_object_identification_x86_64(with_calling_conventions=True)
+
+    def _test_object_identification_x86_64(self, with_calling_conventions: bool):
         p = angr.Project(os.path.join(test_location, "x86_64", "cpp_classes"), auto_load_libs=False)
+        if with_calling_conventions:
+            p.analyses.CFGFast(cross_references=True)
+            for func in p.kb.functions.values():
+                func.calling_convention = angr.calling_conventions.SimCCSystemVAMD64(p.arch)
         object_identifier_analysis = p.analyses.StaticObjectFinder()
         possible_objects_dict = object_identifier_analysis.possible_objects
         possible_constructors = object_identifier_analysis.possible_constructors

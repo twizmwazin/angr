@@ -9,6 +9,7 @@ from angr.analyses.cfg import CFGFast
 from angr.analyses.reaching_definitions import ReachingDefinitionsAnalysis
 from angr.analyses.reaching_definitions.function_handler import FunctionHandler
 from angr.analyses.vtable import VtableFinder
+from angr.calling_conventions import SimRegArg
 from angr.knowledge_plugins.key_definitions.atoms import MemoryLocation, Register
 from angr.knowledge_plugins.key_definitions.constants import OP_AFTER, OP_BEFORE
 from angr.storage.memory_mixins.paged_memory.pages.multi_values import MultiValues
@@ -17,6 +18,25 @@ from angr.utils.cpp import is_cpp_funcname_ctor
 if TYPE_CHECKING:
     from angr.analyses.reaching_definitions.function_handler import FunctionCallData
     from angr.analyses.reaching_definitions.rd_state import ReachingDefinitionsState
+    from angr.calling_conventions import SimCC
+
+
+def _first_arg_reg(arch, cc: SimCC | None) -> tuple[int, int]:
+    """
+    Get the offset and the size (in bytes) of the register that holds the first integer argument.
+    """
+    if cc is not None and cc.ARG_REGS:
+        return arch.registers[cc.ARG_REGS[0]]
+    return arch.registers["rdi"]
+
+
+def _return_val_reg(arch, cc: SimCC | None) -> tuple[int, int]:
+    """
+    Get the offset and the size (in bytes) of the register that holds the integer return value.
+    """
+    if cc is not None and isinstance(cc.RETURN_VAL, SimRegArg):
+        return cc.RETURN_VAL.check_offset(arch), cc.RETURN_VAL.size
+    return arch.registers["rax"]
 
 
 class PossibleObject:
@@ -73,12 +93,7 @@ class NewFunctionHandler(FunctionHandler):
             # check if this is a call to new()
             # reading from rdi for the size argument passed to new()
             cc = self.project.kb.functions[function_address].calling_convention
-            if cc is not None:
-                size_arg_reg_offset = self.project.arch.registers[cc.args[0].reg_name][0]
-                size_arg_reg_size = cc.args[0].size
-            else:
-                size_arg_reg_offset = self.project.arch.registers["rdi"][0]
-                size_arg_reg_size = word_size
+            size_arg_reg_offset, size_arg_reg_size = _first_arg_reg(self.project.arch, cc)
             v0 = state.registers.load(size_arg_reg_offset, size_arg_reg_size).one_value()
             size = v0.concrete_value if v0 is not None and v0.concrete else None
 
@@ -87,12 +102,7 @@ class NewFunctionHandler(FunctionHandler):
                 self.possible_objects_dict[self.max_addr] = PossibleObject(size, self.max_addr)
 
             # assigning eax a concrete address to track the possible this pointer
-            if cc is not None:
-                ret_val_reg_offset = self.project.arch.registers[cc.return_val.reg_name][0]
-                ret_val_reg_size = cc.return_val.size
-            else:
-                ret_val_reg_offset = self.project.arch.registers["rax"][0]
-                ret_val_reg_size = word_size
+            ret_val_reg_offset, ret_val_reg_size = _return_val_reg(self.project.arch, cc)
             atom = Register(ret_val_reg_offset, ret_val_reg_size)
             data.depends(
                 atom,
@@ -114,8 +124,9 @@ class NewFunctionHandler(FunctionHandler):
                     # check if rdi has a possible this pointer/ object address, if so then we can assign this object
                     # this class
                     # also if the func is a constructor(not stripped binaries)
+                    this_ptr_reg_offset, this_ptr_reg_size = _first_arg_reg(state.arch, func.calling_convention)
                     for addr, possible_object in self.possible_objects_dict.items():
-                        v1 = state.registers.load(72, state.arch.bits // state.arch.byte_width).one_value()
+                        v1 = state.registers.load(this_ptr_reg_offset, this_ptr_reg_size).one_value()
                         obj_addr = v1.concrete_value if v1 is not None and v1.concrete else None
                         if obj_addr is not None and addr == obj_addr:
                             col_ind = self.project.kb.functions[function_address].demangled_name.rfind("::")
@@ -152,7 +163,6 @@ class StaticObjectFinder(Analysis):
                 continue
 
             cc = func.calling_convention
-            word_size = self.project.arch.bits // self.project.arch.byte_width
             # the map fo this ptrs
             newhandler = NewFunctionHandler(max_addr=max_addr, new_func_addr=new_func_addr, project=self.project)
             max_addr = newhandler.max_addr
@@ -173,12 +183,7 @@ class StaticObjectFinder(Analysis):
                     call_after_new_addr = func.get_call_target(ret_node_addr)
                     rd_before_node = rd.get_reaching_definitions_by_node(ret_node_addr, OP_BEFORE)
 
-                    if cc is not None:
-                        ret_val_reg_offset = self.project.arch.registers[cc.return_val.reg_name][0]
-                        ret_val_reg_size = cc.return_val.size
-                    else:
-                        ret_val_reg_offset = self.project.arch.registers["rax"][0]
-                        ret_val_reg_size = word_size
+                    ret_val_reg_offset, ret_val_reg_size = _return_val_reg(self.project.arch, cc)
                     v0 = rd_before_node.registers.load(ret_val_reg_offset, ret_val_reg_size).one_value()
                     addr_of_new_obj = v0.concrete_value if v0 is not None and v0.concrete else None
 
@@ -189,12 +194,7 @@ class StaticObjectFinder(Analysis):
                     else:
                         rd_after_node = rd.get_reaching_definitions_by_insn(ret_node_addr, OP_AFTER)
 
-                    if cc is not None:
-                        this_ptr_reg_offset = self.project.arch.registers[cc.args[0].reg_name][0]
-                        this_ptr_reg_size = cc.args[0].size
-                    else:
-                        this_ptr_reg_offset = self.project.arch.registers["rdi"][0]
-                        this_ptr_reg_size = word_size
+                    this_ptr_reg_offset, this_ptr_reg_size = _first_arg_reg(self.project.arch, cc)
                     v1 = rd_after_node.registers.load(this_ptr_reg_offset, this_ptr_reg_size).one_value()
                     addr_in_rdi = v1.concrete_value if v1 is not None and v1.concrete else None
 
