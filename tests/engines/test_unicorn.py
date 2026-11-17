@@ -26,6 +26,12 @@ def _remove_addr_from_trace_item(trace_item_str):
     return m.group(1) + m.group(2)
 
 
+def _arch_regs(arch):
+    if arch == "amd64":
+        return ["rax", "rbx", "rcx", "rdx", "rsi", "rdi", "rbp", "rsp", "rip", "flags"]
+    return [f"r{i}" for i in range(13)] + ["sp", "lr", "pc", "flags", "itstate"]
+
+
 def _compare_trace(trace, expected):
     assert len(trace) == len(expected)
 
@@ -575,6 +581,284 @@ class TestUnicorn(unittest.TestCase):
             before = state.copy()
             state.unicorn.setup_flags()
             assert not state.solver.satisfiable(extra_constraints=[state.regs.flags != before.regs.flags])
+
+    @staticmethod
+    def _run_shellcode(code, arch, thumb, use_unicorn, setup=None, max_steps=None):
+        """
+        Run code that ends with a nop instruction until that instruction is reached, with or without the unicorn
+        engine. The code is placed away from the start of its page. Returns the final states, ordered by the
+        blocks they executed.
+        """
+
+        # Note: use hexadecimal notation for immediate values greater than 9 in code. keystone sometimes parses numbers
+        # without a prefix as hexadecimal ones after assembling code for a different architecture.
+        load_address = 0x10000
+        padding = 0x40
+        p = angr.load_shellcode("nop\n" * padding + code, arch, load_address=load_address, thumb=thumb)
+        nop_size = len(p.arch.asm("nop", load_address, thumb=thumb))
+        start = load_address + padding * nop_size
+        end = p.loader.main_object.max_addr + 1 - nop_size
+        if thumb:
+            start |= 1
+            end |= 1
+        p.hook(end, angr.SIM_PROCEDURES["stubs"]["PathTerminator"]())
+
+        opts = {so.ZERO_FILL_UNCONSTRAINED_MEMORY, so.ZERO_FILL_UNCONSTRAINED_REGISTERS}
+        if use_unicorn:
+            opts |= so.unicorn
+        state = p.factory.blank_state(addr=start, add_options=opts)
+        # Create the stack page: unicorn stops if it has to create pages
+        state.memory.store(state.regs.sp - 0x800, b"\0" * 0x1000)
+        if setup is not None:
+            setup(state)
+        if use_unicorn:
+            # Use unicorn whenever possible
+            state.unicorn.cooldown_nonunicorn_blocks = 0
+            state.unicorn.cooldown_symbolic_stop = 0
+            state.unicorn.cooldown_unsupported_stop = 0
+            state.unicorn.cooldown_stop_point = 0
+            if max_steps is not None:
+                state.unicorn.max_steps = max_steps
+
+        simgr = p.factory.simgr(state)
+        simgr.run(until=lambda sm: sm.move("active", "done", lambda s: s.addr == end) and False, n=100)
+        assert not simgr.active
+        assert not simgr.errored
+        return sorted(simgr.done, key=lambda s: list(s.history.bbl_addrs))
+
+    def _check_unicorn_matches_vex(self, code, arch="armel", thumb=True, setup=None, memory=(), max_steps=None):
+        """
+        Run code in VEX engine and unicorn engine and check that the registers, memory and history of the final states
+        are the same. Returns the final states of the unicorn engine run.
+        """
+
+        vex_states = self._run_shellcode(code, arch, thumb, False, setup=setup)
+        uc_states = self._run_shellcode(code, arch, thumb, True, setup=setup, max_steps=max_steps)
+        assert len(vex_states) == len(uc_states)
+        for vex_state, uc_state in zip(vex_states, uc_states):
+            assert any(desc.startswith("<Unicorn") for desc in uc_state.history.descriptions)
+            assert list(uc_state.history.bbl_addrs) == list(vex_state.history.bbl_addrs)
+            values = [(name, getattr(vex_state.regs, name), getattr(uc_state.regs, name)) for name in _arch_regs(arch)]
+            values += [(hex(addr), vex_state.memory.load(addr, 4), uc_state.memory.load(addr, 4)) for addr in memory]
+            solver = claripy.Solver()
+            for name, vex_value, uc_value in values:
+                assert vex_value.symbolic == uc_value.symbolic, name
+                assert not solver.satisfiable(extra_constraints=[vex_value != uc_value]), name
+            assert not solver.satisfiable(
+                extra_constraints=[
+                    claripy.And(*vex_state.solver.constraints) != claripy.And(*uc_state.solver.constraints)
+                ]
+            )
+
+        return uc_states
+
+    def test_thumb_concrete(self):
+        """
+        Test if THUMB code runs in unicorn and if the state is still in THUMB mode with correct flags after every stop.
+        """
+
+        code = """
+            movs r0, #5
+            movs r1, #0
+        loop:
+            adds r1, r1, r0
+            subs r0, #1
+            bne loop
+            bl func
+            cmp r1, #0x16
+            b check
+        check:
+            ite eq
+            moveq r2, #1
+            movne r2, #2
+            adcs r3, r3
+            b end
+        func:
+            push {r4, lr}
+            movs r4, #7
+            adds r1, r1, r4
+            pop {r4, pc}
+        end:
+            nop
+        """
+        for max_steps in (None, 1, 2):
+            (state,) = self._check_unicorn_matches_vex(code, max_steps=max_steps)
+            assert all(addr & 1 for addr in state.history.bbl_addrs)
+            assert state.solver.eval_one(state.regs.r1) == 22
+            assert state.solver.eval_one(state.regs.r2) == 1
+            assert state.solver.eval_one(state.regs.r3) == 1
+
+    def test_arm_flags_synced_on_stop(self):
+        """
+        Test if the condition flags computed in unicorn are used by a conditional jump executed after unicorn stops.
+        """
+
+        code = """
+            mov r0, #5
+            cmp r0, #7
+            b check
+        check:
+            blt less
+            mov r1, #1
+            b end
+        less:
+            mov r1, #2
+            b end
+        end:
+            nop
+        """
+        (state,) = self._check_unicorn_matches_vex(code, thumb=False, max_steps=1)
+        assert state.solver.eval_one(state.regs.r1) == 2
+
+    def test_arm_thumb_interworking(self):
+        """
+        Test if switches between ARM and THUMB modes are tracked, both inside unicorn and across stops.
+        """
+
+        code = """
+            movs r0, #5
+            adr r1, armcode
+            bx r1
+            .align 2
+        armcode:
+            .arm
+            add r0, r0, #1
+            add r3, r2, r0
+            add r4, pc, #5
+            bx r4
+            .thumb
+            adds r0, #1
+            adds r3, r3, r0
+            b end
+        end:
+            nop
+        """
+
+        def setup(state):
+            state.regs.r2 = claripy.BVS("x", 32, explicit_name=True)
+
+        for max_steps in (None, 1):
+            (state,) = self._check_unicorn_matches_vex(code, setup=setup, max_steps=max_steps)
+            assert [addr & 1 for addr in state.history.bbl_addrs] == [1, 0, 1]
+
+    def test_thumb_symbolic(self):
+        """
+        Test if symbolic data is handled correctly when executing THUMB code in unicorn: the statements to re-execute
+        in VEX should be those of the block lifted in native interface.
+        """
+
+        def setup(state):
+            state.regs.r2 = claripy.BVS("x", 32, explicit_name=True)
+            state.regs.r8 = claripy.BVS("y", 32, explicit_name=True)
+            state.memory.store(0x20000, claripy.BVS("m", 32, explicit_name=True), endness="Iend_LE")
+            state.memory.store(0x20004, b"\x11\x22\x33\x44" * 4)
+
+        symbolic_memory = """
+            movs r0, #2
+            lsls r0, r0, #0x10
+            ldr r1, [r0]
+            ldr r3, [r0, #4]
+            b n1
+        n1:
+            adds r4, r1, r3
+            str r4, [r0, #8]
+            ldr.w r5, [r0, #8]
+            movs r6, #9
+            b n2
+        n2:
+            add.w r5, r5, r6
+            str r5, [r0, #0xc]
+            ldrb r7, [r0, #1]
+            strh r7, [r0, #0x10]
+            b end
+        end:
+            nop
+        """
+        (state,) = self._check_unicorn_matches_vex(symbolic_memory, setup=setup, memory=(0x20008, 0x2000C, 0x20010))
+        assert state.regs.r5.symbolic
+        # All blocks should have been executed in unicorn
+        assert not any(desc.startswith("<IRSB") for desc in state.history.descriptions)
+
+        symbolic_it_block = """
+            movs r0, #5
+            b n0
+        n0:
+            cmp r2, #5
+            ite eq
+            moveq r1, #1
+            movne r1, #2
+            adds r3, r1, r0
+            b n1
+        n1:
+            cmp r3, #6
+            itte ne
+            addne r4, r3, #1
+            lslne r4, r4, #1
+            moveq r4, r8
+            b n2
+        n2:
+            movs r5, #0
+            adcs r5, r5
+            b end
+        end:
+            nop
+        """
+        (state,) = self._check_unicorn_matches_vex(symbolic_it_block, setup=setup)
+        assert state.regs.r1.symbolic
+        assert state.regs.r4.symbolic
+        assert state.regs.r5.symbolic
+
+        symbolic_branch = """
+            movs r0, #5
+            movs r4, #0
+            b n0
+        n0:
+            cmp r2, #3
+            b n1
+        n1:
+            bhi hi
+            adds r4, #1
+            b n2
+        hi:
+            adds r4, #2
+        n2:
+            lsrs r3, r2, #4
+            cbz r3, z
+            adds r4, #4
+        z:
+            adds r4, r4, r2
+            b end
+        end:
+            nop
+        """
+        states = self._check_unicorn_matches_vex(symbolic_branch, setup=setup)
+        assert len(states) == 3
+
+    def test_symbolic_condition_of_select(self):
+        """
+        Test if a value selected using a symbolic condition is symbolic even if the values to select from are concrete.
+        """
+
+        code = """
+            mov rax, 1
+            mov rbx, 2
+            cmp rdi, 5
+            jmp n0
+        n0:
+            cmove rax, rbx
+            add rax, 3
+            jmp end
+        end:
+            nop
+        """
+
+        def setup(state):
+            state.regs.rdi = claripy.BVS("x", 64, explicit_name=True)
+
+        (state,) = self._check_unicorn_matches_vex(code, arch="amd64", thumb=False, setup=setup)
+        assert state.regs.rax.symbolic
+        assert state.solver.eval_one(state.regs.rax, extra_constraints=[state.regs.rdi == 5]) == 5
+        assert state.solver.eval_one(state.regs.rax, extra_constraints=[state.regs.rdi == 6]) == 4
 
     def test_vex_archinfo_ctypes_mirror_matches_native(self):
         """

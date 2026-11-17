@@ -1817,6 +1817,7 @@ class Unicorn(SimStatePlugin, SupportsMerge):
 
         # first, get the ignore list (in case of symbolic registers)
         saved_registers = []
+        symbolic_cc_regs = False
         if options.UNICORN_SYM_REGS_SUPPORT in state.options:
             highest_reg_offset, reg_size = max(state.arch.registers.values())
             symbolic_list = (ctypes.c_uint64 * (highest_reg_offset + reg_size))()
@@ -1830,6 +1831,7 @@ class Unicorn(SimStatePlugin, SupportsMerge):
                     cc_op_reg = state.arch.vex_cc_regs[0]
                     if cc_op_reg.vex_offset not in symbolic_list:
                         symbolic_list.extend(range(cc_op_reg.vex_offset, cc_op_reg.vex_offset + cc_op_reg.size))
+                    symbolic_cc_regs = True
                     break
 
             # we take the approach of saving off the symbolic regs and then writing them back
@@ -1857,7 +1859,17 @@ class Unicorn(SimStatePlugin, SupportsMerge):
             setattr(state.regs, r, v)
 
         # some architecture-specific register fixups
-        if state.arch.name in {"X86", "AMD64"}:
+        if state.arch.qemu_name == "arm":
+            cpsr = self.uc.reg_read(self._uc_const.UC_ARM_REG_CPSR)
+            # unicorn reports the address of the next instruction without the THUMB bit: the execution mode is only
+            # available in the T bit of CPSR. angr determines the execution mode from the least significant bit of pc.
+            if cpsr & 0x20:
+                state.regs.pc = self.uc.reg_read(self._uc_regs["pc"]) | 1
+            # update the condition flags. If they are symbolic, the instructions that set them have been re-executed
+            # in VEX and so the VEX flags thunk is already up to date: do not clobber its concrete parts.
+            if not symbolic_cc_regs:
+                state.regs.flags = claripy.BVV(cpsr & 0xF0000000, state.arch.bits)
+        elif state.arch.name in {"X86", "AMD64"}:
             # update the eflags
             state.regs.eflags = claripy.BVV(self.uc.reg_read(self._uc_const.UC_X86_REG_EFLAGS), state.arch.bits)
 

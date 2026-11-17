@@ -206,8 +206,11 @@ bool State::step(address_t current_address, int32_t size, bool check_stop_points
 	if (track_stack) {
 		stack_pointers.push_back(get_stack_pointer());
 	}
-	executed_pages.insert(current_address & ~0xFFFULL);
-	cur_address = current_address;
+	// current_address has the THUMB bit set for THUMB blocks: use the real address of the block for everything that
+	// deals with the bytes of the block
+	address_t real_address = to_real_address(current_address);
+	executed_pages.insert(real_address & ~0xFFFULL);
+	cur_address = real_address;
 	cur_size = size;
 
 	if (cur_steps >= max_steps) {
@@ -232,12 +235,14 @@ bool State::step(address_t current_address, int32_t size, bool check_stop_points
 		// for us to stop in the middle of a block.
 		// since we do not support stopping in the middle of a block.
 
-		auto stop_point = stop_points.lower_bound(current_address);
-		if (stop_point != stop_points.end() && *stop_point < current_address + real_size) {
+		// Stop points in THUMB code may or may not have the THUMB bit set. Both forms fall in the range of real
+		// addresses of the block.
+		auto stop_point = stop_points.lower_bound(real_address);
+		if (stop_point != stop_points.end() && *stop_point < real_address + real_size) {
 			stop(STOP_STOPPOINT);
 		}
-		else if ((trace_last_block_tot_count > 0) && (trace_last_block_addr >= current_address) &&
-		  (trace_last_block_addr < current_address + real_size) && (trace_last_block_curr_count == trace_last_block_tot_count - 1)) {
+		else if ((trace_last_block_tot_count > 0) && (trace_last_block_addr >= real_address) &&
+		  (trace_last_block_addr < real_address + real_size) && (trace_last_block_curr_count == trace_last_block_tot_count - 1)) {
 			// Executing last block in trace. Stop.
 			stop(STOP_STOPPOINT);
 		}
@@ -342,7 +347,7 @@ void State::commit() {
 		}
 		blocks_with_symbolic_stmts.emplace_back(curr_block_details);
 	}
-	if (curr_block_details.block_addr == trace_last_block_addr) {
+	if (to_real_address(curr_block_details.block_addr) == to_real_address(trace_last_block_addr)) {
 		trace_last_block_curr_count += 1;
 	}
 	// Update details of concrete writes to re-execute
@@ -1695,24 +1700,28 @@ VEXLiftResult* State::lift_block(address_t block_address, int32_t block_size) {
 	// corresponding instruction is executed as dependency of a symbolic instruction to set some VEX temps. Thus, we use
 	// the unoptimized VEX block.
 	VexRegisterUpdates pxControl = VexRegUpdUnwindregsAtMemAccess;
-	address_t lift_address;
-	uint8_t *insn_start;
 
-
-	if ((arch == UC_ARCH_ARM) && is_thumb_mode()) {
+	if (is_thumb_block(block_address)) {
 		// vex_lift's Thumb decoder uses the bytes_offset/lookback convention: insn_start points to the byte at
-		// (block_address + 1) (the byte at insn_addr with the Thumb bit set), and the byte at the physical block start
-		// is reached via the lookback region. Allocate pre/post slack so the Thumb lifter can safely peek beyond the
-		// block (e.g., when checking for surrounding IT instructions or 32-bit Thumb-2 second halfwords), and so that
-		// vex_lift can consume up to block_size bytes from insn_start.
-		const int pre_slack = 8;
-		const int post_slack = 8;
-		std::unique_ptr<uint8_t[]> instructions(new uint8_t[pre_slack + block_size + post_slack]);
-		std::memset(instructions.get(), 0, pre_slack + block_size + post_slack);
-		uc_mem_read(this->uc, block_address, instructions.get() + pre_slack, block_size);
-		lift_address = block_address | 1;
-		insn_start = instructions.get() + pre_slack + 1;
-		return vex_lift(vex_guest, vex_archinfo, insn_start, lift_address, 99, block_size,
+		// (real block address + 1) and insn_addr has the Thumb bit set.
+		//
+		// To find out if the first instructions of the block are inside an IT block, VEX inspects the instructions
+		// before the block. When it is not allowed to look back far enough, it guards every instruction with a check
+		// of ITSTATE instead, which produces a different (and much larger) IRSB that uses statements such as LoadG
+		// that the taint engine cannot handle. The statements to re-execute are reported to python land by their
+		// index in the IRSB, so the IRSB lifted here must be identical to the one lifted there: both sides use the
+		// THUMB_LOOKBACK_SIZE bytes before the block, limited to the page the block starts in since that is the only
+		// page guaranteed to be mapped. Keep this in sync with SimEngineUnicorn._lift_thumb_block.
+		address_t real_address = to_real_address(block_address);
+		int32_t lookback_size = std::min<address_t>(THUMB_LOOKBACK_SIZE, real_address & 0xFFF);
+		// Slack after the block: VEX may read the full length of an instruction that starts inside the block.
+		const int32_t post_slack = 8;
+		std::unique_ptr<uint8_t[]> instructions(new uint8_t[lookback_size + block_size + post_slack]);
+		std::memset(instructions.get(), 0, lookback_size + block_size + post_slack);
+		if (uc_mem_read(this->uc, real_address - lookback_size, instructions.get(), lookback_size + block_size) != UC_ERR_OK) {
+			return NULL;
+		}
+		return vex_lift(vex_guest, vex_archinfo, instructions.get() + lookback_size + 1, block_address, 99, block_size,
 		    1 /* opt_level */,
 		    0 /* traceflags */,
 		    1 /* allow_arch_optimizations */,
@@ -1721,15 +1730,13 @@ VEXLiftResult* State::lift_block(address_t block_address, int32_t block_size) {
 		    0 /* load_from_ro_regions */,
 		    0 /* const_prop */,
 		    pxControl,
-			pre_slack + 1 /* lookback */
+				lookback_size + 1 /* lookback */
 		);
 	}
 
 	std::unique_ptr<uint8_t[]> instructions(new uint8_t[block_size]);
-	lift_address = block_address;
 	uc_mem_read(this->uc, block_address, instructions.get(), block_size);
-	insn_start = instructions.get();
-	return vex_lift(vex_guest, vex_archinfo, insn_start, lift_address, 99, block_size,
+	return vex_lift(vex_guest, vex_archinfo, instructions.get(), block_address, 99, block_size,
 	    1 /* opt_level */,
 	    0 /* traceflags */,
 	    1 /* allow_arch_optimizations */,
@@ -2158,6 +2165,9 @@ void State::propagate_taint_of_one_stmt(const vex_stmt_taint_entry_t &vex_stmt_t
 	}
 	is_stmt_symbolic = false;
 	vex_stmt_details = compute_vex_stmt_details(vex_stmt_taint_entry);
+	// A value selected by a symbolic condition is symbolic even if all values to select from are concrete. This is
+	// how instructions executed conditionally (eg: those in a THUMB IT block) are lifted.
+	auto ite_cond_taint_status = get_final_taint_status(vex_stmt_taint_entry.ite_cond_entity_list);
 	if (taint_sink.entity_type == TAINT_ENTITY_MEM) {
 		vex_stmt_details.has_memory_write = true;
 		auto addr_taint_status = get_final_taint_status(taint_sink.mem_ref_entity_list);
@@ -2172,6 +2182,9 @@ void State::propagate_taint_of_one_stmt(const vex_stmt_taint_entry_t &vex_stmt_t
 			}
 		}
 		auto sink_taint_status = get_final_taint_status(taint_srcs);
+		if (sink_taint_status == TAINT_STATUS_CONCRETE) {
+			sink_taint_status = ite_cond_taint_status;
+		}
 		if (sink_taint_status == TAINT_STATUS_DEPENDS_ON_READ_FROM_SYMBOLIC_ADDR) {
 			if (handle_symbolic_addrs) {
 				is_stmt_symbolic = true;
@@ -2197,6 +2210,9 @@ void State::propagate_taint_of_one_stmt(const vex_stmt_taint_entry_t &vex_stmt_t
 	}
 	else if ((taint_sink.entity_type != TAINT_ENTITY_NONE) || vex_stmt_taint_entry.is_exit) {
 		taint_status_result_t final_taint_status = get_final_taint_status(taint_srcs);
+		if (final_taint_status == TAINT_STATUS_CONCRETE) {
+			final_taint_status = ite_cond_taint_status;
+		}
 		if (final_taint_status == TAINT_STATUS_DEPENDS_ON_READ_FROM_SYMBOLIC_ADDR) {
 			if (handle_symbolic_addrs) {
 				is_stmt_symbolic = true;
@@ -2229,7 +2245,6 @@ void State::propagate_taint_of_one_stmt(const vex_stmt_taint_entry_t &vex_stmt_t
 			mark_register_concrete(taint_sink.reg_offset, taint_sink.value_size);
 		}
 	}
-	auto ite_cond_taint_status = get_final_taint_status(vex_stmt_taint_entry.ite_cond_entity_list);
 	if (ite_cond_taint_status != TAINT_STATUS_CONCRETE) {
 		is_stmt_symbolic = true;
 	}
@@ -2256,14 +2271,15 @@ void State::propagate_taint_of_one_stmt(const vex_stmt_taint_entry_t &vex_stmt_t
 			}
 			else {
 				for (auto &stmt_detail: curr_block_details.vex_cc_reg_setter_details) {
+					// Insert before the first symbolic statement that comes after this one in the block. If there
+					// is none, all symbolic statements come before this one and so it goes at the end.
 					auto sym_stmt_it = curr_block_details.symbolic_stmts.begin();
-					auto sym_stmt_it_end = curr_block_details.symbolic_stmts.end();
-					for (; sym_stmt_it != sym_stmt_it_end; sym_stmt_it++) {
+					for (; sym_stmt_it != curr_block_details.symbolic_stmts.end(); sym_stmt_it++) {
 						if (stmt_detail.stmt_idx < sym_stmt_it->stmt_idx) {
-							curr_block_details.symbolic_stmts.insert(sym_stmt_it - 1, stmt_detail);
 							break;
 						}
 					}
+					curr_block_details.symbolic_stmts.insert(sym_stmt_it, stmt_detail);
 				}
 			}
 			curr_block_details.symbolic_stmts.emplace_back(vex_stmt_details);
@@ -2841,6 +2857,8 @@ static void hook_block(uc_engine *uc, uint64_t address, int32_t size, void *user
 		return;
 	}
 	state->commit();
+	// unicorn reports the real address of the block: set the THUMB bit if needed since that's what angr expects
+	address = state->to_angr_block_address(address);
 	state->set_curr_block_details(address, size);
 	bool hooked = state->step(address, size);
 

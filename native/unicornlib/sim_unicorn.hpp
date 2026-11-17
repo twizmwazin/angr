@@ -20,6 +20,10 @@ extern "C" {
 // See State::step for why this is necessary
 static const uint32_t MAX_BB_SIZE = 800;
 
+// Number of bytes before a THUMB block that are made available to VEX when lifting the block. VEX needs 18 bytes to
+// figure out if the block starts inside an IT block. This should match THUMB_LOOKBACK_SIZE in angr/engines/unicorn.py.
+static const uint32_t THUMB_LOOKBACK_SIZE = 18;
+
 static const uint8_t MAX_MEM_ACCESS_SIZE = 8;
 
 // The size of the longest register in archinfo's uc_regs for all architectures
@@ -791,6 +795,28 @@ class State {
 	}
 
 	public:
+		// angr identifies THUMB blocks by setting the least significant bit of their address but unicorn always reports
+		// the real (even) address of a block. Addresses of blocks are stored in the angr form everywhere in the native
+		// interface so that they can be used as is in python land, and so that an ARM block and a THUMB block at the same
+		// address are never mistaken for each other. These helpers convert between the two forms.
+		inline bool is_thumb_block(address_t block_address) const {
+			return ((arch == UC_ARCH_ARM) && ((block_address & 1) != 0));
+		}
+
+		inline address_t to_angr_block_address(address_t unicorn_block_address) const {
+			if ((arch == UC_ARCH_ARM) && is_thumb_mode()) {
+				return (unicorn_block_address | 1);
+			}
+			return unicorn_block_address;
+		}
+
+		inline address_t to_real_address(address_t angr_address) const {
+			if (arch == UC_ARCH_ARM) {
+				return (angr_address & ~((address_t)1));
+			}
+			return angr_address;
+		}
+
 		uc_engine *uc;
 
 		std::vector<address_t> bbl_addrs;

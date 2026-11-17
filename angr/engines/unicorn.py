@@ -5,6 +5,7 @@ import functools
 import logging
 
 import archinfo
+import pyvex
 
 import angr
 from angr import claripy
@@ -22,6 +23,10 @@ from .vex.heavy.heavy import VEXEarlyExit
 # pylint: disable=arguments-differ
 
 l = logging.getLogger(name=__name__)
+
+# Number of bytes before a THUMB block that are made available to VEX when lifting the block. This should match
+# THUMB_LOOKBACK_SIZE in native/unicornlib/sim_unicorn.hpp
+THUMB_LOOKBACK_SIZE = 18
 
 
 class SimEngineUnicorn(SuccessorsEngine):
@@ -275,7 +280,10 @@ class SimEngineUnicorn(SuccessorsEngine):
     def _get_vex_block_details(self, block_addr, block_size):
         # Mostly based on the lifting code in HeavyVEXMixin
         # pylint:disable=no-member
-        irsb = self.project.factory.block(addr=block_addr, backup_state=self.state, size=block_size).vex
+        if archinfo.arch_arm.is_arm_arch(self.state.arch) and block_addr & 1:
+            irsb = self._lift_thumb_block(block_addr, block_size)
+        else:
+            irsb = self.project.factory.block(addr=block_addr, backup_state=self.state, size=block_size).vex
         if irsb.size == 0:
             if irsb.jumpkind == "Ijk_NoDecode":
                 if not self.state.project.is_hooked(irsb.addr):
@@ -290,6 +298,36 @@ class SimEngineUnicorn(SuccessorsEngine):
             raise SimIRSBError(f"Empty IRSB found at 0x{irsb.addr:02x}.")
 
         return irsb
+
+    def _lift_thumb_block(self, block_addr, block_size):
+        """
+        Lift a THUMB block exactly like the native interface does (see State::lift_block in sim_unicorn.cpp).
+
+        The native interface identifies the statements to re-execute by their index in the IRSB of the block and so the
+        IRSB used here should be identical to the one it lifted. For THUMB code, the IRSB depends on the bytes before
+        the block that VEX is allowed to inspect to find out if the block starts inside an IT block: if there are not
+        enough of them, every instruction is guarded by a check of ITSTATE. The lifter used by the rest of angr gives
+        VEX all bytes available before the block, which is not something the native interface can reproduce. Thus,
+        both sides use the THUMB_LOOKBACK_SIZE bytes before the block, limited to the page the block starts in.
+        """
+
+        real_addr = block_addr & ~1
+        lookback_size = min(THUMB_LOOKBACK_SIZE, real_addr & 0xFFF)
+        data = self.state.memory.load(
+            real_addr - lookback_size, lookback_size + block_size, inspect=False, disable_actions=True
+        )
+        # The native interface adds 8 NUL bytes after the block
+        buff = self.state.solver.eval(data, cast_to=bytes) + b"\0" * 8
+        return pyvex.lift(
+            buff,
+            block_addr,
+            self.state.arch,
+            max_bytes=block_size,
+            bytes_offset=lookback_size + 1,
+            opt_level=1,
+            strict_block_end=True,
+            cross_insn_opt=True,
+        )
 
     def _set_correct_mem_read_addr(self, state):
         assert len(self._instr_mem_reads) != 0
