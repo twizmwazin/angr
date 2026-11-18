@@ -612,6 +612,25 @@ class TestUnicorn(unittest.TestCase):
             states = [s for s in simgr.deadended if s.solver.satisfiable(extra_constraints=[x == value])]
             assert [s.solver.eval_one(s.regs.eax, extra_constraints=[x == value]) for s in states] == [ret]
 
+    def test_arm_flags_synced_on_stop(self):
+        """
+        Test if the condition flags computed in unicorn engine are synced to the state when it stops.
+        """
+
+        code = """
+            mov r0, #5
+            cmp r0, #7
+            b next
+        next:
+            mov r0, #1
+        """
+        p = angr.load_shellcode(code, "armel", load_address=0x10000)
+        state = p.factory.blank_state(addr=0x10000, add_options=so.unicorn)
+        state.unicorn.max_steps = 1
+        successors = state.step()
+        assert successors.description.startswith("Unicorn")
+        assert successors.successors[0].solver.eval_one(successors.successors[0].regs.flags) == 0x80000000
+
     def test_setup_flags_keeps_symbolic_flags(self):
         """
         Test if setting up unicorn's flags register keeps the flags of a VEX flags thunk whose operand is symbolic.

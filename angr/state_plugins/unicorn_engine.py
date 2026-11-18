@@ -1817,6 +1817,7 @@ class Unicorn(SimStatePlugin, SupportsMerge):
 
         # first, get the ignore list (in case of symbolic registers)
         saved_registers = []
+        symbolic_cc_regs = False
         if options.UNICORN_SYM_REGS_SUPPORT in state.options:
             highest_reg_offset, reg_size = max(state.arch.registers.values())
             symbolic_list = (ctypes.c_uint64 * (highest_reg_offset + reg_size))()
@@ -1830,6 +1831,7 @@ class Unicorn(SimStatePlugin, SupportsMerge):
                     cc_op_reg = state.arch.vex_cc_regs[0]
                     if cc_op_reg.vex_offset not in symbolic_list:
                         symbolic_list.extend(range(cc_op_reg.vex_offset, cc_op_reg.vex_offset + cc_op_reg.size))
+                    symbolic_cc_regs = True
                     break
 
             # we take the approach of saving off the symbolic regs and then writing them back
@@ -1921,6 +1923,11 @@ class Unicorn(SimStatePlugin, SupportsMerge):
                 vex_tag_offset -= 1
 
         # TODO: ARM hardfloat
+
+        # If the flags are symbolic, the statements that set them have been re-executed in VEX: the VEX flags thunk is
+        # already up to date.
+        if state.arch.qemu_name == "arm" and not symbolic_cc_regs:
+            state.regs.flags = self.uc.reg_read(self._uc_const.UC_ARM_REG_CPSR) & 0xF0000000
 
         # now, we restore the symbolic registers
         if options.UNICORN_SYM_REGS_SUPPORT in state.options:
