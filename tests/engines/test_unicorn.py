@@ -512,6 +512,29 @@ class TestUnicorn(unittest.TestCase):
         assert len(successors2) == 1
         assert successors2[0].addr == step5
 
+    def test_concrete_flags_thunk_setters_reexecuted(self):
+        """
+        Test if the concrete parts of the VEX flags thunk are updated along with the symbolic ones when the statements
+        that set them come after a symbolic statement.
+        """
+
+        code = """
+            mov r1, #5
+            adds r1, r1, r2
+            b next
+        next:
+            mov r0, #1
+        """
+        p = angr.load_shellcode(code, "armel", load_address=0x10000)
+        state = p.factory.blank_state(addr=0x10000, add_options=so.unicorn)
+        state.regs.r2 = claripy.BVS("x", 32)
+        state.unicorn.max_steps = 1
+        successors = state.step()
+        assert successors.description.startswith("Unicorn")
+        succ = successors.successors[0]
+        # 5 + (-5): zero and carry flags are set
+        assert succ.solver.eval_one(succ.regs.flags, extra_constraints=[succ.regs.r2 == 0xFFFFFFFB]) == 0x60000000
+
     def test_symbolic_flags_preserved_on_stop(self):
         """
         Test if symbolic flags are preserved when unicorn engine stops. This is needed for cases where compare is

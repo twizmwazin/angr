@@ -2264,14 +2264,16 @@ void State::propagate_taint_of_one_stmt(const vex_stmt_taint_entry_t &vex_stmt_t
 			}
 			else {
 				for (auto &stmt_detail: curr_block_details.vex_cc_reg_setter_details) {
+					// Insert before the first symbolic statement that comes after this one in the block, or at the
+					// end if there is none
 					auto sym_stmt_it = curr_block_details.symbolic_stmts.begin();
 					auto sym_stmt_it_end = curr_block_details.symbolic_stmts.end();
 					for (; sym_stmt_it != sym_stmt_it_end; sym_stmt_it++) {
 						if (stmt_detail.stmt_idx < sym_stmt_it->stmt_idx) {
-							curr_block_details.symbolic_stmts.insert(sym_stmt_it - 1, stmt_detail);
 							break;
 						}
 					}
+					curr_block_details.symbolic_stmts.insert(sym_stmt_it, stmt_detail);
 				}
 			}
 			curr_block_details.symbolic_stmts.emplace_back(vex_stmt_details);
