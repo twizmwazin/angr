@@ -1707,11 +1707,15 @@ VEXLiftResult* State::lift_block(address_t block_address, int32_t block_size) {
 		// is reached via the lookback region. Allocate pre/post slack so the Thumb lifter can safely peek beyond the
 		// block (e.g., when checking for surrounding IT instructions or 32-bit Thumb-2 second halfwords), and so that
 		// vex_lift can consume up to block_size bytes from insn_start.
-		const int pre_slack = 8;
+		// If VEX cannot inspect enough bytes before the block to find out if it starts inside an IT block, it guards
+		// every instruction with a check of ITSTATE, which the taint engine cannot handle. The IRSB should also be
+		// identical to the one used for re-execution in python land (see SimEngineUnicorn._lift_thumb_block): both
+		// use the bytes before the block, limited to the page the block starts in.
+		const int pre_slack = std::min<address_t>(THUMB_LOOKBACK_SIZE, block_address & 0xFFE);
 		const int post_slack = 8;
 		std::unique_ptr<uint8_t[]> instructions(new uint8_t[pre_slack + block_size + post_slack]);
 		std::memset(instructions.get(), 0, pre_slack + block_size + post_slack);
-		uc_mem_read(this->uc, block_address & ~1ULL, instructions.get() + pre_slack, block_size);
+		uc_mem_read(this->uc, (block_address & ~1ULL) - pre_slack, instructions.get(), pre_slack + block_size);
 		lift_address = block_address | 1;
 		insn_start = instructions.get() + pre_slack + 1;
 		return vex_lift(vex_guest, vex_archinfo, insn_start, lift_address, 99, block_size,

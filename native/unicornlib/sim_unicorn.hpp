@@ -20,6 +20,10 @@ extern "C" {
 // See State::step for why this is necessary
 static const uint32_t MAX_BB_SIZE = 800;
 
+// Number of bytes before a THUMB block that VEX may inspect to find out if the block starts inside an IT block. This
+// should match THUMB_LOOKBACK_SIZE in angr/engines/unicorn.py.
+static const uint32_t THUMB_LOOKBACK_SIZE = 18;
+
 static const uint8_t MAX_MEM_ACCESS_SIZE = 8;
 
 // The size of the longest register in archinfo's uc_regs for all architectures

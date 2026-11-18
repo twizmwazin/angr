@@ -451,6 +451,29 @@ class TestUnicorn(unittest.TestCase):
 
         assert collect_trace(so.unicorn) == collect_trace(set())
 
+    def test_thumb_symbolic_statements_reexecuted(self):
+        """
+        Test if the symbolic statements of a THUMB block are executed in unicorn engine and re-executed in VEX. The
+        block is not at the start of a page: VEX can find out that it does not start inside an IT block.
+        """
+
+        code = """
+            add.w r1, r0, r2
+            ldr.w r3, [r0]
+            b next
+        next:
+            adds r0, #1
+        """
+        p = angr.load_shellcode("nop\n" * 16 + code, "armel", load_address=0x10000, thumb=True)
+        state = p.factory.blank_state(addr=0x10021, add_options=so.unicorn)
+        state.regs.r0 = 0x10000
+        state.regs.r2 = claripy.BVS("x", 32)
+        state.unicorn.max_steps = 1
+        successors = state.step()
+        assert successors.description.startswith("Unicorn")
+        succ = successors.successors[0]
+        assert not succ.solver.satisfiable(extra_constraints=[succ.regs.r1 != succ.regs.r2 + 0x10000])
+
     def test_explore(self):
         p = angr.Project(os.path.join(test_location, "i386", "uc_stop"), auto_load_libs=False)
 
