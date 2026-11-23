@@ -715,7 +715,6 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
                         inner,
                         shift_const,
                         false,
-                        false,
                         None,
                         None,
                         None,
@@ -784,6 +783,11 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
         if name == "Not" && op.label() != "Iop_Not1" {
             name = "BitwiseNeg".to_string();
         }
+        if simop.float {
+            name = float_op_name(&name)
+                .ok_or(ConvErr::Unsupported)?
+                .to_string();
+        }
         // Python arg eval order: UnaryOp(next_atom(), name, convert(arg), bits=...).
         let idx = self.next_atom();
         let operand = self.convert_expr(arg)?;
@@ -793,7 +797,6 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
             inner: ExprInner::UnaryOp {
                 op: name,
                 operand: Arc::new(operand),
-                floating_point: simop.float,
             },
         })
     }
@@ -895,7 +898,6 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
         }
 
         let mut signed = false;
-        let mut floating_point = false;
         let mut vector_count: Option<i64> = None;
         let mut vector_size: Option<i64> = None;
         if simop.vector_zero
@@ -914,9 +916,16 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
             } else {
                 simop.is_signed()
             };
-            op_name = Some(format!("{}V", op_name.unwrap_or_default()));
             // lane-wise FP ops (CmpEQ64F0x2, CmpLT32Fx4, ...) keep their FP nature
-            floating_point = simop.float;
+            let lane_op = op_name.unwrap_or_default();
+            let lane_op = if simop.float {
+                float_op_name(&lane_op)
+                    .ok_or(ConvErr::Unsupported)?
+                    .to_string()
+            } else {
+                lane_op
+            };
+            op_name = Some(format!("{lane_op}V"));
             vector_count = simop.vector_count.map(|v| v as i64);
             vector_size = simop.vector_size.map(|v| v as i64);
         } else if matches!(
@@ -1029,7 +1038,6 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
                     operands[0].clone(),
                     operands[1].clone(),
                     signed,
-                    false,
                     None,
                     Some(op1_size),
                     None,
@@ -1059,7 +1067,6 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
                     operands[0].clone(),
                     operands[1].clone(),
                     signed,
-                    false,
                     None,
                     Some(op1_size),
                     None,
@@ -1088,7 +1095,6 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
                 truncated_mod,
                 truncated_div,
                 false,
-                false,
                 None,
                 Some(bits),
                 None,
@@ -1110,7 +1116,6 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
             lhs,
             rhs,
             signed,
-            floating_point,
             None,
             Some(bits),
             vector_count,
@@ -1139,7 +1144,6 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
             lhs,
             rhs,
             false,
-            true,
             rm,
             Some(scalar_bits),
             None,
@@ -1237,6 +1241,9 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
                 return self.scalar_in_vector_op(scalar_op, lhs, rhs, scalar_bits, Some(rm));
             }
             // packed FP ops (Add64Fx2, Mul32Fx4, ...) are lane-wise: keep the "V" op name and the lane layout
+            let op_name = float_op_name(&op_name)
+                .ok_or(ConvErr::Unsupported)?
+                .to_string();
             let (op_name, vector_count, vector_size) =
                 if simop.vector_count.is_some() && simop.vector_size.is_some() {
                     (
@@ -1254,7 +1261,6 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
                 lhs,
                 rhs,
                 true, // all floating-point operations are signed
-                true,
                 Some(rm),
                 Some(bits),
                 vector_count,
@@ -1311,7 +1317,6 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
                 rm,
                 x,
                 false,
-                false,
                 None,
                 Some(bits),
                 None,
@@ -1324,7 +1329,7 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
             let x = self.convert_expr(a2)?;
             let exp2 = self.fp_unop("Exp2", x, bits);
             let one = self.make_const(ConstValue::Float(1.0), bits)?;
-            return Ok(Some(self.fp_binop("Sub", exp2, one, bits)));
+            return Ok(Some(self.fp_binop("SubF", exp2, one, bits)));
         }
         if let Some((count, size)) = cmpun_vector_shape(label) {
             let lhs = self.convert_expr(a1)?;
@@ -1336,7 +1341,6 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
                 lhs,
                 rhs,
                 false,
-                true,
                 None,
                 Some(bits),
                 Some(count),
@@ -1391,10 +1395,10 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
                 let mut x = self.convert_expr(b)?;
                 if label == "Iop_Yl2xp1F64" {
                     let one = self.make_const(ConstValue::Float(1.0), bits)?;
-                    x = self.fp_binop("Add", x, one, bits);
+                    x = self.fp_binop("AddF", x, one, bits);
                 }
                 let log2 = self.fp_unop("Log2", x, bits);
-                Ok(Some(self.fp_binop("Mul", y, log2, bits)))
+                Ok(Some(self.fp_binop("MulF", y, log2, bits)))
             }
             "Iop_PRemC3210F64" | "Iop_PRem1C3210F64" => {
                 // the C3/C2/C0 status bits of fprem/fprem1, in FPU status-word layout: an intrinsic
@@ -1429,7 +1433,6 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
             inner: ExprInner::UnaryOp {
                 op: op.to_string(),
                 operand: Arc::new(operand),
-                floating_point: true,
             },
         }
     }
@@ -1448,7 +1451,6 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
             lhs,
             rhs,
             true, // all floating-point operations are signed
-            true,
             None,
             Some(bits),
             None,
@@ -1471,7 +1473,6 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
             op.to_string(),
             lhs,
             rhs,
-            true,
             true,
             Some(rm),
             Some(bits),
@@ -1535,10 +1536,10 @@ impl<'py, 'r, R: IrReader> Conv<'py, 'r, R> {
         let a = self.convert_expr(&args[1])?;
         let b = self.convert_expr(&args[2])?;
         let c = self.convert_expr(&args[3])?;
-        let mul = self.fp_binop_rm("Mul", a, b, bits, rm.clone());
-        let mut e = self.fp_binop_rm(if sub { "Sub" } else { "Add" }, mul, c, bits, rm.clone());
+        let mul = self.fp_binop_rm("MulF", a, b, bits, rm.clone());
+        let mut e = self.fp_binop_rm(if sub { "SubF" } else { "AddF" }, mul, c, bits, rm.clone());
         if neg {
-            e = self.fp_unop("Neg", e, bits);
+            e = self.fp_unop("NegF", e, bits);
         }
         if round32 {
             e = self.round_f64_to_f32(e, rm);
@@ -2174,10 +2175,10 @@ fn new_stmt(idx: i64, tags: Tags, inner: StmtInner) -> AilStatement {
 /// The scalar AIL op name for a VEX scalar-in-vector ("F0x") generic name, if it is one we lower.
 fn scalar_in_vector_op_name(generic: Option<&str>) -> Option<&'static str> {
     match generic {
-        Some("Add") => Some("Add"),
-        Some("Sub") => Some("Sub"),
-        Some("Mul") => Some("Mul"),
-        Some("Div") => Some("Div"),
+        Some("Add") => Some("AddF"),
+        Some("Sub") => Some("SubF"),
+        Some("Mul") => Some("MulF"),
+        Some("Div") => Some("DivF"),
         Some("Max") => Some("MaxF"),
         Some("Min") => Some("MinF"),
         _ => None,
@@ -2191,7 +2192,6 @@ fn new_binop(
     lhs: AilExpression,
     rhs: AilExpression,
     signed: bool,
-    floating_point: bool,
     rounding_mode: Option<RoundingModeOrExpr>,
     bits: Option<u32>,
     vector_count: Option<i64>,
@@ -2206,7 +2206,6 @@ fn new_binop(
             op,
             operands: [Arc::new(lhs), Arc::new(rhs)],
             signed,
-            floating_point,
             rounding_mode,
             vector_count,
             vector_size,
@@ -2325,12 +2324,35 @@ fn new_dirty_expr_with_operands(
 }
 
 /// AIL op of a PPC `Iop_<Op>F64r32(rm, a, b)` (F64 arithmetic rounded to single precision).
+/// The AIL op of a floating-point VEX op, by the op's generic name. Integer and floating-point
+/// operations are distinct AIL ops (`Add` / `AddF`); this lists every generic name a
+/// floating-point VEX op reaches the generic unop/binop/triop paths with.
+fn float_op_name(generic: &str) -> Option<&'static str> {
+    Some(match generic {
+        "Abs" => "AbsF",
+        "Add" => "AddF",
+        "CmpEQ" => "CmpEQF",
+        "CmpLE" => "CmpLEF",
+        "CmpLT" => "CmpLTF",
+        "Div" => "DivF",
+        "Max" => "MaxF",
+        "Min" => "MinF",
+        "Mul" => "MulF",
+        "Neg" => "NegF",
+        "RSqrtEst" => "RSqrtEstF",
+        "Round" => "RoundF",
+        "Sqrt" => "Sqrt",
+        "Sub" => "SubF",
+        _ => return None,
+    })
+}
+
 fn f64r32_op_name(label: &str) -> Option<&'static str> {
     Some(match label {
-        "Iop_AddF64r32" => "Add",
-        "Iop_SubF64r32" => "Sub",
-        "Iop_MulF64r32" => "Mul",
-        "Iop_DivF64r32" => "Div",
+        "Iop_AddF64r32" => "AddF",
+        "Iop_SubF64r32" => "SubF",
+        "Iop_MulF64r32" => "MulF",
+        "Iop_DivF64r32" => "DivF",
         _ => return None,
     })
 }

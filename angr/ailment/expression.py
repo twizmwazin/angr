@@ -244,10 +244,9 @@ else:
             op,
             operand,
             bits=None,
-            floating_point=False,
             **tags,
         ) -> _Expression:
-            return _Expression._new_unary_op(idx, op, operand, bits=bits, floating_point=floating_point, **tags)
+            return _Expression._new_unary_op(idx, op, operand, bits=bits, **tags)
 
     class Convert(metaclass=_AilMarkerMeta):
         """Marker for ``Expression`` instances whose variant is ``Convert``."""
@@ -311,6 +310,12 @@ else:
         "CmpGE": 1,
         "CmpLE": 1,
         "CmpGT": 1,
+        "CmpEQF": 1,
+        "CmpNEF": 1,
+        "CmpLTF": 1,
+        "CmpGEF": 1,
+        "CmpLEF": 1,
+        "CmpGTF": 1,
         "CmpUN": 1,
         "ExpCmpNE": 1,
         "Carry": 8,
@@ -342,6 +347,12 @@ else:
             "CmpGE": "CmpLT",
             "CmpLE": "CmpGT",
             "CmpGT": "CmpLE",
+            "CmpEQF": "CmpNEF",
+            "CmpNEF": "CmpEQF",
+            "CmpLTF": "CmpGEF",
+            "CmpGEF": "CmpLTF",
+            "CmpLEF": "CmpGTF",
+            "CmpGTF": "CmpLEF",
         }
 
         def __new__(  # type: ignore[misc]
@@ -352,7 +363,6 @@ else:
             signed=False,
             *,
             bits=None,
-            floating_point=False,
             rounding_mode=None,
             vector_count=None,
             vector_size=None,
@@ -366,7 +376,6 @@ else:
                 operands,
                 signed,
                 bits=bits,
-                floating_point=floating_point,
                 rounding_mode=rounding_mode,
                 vector_count=vector_count,
                 vector_size=vector_size,
@@ -693,6 +702,60 @@ if not TYPE_CHECKING:
         """Marker for ``isinstance(x, Op)`` checks."""
 
 
+# The floating-point operations. Integer and floating-point operations are distinct ops: the floating-point
+# counterpart of an integer op carries an F suffix (Add / AddF), ahead of the V suffix of a lane-wise vector op
+# (AddV / AddFV). CmpF is not one of them: it yields an integer condition code.
+FLOAT_OPS: frozenset[str] = frozenset(
+    {
+        # arithmetic
+        "AddF",
+        "SubF",
+        "MulF",
+        "DivF",
+        "NegF",
+        "AbsF",
+        "MaxF",
+        "MinF",
+        "Sqrt",
+        "RSqrtEstF",
+        "RoundF",
+        "Scale",
+        "PRem",
+        "PRem1",
+        # comparisons and classification
+        "CmpEQF",
+        "CmpNEF",
+        "CmpLTF",
+        "CmpLEF",
+        "CmpGTF",
+        "CmpGEF",
+        "CmpUN",
+        "SignBit",
+        # trigonometric, exponential and logarithmic functions
+        "Sin",
+        "Cos",
+        "Tan",
+        "Atan2",
+        "Exp2",
+        "Log2",
+        # lane-wise vector operations
+        "AddFV",
+        "SubFV",
+        "MulFV",
+        "DivFV",
+        "MaxFV",
+        "MinFV",
+        "SqrtV",
+        "CmpEQFV",
+        "CmpNEFV",
+        "CmpLTFV",
+        "CmpLEFV",
+        "CmpGTFV",
+        "CmpGEFV",
+        "CmpUNV",
+    }
+)
+
 _LOGICAL_DUAL = {"LogicalAnd": "LogicalOr", "LogicalOr": "LogicalAnd"}
 
 
@@ -720,7 +783,6 @@ def negate(expr: Expression, manager) -> Expression:
                 expr.operands,
                 signed=expr.signed,
                 bits=expr.bits,
-                floating_point=expr.floating_point,
                 rounding_mode=expr.rounding_mode,
                 **dict(expr.tags),
             )
@@ -738,6 +800,7 @@ def negate(expr: Expression, manager) -> Expression:
 
 
 __all__ = [
+    "FLOAT_OPS",
     "ITE",
     "Array",
     "Atom",

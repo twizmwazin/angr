@@ -238,9 +238,7 @@ class Expression:
         **tags: Any,
     ) -> Expression: ...
     @staticmethod
-    def _new_unary_op(
-        idx: int, op: str, operand: Expression, bits: int | None = ..., floating_point: bool = ..., **tags: Any
-    ) -> Expression: ...
+    def _new_unary_op(idx: int, op: str, operand: Expression, bits: int | None = ..., **tags: Any) -> Expression: ...
     @staticmethod
     def _new_convert(
         idx: int,
@@ -271,7 +269,6 @@ class Expression:
         signed: bool = ...,
         *,
         bits: int | None = ...,
-        floating_point: bool = ...,
         rounding_mode: RoundingMode | Expression | None = ...,
         vector_count: int | None = ...,
         vector_size: int | None = ...,
@@ -764,16 +761,12 @@ class UnaryOp(Op):
     """UnaryOp.operand"""
     operands: Any
     """UnaryOp.operands (single-element list, legacy quirk)"""
-    @property
-    def floating_point(self) -> bool:
-        """UnaryOp.floating_point"""
     def __init__(
         self,
         idx: int | None,
         op: str,
         operand: Expression,
         bits: int | None = ...,
-        floating_point: bool = ...,
         **tags: Any,
     ) -> None: ...
 
@@ -784,9 +777,6 @@ class BinaryOp(Op):
     @property
     def signed(self) -> bool:
         """BinaryOp.signed"""
-    @property
-    def floating_point(self) -> bool:
-        """BinaryOp.floating_point"""
     @property
     def rounding_mode(self) -> RoundingMode | Expression | None:
         """BinaryOp.rounding_mode"""
@@ -804,7 +794,6 @@ class BinaryOp(Op):
         signed: bool = ...,
         *,
         bits: int | None = ...,
-        floating_point: bool = ...,
         rounding_mode: RoundingMode | Expression | None = ...,
         vector_count: int | None = ...,
         vector_size: int | None = ...,

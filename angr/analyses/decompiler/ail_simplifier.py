@@ -13,6 +13,7 @@ import networkx
 from angr.ailment import Address, AILBlockRewriter, AILBlockViewer
 from angr.ailment.block import Block
 from angr.ailment.expression import (
+    FLOAT_OPS,
     ITE,
     BinaryOp,
     Call,
@@ -304,7 +305,7 @@ class _FPOpOriginFinder(AILBlockViewer):
     def _handle_expr(
         self, expr_idx: int, expr: Expression, stmt_idx: int, stmt: Statement | None, block: Block | None
     ) -> None:
-        if isinstance(expr, BinaryOp) and expr.floating_point:
+        if isinstance(expr, BinaryOp) and expr.op in FLOAT_OPS:
             origin = (expr.tags.get("ins_addr"), expr.tags.get("vex_stmt_idx"))
             if origin in self.origins:
                 self.found.add(origin)
@@ -2677,8 +2678,7 @@ class AILSimplifier(Analysis):
         src = stmt.src
         return (
             isinstance(src, BinaryOp)
-            and src.floating_point
-            and src.op in {"Add", "Sub", "Mul", "Div"}
+            and src.op in {"AddF", "SubF", "MulF", "DivF"}
             and all(isinstance(op, Const) and isinstance(op.value, float) for op in src.operands)
             # a copy propagated from another instruction is not the original op
             and src.tags.get("ins_addr") == stmt.tags.get("ins_addr")

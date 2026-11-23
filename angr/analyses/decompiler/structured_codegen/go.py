@@ -1250,6 +1250,7 @@ _GO_MATH_UNOPS: dict[str, tuple[str, tuple[int, ...]]] = {
     "SignBit": ("math.Signbit", ()),
     "Sqrt": ("math.Sqrt", ()),
     "Abs": ("math.Abs", ()),
+    "AbsF": ("math.Abs", ()),
     "Floor": ("math.Floor", ()),
     "Ceil": ("math.Ceil", ()),
     "Trunc": ("math.Trunc", ()),
@@ -1277,6 +1278,12 @@ _GO_CMP_SWAP = {
     "CmpGT": "CmpLT",
     "CmpLE": "CmpGE",
     "CmpGE": "CmpLE",
+    "CmpEQF": "CmpEQF",
+    "CmpNEF": "CmpNEF",
+    "CmpLTF": "CmpGTF",
+    "CmpGTF": "CmpLTF",
+    "CmpLEF": "CmpGEF",
+    "CmpGEF": "CmpLEF",
     "CmpLTs": "CmpGTs",
     "CmpGTs": "CmpLTs",
     "CmpLEs": "CmpGEs",
@@ -1866,6 +1873,10 @@ class GoAssignment(GoStatement):
             "Sub": "-",
             "Mul": "*",
             "Div": "/",
+            "AddF": "+",
+            "SubF": "-",
+            "MulF": "*",
+            "DivF": "/",
             "And": "&",
             "Xor": "^",
             "Or": "|",
@@ -1873,7 +1884,7 @@ class GoAssignment(GoStatement):
             "Shl": "<<",
             "Sar": ">>",
         }
-        commutative_ops = {"Add", "Mul", "And", "Xor", "Or"}
+        commutative_ops = {"Add", "Mul", "AddF", "MulF", "And", "Xor", "Or"}
 
         compound_expr_rhs = None
         if (
@@ -1894,11 +1905,11 @@ class GoAssignment(GoStatement):
 
         if (
             compound_expr_rhs is not None
-            and self.rhs.op in ("Add", "Sub")
+            and self.rhs.op in ("Add", "Sub", "AddF", "SubF")
             and isinstance(compound_expr_rhs, GoConstant)
             and compound_expr_rhs.value == 1
         ):
-            yield ("++" if self.rhs.op == "Add" else "--"), self
+            yield ("++" if self.rhs.op in ("Add", "AddF") else "--"), self
         elif compound_expr_rhs is not None:
             # a = a + x  =>  a += x
             # a = x + a  =>  a += x
@@ -2696,6 +2707,7 @@ class GoUnaryOp(GoExpression, UnaryOpNode):
         OP_MAP = {
             "Not": self._c_repr_chunks_not,
             "Neg": self._c_repr_chunks_neg,
+            "NegF": self._c_repr_chunks_neg,
             "BitwiseNeg": self._c_repr_chunks_bitwiseneg,
             "Reference": self._c_repr_chunks_reference,
             "Dereference": self._c_repr_chunks_dereference,
@@ -2729,6 +2741,8 @@ class GoUnaryOp(GoExpression, UnaryOpNode):
     _CMP_NEGATION = {
         "CmpEQ": "CmpNE",
         "CmpNE": "CmpEQ",
+        "CmpEQF": "CmpNEF",
+        "CmpNEF": "CmpEQF",
         "CmpLT": "CmpGE",
         "CmpGE": "CmpLT",
         "CmpLE": "CmpGT",
@@ -2744,7 +2758,7 @@ class GoUnaryOp(GoExpression, UnaryOpNode):
         cmp = self.operand
         if not isinstance(cmp, GoBinaryOp) or cmp.collapsed or cmp.op not in self._CMP_NEGATION:
             return None
-        if cmp.op not in {"CmpEQ", "CmpNE"}:
+        if cmp.op not in {"CmpEQ", "CmpNE", "CmpEQF", "CmpNEF"}:
             for side in (cmp.lhs, cmp.rhs):
                 ty = unpack_typeref(side.type) if side.type is not None else None
                 if ty is None or isinstance(ty, (SimTypeFloat, SimTypeDouble)):
@@ -2889,10 +2903,16 @@ class GoBinaryOp(GoExpression, BinaryOpNode):
                 "CmpLTs",
                 "CmpGTs",
                 "CmpGEs",
+                "CmpEQF",
+                "CmpNEF",
+                "CmpLEF",
+                "CmpLTF",
+                "CmpGTF",
+                "CmpGEF",
                 "LogicalXor",
             ],
-            ["Add", "Sub", "Or", "Xor"],
-            ["Mul", "Mull", "Div", "Mod", "Shl", "Shr", "Sar", "And"],
+            ["Add", "Sub", "AddF", "SubF", "Or", "Xor"],
+            ["Mul", "Mull", "Div", "Mod", "MulF", "DivF", "Shl", "Shr", "Sar", "And"],
             ["SBorrow", "SCarry", "Carry"],
         ]
         for i, sublist in enumerate(precedence_list):
@@ -2931,6 +2951,16 @@ class GoBinaryOp(GoExpression, BinaryOpNode):
             "CmpGEs": self._c_repr_chunks_cmpge,
             "CmpEQ": self._c_repr_chunks_cmpeq,
             "CmpNE": self._c_repr_chunks_cmpne,
+            "AddF": self._c_repr_chunks_add,
+            "SubF": self._c_repr_chunks_sub,
+            "MulF": self._c_repr_chunks_mul,
+            "DivF": self._c_repr_chunks_div,
+            "CmpLEF": self._c_repr_chunks_cmple,
+            "CmpLTF": self._c_repr_chunks_cmplt,
+            "CmpGTF": self._c_repr_chunks_cmpgt,
+            "CmpGEF": self._c_repr_chunks_cmpge,
+            "CmpEQF": self._c_repr_chunks_cmpeq,
+            "CmpNEF": self._c_repr_chunks_cmpne,
             "Concat": self._c_repr_chunks_concat,
             "Rol": self._c_repr_chunks_rol,
             "Ror": self._c_repr_chunks_ror,
@@ -5759,10 +5789,10 @@ class GoStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializa
 
         if expr.op == "CmpUN":
             return self._unordered(expr)
-        if expr.floating_point and expr.op in {"CmpEQ", "CmpNE"} and expr.operands[0].likes(expr.operands[1]):
+        if expr.op in {"CmpEQF", "CmpNEF"} and expr.operands[0].likes(expr.operands[1]):
             # the self-compare is the NaN test
             isnan = self._math_call("IsNaN", expr.operands[0], expr.tags)
-            return isnan if expr.op == "CmpNE" else GoUnaryOp("Not", isnan, tags=expr.tags, codegen=self)
+            return isnan if expr.op == "CmpNEF" else GoUnaryOp("Not", isnan, tags=expr.tags, codegen=self)
         if expr.op == "Round" and (round_op := _go_round_unop(expr.operands[0])) is not None:
             return self._math_call(round_op, expr.operands[1], expr.tags)
 
@@ -5797,7 +5827,7 @@ class GoStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializa
             codegen=self,
             collapsed=expr.depth > self.binop_depth_cutoff,
         )
-        if expr.op in {"Div", "Mod"}:
+        if expr.op in {"Div", "Mod", "DivF"}:
             r.signed = expr.signed
         return r
 

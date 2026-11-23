@@ -193,7 +193,20 @@ class BooleanNaming(ClinicNamingBase):
     @staticmethod
     def _is_comparison_op(op: str) -> bool:
         """Check if an operation is a comparison."""
-        comparison_ops = {"CmpEQ", "CmpNE", "CmpLT", "CmpLE", "CmpGT", "CmpGE"}
+        comparison_ops = {
+            "CmpEQ",
+            "CmpNE",
+            "CmpLT",
+            "CmpLE",
+            "CmpGT",
+            "CmpGE",
+            "CmpEQF",
+            "CmpNEF",
+            "CmpLTF",
+            "CmpLEF",
+            "CmpGTF",
+            "CmpGEF",
+        }
         return op in comparison_ops
 
     def _init_candidate(self, var: SimVariable) -> None:

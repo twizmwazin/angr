@@ -1800,6 +1800,10 @@ class CAssignment(CStatement):
             "Sub": "-",
             "Mul": "*",
             "Div": "/",
+            "AddF": "+",
+            "SubF": "-",
+            "MulF": "*",
+            "DivF": "/",
             "And": "&",
             "Xor": "^",
             "Or": "|",
@@ -1807,7 +1811,7 @@ class CAssignment(CStatement):
             "Shl": "<<",
             "Sar": ">>",
         }
-        commutative_ops = {"Add", "Mul", "And", "Xor", "Or"}
+        commutative_ops = {"Add", "Mul", "AddF", "MulF", "And", "Xor", "Or"}
 
         compound_expr_rhs = None
         if (
@@ -2377,12 +2381,14 @@ class CUnaryOp(CExpression, UnaryOpNode):
         OP_MAP = {
             "Not": self._c_repr_chunks_not,
             "Neg": self._c_repr_chunks_neg,
+            "NegF": self._c_repr_chunks_neg,
             "BitwiseNeg": self._c_repr_chunks_bitwiseneg,
             "Reference": self._c_repr_chunks_reference,
             "Dereference": self._c_repr_chunks_dereference,
             "Clz": self._c_repr_chunks_clz,
             "ClzNat": self._c_repr_chunks_clz,  # libVEX 3.27+ name for the zero-defined scalar Clz
             "Abs": self._c_repr_chunks_libm,
+            "AbsF": self._c_repr_chunks_libm,
             "Sqrt": self._c_repr_chunks_libm,
             "Sin": self._c_repr_chunks_libm,
             "Cos": self._c_repr_chunks_libm,
@@ -2411,6 +2417,7 @@ class CUnaryOp(CExpression, UnaryOpNode):
     # libm function per AIL op; the "f" variant is picked for float-typed operands
     _LIBM_FUNCS = {
         "Abs": "fabs",
+        "AbsF": "fabs",
         "Sqrt": "sqrt",
         "Sin": "sin",
         "Cos": "cos",
@@ -2505,7 +2512,27 @@ class CUnaryOp(CExpression, UnaryOpNode):
 
 
 _NON_ASSOCIATIVE_OPS = frozenset(
-    {"Sub", "Div", "Shl", "Shr", "Sar", "CmpEQ", "CmpNE", "CmpLE", "CmpLT", "CmpGT", "CmpGE"}
+    {
+        "Sub",
+        "Div",
+        "Shl",
+        "Shr",
+        "Sar",
+        "CmpEQ",
+        "CmpNE",
+        "CmpLE",
+        "CmpLT",
+        "CmpGT",
+        "CmpGE",
+        "SubF",
+        "DivF",
+        "CmpEQF",
+        "CmpNEF",
+        "CmpLEF",
+        "CmpLTF",
+        "CmpGTF",
+        "CmpGEF",
+    }
 )
 
 
@@ -2614,11 +2641,11 @@ class CBinaryOp(CExpression, BinaryOpNode):
             ["Or"],
             ["Xor"],
             ["And"],
-            ["CmpEQ", "CmpNE"],
-            ["CmpLE", "CmpLT", "CmpGT", "CmpGE"],
+            ["CmpEQ", "CmpNE", "CmpEQF", "CmpNEF"],
+            ["CmpLE", "CmpLT", "CmpGT", "CmpGE", "CmpLEF", "CmpLTF", "CmpGTF", "CmpGEF"],
             ["Shl", "Shr", "Sar"],
-            ["Add", "Sub"],
-            ["Mul", "Div"],
+            ["Add", "Sub", "AddF", "SubF"],
+            ["Mul", "Div", "MulF", "DivF"],
             ["SBorrow", "SCarry", "Carry"],
             # highest precedence
         ]
@@ -2658,6 +2685,16 @@ class CBinaryOp(CExpression, BinaryOpNode):
             "CmpGEs": self._c_repr_chunks_cmpge,
             "CmpEQ": self._c_repr_chunks_cmpeq,
             "CmpNE": self._c_repr_chunks_cmpne,
+            "AddF": self._c_repr_chunks_add,
+            "SubF": self._c_repr_chunks_sub,
+            "MulF": self._c_repr_chunks_mul,
+            "DivF": self._c_repr_chunks_div,
+            "CmpLEF": self._c_repr_chunks_cmple,
+            "CmpLTF": self._c_repr_chunks_cmplt,
+            "CmpGTF": self._c_repr_chunks_cmpgt,
+            "CmpGEF": self._c_repr_chunks_cmpge,
+            "CmpEQF": self._c_repr_chunks_cmpeq,
+            "CmpNEF": self._c_repr_chunks_cmpne,
             "Concat": self._c_repr_chunks_concat,
             "Rol": self._c_repr_chunks_rol,
             "Ror": self._c_repr_chunks_ror,
@@ -2930,9 +2967,9 @@ def prefix_unary_operand_needs_parens(operand: CExpression, op: str) -> bool:
     -(-x) and ~(~x) keep their parentheses.
     Everything else (binops or an expression class with no known precedence) keeps parentheses.
     """
-    if isinstance(operand, CUnaryOp) and operand.op == op and op in {"Neg", "BitwiseNeg"}:
+    if isinstance(operand, CUnaryOp) and operand.op == op and op in {"Neg", "NegF", "BitwiseNeg"}:
         return True
-    if op == "Neg" and isinstance(operand, CConstant):
+    if op in {"Neg", "NegF"} and isinstance(operand, CConstant):
         return True
     return not isinstance(
         operand,
@@ -5639,7 +5676,7 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
         if expr.op == "Reference" and isinstance(operand, CUnaryOp) and operand.op == "Dereference":
             # cancel out
             return operand.operand
-        if expr.op in {"Neg", "Not"} and not expr.floating_point:
+        if expr.op in {"Neg", "Not"}:
             operand = self._fp_operand_bits(operand, expr.operand.bits)
         return CUnaryOp(
             expr.op,
@@ -5707,10 +5744,10 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
         if sse is not None:
             return sse
 
-        if expr.floating_point and expr.op in {"CmpEQ", "CmpNE"} and expr.operands[0].likes(expr.operands[1]):
+        if expr.op in {"CmpEQF", "CmpNEF"} and expr.operands[0].likes(expr.operands[1]):
             # the self-compare is the NaN test
             isnan = self._handle(Expr.Call(expr.idx, "isnan", args=[expr.operands[0]], bits=expr.bits, **expr.tags))
-            if expr.op == "CmpNE":
+            if expr.op == "CmpNEF":
                 return isnan
             return CUnaryOp("Not", isnan, tags=expr.tags, codegen=self)
 
@@ -5719,7 +5756,7 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
             if round_op is not None:
                 return CUnaryOp(round_op, self._handle(expr.operands[1]), tags=expr.tags, codegen=self)
 
-        if expr.floating_point and expr.vector_count is None:
+        if expr.op in Expr.FLOAT_OPS and expr.vector_count is None:
             # an FP operation reads its operands as FP values of their own width; constants keep _fp_constant
             lhs = self._handle(expr.operands[0], type_=self._fp_operand_type(expr.operands[0]))
             rhs_type = None if expr.op == "Scale" else self._fp_operand_type(expr.operands[1])
@@ -5728,7 +5765,7 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
             lhs = self._handle(expr.operands[0])
             rhs = self._handle(expr.operands[1], likely_signed=expr.op not in {"And", "Or"})
 
-        if expr.floating_point:
+        if expr.op in Expr.FLOAT_OPS:
             scalar = expr.vector_count is None
             lhs = self._fp_view_of_int_lvalue(self._fp_constant(lhs, expr.operands[0], scalar), expr.operands[0].bits)
             if expr.op != "Scale":  # ldexp's exponent operand is an integer
@@ -5741,7 +5778,7 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
             rhs = self._fp_operand_bits(rhs, expr.operands[1].bits)
 
         cmp_signed = None
-        if expr.op in _ORDER_CMP_OPS and not expr.floating_point:
+        if expr.op in _ORDER_CMP_OPS:
             cmp_signed = expr.signed
             bits = expr.operands[0].bits
             lhs = self._compare_operand(lhs, bits, cmp_signed)
@@ -5799,7 +5836,12 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
         child = self._handle(expr.operand)
         if expr.from_type == Expr.ConvertType.TYPE_FP:
             child = self._fp_view_of_int_lvalue(child, expr.operand.bits)
-        if expr.from_bits == 1 and expr.to_bits > 1 and isinstance(child, CBinaryOp) and child.op == "CmpNE":
+        if (
+            expr.from_bits == 1
+            and expr.to_bits > 1
+            and isinstance(child, CBinaryOp)
+            and child.op in {"CmpNE", "CmpNEF"}
+        ):
             # a bool used as an integer value: `x != 0` must not be shortened to `x`
             child._cstyle_null_cmp = False
 

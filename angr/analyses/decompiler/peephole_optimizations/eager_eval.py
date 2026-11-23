@@ -3,7 +3,7 @@ from __future__ import annotations
 from math import gcd
 
 from angr.ailment import ExpressionKind
-from angr.ailment.expression import ITE, BinaryOp, Const, Convert, StackBaseOffset, UnaryOp
+from angr.ailment.expression import FLOAT_OPS, ITE, BinaryOp, Const, Convert, StackBaseOffset, UnaryOp
 from angr.utils.bits import sign_extend
 
 from .base import PeepholeOptimizationExprBase
@@ -41,7 +41,7 @@ class EagerEvaluation(PeepholeOptimizationExprBase):
 
     def _optimize_binaryop(self, expr: BinaryOp):
         # The identities below assume integer arithmetic and are not generally valid under IEEE 754.
-        if expr.floating_point:
+        if expr.op in FLOAT_OPS:
             return None
 
         op0, op1 = expr.operands
@@ -102,9 +102,6 @@ class EagerEvaluation(PeepholeOptimizationExprBase):
             if op0.likes(op1):
                 # x + x => 2 * x
                 # the Mul takes over expr.idx; VariableMap keys variables by idx, so the new constant needs its own
-                if expr.floating_point:
-                    count = Const(self.manager.next_atom(), 2.0, op0.bits, **expr.tags)
-                    return BinaryOp(expr.idx, "Mul", [op0, count], expr.signed, floating_point=True, **expr.tags)
                 count = Const(self.manager.next_atom(), 2, op0.bits, **expr.tags)
                 return BinaryOp(expr.idx, "Mul", [op0, count], expr.signed, **expr.tags)
 
@@ -263,7 +260,6 @@ class EagerEvaluation(PeepholeOptimizationExprBase):
             and op1.is_int
             and isinstance(op0, BinaryOp)
             and op0.op == "Mul"
-            and not op0.floating_point
             and isinstance(op0.operands[1], Const)
             and op0.operands[1].is_int
         ):

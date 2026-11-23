@@ -4,12 +4,28 @@ from __future__ import annotations
 import math
 import struct
 
-from angr.ailment.expression import BinaryOp, Call, Const, Convert, Insert, Reinterpret, UnaryOp
+from angr.ailment.expression import FLOAT_OPS, BinaryOp, Call, Const, Convert, Insert, Reinterpret, UnaryOp
 from angr.ailment.utils import is_lsb_overwrite
 from angr.analyses.decompiler.variable_map import variable_map_of
 from angr.sim_type import SimTypeFloat
 
 from .base import PeepholeOptimizationExprBase
+
+# the float comparison a comparison of a floating-point Convert stands for
+_FP_CMP_OPS: dict[str, str] = {
+    "CmpEQ": "CmpEQF",
+    "CmpNE": "CmpNEF",
+    "CmpLT": "CmpLTF",
+    "CmpLE": "CmpLEF",
+    "CmpGT": "CmpGTF",
+    "CmpGE": "CmpGEF",
+    "CmpEQF": "CmpEQF",
+    "CmpNEF": "CmpNEF",
+    "CmpLTF": "CmpLTF",
+    "CmpLEF": "CmpLEF",
+    "CmpGTF": "CmpGTF",
+    "CmpGEF": "CmpGEF",
+}
 
 _FP_WIDTHS = frozenset((32, 64, 80))
 
@@ -70,6 +86,22 @@ class RemoveRedundantConversions(PeepholeOptimizationExprBase):
                             **expr.operands[0].tags,
                         )
 
+                elif expr.op in _FP_CMP_OPS and (
+                    expr.operands[0].from_type == Convert.TYPE_FP or expr.operands[0].to_type == Convert.TYPE_FP
+                ):
+                    # Conv(32F->64F, x) == c compares as a float iff c is a float
+                    con = self._narrowed_fp_const(expr.operands[1], from_bits, to_bits)
+                    if con is None:
+                        return None
+                    return BinaryOp(
+                        expr.idx,
+                        _FP_CMP_OPS[expr.op],
+                        (expr.operands[0].operand, con),
+                        expr.signed,
+                        bits=1,
+                        **expr.tags,
+                    )
+
                 elif expr.op in {
                     "CmpEQ",
                     "CmpNE",
@@ -82,20 +114,6 @@ class RemoveRedundantConversions(PeepholeOptimizationExprBase):
                     "CmpLTs",
                     "CmpLEs",
                 }:
-                    if expr.operands[0].from_type == Convert.TYPE_FP or expr.operands[0].to_type == Convert.TYPE_FP:
-                        # Conv(32F->64F, x) == c compares as a float iff c is a float
-                        con = self._narrowed_fp_const(expr.operands[1], from_bits, to_bits)
-                        if con is None:
-                            return None
-                        return BinaryOp(
-                            expr.idx,
-                            expr.op,
-                            (expr.operands[0].operand, con),
-                            expr.signed,
-                            bits=1,
-                            floating_point=True,
-                            **expr.tags,
-                        )
                     if 0 <= expr.operands[1].value <= ((1 << from_bits) - 1) or (
                         expr.operands[0].is_signed and expr.operands[1].value >= (1 << to_bits) - (1 << (from_bits - 1))
                     ):
@@ -108,7 +126,6 @@ class RemoveRedundantConversions(PeepholeOptimizationExprBase):
                             (expr.operands[0].operand, con),
                             expr.signed,
                             bits=1,
-                            floating_point=expr.floating_point,
                             **expr.tags,
                         )
 
@@ -265,11 +282,10 @@ class RemoveRedundantConversions(PeepholeOptimizationExprBase):
                     operand_expr.op,
                     inner_conv.operand,
                     bits=expr.to_bits,
-                    floating_point=operand_expr.floating_point,
                     ins_addr=operand_expr.tags.get("ins_addr"),
                 )
         if isinstance(operand_expr, BinaryOp) and not (
-            operand_expr.floating_point and expr.from_type == Convert.TYPE_INT
+            operand_expr.op in FLOAT_OPS and expr.from_type == Convert.TYPE_INT
         ):
             # (an integer truncation of an FP result extracts bits; none of the integer identities below apply)
             if operand_expr.op in {
@@ -280,6 +296,10 @@ class RemoveRedundantConversions(PeepholeOptimizationExprBase):
                 "Mod",
                 "Add",
                 "Sub",
+                "MulF",
+                "DivF",
+                "AddF",
+                "SubF",
             }:
                 op0, op1 = operand_expr.operands
                 if (

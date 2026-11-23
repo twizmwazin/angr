@@ -11,13 +11,29 @@ from .base import PeepholeOptimizationExprBase
 #
 #   Extract(ShrNV(x, 52), 16@0)        ->  Extract(Shr(lane0(x), 52), 16@0)      (psrlq + pextrw: exponent bits)
 #   Conv(128->64, SubV(a, b))          ->  Sub(lane0(a), lane0(b))               (psubq)
+#   Conv(128->64, SubFV(a, b))         ->  SubF(lane0(a), lane0(b))              (subpd)
 #   Extract(CmpEQV(a, b), 64@0)        ->  ITE(lane0(a) == lane0(b), -1, 0)      (pcmpeqq / cmpeqsd)
 #   Extract(ConvV(32->s32Fx4, x), 32@0) ->  Conv(32->s32F, lane0(x))             (movd + cvtdq2ps)
 
 _SHIFT_OPS: dict[str, str] = {"ShlN": "Shl", "ShrN": "Shr", "SarN": "Sar"}
-_ARITH_OPS: frozenset[str] = frozenset({"Add", "Sub", "Mul", "Div"})
-_FP_MINMAX_OPS: dict[str, str] = {"Max": "MaxF", "Min": "MinF"}
-_CMP_OPS: frozenset[str] = frozenset({"CmpEQ", "CmpNE", "CmpLT", "CmpLE", "CmpGT", "CmpGE"})
+_ARITH_OPS: frozenset[str] = frozenset({"Add", "Sub", "Mul", "Div", "AddF", "SubF", "MulF", "DivF"})
+_FP_MINMAX_OPS: frozenset[str] = frozenset({"MaxF", "MinF"})
+_CMP_OPS: frozenset[str] = frozenset(
+    {
+        "CmpEQ",
+        "CmpNE",
+        "CmpLT",
+        "CmpLE",
+        "CmpGT",
+        "CmpGE",
+        "CmpEQF",
+        "CmpNEF",
+        "CmpLTF",
+        "CmpLEF",
+        "CmpGTF",
+        "CmpGEF",
+    }
+)
 
 
 def lane0(expr: Expression, lane_bits: int, manager: Manager) -> Expression:
@@ -98,19 +114,17 @@ def lower_lane0(expr: BinaryOp | Convert, manager: Manager) -> Expression | None
             [lane0(lhs, lane, manager), lane0(rhs, lane, manager)],
             expr.signed,
             bits=lane,
-            floating_point=expr.floating_point,
             rounding_mode=expr.rounding_mode,
             **expr.tags,
         )
 
-    if generic in _FP_MINMAX_OPS and expr.floating_point:
+    if generic in _FP_MINMAX_OPS:
         return BinaryOp(
             expr.idx,
-            _FP_MINMAX_OPS[generic],
+            generic,
             [lane0(lhs, lane, manager), lane0(rhs, lane, manager)],
             False,
             bits=lane,
-            floating_point=True,
             **expr.tags,
         )
 
@@ -122,7 +136,6 @@ def lower_lane0(expr: BinaryOp | Convert, manager: Manager) -> Expression | None
             [lane0(lhs, lane, manager), lane0(rhs, lane, manager)],
             expr.signed,
             bits=1,
-            floating_point=expr.floating_point,
             **expr.tags,
         )
         ones = Const(manager.next_atom(), (1 << lane) - 1, lane)
