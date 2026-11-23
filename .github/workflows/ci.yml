@@ -13,14 +13,28 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
       - shell: bash
         run: |
-          git clone https://github.com/angr/pyvex.git pv
+          git -c core.autocrlf=false clone https://github.com/angr/pyvex.git pv
           cd pv
           git checkout 6a81d15f490795522aeebb7e1786bb60c5ca2ec1
-          git submodule update --init --recursive
-          cl 2>&1 | head -2
+          git -c core.autocrlf=false submodule update --init --recursive
           cl //nologo //DAVX_512 //Ivex/pub vex/auxprogs/genoffsets.c //Fegenoffsets.exe
           ./genoffsets.exe > vex/pub/libvex_guest_offsets.h
           mkdir -p pyvex/include && cp pyvex_c/pyvex.h pyvex/include/
-          grep -oE 'vex/priv/[A-Za-z0-9_/.-]+\.c' CMakeLists.txt > srcs.txt
-          wc -l srcs.txt
           python ../.github/ice_bisect.py
+          rm -f vex/priv/guest_s390__v.c vex/pub/libvex_guest_offsets.h genoffsets.* tmp.obj
+          rm -rf pyvex/include
+          git status --short
+          git apply --ignore-whitespace ../.github/pyvex-msvc.patch
+          git diff --stat
+          python -m venv ../venv
+          ../venv/Scripts/python -m pip install -q git+https://github.com/angr/archinfo.git
+          ../venv/Scripts/python -m pip install -v . 2>&1 | grep -E "compiler identification|guest_s390_toIR|bad size|error|Successfully" | head -40
+          cd ..
+          venv/Scripts/python -c "
+          import pyvex, archinfo
+          print(pyvex.__version__)
+          pyvex.lift(bytes.fromhex('4889d8c3'), 0x1000, archinfo.ArchAMD64()).pp()
+          # EX r1,0(r2) then BR r14
+          pyvex.lift(bytes.fromhex('4410200007fe'), 0x1000, archinfo.ArchS390X()).pp()
+          print('LIFT OK')
+          "

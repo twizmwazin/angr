@@ -1,0 +1,15 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index b4dd433..f99b24a 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -200,3 +200,10 @@ add_dependencies(pyvex copy_headers)
+ add_dependencies(vex copy_headers)
+ add_dependencies(copy_headers generate_offsets_header)
+ # --- END: Copy headers to pyvex/include ---
++
++# MSVC 19.52 (Visual Studio 2026) hits an internal compiler error ("base type 2
++# bad size 7") in s390_irgen_EX when it inlines the s390 decoder at /Ob2.
++# Limit inlining for that one file.
++if (MSVC)
++    set_source_files_properties(vex/priv/guest_s390_toIR.c PROPERTIES COMPILE_OPTIONS "/Ob1")
++endif()
