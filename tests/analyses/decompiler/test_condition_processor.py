@@ -18,6 +18,7 @@ from angr.ailment.expression import (
     Extract,
     Load,
     StackBaseOffset,
+    UnaryOp,
     VirtualVariable,
     VirtualVariableCategory,
 )
@@ -25,6 +26,7 @@ from angr.analyses.decompiler import condition_processor as cp_mod
 from angr.analyses.decompiler.condition_processor import ConditionProcessor
 from angr.analyses.decompiler.structurer_nodes import ConditionNode, SequenceNode
 from angr.analyses.decompiler.utils import peephole_optimize_expr
+from angr.rustylib.ailment import RoundingMode
 from tests.common import bin_location
 
 
@@ -106,6 +108,50 @@ class TestConditionProcessor(TestCase):
         x, y = _vvar(8, 80, 32), _vvar(9, 80, 48)
         wide = BinaryOp(10, "CmpLTF", [x, y], False, bits=1)
         assert cp.convert_claripy_bool_ast(cp.claripy_ast_from_ail_condition(wide)).likes(wide)
+
+    def test_float_arithmetic_round_trips_through_claripy_float_ops(self):
+        arch = archinfo.ArchAMD64()
+        cp = ConditionProcessor(arch, ailment.Manager())
+        a, b, c = _vvar(1, 64, 16), _vvar(2, 64, 24), _vvar(3, 64, 32)
+        rtz = RoundingMode.RM_TowardsZero
+
+        for op, claripy_op in (("AddF", "fpAdd"), ("SubF", "fpSub"), ("MulF", "fpMul"), ("DivF", "fpDiv")):
+            expr = BinaryOp(4, op, [a, b], True, bits=64, rounding_mode=rtz)
+            ast = cp.claripy_ast_from_ail_condition(expr)
+            # the value is the bit pattern of the claripy float operation
+            assert isinstance(ast, claripy.ast.BV) and ast.size() == 64
+            assert ast.op == "fpToIEEEBV" and ast.args[0].op == claripy_op, ast
+            assert ast.args[0].args[2] == claripy.fp.RM.RM_TowardsZero
+            assert cp.convert_claripy_bool_ast(ast) == expr
+        for op, claripy_op in (("NegF", "fpNeg"), ("AbsF", "fpAbs")):
+            expr = UnaryOp(5, op, a, bits=64)
+            ast = cp.claripy_ast_from_ail_condition(expr)
+            assert ast.op == "fpToIEEEBV" and ast.args[0].op == claripy_op, ast
+            assert cp.convert_claripy_bool_ast(ast) == expr
+
+        # arithmetic under a comparison nests as claripy float operations, and an operation without a rounding mode
+        # comes back without one
+        add = BinaryOp(6, "AddF", [a, b], False, bits=64)
+        cond = BinaryOp(7, "CmpLTF", [add, c], False, bits=1)
+        ast = cp.claripy_ast_from_ail_condition(cond)
+        assert ast.op == "fpLT" and ast.args[0].op == "fpAdd", ast
+        back = cp.convert_claripy_bool_ast(ast)
+        assert isinstance(back, BinaryOp) and back.op == "CmpLTF" and back.operands[0] == add
+
+        # an operation claripy builds itself is rebuilt with its operands and rounding mode
+        built = claripy.fpMul(claripy.fp.RM.RM_TowardsZero, ast.args[0], ast.args[1]).raw_to_bv()
+        rebuilt = cp.convert_claripy_bool_ast(built)
+        assert isinstance(rebuilt, BinaryOp) and rebuilt.op == "MulF" and rebuilt.bits == 64
+        assert rebuilt.rounding_mode == rtz
+        assert rebuilt.operands[0] == add and rebuilt.operands[1].likes(c)
+
+        # a rounding mode only known at run time, and a width claripy has no float sort for, stay opaque
+        dynamic = BinaryOp(8, "AddF", [a, b], False, bits=64, rounding_mode=_vvar(9, 32, 40))
+        wide = BinaryOp(10, "AddF", [_vvar(11, 80, 48), _vvar(12, 80, 64)], False, bits=80)
+        for expr in (dynamic, wide):
+            ast = cp.claripy_ast_from_ail_condition(expr)
+            assert ast.op == "BVS", ast
+            assert cp.convert_claripy_bool_ast(ast) == expr
 
     def test_bitwise_op_on_one_bit_operands_round_trips(self):
         # a 1-bit operand of a bitwise op must stay a bit-vector; as a Bool, claripy coerces it into If(b, 1, 0),
