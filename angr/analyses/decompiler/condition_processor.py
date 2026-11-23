@@ -90,10 +90,9 @@ def _dummy_bools(condition, condition_mapping, name_suffix=""):
 
 
 _BITWISE_OPS = frozenset({"And", "Or", "Xor"})
-_FP_FLAGGED_OPS = frozenset({"CmpEQ", "CmpNE", "CmpLT", "CmpLE", "CmpGT", "CmpGE", "Add", "Sub", "Mul", "Div"})
-_CLARIPY_CMP_OPS = frozenset(
-    {"__eq__", "__ne__", "__lt__", "__le__", "__gt__", "__ge__", "SLT", "SLE", "SGT", "SGE", "ULT", "ULE", "UGT", "UGE"}
-)
+_FP_FLAGGED_OPS = frozenset({"Add", "Sub", "Mul", "Div"})
+# widths claripy has a floating-point sort for
+_CLARIPY_FP_BITS = frozenset({32, 64})
 
 
 def _cmp_with_unified_size(op: Callable) -> Callable:
@@ -104,18 +103,8 @@ def _cmp_with_unified_size(op: Callable) -> Callable:
     """
 
     def _cmp(expr, conv: Callable, m, ins_addr: int, *args):  # pylint:disable=unused-argument
-        if expr.floating_point and expr.operands[0].likes(expr.operands[1]):
-            # x != x is the NaN test; claripy would fold it to a constant
-            return _dummy_bools(expr, m)
-        operands = []
-        for operand in expr.operands:
-            if expr.floating_point and isinstance(operand, ailment.Expr.BinaryOp) and operand.op in _BITWISE_OPS:
-                # bit operations on an FP compare operand (fabs as x & 0x7fff...) must stay opaque: claripy would
-                # simplify them into integer extracts and the compare would lose its FP meaning
-                operands.append(_dummy_bvs(operand, m))
-            else:
-                operands.append(conv(operand, nobool=True, ins_addr=ins_addr))
-        operand0, operand1 = operands
+        operand0 = conv(expr.operands[0], nobool=True, ins_addr=ins_addr)
+        operand1 = conv(expr.operands[1], nobool=True, ins_addr=ins_addr)
         if isinstance(operand0, claripy.ast.BV) and isinstance(operand1, claripy.ast.BV):
             size0, size1 = operand0.size(), operand1.size()
             if size1 < size0:
@@ -127,6 +116,61 @@ def _cmp_with_unified_size(op: Callable) -> Callable:
     return _cmp
 
 
+def _fp_view(operand, conv: Callable, m, ins_addr: int) -> claripy.ast.FP | None:
+    """
+    The operand of a floating-point operation as a claripy float. AIL values are bit-vectors, so the operand is
+    viewed as a float of its width. None when claripy cannot express it.
+    """
+    if operand.bits not in _CLARIPY_FP_BITS:
+        # claripy has no floating-point sort of this width (x87 extended precision, binary128)
+        return None
+    if isinstance(operand, ailment.Expr.BinaryOp) and operand.op in _BITWISE_OPS:
+        # bit operations on an FP operand (fabs as x & 0x7fff...) must stay opaque: claripy would simplify them into
+        # integer extracts
+        bv = _dummy_bvs(operand, m)
+    else:
+        bv = conv(operand, nobool=True, ins_addr=ins_addr)
+    if not isinstance(bv, claripy.ast.BV) or bv.size() != operand.bits:
+        return None
+    return bv.raw_to_fp()
+
+
+def _is_fp_const(fp: claripy.ast.FP) -> bool:
+    return fp.op == "FPV" or (fp.op == "bvToFP" and fp.args[0].op == "BVV")
+
+
+def _fp_cmp(op: Callable, symmetric: bool = False) -> Callable:
+    """
+    Build the conversion of a floating-point comparison into the claripy floating-point comparison ``op``. A
+    ``symmetric`` comparison gets its constant operand on the right, as claripy does for integer equalities.
+    """
+
+    def _cmp(expr, conv: Callable, m, ins_addr: int, *args):  # pylint:disable=unused-argument
+        lhs, rhs = expr.operands
+        if lhs.likes(rhs):
+            # x != x is the NaN test; keep it as written
+            return _dummy_bools(expr, m)
+        if lhs.bits != rhs.bits:
+            return _dummy_bools(expr, m)
+        operands = [_fp_view(operand, conv, m, ins_addr) for operand in (lhs, rhs)]
+        if operands[0] is None or operands[1] is None:
+            return _dummy_bools(expr, m)
+        if symmetric and _is_fp_const(operands[0]) and not _is_fp_const(operands[1]):
+            operands.reverse()
+        return op(*operands)
+
+    return _cmp
+
+
+def _int_or_fp_cmp(int_cmp: Callable, fp_cmp: Callable) -> Callable:
+    """The conversion of a comparison that is an integer or a floating-point one by its ``floating_point`` flag."""
+
+    def _cmp(expr, *args):
+        return (fp_cmp if expr.floating_point else int_cmp)(expr, *args)
+
+    return _cmp
+
+
 _ail2claripy_op_mapping = {
     "LogicalAnd": lambda expr, conv, _, ia, *args: claripy.And(
         conv(expr.operands[0], ins_addr=ia), conv(expr.operands[1], ins_addr=ia)
@@ -134,15 +178,18 @@ _ail2claripy_op_mapping = {
     "LogicalOr": lambda expr, conv, _, ia, *args: claripy.Or(
         conv(expr.operands[0], ins_addr=ia), conv(expr.operands[1], ins_addr=ia)
     ),
-    "CmpEQ": _cmp_with_unified_size(operator.eq),
-    "CmpNE": _cmp_with_unified_size(operator.ne),
-    "CmpLE": _cmp_with_unified_size(operator.le),
+    # a floating-point comparison never carries the signedness suffix
+    "CmpEQ": _int_or_fp_cmp(_cmp_with_unified_size(operator.eq), _fp_cmp(claripy.fpEQ, symmetric=True)),
+    "CmpNE": _int_or_fp_cmp(
+        _cmp_with_unified_size(operator.ne), _fp_cmp(lambda a, b: claripy.Not(claripy.fpEQ(a, b)), symmetric=True)
+    ),
+    "CmpLE": _int_or_fp_cmp(_cmp_with_unified_size(operator.le), _fp_cmp(claripy.fpLEQ)),
     "CmpLEs": _cmp_with_unified_size(claripy.SLE),
-    "CmpLT": _cmp_with_unified_size(operator.lt),
+    "CmpLT": _int_or_fp_cmp(_cmp_with_unified_size(operator.lt), _fp_cmp(claripy.fpLT)),
     "CmpLTs": _cmp_with_unified_size(claripy.SLT),
-    "CmpGE": _cmp_with_unified_size(operator.ge),
+    "CmpGE": _int_or_fp_cmp(_cmp_with_unified_size(operator.ge), _fp_cmp(claripy.fpGEQ)),
     "CmpGEs": _cmp_with_unified_size(claripy.SGE),
-    "CmpGT": _cmp_with_unified_size(operator.gt),
+    "CmpGT": _int_or_fp_cmp(_cmp_with_unified_size(operator.gt), _fp_cmp(claripy.fpGT)),
     "CmpGTs": _cmp_with_unified_size(claripy.SGT),
     "CasCmpEQ": _cmp_with_unified_size(operator.eq),
     "CasCmpNE": _cmp_with_unified_size(operator.ne),
@@ -917,7 +964,33 @@ class ConditionProcessor:
                     )
             return _binary_op_reduce(op, cond_.args, tags)
 
+        def _fp_value(arg, tags):
+            # the AIL expression (a bit-vector) of a claripy float
+            if arg.op == "bvToFP":
+                return self.convert_claripy_bool_ast(arg.args[0])
+            if arg.op == "FPV":
+                return ailment.Expr.Const(self.ail_manager.next_atom(), arg.args[0], arg.size(), **tags)
+            raise NotImplementedError(
+                f"Floating-point value {arg} has an unsupported operator {arg.op}. Consider implementing."
+            )
+
+        def _fp_cmp_reduce(op, cond_, tags):
+            lhs, rhs = cond_.args
+            return ailment.Expr.BinaryOp(
+                self.ail_manager.next_atom(),
+                op,
+                (_fp_value(lhs, tags), _fp_value(rhs, tags)),
+                False,
+                floating_point=True,
+                **tags,
+            )
+
         _mapping = {
+            "fpEQ": lambda cond_, tags: _fp_cmp_reduce("CmpEQ", cond_, tags),
+            "fpLT": lambda cond_, tags: _fp_cmp_reduce("CmpLT", cond_, tags),
+            "fpLEQ": lambda cond_, tags: _fp_cmp_reduce("CmpLE", cond_, tags),
+            "fpGT": lambda cond_, tags: _fp_cmp_reduce("CmpGT", cond_, tags),
+            "fpGEQ": lambda cond_, tags: _fp_cmp_reduce("CmpGE", cond_, tags),
             "Not": lambda cond_, tags: _unary_op_reduce("Not", cond_.args[0], tags),
             "__neg__": lambda cond_, tags: _unary_op_reduce("Neg", cond_.args[0], tags),
             "__invert__": lambda cond_, tags: _unary_op_reduce("BitwiseNeg", cond_.args[0], tags),
@@ -970,11 +1043,6 @@ class ConditionProcessor:
                 cond_tags = self._ast2annotations[claripy.Not(cond)]
             else:
                 cond_tags = {}
-            if cond_tags.get("floating_point") is not True and cond.op in _CLARIPY_CMP_OPS:
-                # a comparison claripy derived by negating an FP comparison is an FP comparison too
-                negated_tags = self._ast2annotations.get(claripy.Not(cond))
-                if negated_tags is not None and negated_tags.get("floating_point") is True:
-                    cond_tags = {**cond_tags, "floating_point": True}
             if cond_tags.get("floating_point") is True:
                 # claripy has no FP flavor of these operators; restore the flag on the rebuilt expression
                 cond_tags = {k: v for k, v in cond_tags.items() if k != "floating_point"}
@@ -1151,13 +1219,13 @@ class ConditionProcessor:
             else:
                 r = claripy.BVS(f"ailexpr_{condition!r}", condition.bits, explicit_name=True)
             self._condition_mapping[r.args[0]] = condition
-        # don't lose tags, nor the floating-point flag of an FP comparison (claripy folds !(a == b) into a != b,
-        # so the negation of an FP comparison annotates that comparison)
+        # don't lose tags, nor the floating-point flag of FP arithmetic, which converts like integer arithmetic
         tags = condition.tags
-        fp_source = condition
-        if isinstance(condition, ailment.Expr.UnaryOp) and condition.op == "Not":
-            fp_source = condition.operand
-        if isinstance(fp_source, (ailment.Expr.BinaryOp, ailment.Expr.UnaryOp)) and fp_source.floating_point:
+        if (
+            isinstance(condition, ailment.Expr.BinaryOp)
+            and condition.op in _FP_FLAGGED_OPS
+            and condition.floating_point
+        ):
             tags = {**tags, "floating_point": True}
         self._ast2annotations[r] = tags
 

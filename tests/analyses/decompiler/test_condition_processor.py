@@ -76,6 +76,41 @@ class TestConditionProcessor(TestCase):
             ast = cp.claripy_ast_from_ail_condition(expr)
             assert isinstance(ast, claripy.ast.BV) and ast.size() == 64
 
+    def test_float_comparison_round_trips_through_claripy_float_ops(self):
+        arch = archinfo.ArchAMD64()
+        cp = ConditionProcessor(arch, ailment.Manager())
+        a, b = _vvar(1, 64, 16), _vvar(2, 64, 24)
+
+        def fp_cmp(idx, op, lhs, rhs):
+            return BinaryOp(idx, op, [lhs, rhs], False, bits=1, floating_point=True)
+
+        for op, claripy_op in (("CmpLT", "fpLT"), ("CmpLE", "fpLEQ"), ("CmpGT", "fpGT"), ("CmpGE", "fpGEQ")):
+            ast = cp.claripy_ast_from_ail_condition(fp_cmp(3, op, a, b))
+            assert ast.op == claripy_op, ast
+            back = cp.convert_claripy_bool_ast(ast)
+            assert isinstance(back, BinaryOp) and back.op == op and back.floating_point, back
+            assert back.operands[0].likes(a) and back.operands[1].likes(b)
+
+        # an integer comparison of the same operands is a different condition
+        lt = cp.claripy_ast_from_ail_condition(fp_cmp(3, "CmpLT", a, b))
+        assert lt is not cp.claripy_ast_from_ail_condition(BinaryOp(4, "CmpLT", [a, b], False, bits=1))
+        # the negation of a float comparison stays a float comparison
+        negated = cp.convert_claripy_bool_ast(claripy.Not(lt))
+        assert isinstance(negated, BinaryOp) and negated.op == "CmpGE" and negated.floating_point, negated
+
+        # equality puts the constant on the right, and x != x stays the NaN test
+        ne = fp_cmp(5, "CmpNE", Const(6, 0.0, 64), a)
+        back = cp.convert_claripy_bool_ast(cp.claripy_ast_from_ail_condition(ne))
+        assert isinstance(back, BinaryOp) and back.op == "CmpNE" and back.floating_point, back
+        assert back.operands[0].likes(a) and isinstance(back.operands[1], Const)
+        nan_test = fp_cmp(7, "CmpNE", a, a)
+        assert cp.convert_claripy_bool_ast(cp.claripy_ast_from_ail_condition(nan_test)).likes(nan_test)
+
+        # claripy has no 80-bit float sort: the comparison stays opaque and still round-trips
+        x, y = _vvar(8, 80, 32), _vvar(9, 80, 48)
+        wide = fp_cmp(10, "CmpLT", x, y)
+        assert cp.convert_claripy_bool_ast(cp.claripy_ast_from_ail_condition(wide)).likes(wide)
+
     def test_bitwise_op_on_one_bit_operands_round_trips(self):
         # a 1-bit operand of a bitwise op must stay a bit-vector; as a Bool, claripy coerces it into If(b, 1, 0),
         # which has no AIL conversion
