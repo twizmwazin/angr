@@ -2,39 +2,77 @@ name: CI
 
 on:
   push:
-    branches: [claude/nice-edison-d26f0f]
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+  merge_group:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 jobs:
-  ice:
-    name: Locate MSVC ICE (temporary)
-    runs-on: windows-2025
+  ci:
+    uses: angr/ci-settings/.github/workflows/angr-ci.yml@master
+
+  installation:
+    name: Test installation (${{ matrix.environment.os }}, py${{ matrix.environment.python-version }})
+    strategy:
+      matrix:
+        environment:
+          - os: windows-2022
+            python-version: 3.12
+          - os: macos-26
+            python-version: 3.12
+          - os: ubuntu-24.04
+            python-version: 3.14
+          - os: ubuntu-24.04-arm
+            python-version: 3.12
+      fail-fast: false
+    runs-on: ${{ matrix.environment.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
-      - shell: bash
+        if: startsWith(runner.os, 'windows')
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v6
+      - name: Sync dependencies
+        run: uv sync -p ${{ matrix.environment.python-version }}
+      - name: Collect tests
+        run: uv run pytest --collect-only tests
+
+  rust_check:
+    name: Rust Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30 # v2.0.1
+        with:
+          components: clippy, rustfmt
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+      - run: cargo fmt --all -- --check
+      - run: cargo doc --no-deps --all-features --document-private-items
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  rust_test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      READ_ONLY_GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30 # v2.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v5
+        with:
+          python-version: "3.12"
+      # Windows is the one platform where gh-release links against an import library rather than
+      # statically, so the libz3.dll it downloaded has to be findable when the tests run
+      - name: Put the downloaded libz3.dll on PATH
+        if: startsWith(runner.os, 'windows')
         run: |
-          git -c core.autocrlf=false clone https://github.com/angr/pyvex.git pv
-          cd pv
-          git checkout 6a81d15f490795522aeebb7e1786bb60c5ca2ec1
-          git -c core.autocrlf=false submodule update --init --recursive
-          cl //nologo //DAVX_512 //Ivex/pub vex/auxprogs/genoffsets.c //Fegenoffsets.exe
-          ./genoffsets.exe > vex/pub/libvex_guest_offsets.h
-          mkdir -p pyvex/include && cp pyvex_c/pyvex.h pyvex/include/
-          python ../.github/ice_bisect.py
-          rm -f vex/priv/guest_s390__v.c vex/pub/libvex_guest_offsets.h genoffsets.* tmp.obj
-          rm -rf pyvex/include
-          git status --short
-          git apply --ignore-whitespace ../.github/pyvex-msvc.patch
-          git diff --stat
-          python -m venv ../venv
-          ../venv/Scripts/python -m pip install -q git+https://github.com/angr/archinfo.git
-          ../venv/Scripts/python -m pip install -v . 2>&1 | grep -E "compiler identification|guest_s390_toIR|bad size|error|Successfully" | head -40
-          cd ..
-          venv/Scripts/python -c "
-          import pyvex, archinfo
-          print(pyvex.__version__)
-          pyvex.lift(bytes.fromhex('4889d8c3'), 0x1000, archinfo.ArchAMD64()).pp()
-          # EX r1,0(r2) then BR r14
-          pyvex.lift(bytes.fromhex('4410200007fe'), 0x1000, archinfo.ArchS390X()).pp()
-          print('LIFT OK')
-          "
+          cargo test --release --features z3-sys/gh-release --no-run
+          (Get-ChildItem target/release/build -Recurse -Filter libz3.dll | Select-Object -First 1).DirectoryName >> $env:GITHUB_PATH
+      - run: cargo test --release --features z3-sys/gh-release
