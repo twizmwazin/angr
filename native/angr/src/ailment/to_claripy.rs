@@ -8,8 +8,10 @@
 //! opaque, explicitly named symbol that is recorded in ``condition_mapping``
 //! so that the reverse conversion can restore the original AIL expression.
 //!
-//! The walk over the AIL tree, the operator dispatch and the symbol naming all
-//! happen here, on the native [`AilExpression`] tree. A Python ``Expression``
+//! The conversion is one function, [`Converter::convert_node`]: a match over
+//! the expression variants that converts the leaves, followed by a single
+//! operator table keyed by operator name and arity. It works on the native
+//! [`AilExpression`] tree. A Python ``Expression``
 //! wrapper is only materialized for the nodes that end up in one of the
 //! side tables. claripy operators are applied through the same entry points
 //! Python code uses, so operand coercion and simplification stay identical.
@@ -43,118 +45,6 @@ const LOGGER_NAME: &str = "angr.analyses.decompiler.condition_processor";
 const MAX_DEPTH: u32 = 300;
 
 type Ast<'py> = Bound<'py, PyAny>;
-
-/// A comparison operator and its claripy counterpart.
-#[derive(Clone, Copy)]
-enum Cmp {
-    Eq,
-    Ne,
-    Ult,
-    Ule,
-    Ugt,
-    Uge,
-    Slt,
-    Sle,
-    Sgt,
-    Sge,
-}
-
-/// A binary bit-vector operator whose second operand is brought to the width
-/// of the first.
-#[derive(Clone, Copy)]
-enum Arith {
-    Add,
-    Sub,
-    Mul,
-    Xor,
-    And,
-    Or,
-    Shr,
-    Shl,
-    Sar,
-}
-
-/// What to do with an AIL operator.
-#[derive(Clone, Copy)]
-enum OpHandler {
-    LogicalAnd,
-    LogicalOr,
-    Cmp(Cmp),
-    Arith(Arith),
-    Div,
-    Mod,
-    Concat,
-    Not,
-    Neg,
-    BitwiseNeg,
-    /// No claripy counterpart: an opaque bit-vector symbol.
-    OpaqueBv,
-    /// No claripy counterpart: an opaque boolean symbol.
-    OpaqueBool,
-}
-
-impl OpHandler {
-    fn is_binary(self) -> bool {
-        matches!(
-            self,
-            Self::LogicalAnd
-                | Self::LogicalOr
-                | Self::Cmp(_)
-                | Self::Arith(_)
-                | Self::Div
-                | Self::Mod
-                | Self::Concat
-        )
-    }
-
-    fn is_unary(self) -> bool {
-        matches!(self, Self::Not | Self::Neg | Self::BitwiseNeg)
-    }
-}
-
-/// The handler of an AIL operator name, or ``None`` for an unknown operator.
-fn op_handler(op: &str) -> Option<OpHandler> {
-    use OpHandler as H;
-    Some(match op {
-        "LogicalAnd" => H::LogicalAnd,
-        "LogicalOr" => H::LogicalOr,
-        "CmpEQ" | "CasCmpEQ" => H::Cmp(Cmp::Eq),
-        "CmpNE" | "CasCmpNE" => H::Cmp(Cmp::Ne),
-        "CmpLE" | "CasCmpLE" => H::Cmp(Cmp::Ule),
-        "CmpLEs" | "CasCmpLEs" => H::Cmp(Cmp::Sle),
-        "CmpLT" | "CasCmpLT" => H::Cmp(Cmp::Ult),
-        "CmpLTs" | "CasCmpLTs" => H::Cmp(Cmp::Slt),
-        "CmpGE" | "CasCmpGE" => H::Cmp(Cmp::Uge),
-        "CmpGEs" | "CasCmpGEs" => H::Cmp(Cmp::Sge),
-        "CmpGT" | "CasCmpGT" => H::Cmp(Cmp::Ugt),
-        "CmpGTs" | "CasCmpGTs" => H::Cmp(Cmp::Sgt),
-        "Add" => H::Arith(Arith::Add),
-        "Sub" => H::Arith(Arith::Sub),
-        "Mul" => H::Arith(Arith::Mul),
-        "Xor" => H::Arith(Arith::Xor),
-        "And" => H::Arith(Arith::And),
-        "Or" => H::Arith(Arith::Or),
-        "Shr" => H::Arith(Arith::Shr),
-        "Shl" => H::Arith(Arith::Shl),
-        "Sar" => H::Arith(Arith::Sar),
-        "Div" => H::Div,
-        "Mod" => H::Mod,
-        "Concat" => H::Concat,
-        "Not" => H::Not,
-        "Neg" => H::Neg,
-        "BitwiseNeg" => H::BitwiseNeg,
-        // There are no corresponding claripy operations for the following operations
-        "CmpF" | "Mull" | "Mulls" | "Reinterpret" | "Rol" | "Ror" | "LogicalXor" | "Carry"
-        | "SCarry" | "SBorrow" | "MovMskPD" | "MovMskPS" | "CmpEQV" | "GetMSBs" | "ShlNV"
-        | "ShrNV" | "InterleaveLOV" | "InterleaveHIV" => H::OpaqueBv,
-        // in case CmpORDRewriter fails
-        "CmpORD" => H::OpaqueBv,
-        "ExpCmpNE" | "CmpUN" | "IsNaN" | "SignBit" | "IsInf" | "IsFinite" | "IsNormal" => {
-            H::OpaqueBool
-        }
-        _ => return None,
-    })
-}
 
 /// An AIL node together with its Python wrapper, which is only created once
 /// something needs it.
@@ -314,53 +204,8 @@ impl<'a, 'py> Converter<'a, 'py> {
     }
 
     //
-    // Leaves
+    // Operands
     //
-
-    /// The identifier of the variable associated with ``node``, if any.
-    fn variable_ident(&mut self, node: &Node<'_, 'py>) -> PyResult<Option<String>> {
-        static VARIABLE_MAP_OF: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
-        let py = self.py;
-        let variable_map = match &self.variable_map {
-            Some(variable_map) => variable_map.clone(),
-            None => {
-                let variable_map = cached_import(
-                    py,
-                    &VARIABLE_MAP_OF,
-                    "angr.analyses.decompiler.variable_map",
-                    "variable_map_of",
-                )?
-                .call1((self.ail_manager,))?;
-                self.variable_map.insert(variable_map).clone()
-            }
-        };
-        let variable = variable_map.call_method1("variable", (node.obj(py)?,))?;
-        if variable.is_none() {
-            return Ok(None);
-        }
-        Ok(Some(variable.getattr("ident")?.str()?.to_string()))
-    }
-
-    /// A ``Load``, ``Register`` or ``VirtualVariable``: one symbol per
-    /// variable (or atom) and instruction.
-    fn convert_variable(&mut self, node: &Node<'_, 'py>, ins_addr: i128) -> PyResult<Ast<'py>> {
-        // SSA: the same vvar holds the same value at every instruction
-        let ins_addr = match node.expr.inner {
-            ExprInner::VirtualVariable { .. } => 0,
-            _ => ins_addr,
-        };
-        // does it have a variable associated?
-        let ident = match self.variable_ident(node)? {
-            Some(ident) => ident,
-            None => node.expr.header.idx.to_string(),
-        };
-        let name = format!(
-            "ailexpr_{}-{ident}-{}",
-            node.repr(self.py)?,
-            fmt_hex(ins_addr)
-        );
-        self.sized_symbol(node, name)
-    }
 
     /// The offset of an ``Extract`` / ``Insert`` as it appears in a symbol name.
     fn offset_str(&mut self, offset: &AilExpression, ins_addr: i128) -> PyResult<String> {
@@ -370,124 +215,41 @@ impl<'a, 'py> Converter<'a, 'py> {
         first_arg_str(&self.convert(&Node::new(offset), false, false, ins_addr)?)
     }
 
-    fn convert_const(&self, node: &Node<'_, 'py>, value: &ConstValue) -> PyResult<Ast<'py>> {
-        let py = self.py;
-        let bits = node.bits();
-        let value = match value {
-            // represent FP constants by their bit pattern
-            ConstValue::Float(f) => match bits {
-                64 => f.to_bits().into_pyobject(py)?.into_any(),
-                32 => {
-                    let single = *f as f32;
-                    if single.is_infinite() && f.is_finite() {
-                        return Err(PyOverflowError::new_err(
-                            "float too large to pack with f format",
-                        ));
-                    }
-                    single.to_bits().into_pyobject(py)?.into_any()
-                }
-                _ => {
-                    return Err(PyTypeError::new_err(
-                        "BVV value must be a int, bytes, or str",
-                    ));
-                }
-            },
-            value => value.into_pyobject(py)?,
-        };
-        let plain = bv::BVV(py, value, Some(bits))?;
-        // we do not want to lose track of this constant
-        let var = plain
-            .as_any()
-            .call_method1("annotate", (self.const_annotation,))?;
-        self.condition_mapping.set_item(&var, node.obj(py)?)?;
-        if bits == 1 {
-            let one = plain
-                .get()
-                .concrete_value()?
-                .is_some_and(|v| v == 1u8.into());
-            return self.bool_value(one);
-        }
-        Ok(var)
-    }
-
-    //
-    // Operators
-    //
-
-    fn apply_cmp(&self, cmp: Cmp, lhs: &Ast<'py>, rhs: &Ast<'py>) -> PyResult<Ast<'py>> {
-        let py = self.py;
-        let signed = |f: fn(
-            Python<'py>,
-            crate::claripy::ast::coerce::CoerceBV,
-            crate::claripy::ast::coerce::CoerceBV,
-        ) -> Result<Bound<'py, Bool>, ClaripyError>|
-         -> PyResult<Ast<'py>> {
-            Ok(f(py, lhs.extract()?, rhs.extract()?)?.into_any())
-        };
-        match cmp {
-            Cmp::Eq => lhs.rich_compare(rhs, CompareOp::Eq),
-            Cmp::Ne => lhs.rich_compare(rhs, CompareOp::Ne),
-            Cmp::Ult => lhs.rich_compare(rhs, CompareOp::Lt),
-            Cmp::Ule => lhs.rich_compare(rhs, CompareOp::Le),
-            Cmp::Ugt => lhs.rich_compare(rhs, CompareOp::Gt),
-            Cmp::Uge => lhs.rich_compare(rhs, CompareOp::Ge),
-            Cmp::Slt => signed(bv::SLT),
-            Cmp::Sle => signed(bv::SLE),
-            Cmp::Sgt => signed(bv::SGT),
-            Cmp::Sge => signed(bv::SGE),
-        }
-    }
-
-    fn apply_arith(&self, op: Arith, lhs: &Ast<'py>, rhs: &Ast<'py>) -> PyResult<Ast<'py>> {
-        match op {
-            Arith::Add => lhs.add(rhs),
-            Arith::Sub => lhs.sub(rhs),
-            Arith::Mul => lhs.mul(rhs),
-            Arith::Xor => lhs.bitxor(rhs),
-            Arith::And => lhs.bitand(rhs),
-            Arith::Or => lhs.bitor(rhs),
-            Arith::Shl => lhs.lshift(rhs),
-            Arith::Sar => lhs.rshift(rhs),
-            Arith::Shr => Ok(bv::LShR(self.py, lhs.extract()?, rhs.extract()?)?.into_any()),
-        }
-    }
-
-    /// A comparison. Its operands are brought to the same width first: an AIL
-    /// comparison can end up with operands that convert to bit-vectors of
-    /// different widths (an ill-formed expression from an earlier pass);
-    /// claripy refuses to compare those, and a decompilation should not die on
-    /// a condition.
-    fn convert_cmp(
+    /// The converted operands of a comparison, or ``None`` for the NaN test
+    /// ``x != x`` (which claripy would fold to a constant).
+    ///
+    /// The operands are brought to the same width: an AIL comparison can end up
+    /// with operands that convert to bit-vectors of different widths (an
+    /// ill-formed expression from an earlier pass); claripy refuses to compare
+    /// those, and a decompilation should not die on a condition.
+    fn cmp_operands(
         &mut self,
-        node: &Node<'_, 'py>,
-        cmp: Cmp,
-        operands: &[Arc<AilExpression>; 2],
+        lhs: &Arc<AilExpression>,
+        rhs: &Arc<AilExpression>,
         floating_point: bool,
         ins_addr: i128,
-    ) -> PyResult<Ast<'py>> {
+    ) -> PyResult<Option<(Ast<'py>, Ast<'py>)>> {
         let py = self.py;
-        if floating_point && operands[0].likes(&operands[1]) {
-            // x != x is the NaN test; claripy would fold it to a constant
-            return self.opaque(node, "", true);
+        if floating_point && lhs.likes(rhs) {
+            return Ok(None);
         }
-        let mut converted = Vec::with_capacity(2);
-        for operand in operands {
-            let operand_node = Node::new(operand);
+        let mut convert = |operand: &Arc<AilExpression>| {
+            let node = Node::new(operand);
             let is_bitwise = matches!(
                 &operand.inner,
                 ExprInner::BinaryOp { op, .. } if matches!(op.as_str(), "And" | "Or" | "Xor")
             );
-            converted.push(if floating_point && is_bitwise {
+            if floating_point && is_bitwise {
                 // bit operations on an FP compare operand (fabs as x & 0x7fff...) must stay
                 // opaque: claripy would simplify them into integer extracts and the compare
                 // would lose its FP meaning
-                self.opaque(&operand_node, "", false)?
+                self.opaque(&node, "", false)
             } else {
-                self.convert(&operand_node, true, false, ins_addr)?
-            });
-        }
-        let rhs = converted.pop().expect("two operands");
-        let lhs = converted.pop().expect("two operands");
+                self.convert(&node, true, false, ins_addr)
+            }
+        };
+        let lhs = convert(lhs)?;
+        let rhs = convert(rhs)?;
         let rhs = match (lhs.cast::<BV>(), rhs.cast::<BV>()) {
             (Ok(lhs_bv), Ok(rhs_bv)) => {
                 let (lhs_size, rhs_size) = (lhs_bv.get().size(), rhs_bv.get().size());
@@ -502,43 +264,37 @@ impl<'a, 'py> Converter<'a, 'py> {
             }
             _ => rhs,
         };
-        self.apply_cmp(cmp, &lhs, &rhs)
+        Ok(Some((lhs, rhs)))
     }
 
-    /// A binary operator whose second operand must be as wide as the first.
-    fn convert_arith(
+    /// The converted operands of a binary bit-vector operator, the second one
+    /// as wide as the first.
+    fn arith_operands(
         &mut self,
-        op: Arith,
-        operands: &[Arc<AilExpression>; 2],
+        lhs: &Arc<AilExpression>,
+        rhs: &Arc<AilExpression>,
         ins_addr: i128,
-    ) -> PyResult<Ast<'py>> {
-        let py = self.py;
-        let [operand0, operand1] = operands;
-        if let ExprInner::Const { value } = &operand1.inner
+    ) -> PyResult<(Ast<'py>, Ast<'py>)> {
+        if let ExprInner::Const { value } = &rhs.inner
             && value.is_int()
         {
             // amazing - we do the easy thing here: claripy sizes the integer itself
-            let lhs = self.convert(&Node::new(operand0), true, false, ins_addr)?;
-            return self.apply_arith(op, &lhs, &value.into_pyobject(py)?);
+            let lhs = self.convert(&Node::new(lhs), true, false, ins_addr)?;
+            return Ok((lhs, value.into_pyobject(self.py)?));
         }
-        if operand1.header.bits == operand0.header.bits {
-            let lhs = self.convert(&Node::new(operand0), true, false, ins_addr)?;
-            let rhs = self.convert(&Node::new(operand1), true, false, ins_addr)?;
-            return self.apply_arith(op, &lhs, &rhs);
+        if rhs.header.bits == lhs.header.bits {
+            let lhs_ast = self.convert(&Node::new(lhs), true, false, ins_addr)?;
+            let rhs_ast = self.convert(&Node::new(rhs), true, false, ins_addr)?;
+            return Ok((lhs_ast, rhs_ast));
         }
         // extension (or, for a shift amount wider than the value, truncation) is required
         let idx: i64 = self.ail_manager.call_method0("next_atom")?.extract()?;
         let resized = AilExpression {
-            header: ExprHeader::new(
-                idx,
-                operand1.header.depth + 1,
-                operand0.header.bits,
-                Tags::default(),
-            ),
+            header: ExprHeader::new(idx, rhs.header.depth + 1, lhs.header.bits, Tags::default()),
             inner: ExprInner::Convert {
-                operand: Arc::clone(operand1),
-                from_bits: operand1.header.bits,
-                to_bits: operand0.header.bits,
+                operand: Arc::clone(rhs),
+                from_bits: rhs.header.bits,
+                to_bits: lhs.header.bits,
                 is_signed: false,
                 from_type: ConvertType::TypeInt,
                 to_type: ConvertType::TypeInt,
@@ -546,169 +302,13 @@ impl<'a, 'py> Converter<'a, 'py> {
                 vector_count: None,
             },
         };
-        let lhs = self.convert(&Node::new(operand0), true, false, ins_addr)?;
+        let lhs = self.convert(&Node::new(lhs), true, false, ins_addr)?;
         let rhs = self.convert(&Node::new(&resized), true, false, ins_addr)?;
-        self.apply_arith(op, &lhs, &rhs)
-    }
-
-    fn convert_binary(
-        &mut self,
-        node: &Node<'_, 'py>,
-        handler: OpHandler,
-        operands: &[Arc<AilExpression>; 2],
-        floating_point: bool,
-        ins_addr: i128,
-    ) -> PyResult<Ast<'py>> {
-        let py = self.py;
-        let [operand0, operand1] = operands;
-        match handler {
-            OpHandler::LogicalAnd | OpHandler::LogicalOr => {
-                let args = vec![
-                    self.convert(&Node::new(operand0), false, false, ins_addr)?,
-                    self.convert(&Node::new(operand1), false, false, ins_addr)?,
-                ];
-                Ok(if matches!(handler, OpHandler::LogicalAnd) {
-                    claripy_and(py, args)?
-                } else {
-                    claripy_or(py, args)?
-                }
-                .into_any())
-            }
-            OpHandler::Cmp(cmp) => self.convert_cmp(node, cmp, operands, floating_point, ins_addr),
-            OpHandler::Arith(op) => self.convert_arith(op, operands, ins_addr),
-            OpHandler::Div | OpHandler::Mod => {
-                let lhs = self.convert(&Node::new(operand0), true, false, ins_addr)?;
-                let rhs = self.convert(&Node::new(operand1), true, false, ins_addr)?;
-                if matches!(handler, OpHandler::Div) {
-                    lhs.div(rhs)
-                } else {
-                    lhs.rem(rhs)
-                }
-            }
-            OpHandler::Concat => {
-                let args = vec![
-                    self.convert(&Node::new(operand0), false, false, ins_addr)?
-                        .extract()?,
-                    self.convert(&Node::new(operand1), false, false, ins_addr)?
-                        .extract()?,
-                ];
-                Ok(bv::Concat(py, args)?.into_any())
-            }
-            OpHandler::OpaqueBool => self.opaque(node, "", true),
-            _ => self.opaque(node, "", false),
-        }
-    }
-
-    fn convert_unary(
-        &mut self,
-        node: &Node<'_, 'py>,
-        handler: OpHandler,
-        operand: &AilExpression,
-        ins_addr: i128,
-    ) -> PyResult<Ast<'py>> {
-        match handler {
-            OpHandler::Not => {
-                let operand = self.convert(&Node::new(operand), false, false, ins_addr)?;
-                Ok(claripy_not(self.py, operand.cast_into::<Base>()?)?.into_any())
-            }
-            OpHandler::Neg => self
-                .convert(&Node::new(operand), false, false, ins_addr)?
-                .neg(),
-            OpHandler::BitwiseNeg => self
-                .convert(&Node::new(operand), false, false, ins_addr)?
-                .bitnot(),
-            OpHandler::OpaqueBool => self.opaque(node, "", true),
-            _ => self.opaque(node, "", false),
-        }
-    }
-
-    /// Fall back to the catch-all handler for an operator nothing else handles.
-    fn unsupported(&self, op: &str, verbose_op: &str) -> PyResult<OpHandler> {
-        logger(self.py)?.call_method1(
-            "debug",
-            (
-                "Unsupported AIL expression operation %s (or verbose: %s). Fall back to the default catch-all \
-                 dummy option. Consider implementing.",
-                op,
-                verbose_op,
-            ),
-        )?;
-        Ok(OpHandler::OpaqueBv)
-    }
-
-    /// Dispatch an operator-shaped expression to its handler.
-    fn apply_operator(&mut self, node: &Node<'_, 'py>, ins_addr: i128) -> PyResult<Ast<'py>> {
-        match &node.expr.inner {
-            ExprInner::BinaryOp {
-                op,
-                operands,
-                signed,
-                floating_point,
-                ..
-            } => {
-                // a signed integer operator is first looked up under its verbose name (CmpLEs)
-                let verbose = (*signed && !*floating_point).then(|| format!("{op}s"));
-                let handler = verbose
-                    .as_deref()
-                    .and_then(op_handler)
-                    .or_else(|| op_handler(op))
-                    .filter(|handler| !handler.is_unary());
-                let handler = match handler {
-                    Some(handler) => handler,
-                    None => self.unsupported(op, verbose.as_deref().unwrap_or(op))?,
-                };
-                self.convert_binary(node, handler, operands, *floating_point, ins_addr)
-            }
-            ExprInner::UnaryOp { op, operand, .. } => {
-                let handler = match op_handler(op).filter(|handler| !handler.is_binary()) {
-                    Some(handler) => handler,
-                    None => self.unsupported(op, op)?,
-                };
-                self.convert_unary(node, handler, operand, ins_addr)
-            }
-            ExprInner::Reinterpret { .. } => self.opaque(node, "", false),
-            ExprInner::DirtyExpression(dirty) => {
-                self.unsupported(&dirty.callee, &dirty.callee)?;
-                self.opaque(node, "", false)
-            }
-            _ => {
-                self.unsupported("let", "let")?;
-                self.opaque(node, "", false)
-            }
-        }
-    }
-
-    /// The tags to remember for the AST converted from ``node``.
-    fn annotations(&self, node: &Node<'_, 'py>) -> PyResult<Bound<'py, PyAny>> {
-        let py = self.py;
-        let tags = &node.expr.header.tags;
-        // don't lose the floating-point flag of an FP comparison (claripy folds !(a == b) into
-        // a != b, so the negation of an FP comparison annotates that comparison)
-        let fp_source = match &node.expr.inner {
-            ExprInner::UnaryOp { op, operand, .. } if op == "Not" => &**operand,
-            _ => node.expr,
-        };
-        let floating_point = matches!(
-            &fp_source.inner,
-            ExprInner::BinaryOp {
-                floating_point: true,
-                ..
-            } | ExprInner::UnaryOp {
-                floating_point: true,
-                ..
-            }
-        );
-        if floating_point {
-            let dict: Bound<'py, PyDict> = tags.to_py_dict(py)?;
-            dict.set_item("floating_point", true)?;
-            return Ok(dict.into_any());
-        }
-        let view = TagsView::with_parent(tags.clone(), node.obj(py)?.clone().into_any().unbind());
-        Ok(Bound::new(py, view)?.into_any())
+        Ok((lhs, rhs))
     }
 
     //
-    // Entry point
+    // The conversion
     //
 
     /// Convert ``node``. With ``nobool`` an operator result is always a
@@ -726,12 +326,12 @@ impl<'a, 'py> Converter<'a, 'py> {
             ));
         }
         self.depth += 1;
-        let result = self.convert_inner(node, nobool, must_bool, ins_addr);
+        let result = self.convert_node(node, nobool, must_bool, ins_addr);
         self.depth -= 1;
         result
     }
 
-    fn convert_inner(
+    fn convert_node(
         &mut self,
         node: &Node<'_, 'py>,
         nobool: bool,
@@ -742,113 +342,319 @@ impl<'a, 'py> Converter<'a, 'py> {
         let expr = node.expr;
         let bits = node.bits();
 
-        // Unpack a condition all the way to the leaves
-        match &expr.inner {
-            ExprInner::VEXCCallExpression { .. }
-            | ExprInner::BasePointerOffset { .. }
-            | ExprInner::StackBaseOffset { .. }
-            | ExprInner::ITE { .. }
-            | ExprInner::StringLiteral { .. } => return self.opaque(node, "", must_bool),
-            ExprInner::Call { .. }
-            | ExprInner::Macro { .. }
-            | ExprInner::FunctionLikeMacro { .. } => {
-                let call_addr = i128::from(expr.header.tags.ins_addr.unwrap_or(0));
-                let suffix = if call_addr < 0 {
-                    format!("-0x{:x}", call_addr.unsigned_abs())
-                } else {
-                    format!("0x{call_addr:x}")
-                };
-                return self.opaque(node, &suffix, must_bool);
-            }
-            ExprInner::Load { .. }
-            | ExprInner::Register { .. }
-            | ExprInner::VirtualVariable { .. } => return self.convert_variable(node, ins_addr),
-            ExprInner::Extract {
-                base,
-                offset,
-                endness,
-            } => {
-                let base = self.convert(&Node::new(base), false, false, ins_addr)?;
-                let offset = self.offset_str(offset, ins_addr)?;
-                let name = format!(
-                    "ailexpr_Extract({bits}, {endness}, {offset}, {})",
-                    ast_hash(&base)?
-                );
-                return self.symbol(node, name, false, bits);
-            }
-            ExprInner::Insert {
-                base,
-                offset,
-                value,
-                ..
-            } => {
-                let base = self.convert(&Node::new(base), false, false, ins_addr)?;
-                let value = self.convert(&Node::new(value), false, false, ins_addr)?;
-                let offset = self.offset_str(offset, ins_addr)?;
-                let name = format!(
-                    "ailexpr_Insert({offset}, {}, {})",
-                    ast_hash(&value)?,
-                    ast_hash(&base)?
-                );
-                return self.symbol(node, name, false, bits);
-            }
-            ExprInner::Convert {
-                operand,
-                from_bits,
-                to_bits,
-                ..
-            } => {
-                // convert is special. if it generates a 1-bit variable, it should be treated as
-                // a BoolS
-                let boolean = *to_bits == 1 && !nobool;
-                let operand = self.convert(&Node::new(operand), false, false, ins_addr)?;
-                let name = format!(
-                    "{}_Conv({from_bits}->{to_bits}, {})",
-                    if boolean { "ailcond" } else { "ailexpr" },
-                    ast_hash(&operand)?
-                );
-                return self.symbol(node, name, boolean, *to_bits);
-            }
-            ExprInner::Const { value } => return self.convert_const(node, value),
-            ExprInner::Tmp { tmp_idx } => {
-                logger(py)?.call_method1(
-                    "warning",
-                    ("Left-over ailment.Tmp variable %s.", node.obj(py)?),
-                )?;
-                return self.sized_symbol(node, format!("ailtmp_{tmp_idx}"));
-            }
-            ExprInner::MultiStatementExpression { .. } => {
-                // just cache it
-                let name = format!("mstmtexpr_{}", python_hash(expr));
-                return self.sized_symbol(node, name);
-            }
-            ExprInner::UnaryOp { .. }
-            | ExprInner::BinaryOp { .. }
-            | ExprInner::Reinterpret { .. }
-            | ExprInner::Let { .. }
-            | ExprInner::DirtyExpression(..) => {}
-            _ => {
-                // an atom without an operator (a struct literal, a phi, ...): keep it opaque
-                let name = format!("ailexpr_opaque_{}", python_hash(expr));
-                return self.sized_symbol(node, name);
-            }
+        // An operand as is / as a bit-vector.
+        macro_rules! conv {
+            ($operand:expr) => {
+                self.convert(&Node::new($operand), false, false, ins_addr)?
+            };
+        }
+        macro_rules! conv_bv {
+            ($operand:expr) => {
+                self.convert(&Node::new($operand), true, false, ins_addr)?
+            };
+        }
+        // Unpack a condition all the way to the leaves. Leaves and other atoms are converted
+        // right here; an operator goes on to the operator table below.
+        let (op, operands, signed, floating_point): (&str, &[Arc<AilExpression>], bool, bool) =
+            match &expr.inner {
+                ExprInner::VEXCCallExpression { .. }
+                | ExprInner::BasePointerOffset { .. }
+                | ExprInner::StackBaseOffset { .. }
+                | ExprInner::ITE { .. }
+                | ExprInner::StringLiteral { .. } => return self.opaque(node, "", must_bool),
+                ExprInner::Call { .. }
+                | ExprInner::Macro { .. }
+                | ExprInner::FunctionLikeMacro { .. } => {
+                    // one symbol per call site
+                    let call_addr = i128::from(expr.header.tags.ins_addr.unwrap_or(0));
+                    let suffix = if call_addr < 0 {
+                        format!("-0x{:x}", call_addr.unsigned_abs())
+                    } else {
+                        format!("0x{call_addr:x}")
+                    };
+                    return self.opaque(node, &suffix, must_bool);
+                }
+                ExprInner::Load { .. }
+                | ExprInner::Register { .. }
+                | ExprInner::VirtualVariable { .. } => {
+                    // one symbol per variable (or atom) and instruction
+                    static VARIABLE_MAP_OF: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
+                    // SSA: the same vvar holds the same value at every instruction
+                    let ins_addr = match expr.inner {
+                        ExprInner::VirtualVariable { .. } => 0,
+                        _ => ins_addr,
+                    };
+                    let variable_map = match &self.variable_map {
+                        Some(variable_map) => variable_map.clone(),
+                        None => {
+                            let variable_map = cached_import(
+                                py,
+                                &VARIABLE_MAP_OF,
+                                "angr.analyses.decompiler.variable_map",
+                                "variable_map_of",
+                            )?
+                            .call1((self.ail_manager,))?;
+                            self.variable_map.insert(variable_map).clone()
+                        }
+                    };
+                    // does it have a variable associated?
+                    let variable = variable_map.call_method1("variable", (node.obj(py)?,))?;
+                    let ident = if variable.is_none() {
+                        expr.header.idx.to_string()
+                    } else {
+                        variable.getattr("ident")?.str()?.to_string()
+                    };
+                    let name = format!("ailexpr_{}-{ident}-{}", node.repr(py)?, fmt_hex(ins_addr));
+                    return self.sized_symbol(node, name);
+                }
+                ExprInner::Extract {
+                    base,
+                    offset,
+                    endness,
+                } => {
+                    let base = conv!(base);
+                    let offset = self.offset_str(offset, ins_addr)?;
+                    let name = format!(
+                        "ailexpr_Extract({bits}, {endness}, {offset}, {})",
+                        ast_hash(&base)?
+                    );
+                    return self.symbol(node, name, false, bits);
+                }
+                ExprInner::Insert {
+                    base,
+                    offset,
+                    value,
+                    ..
+                } => {
+                    let base = conv!(base);
+                    let value = conv!(value);
+                    let offset = self.offset_str(offset, ins_addr)?;
+                    let name = format!(
+                        "ailexpr_Insert({offset}, {}, {})",
+                        ast_hash(&value)?,
+                        ast_hash(&base)?
+                    );
+                    return self.symbol(node, name, false, bits);
+                }
+                ExprInner::Convert {
+                    operand,
+                    from_bits,
+                    to_bits,
+                    ..
+                } => {
+                    // convert is special. if it generates a 1-bit variable, it should be
+                    // treated as a BoolS
+                    let boolean = *to_bits == 1 && !nobool;
+                    let operand = conv!(operand);
+                    let name = format!(
+                        "{}_Conv({from_bits}->{to_bits}, {})",
+                        if boolean { "ailcond" } else { "ailexpr" },
+                        ast_hash(&operand)?
+                    );
+                    return self.symbol(node, name, boolean, *to_bits);
+                }
+                ExprInner::Const { value } => {
+                    let value = match value {
+                        // represent FP constants by their bit pattern
+                        ConstValue::Float(f) => match bits {
+                            64 => f.to_bits().into_pyobject(py)?.into_any(),
+                            32 => {
+                                let single = *f as f32;
+                                if single.is_infinite() && f.is_finite() {
+                                    return Err(PyOverflowError::new_err(
+                                        "float too large to pack with f format",
+                                    ));
+                                }
+                                single.to_bits().into_pyobject(py)?.into_any()
+                            }
+                            _ => {
+                                return Err(PyTypeError::new_err(
+                                    "BVV value must be a int, bytes, or str",
+                                ));
+                            }
+                        },
+                        value => value.into_pyobject(py)?,
+                    };
+                    let plain = bv::BVV(py, value, Some(bits))?;
+                    // we do not want to lose track of this constant
+                    let var = plain
+                        .as_any()
+                        .call_method1("annotate", (self.const_annotation,))?;
+                    self.condition_mapping.set_item(&var, node.obj(py)?)?;
+                    if bits == 1 {
+                        let one = plain
+                            .get()
+                            .concrete_value()?
+                            .is_some_and(|v| v == 1u8.into());
+                        return self.bool_value(one);
+                    }
+                    return Ok(var);
+                }
+                ExprInner::Tmp { tmp_idx } => {
+                    logger(py)?.call_method1(
+                        "warning",
+                        ("Left-over ailment.Tmp variable %s.", node.obj(py)?),
+                    )?;
+                    return self.sized_symbol(node, format!("ailtmp_{tmp_idx}"));
+                }
+                ExprInner::MultiStatementExpression { .. } => {
+                    // just cache it
+                    let name = format!("mstmtexpr_{}", python_hash(expr));
+                    return self.sized_symbol(node, name);
+                }
+                ExprInner::UnaryOp { op, operand, .. } => {
+                    (op, std::slice::from_ref(operand), false, false)
+                }
+                ExprInner::BinaryOp {
+                    op,
+                    operands,
+                    signed,
+                    floating_point,
+                    ..
+                } => (op, operands, *signed && !*floating_point, *floating_point),
+                ExprInner::Reinterpret { .. } => ("Reinterpret", &[], false, false),
+                ExprInner::DirtyExpression(dirty) => (&dirty.callee, &[], false, false),
+                ExprInner::Let { .. } => ("let", &[], false, false),
+                _ => {
+                    // an atom without an operator (a struct literal, a phi, ...): keep it opaque
+                    let name = format!("ailexpr_opaque_{}", python_hash(expr));
+                    return self.sized_symbol(node, name);
+                }
+            };
+
+        // A comparison of two operands of the same width.
+        macro_rules! cmp {
+            ($a:expr, $b:expr, ($x:ident, $y:ident) => $apply:expr) => {
+                match self.cmp_operands($a, $b, floating_point, ins_addr)? {
+                    Some(($x, $y)) => $apply,
+                    None => self.opaque(node, "", true)?,
+                }
+            };
+        }
+        macro_rules! cmp_unsigned {
+            ($a:expr, $b:expr, $op:ident) => {
+                cmp!($a, $b, (x, y) => x.rich_compare(y, CompareOp::$op)?)
+            };
+        }
+        macro_rules! cmp_signed {
+            ($a:expr, $b:expr, $op:ident) => {
+                cmp!($a, $b, (x, y) => bv::$op(py, x.extract()?, y.extract()?)?.into_any())
+            };
+        }
+        // A bit-vector operator whose second operand is brought to the width of the first.
+        macro_rules! arith {
+            ($a:expr, $b:expr, $op:ident) => {{
+                let (x, y) = self.arith_operands($a, $b, ins_addr)?;
+                x.$op(y)?
+            }};
+        }
+        // A division: dividing by a constant zero keeps the expression opaque.
+        macro_rules! division {
+            ($a:expr, $b:expr, $op:ident) => {{
+                let (x, y) = (conv_bv!($a), conv_bv!($b));
+                match x.$op(y) {
+                    Err(err) if err.is_instance_of::<PyZeroDivisionError>(py) => {
+                        self.opaque(node, "", bits == 1 && !nobool)?
+                    }
+                    result => result?,
+                }
+            }};
         }
 
-        let mut r = match self.apply_operator(node, ins_addr) {
-            Ok(r) if nobool && is_bool(&r) => {
-                let name = format!("ailexpr_from_bool_{}", r.repr()?);
-                self.symbol(node, name, false, 1)?
+        // The operator table, keyed by operator name and arity.
+        let mut r = match (op, operands) {
+            ("LogicalAnd", [a, b]) => claripy_and(py, vec![conv!(a), conv!(b)])?.into_any(),
+            ("LogicalOr", [a, b]) => claripy_or(py, vec![conv!(a), conv!(b)])?.into_any(),
+            ("Not", [a]) => claripy_not(py, conv!(a).cast_into::<Base>()?)?.into_any(),
+
+            ("CmpEQ" | "CasCmpEQ", [a, b]) => cmp_unsigned!(a, b, Eq),
+            ("CmpNE" | "CasCmpNE", [a, b]) => cmp_unsigned!(a, b, Ne),
+            ("CmpLT" | "CasCmpLT", [a, b]) if !signed => cmp_unsigned!(a, b, Lt),
+            ("CmpLE" | "CasCmpLE", [a, b]) if !signed => cmp_unsigned!(a, b, Le),
+            ("CmpGT" | "CasCmpGT", [a, b]) if !signed => cmp_unsigned!(a, b, Gt),
+            ("CmpGE" | "CasCmpGE", [a, b]) if !signed => cmp_unsigned!(a, b, Ge),
+            ("CmpLT" | "CasCmpLT" | "CmpLTs" | "CasCmpLTs", [a, b]) => cmp_signed!(a, b, SLT),
+            ("CmpLE" | "CasCmpLE" | "CmpLEs" | "CasCmpLEs", [a, b]) => cmp_signed!(a, b, SLE),
+            ("CmpGT" | "CasCmpGT" | "CmpGTs" | "CasCmpGTs", [a, b]) => cmp_signed!(a, b, SGT),
+            ("CmpGE" | "CasCmpGE" | "CmpGEs" | "CasCmpGEs", [a, b]) => cmp_signed!(a, b, SGE),
+
+            ("Add", [a, b]) => arith!(a, b, add),
+            ("Sub", [a, b]) => arith!(a, b, sub),
+            ("Mul", [a, b]) => arith!(a, b, mul),
+            ("Div", [a, b]) => division!(a, b, div),
+            ("Mod", [a, b]) => division!(a, b, rem),
+            ("Neg", [a]) => conv!(a).neg()?,
+            ("And", [a, b]) => arith!(a, b, bitand),
+            ("Or", [a, b]) => arith!(a, b, bitor),
+            ("Xor", [a, b]) => arith!(a, b, bitxor),
+            ("BitwiseNeg", [a]) => conv!(a).bitnot()?,
+            ("Shl", [a, b]) => arith!(a, b, lshift),
+            ("Sar", [a, b]) => arith!(a, b, rshift),
+            ("Shr", [a, b]) => {
+                let (x, y) = self.arith_operands(a, b, ins_addr)?;
+                bv::LShR(py, x.extract()?, y.extract()?)?.into_any()
             }
-            Ok(r) => r,
-            // a constant division by zero: keep the expression opaque
-            Err(err) if err.is_instance_of::<PyZeroDivisionError>(py) => {
-                self.opaque(node, "", bits == 1 && !nobool)?
+            ("Concat", [a, b]) => {
+                bv::Concat(py, vec![conv!(a).extract()?, conv!(b).extract()?])?.into_any()
             }
-            Err(err) => return Err(err),
+
+            // There are no corresponding claripy operations for the following operations
+            ("ExpCmpNE" | "CmpUN" | "IsNaN" | "SignBit" | "IsInf" | "IsFinite" | "IsNormal", _) => {
+                self.opaque(node, "", true)?
+            }
+            (
+                "CmpF" | "Mull" | "Mulls" | "Reinterpret" | "Rol" | "Ror" | "LogicalXor" | "Carry"
+                | "SCarry" | "SBorrow" | "MovMskPD" | "MovMskPS" | "CmpEQV" | "GetMSBs" | "ShlNV"
+                | "ShrNV" | "InterleaveLOV" | "InterleaveHIV",
+                _,
+            ) => self.opaque(node, "", false)?,
+            // in case CmpORDRewriter fails
+            ("CmpORD", _) => self.opaque(node, "", false)?,
+
+            // catch-all
+            _ => {
+                logger(py)?.call_method1(
+                    "debug",
+                    (
+                        "Unsupported AIL expression operation %s (or verbose: %s). Fall back to the default \
+                         catch-all dummy option. Consider implementing.",
+                        op,
+                        if signed { format!("{op}s") } else { op.to_string() },
+                    ),
+                )?;
+                self.opaque(node, "", false)?
+            }
         };
 
-        // don't lose tags
-        self.ast2annotations.set_item(&r, self.annotations(node)?)?;
+        if nobool && is_bool(&r) {
+            let name = format!("ailexpr_from_bool_{}", r.repr()?);
+            r = self.symbol(node, name, false, 1)?;
+        }
+
+        // don't lose tags, nor the floating-point flag of an FP comparison (claripy folds
+        // !(a == b) into a != b, so the negation of an FP comparison annotates that comparison)
+        let fp_source = match (op, operands) {
+            ("Not", [operand]) => &**operand,
+            _ => expr,
+        };
+        let tags = if matches!(
+            &fp_source.inner,
+            ExprInner::BinaryOp {
+                floating_point: true,
+                ..
+            } | ExprInner::UnaryOp {
+                floating_point: true,
+                ..
+            }
+        ) {
+            let tags: Bound<'py, PyDict> = expr.header.tags.to_py_dict(py)?;
+            tags.set_item("floating_point", true)?;
+            tags.into_any()
+        } else {
+            let parent = node.obj(py)?.clone().into_any().unbind();
+            Bound::new(py, TagsView::with_parent(expr.header.tags.clone(), parent))?.into_any()
+        };
+        self.ast2annotations.set_item(&r, tags)?;
 
         if must_bool
             && let Ok(r_bv) = r.cast::<BV>()
