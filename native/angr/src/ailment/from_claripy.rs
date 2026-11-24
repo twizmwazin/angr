@@ -8,15 +8,17 @@
 //! are rebuilt as AIL operators, with the tags the forward conversion
 //! recorded in ``ast2annotations``.
 //!
-//! The conversion is one function, [`Converter::convert_node`]: a single match
-//! over the claripy operators. Subtrees are memoized by claripy hash, and
-//! every node that is built is handed to the caller's ``optimize`` callback
+//! The conversion is one function: a [`walk`] over the claripy AST whose
+//! post-visit is a single match over the claripy operators, building each node
+//! from its already converted children. Subtrees are memoized by claripy hash,
+//! and every node that is built is handed to the caller's ``optimize`` callback
 //! (the peephole rules), bottom-up.
 
+use std::cell::RefCell;
 use std::sync::Arc;
 
 use num_bigint::{BigInt, BigUint};
-use pyo3::exceptions::{PyNotImplementedError, PyRecursionError};
+use pyo3::exceptions::{PyNotImplementedError, PyRuntimeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict};
 
@@ -29,12 +31,9 @@ use crate::claripy::ast::base::Base;
 use crate::claripy::ast::not as claripy_not;
 use crate::claripy::ast::opstring::ToOpString;
 use crate::claripy::error::ClaripyError;
+use clarirs_core::algorithms::walk;
 use clarirs_core::ast::AstFactory;
-use clarirs_core::prelude::{AstOp, AstRef, BitVec};
-
-/// How many claripy nodes deep the conversion may recurse before it gives up
-/// with a ``RecursionError`` rather than exhausting the native stack.
-const MAX_DEPTH: u32 = 300;
+use clarirs_core::prelude::{AstOp, AstRef, BitVec, ClarirsError};
 
 /// A converted expression: a Python ``Expression``.
 type Ail<'py> = Bound<'py, PyAny>;
@@ -55,180 +54,151 @@ fn binary_op_bits(op: &str, lhs: &AilExpression, rhs: &AilExpression) -> u32 {
     }
 }
 
-/// State of one conversion.
-struct Converter<'a, 'py> {
-    py: Python<'py>,
-    /// Symbol name (or annotated constant) -> the AIL expression it stands for.
-    condition_mapping: &'a Bound<'py, PyAny>,
-    /// claripy AST -> tags of the AIL expression it was converted from.
-    ast2annotations: &'a Bound<'py, PyAny>,
-    ail_manager: &'a Bound<'py, PyAny>,
-    /// claripy hash -> converted (and optimized) AIL expression.
-    memo: &'a Bound<'py, PyDict>,
-    /// Applied to every expression the conversion builds.
-    optimize: &'a Bound<'py, PyAny>,
-    depth: u32,
+fn constant(idx: i64, value: ConstValue, bits: u32, tags: &Tags) -> AilExpression {
+    AilExpression {
+        header: ExprHeader::new(idx, 0, bits, tags.clone()),
+        inner: ExprInner::Const { value },
+    }
 }
 
-impl<'a, 'py> Converter<'a, 'py> {
-    //
-    // Building AIL expressions
-    //
-
-    fn next_atom(&self) -> PyResult<i64> {
-        self.ail_manager.call_method0("next_atom")?.extract()
+fn binary_op(
+    idx: i64,
+    op: &str,
+    lhs: AilExpression,
+    rhs: AilExpression,
+    signed: bool,
+    tags: &Tags,
+) -> AilExpression {
+    let depth = lhs.header.depth.max(rhs.header.depth) + 1;
+    let bits = binary_op_bits(op, &lhs, &rhs);
+    AilExpression {
+        header: ExprHeader::new(idx, depth, bits, tags.clone()),
+        inner: ExprInner::BinaryOp {
+            op: op.to_string(),
+            operands: [Arc::new(lhs), Arc::new(rhs)],
+            signed,
+            floating_point: false,
+            rounding_mode: None,
+            vector_count: None,
+            vector_size: None,
+        },
     }
+}
 
-    fn wrap(&self, expr: AilExpression) -> PyResult<Ail<'py>> {
-        Ok(Bound::new(self.py, Expression::wrap(expr))?.into_any())
-    }
+/// The tags recorded for ``cond`` (or, failing that, for its negation),
+/// without the floating-point flag, which is returned separately.
+fn tags_of<'py>(
+    ast2annotations: &Bound<'py, PyAny>,
+    cond: &Bound<'py, Base>,
+    is_comparison: bool,
+) -> PyResult<(Tags, bool)> {
+    let py = cond.py();
+    let is_fp = |tags: &Bound<'py, PyAny>| -> PyResult<bool> {
+        Ok(tags
+            .call_method1("get", ("floating_point",))?
+            .is(&*PyBool::new(py, true)))
+    };
+    let negated = || claripy_not(py, cond.clone());
 
-    fn constant(&self, value: ConstValue, bits: u32, tags: &Tags) -> PyResult<AilExpression> {
-        Ok(AilExpression {
-            header: ExprHeader::new(self.next_atom()?, 0, bits, tags.clone()),
-            inner: ExprInner::Const { value },
-        })
-    }
-
-    fn binary_op(
-        &self,
-        idx: i64,
-        op: &str,
-        lhs: AilExpression,
-        rhs: AilExpression,
-        signed: bool,
-        tags: &Tags,
-    ) -> AilExpression {
-        let depth = lhs.header.depth.max(rhs.header.depth) + 1;
-        let bits = binary_op_bits(op, &lhs, &rhs);
-        AilExpression {
-            header: ExprHeader::new(idx, depth, bits, tags.clone()),
-            inner: ExprInner::BinaryOp {
-                op: op.to_string(),
-                operands: [Arc::new(lhs), Arc::new(rhs)],
-                signed,
-                floating_point: false,
-                rounding_mode: None,
-                vector_count: None,
-                vector_size: None,
-            },
-        }
-    }
-
-    /// Fold ``args`` into a left-leaning chain of ``op``. A single argument
-    /// converts to itself.
-    fn reduce<'r>(
-        &mut self,
-        op: &str,
-        args: impl IntoIterator<Item = &'r AstRef<'static>>,
-        signed: bool,
-        tags: &Tags,
-    ) -> PyResult<Ail<'py>> {
-        let mut result: Option<Ail<'py>> = None;
-        for arg in args {
-            result = Some(match result {
-                None => self.convert(arg)?,
-                Some(lhs) => {
-                    let idx = self.next_atom()?;
-                    let rhs = self.convert(arg)?;
-                    self.wrap(self.binary_op(
-                        idx,
-                        op,
-                        lhs.extract()?,
-                        rhs.extract()?,
-                        signed,
-                        tags,
-                    ))?
-                }
-            });
-        }
-        Ok(result.unwrap_or_else(|| self.py.None().into_bound(self.py)))
-    }
-
-    //
-    // The conversion
-    //
-
-    /// The tags recorded for ``cond`` (or, failing that, for its negation),
-    /// without the floating-point flag, which is returned separately.
-    fn tags_of(&self, cond: &Bound<'py, Base>, is_comparison: bool) -> PyResult<(Tags, bool)> {
-        let py = self.py;
-        let is_fp = |tags: &Bound<'py, PyAny>| -> PyResult<bool> {
-            Ok(tags
-                .call_method1("get", ("floating_point",))?
-                .is(&*PyBool::new(py, true)))
-        };
-        let negated = || claripy_not(py, cond.clone());
-
-        let recorded = if self.ast2annotations.contains(cond)? {
-            Some(self.ast2annotations.get_item(cond)?)
+    let recorded = if ast2annotations.contains(cond)? {
+        Some(ast2annotations.get_item(cond)?)
+    } else {
+        let negated = negated()?;
+        if ast2annotations.contains(&negated)? {
+            Some(ast2annotations.get_item(&negated)?)
         } else {
-            let negated = negated()?;
-            if self.ast2annotations.contains(&negated)? {
-                Some(self.ast2annotations.get_item(&negated)?)
-            } else {
-                None
-            }
-        };
-        let mut floating_point = match &recorded {
-            Some(tags) => is_fp(tags)?,
-            None => false,
-        };
-        if !floating_point && is_comparison {
-            // a comparison claripy derived by negating an FP comparison is an FP comparison too
-            let negated = negated()?;
-            if self.ast2annotations.contains(&negated)? {
-                floating_point = is_fp(&self.ast2annotations.get_item(&negated)?)?;
-            }
+            None
         }
-        let mut tags: Tags = match recorded {
-            Some(tags) => tags.extract()?,
-            None => Tags::default(),
-        };
-        if floating_point {
-            tags.clear("floating_point");
+    };
+    let mut floating_point = match &recorded {
+        Some(tags) => is_fp(tags)?,
+        None => false,
+    };
+    if !floating_point && is_comparison {
+        // a comparison claripy derived by negating an FP comparison is an FP comparison too
+        let negated = negated()?;
+        if ast2annotations.contains(&negated)? {
+            floating_point = is_fp(&ast2annotations.get_item(&negated)?)?;
         }
-        Ok((tags, floating_point))
     }
+    let mut tags: Tags = match recorded {
+        Some(tags) => tags.extract()?,
+        None => Tags::default(),
+    };
+    if floating_point {
+        tags.clear("floating_point");
+    }
+    Ok((tags, floating_point))
+}
 
-    /// Convert ``ast``, reusing the conversion of a subtree seen before.
-    fn convert(&mut self, ast: &AstRef<'static>) -> PyResult<Ail<'py>> {
-        let key = ast.hash();
-        if let Some(converted) = self.memo.get_item(key)?
-            && !converted.is_none()
-        {
-            return Ok(converted);
-        }
-        if self.depth >= MAX_DEPTH {
-            return Err(PyRecursionError::new_err(
-                "maximum recursion depth exceeded while converting a claripy AST to an AIL expression",
-            ));
-        }
-        self.depth += 1;
-        let converted = self.convert_node(ast);
-        self.depth -= 1;
-        let converted = self.optimize.call1((converted?,))?;
-        self.memo.set_item(key, &converted)?;
+/// Convert a claripy AST back into an AIL expression.
+///
+/// ``condition_mapping`` and ``ast2annotations`` are the tables that
+/// ``claripy_ast_from_ail`` filled. ``memo`` maps the claripy hash of every
+/// subtree converted so far to its AIL expression; pass the same dict to
+/// several calls to share conversions between them. ``optimize`` is called
+/// with every expression the conversion builds and returns the expression to
+/// use in its place.
+#[pyfunction]
+pub fn ail_from_claripy_ast<'py>(
+    py: Python<'py>,
+    cond: Bound<'py, Base>,
+    condition_mapping: Bound<'py, PyAny>,
+    ast2annotations: Bound<'py, PyAny>,
+    ail_manager: Bound<'py, PyAny>,
+    memo: Bound<'py, PyDict>,
+    optimize: Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    // `walk` only knows clarirs errors: a Python exception is parked here while the walk unwinds
+    let raised: RefCell<Option<PyErr>> = RefCell::new(None);
+    let park = |err: PyErr| {
+        raised.replace(Some(err));
+        ClarirsError::BackendError("python", "exception raised".to_string())
+    };
+
+    let next_atom = || -> PyResult<i64> { ail_manager.call_method0("next_atom")?.extract() };
+    let wrap = |expr: AilExpression| -> PyResult<Ail<'py>> {
+        Ok(Bound::new(py, Expression::wrap(expr))?.into_any())
+    };
+    let memoized = |ast: &AstRef<'static>| -> PyResult<Option<Ail<'py>>> {
+        Ok(memo.get_item(ast.hash())?.filter(|hit| !hit.is_none()))
+    };
+    // Every converted node is optimized, then remembered
+    let finish = |ast: &AstRef<'static>, converted: Ail<'py>| -> PyResult<Ail<'py>> {
+        let converted = optimize.call1((converted,))?;
+        memo.set_item(ast.hash(), &converted)?;
         Ok(converted)
-    }
+    };
 
-    fn convert_node(&mut self, ast: &AstRef<'static>) -> PyResult<Ail<'py>> {
-        let py = self.py;
+    // Leaves: a subtree converted before, or whatever the forward conversion made a symbol (or
+    // an annotated constant) of
+    let pre_visit = |ast: &AstRef<'static>| -> PyResult<Option<Ail<'py>>> {
+        if let Some(hit) = memoized(ast)? {
+            return Ok(Some(hit));
+        }
         let cond = Base::from_ast(py, ast.clone())?;
-
-        // Leaves: whatever the forward conversion made a symbol (or an annotated constant) of
-        if let AstOp::BoolV(true) = ast.op() {
-            return self.wrap(self.constant(ConstValue::Int(1), 1, &Tags::default())?);
-        }
-        if self.condition_mapping.contains(&cond)? {
-            return self.condition_mapping.get_item(&cond);
-        }
-        if let AstOp::BVS(name, _) | AstOp::BoolS(name) = ast.op()
-            && self.condition_mapping.contains(name.as_str())?
+        let leaf = if let AstOp::BoolV(true) = ast.op() {
+            wrap(constant(
+                next_atom()?,
+                ConstValue::Int(1),
+                1,
+                &Tags::default(),
+            ))?
+        } else if condition_mapping.contains(&cond)? {
+            condition_mapping.get_item(&cond)?
+        } else if let AstOp::BVS(name, _) | AstOp::BoolS(name) = ast.op()
+            && condition_mapping.contains(name.as_str())?
         {
-            return self.condition_mapping.get_item(name.as_str());
-        }
+            condition_mapping.get_item(name.as_str())?
+        } else {
+            return Ok(None);
+        };
+        finish(ast, leaf).map(Some)
+    };
 
+    // Operators, built from their converted children
+    let post_visit = |ast: AstRef<'static>, children: &[Ail<'py>]| -> PyResult<Ail<'py>> {
+        let cond = Base::from_ast(py, ast.clone())?;
         let is_bool = ast.ast_type().is_bool();
         let is_comparison = matches!(
             ast.op(),
@@ -243,15 +213,35 @@ impl<'a, 'py> Converter<'a, 'py> {
                 | AstOp::SGT(..)
                 | AstOp::SGE(..)
         );
-        let (tags, floating_point) = self.tags_of(&cond, is_comparison)?;
+        let (tags, floating_point) = tags_of(&ast2annotations, &cond, is_comparison)?;
         let tags = &tags;
 
+        // A left-leaning chain of `op` over the operands. A single operand stands for itself.
+        let fold = |op: &str, signed: bool, operands: &[Ail<'py>]| -> PyResult<Ail<'py>> {
+            let (first, rest) = operands
+                .split_first()
+                .ok_or_else(|| PyRuntimeError::new_err(format!("{op} without operands")))?;
+            let mut chain = first.clone();
+            for operand in rest {
+                let idx = next_atom()?;
+                chain = wrap(binary_op(
+                    idx,
+                    op,
+                    chain.extract()?,
+                    operand.extract()?,
+                    signed,
+                    tags,
+                ))?;
+            }
+            Ok(chain)
+        };
+
         macro_rules! unop {
-            ($op:literal, $a:expr) => {{
-                let operand: AilExpression = self.convert($a)?.extract()?;
-                self.wrap(AilExpression {
+            ($op:literal) => {{
+                let operand: AilExpression = children[0].extract()?;
+                wrap(AilExpression {
                     header: ExprHeader::new(
-                        self.next_atom()?,
+                        next_atom()?,
                         operand.header.depth + 1,
                         operand.header.bits,
                         tags.clone(),
@@ -265,16 +255,11 @@ impl<'a, 'py> Converter<'a, 'py> {
             }};
         }
         macro_rules! binop {
-            ($op:literal, $a:expr, $b:expr) => {
-                self.reduce($op, [$a, $b], false, tags)?
+            ($op:literal) => {
+                fold($op, false, children)?
             };
-            ($op:literal, $a:expr, $b:expr, signed) => {
-                self.reduce($op, [$a, $b], true, tags)?
-            };
-        }
-        macro_rules! naryop {
-            ($op:literal, $args:expr) => {
-                self.reduce($op, $args, false, tags)?
+            ($op:literal, signed) => {
+                fold($op, true, children)?
             };
         }
         // An (in)equality. A bit test like `(base & 0b100) != 0` is canonicalized by clarirs
@@ -298,78 +283,99 @@ impl<'a, 'py> Converter<'a, 'py> {
                     });
                 match bit_test {
                     Some((base, hi, lo)) => {
+                        // the base was converted on the way to the extract
+                        let base_ail: AilExpression = memoized(base)?
+                            .ok_or_else(|| PyRuntimeError::new_err("unconverted extract base"))?
+                            .extract()?;
                         let mask = ((BigInt::from(1) << (hi - lo + 1)) - 1) << lo;
-                        let base_ail: AilExpression = self.convert(base)?.extract()?;
-                        let idx = self.next_atom()?;
-                        let mask = self.constant(const_value(mask), base.size(), tags)?;
-                        let masked = self.binary_op(idx, "And", base_ail, mask, false, tags);
-                        let idx = self.next_atom()?;
-                        let zero = self.constant(ConstValue::Int(0), base.size(), tags)?;
-                        self.wrap(self.binary_op(idx, $op, masked, zero, false, tags))?
+                        let idx = next_atom()?;
+                        let mask = constant(next_atom()?, const_value(mask), base.size(), tags);
+                        let masked = binary_op(idx, "And", base_ail, mask, false, tags);
+                        let idx = next_atom()?;
+                        let zero = constant(next_atom()?, ConstValue::Int(0), base.size(), tags);
+                        wrap(binary_op(idx, $op, masked, zero, false, tags))?
                     }
-                    None => binop!($op, $a, $b),
+                    None => binop!($op),
                 }
             }};
         }
 
-        let converted = match ast.op() {
+        let mut converted = match ast.op() {
             // Polymorphic boolean/bitvector operations
-            AstOp::Not(a) if is_bool => unop!("Not", a),
-            AstOp::Not(a) => unop!("BitwiseNeg", a),
-            AstOp::And(args) if is_bool => naryop!("LogicalAnd", args),
-            AstOp::And(args) => naryop!("And", args),
-            AstOp::Or(args) if is_bool => naryop!("LogicalOr", args),
-            AstOp::Or(args) => naryop!("Or", args),
-            AstOp::Xor(args) if !is_bool => naryop!("Xor", args),
+            AstOp::Not(..) if is_bool => unop!("Not"),
+            AstOp::Not(..) => unop!("BitwiseNeg"),
+            AstOp::And(..) if is_bool => binop!("LogicalAnd"),
+            AstOp::And(..) => binop!("And"),
+            AstOp::Or(..) if is_bool => binop!("LogicalOr"),
+            AstOp::Or(..) => binop!("Or"),
+            AstOp::Xor(..) if !is_bool => binop!("Xor"),
 
             // Boolean leaves and predicates
-            AstOp::BoolV(value) => {
-                self.wrap(self.constant(ConstValue::Int(i128::from(*value)), 1, tags)?)?
-            }
+            AstOp::BoolV(value) => wrap(constant(
+                next_atom()?,
+                ConstValue::Int(i128::from(*value)),
+                1,
+                tags,
+            ))?,
             AstOp::Eq(a, b) => equality!("CmpEQ", a, b),
             AstOp::Neq(a, b) => equality!("CmpNE", a, b),
-            AstOp::ULT(a, b) => binop!("CmpLT", a, b),
-            AstOp::ULE(a, b) => binop!("CmpLE", a, b),
-            AstOp::UGT(a, b) => binop!("CmpGT", a, b),
-            AstOp::UGE(a, b) => binop!("CmpGE", a, b),
-            AstOp::SLT(a, b) => binop!("CmpLT", a, b, signed),
-            AstOp::SLE(a, b) => binop!("CmpLE", a, b, signed),
-            AstOp::SGT(a, b) => binop!("CmpGT", a, b, signed),
-            AstOp::SGE(a, b) => binop!("CmpGE", a, b, signed),
+            AstOp::ULT(..) => binop!("CmpLT"),
+            AstOp::ULE(..) => binop!("CmpLE"),
+            AstOp::UGT(..) => binop!("CmpGT"),
+            AstOp::UGE(..) => binop!("CmpGE"),
+            AstOp::SLT(..) => binop!("CmpLT", signed),
+            AstOp::SLE(..) => binop!("CmpLE", signed),
+            AstOp::SGT(..) => binop!("CmpGT", signed),
+            AstOp::SGE(..) => binop!("CmpGE", signed),
 
             // Bitvector leaves and operations
             AstOp::BVV(value) => {
                 let value = const_value(BigInt::from(value.to_biguint()));
-                self.wrap(self.constant(value, ast.size(), tags)?)?
+                wrap(constant(next_atom()?, value, ast.size(), tags))?
             }
-            AstOp::Neg(a) => unop!("Neg", a),
-            AstOp::Add(args) => naryop!("Add", args),
-            AstOp::Sub(a, b) => binop!("Sub", a, b),
-            AstOp::Mul(args) => naryop!("Mul", args),
-            AstOp::UDiv(a, b) => binop!("Div", a, b),
-            AstOp::URem(a, b) => binop!("Mod", a, b),
-            AstOp::ShL(a, b) => binop!("Shl", a, b),
-            AstOp::LShR(a, b) => binop!("Shr", a, b),
-            AstOp::AShR(a, b) => binop!("Sar", a, b),
-            AstOp::ZeroExt(a, amount) => {
+            AstOp::Neg(..) => unop!("Neg"),
+            AstOp::Add(..) => binop!("Add"),
+            AstOp::Sub(..) => binop!("Sub"),
+            AstOp::Mul(..) => binop!("Mul"),
+            AstOp::UDiv(..) => binop!("Div"),
+            AstOp::URem(..) => binop!("Mod"),
+            AstOp::ShL(..) => binop!("Shl"),
+            AstOp::LShR(..) => binop!("Shr"),
+            AstOp::AShR(..) => binop!("Sar"),
+            AstOp::ZeroExt(_, amount) => {
+                // zero bits concatenated in front; the zero converts like any other constant
                 let zero = GLOBAL_CONTEXT
                     .bvv(BitVec::from((BigUint::ZERO, *amount)))
                     .map_err(ClaripyError::from)?;
-                binop!("Concat", &zero, a)
+                let zero_ail = match memoized(&zero)? {
+                    Some(hit) => hit,
+                    None => {
+                        let zero_cond = Base::from_ast(py, zero.clone())?;
+                        let (zero_tags, _) = tags_of(&ast2annotations, &zero_cond, false)?;
+                        let value = constant(next_atom()?, ConstValue::Int(0), *amount, &zero_tags);
+                        finish(&zero, wrap(value)?)?
+                    }
+                };
+                fold("Concat", false, &[zero_ail, children[0].clone()])?
             }
             AstOp::Extract(a, hi, lo) => {
                 // ailment does not support Extract. We translate Extract(hi, lo, expr) to a
                 // logical right shift by `lo` (dropping the low bits) followed by a Convert
                 // that truncates to the extracted width.
-                let mut operand: AilExpression = self.convert(a)?.extract()?;
+                let mut operand: AilExpression = children[0].extract()?;
                 if *lo != 0 {
-                    let idx = self.next_atom()?;
-                    let amount = self.constant(ConstValue::Int(i128::from(*lo)), a.size(), tags)?;
-                    operand = self.binary_op(idx, "Shr", operand, amount, false, tags);
+                    let idx = next_atom()?;
+                    let amount = constant(
+                        next_atom()?,
+                        ConstValue::Int(i128::from(*lo)),
+                        a.size(),
+                        tags,
+                    );
+                    operand = binary_op(idx, "Shr", operand, amount, false, tags);
                 }
-                self.wrap(AilExpression {
+                wrap(AilExpression {
                     header: ExprHeader::new(
-                        self.next_atom()?,
+                        next_atom()?,
                         operand.header.depth + 1,
                         hi - lo + 1,
                         tags.clone(),
@@ -386,7 +392,7 @@ impl<'a, 'py> Converter<'a, 'py> {
                     },
                 })?
             }
-            AstOp::Concat(args) => naryop!("Concat", args),
+            AstOp::Concat(..) => binop!("Concat"),
 
             _ => {
                 return Err(PyNotImplementedError::new_err(format!(
@@ -400,15 +406,18 @@ impl<'a, 'py> Converter<'a, 'py> {
         if floating_point && let Ok(expression) = converted.cast::<Expression>() {
             // claripy has no FP flavor of these operators; restore the flag on the rebuilt
             // expression
-            let expr = &expression.borrow().expr;
-            if let ExprInner::BinaryOp {
-                op,
-                operands,
-                signed,
-                floating_point: false,
-                ..
-            } = &expr.inner
-                && matches!(
+            let flagged = match &expression.borrow().expr {
+                expr @ AilExpression {
+                    inner:
+                        ExprInner::BinaryOp {
+                            op,
+                            operands,
+                            signed,
+                            floating_point: false,
+                            ..
+                        },
+                    ..
+                } if matches!(
                     op.as_str(),
                     "CmpEQ"
                         | "CmpNE"
@@ -420,58 +429,44 @@ impl<'a, 'py> Converter<'a, 'py> {
                         | "Sub"
                         | "Mul"
                         | "Div"
-                )
-            {
-                let depth = operands[0].header.depth.max(operands[1].header.depth) + 1;
-                return self.wrap(AilExpression {
-                    header: ExprHeader::new(
-                        expr.header.idx,
-                        depth,
-                        expr.header.bits,
-                        expr.header.tags.clone(),
-                    ),
-                    inner: ExprInner::BinaryOp {
-                        op: op.clone(),
-                        operands: operands.clone(),
-                        signed: *signed,
-                        floating_point: true,
-                        rounding_mode: None,
-                        vector_count: None,
-                        vector_size: None,
-                    },
-                });
+                ) =>
+                {
+                    let depth = operands[0].header.depth.max(operands[1].header.depth) + 1;
+                    Some(AilExpression {
+                        header: ExprHeader::new(
+                            expr.header.idx,
+                            depth,
+                            expr.header.bits,
+                            expr.header.tags.clone(),
+                        ),
+                        inner: ExprInner::BinaryOp {
+                            op: op.clone(),
+                            operands: operands.clone(),
+                            signed: *signed,
+                            floating_point: true,
+                            rounding_mode: None,
+                            vector_count: None,
+                            vector_size: None,
+                        },
+                    })
+                }
+                _ => None,
+            };
+            if let Some(flagged) = flagged {
+                converted = wrap(flagged)?;
             }
         }
-        Ok(converted)
-    }
-}
-
-/// Convert a claripy AST back into an AIL expression.
-///
-/// ``condition_mapping`` and ``ast2annotations`` are the tables that
-/// ``claripy_ast_from_ail`` filled. ``memo`` maps the claripy hash of every
-/// subtree converted so far to its AIL expression; pass the same dict to
-/// several calls to share conversions between them. ``optimize`` is called
-/// with every expression the conversion builds and returns the expression to
-/// use in its place.
-#[pyfunction]
-pub fn ail_from_claripy_ast<'py>(
-    py: Python<'py>,
-    cond: Bound<'py, Base>,
-    condition_mapping: Bound<'py, PyAny>,
-    ast2annotations: Bound<'py, PyAny>,
-    ail_manager: Bound<'py, PyAny>,
-    memo: Bound<'py, PyDict>,
-    optimize: Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let mut converter = Converter {
-        py,
-        condition_mapping: &condition_mapping,
-        ast2annotations: &ast2annotations,
-        ail_manager: &ail_manager,
-        memo: &memo,
-        optimize: &optimize,
-        depth: 0,
+        finish(&ast, converted)
     };
-    converter.convert(&cond.get().ast())
+
+    walk(
+        cond.get().ast(),
+        |ast| pre_visit(ast).map_err(park),
+        |ast, children| post_visit(ast, children).map_err(park),
+        &(),
+    )
+    .map_err(|err| match raised.take() {
+        Some(raised) => raised,
+        None => ClaripyError::from(err).into(),
+    })
 }
