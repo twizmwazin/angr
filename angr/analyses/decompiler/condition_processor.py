@@ -5,7 +5,7 @@ import operator
 import struct
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable, Generator
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
 import networkx
 
@@ -29,6 +29,7 @@ from .structurer_nodes import (
     IncompleteSwitchCaseNode,
     LoopNode,
     MultiNode,
+    Node,
     SequenceNode,
     SwitchCaseNode,
 )
@@ -307,7 +308,7 @@ class ConditionProcessor:
         cond = claripy.Not(edge_cond_left) == edge_cond_right
         return claripy.is_true(claripy.simplify(cond))  # type: ignore
 
-    def recover_edge_condition(self, graph: networkx.DiGraph, src, dst):
+    def recover_edge_condition(self, graph: networkx.DiGraph, src, dst) -> claripy.ast.Bool:
         def _check_condnode_and_get_condition(cond_node: ConditionNode) -> claripy.ast.Bool | None:
             for cond_block, negate in [(cond_node.true_node, False), (cond_node.false_node, True)]:
                 if isinstance(cond_block, ailment.Block) and cond_block.statements:
@@ -485,8 +486,19 @@ class ConditionProcessor:
 
         self.guarding_conditions = guarding_conditions
 
+    @overload
+    def remove_claripy_bool_asts(
+        self, node: SequenceNode[claripy.ast.Bool]
+    ) -> SequenceNode[ailment.Expr.Expression]: ...
+    @overload
+    def remove_claripy_bool_asts(self, node: Node[claripy.ast.Bool]) -> Node[ailment.Expr.Expression]: ...
+
     def remove_claripy_bool_asts(self, node):
-        # Convert claripy Bool ASTs to AIL expressions
+        """
+        Convert a structured tree whose conditions are claripy Bools into one whose conditions are AIL expressions.
+        This is the one place a tree changes its condition type: structurers produce the former, and everything that
+        runs after structuring works on the latter.
+        """
 
         if self._conversion_memo is not None:
             return self._remove_claripy_bool_asts(node)
@@ -821,7 +833,7 @@ class ConditionProcessor:
             **tags,
         )
 
-    def convert_claripy_bool_ast(self, cond):
+    def convert_claripy_bool_ast(self, cond) -> ailment.Expr.Expression:
         """
         Convert recovered reaching conditions from claripy ASTs to ailment Expressions.
 
@@ -989,7 +1001,32 @@ class ConditionProcessor:
             f"Condition variable {cond} has an unsupported operator {cond.op}. Consider implementing."
         )
 
+    @overload
     def claripy_ast_from_ail_condition(
+        self, condition, *, nobool: bool = False, must_bool: Literal[True], ins_addr: int = 0
+    ) -> claripy.ast.Bool: ...
+    @overload
+    def claripy_ast_from_ail_condition(
+        self, condition, *, nobool: bool = False, must_bool: bool = False, ins_addr: int = 0
+    ) -> claripy.ast.Bool | claripy.ast.Bits: ...
+
+    def claripy_ast_from_ail_condition(
+        self, condition, *, nobool: bool = False, must_bool: bool = False, ins_addr: int = 0
+    ) -> claripy.ast.Bool | claripy.ast.Bits:
+        """
+        Convert an AIL expression into a claripy AST, keeping what cannot be expressed in claripy as an opaque variable
+        that converts back to the original expression.
+
+        :param nobool:      Never return a Bool; a boolean result comes back as a 1-bit bitvector.
+        :param must_bool:   Always return a Bool; a bitvector result ``v`` comes back as ``v != 0``.
+        :param ins_addr:    The address of the instruction the expression is evaluated at.
+        """
+        r = self._claripy_ast_from_ail_condition(condition, nobool=nobool, must_bool=must_bool, ins_addr=ins_addr)
+        if must_bool and not isinstance(r, claripy.ast.Bool):
+            r = cast("claripy.ast.Bool", r != 0)
+        return r
+
+    def _claripy_ast_from_ail_condition(
         self, condition, *, nobool: bool = False, must_bool: bool = False, ins_addr: int = 0
     ) -> claripy.ast.Bool | claripy.ast.Bits:
         # Unpack a condition all the way to the leaves
@@ -1102,7 +1139,7 @@ class ConditionProcessor:
             return var
         if isinstance(condition, ailment.Expr.MultiStatementExpression):
             # just cache it
-            if condition.bits == 1:
+            if condition.bits == 1 or must_bool:
                 var = claripy.BoolS(f"mstmtexpr_{hash(condition)}", explicit_name=True)
             else:
                 var = claripy.BVS(f"mstmtexpr_{hash(condition)}", condition.bits, explicit_name=True)

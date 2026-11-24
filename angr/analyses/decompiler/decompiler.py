@@ -70,7 +70,7 @@ _PEEPHOLE_OPTIMIZATIONS_TYPE = (
 )
 
 
-class ConstantCollector(SequenceWalker):
+class ConstantCollector(SequenceWalker[ailment.Expr.Expression]):
     """
     Collect the values of all integer constants in a structured sequence, including the constants inside expressions
     and statements that structuring lifts out of blocks and onto the nodes themselves.

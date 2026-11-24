@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from angr.ailment import Manager
 
 
-class SwitchExpressionSimplifier(SequenceWalker):
+class SwitchExpressionSimplifier(SequenceWalker[ailment.Expr.Expression]):
     """
     Identifies switch expressions that adds or minuses a constant, removes the constant from the switch expression, and
     adjust all case expressions accordingly.

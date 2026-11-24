@@ -7,7 +7,7 @@ from angr.analyses.decompiler.sequence_walker import SequenceWalker
 from angr.analyses.decompiler.structurer_nodes import LoopNode
 
 
-class ControlFlowStructureCounter(SequenceWalker):
+class ControlFlowStructureCounter(SequenceWalker[ailment.Expr.Expression]):
     """
     Counts the number of different types of control flow structures found in a sequence of nodes.
     This should be used after the sequence has been simplified.

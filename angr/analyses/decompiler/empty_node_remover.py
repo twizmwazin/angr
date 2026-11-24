@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from angr import ailment, claripy
 from angr.ailment.expression import negate
@@ -18,6 +18,7 @@ from .structurer_nodes import (
     ContinueNode,
     LoopNode,
     MultiNode,
+    Node,
     SequenceNode,
     SwitchCaseNode,
 )
@@ -26,7 +27,7 @@ if TYPE_CHECKING:
     from angr.ailment import Manager
 
 
-class EmptyNodeRemover:
+class EmptyNodeRemover[C: claripy.ast.Bool | ailment.Expr.Expression]:
     """
     Rewrites a node and its children to remove empty nodes.
 
@@ -34,10 +35,10 @@ class EmptyNodeRemover:
     - Convert if (A) { } else { ... } to if(!A) { ... } else { }
 
     :ivar _claripy_ast_conditions:  True if all node conditions are claripy ASTs. False if all node conditions are AIL
-                                    expressions.
+                                    expressions. It must agree with ``C``, the condition type of the tree.
     """
 
-    def __init__(self, node, ail_manager: Manager, claripy_ast_conditions: bool = True):
+    def __init__(self, node: Node[C], ail_manager: Manager, claripy_ast_conditions: bool = True):
         self.root = node
         self.ail_manager = ail_manager
         self._claripy_ast_conditions = claripy_ast_conditions
@@ -58,7 +59,8 @@ class EmptyNodeRemover:
             ConditionalBreakNode: self._handle_Default,
             ailment.Block: self._handle_Block,
         }
-        self._walker = SequenceWalker(handlers=handlers)
+        self._walker: SequenceWalker[C] = SequenceWalker(handlers=handlers)
+        self.result: SequenceNode[C]
         r = self._walker.walk(self.root)
         if r is None:
             self.result = SequenceNode(node.addr, nodes=[])
@@ -124,7 +126,13 @@ class EmptyNodeRemover:
             return inner_node
         if self._claripy_ast_conditions and isinstance(inner_node, CodeNode):
             # unpack the codenode so we don't have directly nested CodeNodes
-            return CodeNode(inner_node.node, claripy.And(node.reaching_condition, inner_node.reaching_condition))
+            return CodeNode(
+                inner_node.node,
+                claripy.And(
+                    cast("claripy.ast.Bool", node.reaching_condition),
+                    cast("claripy.ast.Bool", inner_node.reaching_condition),
+                ),
+            )
         return CodeNode(inner_node, node.reaching_condition)
 
     def _handle_Condition(self, node, **kwargs):
@@ -185,7 +193,8 @@ class EmptyNodeRemover:
             return None
 
         result = node.copy()
-        result.sequence_node = new_seq
+        # a loop whose body was removed entirely keeps None as its body
+        result.sequence_node = new_seq  # type: ignore[assignment]
         return result
 
     def _handle_Continue(self, node: ContinueNode, **kwargs):

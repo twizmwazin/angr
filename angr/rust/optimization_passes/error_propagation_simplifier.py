@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from angr import ailment
 from angr.ailment import AILBlockViewer, Assignment, Block, Const
 from angr.ailment.expression import Call, RustEnum, VirtualVariable
 from angr.ailment.statement import Jump, Label, Return
@@ -14,7 +15,7 @@ from angr.rust.structuring.structurer_nodes import PatternMatchNode
 from angr.utils.ssa import VVarUsesCollector
 
 
-class ErrorPropagationWalker(SequenceWalker):
+class ErrorPropagationWalker(SequenceWalker[ailment.Expr.Expression]):
     """Walk sequence nodes to detect and simplify error propagation patterns."""
 
     def __init__(self, context: ErrorPropagationSimplifier):

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from angr import ailment, claripy
 from angr.ailment import Block
 from angr.ailment.block_walker import AILBlockViewer
 from angr.ailment.statement import ConditionalJump, Label
@@ -35,7 +36,7 @@ class AILBlockCallCounter(AILBlockViewer):
         super()._handle_Call(expr_idx, expr, stmt_idx, stmt, block)
 
 
-class AILCallCounter(SequenceWalker):
+class AILCallCounter[C: claripy.ast.Bool | ailment.Expr.Expression](SequenceWalker[C]):
     """
     Helper class to count AIL calls and call expressions in a structuring node, or collect call statements and call
     expressions as well as their locations.

@@ -1,6 +1,7 @@
 # pylint:disable=unused-argument,arguments-differ
 from __future__ import annotations
 
+from angr import ailment
 from angr.analyses.decompiler.condition_processor import ConditionProcessor
 from angr.analyses.decompiler.sequence_walker import SequenceWalker
 from angr.analyses.decompiler.structurer_nodes import (
@@ -15,7 +16,7 @@ from angr.analyses.decompiler.structurer_nodes import (
 from angr.analyses.decompiler.utils import insert_node, is_statement_terminating
 
 
-class IfElseFlattener(SequenceWalker):
+class IfElseFlattener(SequenceWalker[ailment.Expr.Expression]):
     """
     Remove unnecessary else branches and make the else node a direct successor of the previous If node if the If node
     always returns.

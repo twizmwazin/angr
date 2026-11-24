@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from angr import ailment, claripy
 from angr.ailment import Block
 
 from .sequence_walker import SequenceWalker
 
 
-class SequenceToBlocks(SequenceWalker):
+class SequenceToBlocks[C: claripy.ast.Bool | ailment.Expr.Expression](SequenceWalker[C]):
     """
     A helper class to convert a sequence node into a list of blocks.
     """

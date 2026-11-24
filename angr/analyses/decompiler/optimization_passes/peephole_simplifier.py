@@ -10,7 +10,7 @@ from angr.analyses.decompiler.utils import (
 from .optimization_pass import OptimizationPassStage, SequenceOptimizationPass
 
 
-class ExpressionSequenceWalker(SequenceWalker):
+class ExpressionSequenceWalker(SequenceWalker[ailment.Expr.Expression]):
     """
     Walks sequences with generic expression handling.
     """

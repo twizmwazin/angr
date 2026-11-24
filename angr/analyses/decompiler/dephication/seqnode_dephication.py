@@ -5,6 +5,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
 import angr
+from angr import ailment
 from angr.ailment.block import Block
 from angr.ailment.expression import BinaryOp, Phi, UnaryOp, VirtualVariable
 from angr.ailment.statement import Assignment
@@ -25,7 +26,7 @@ if TYPE_CHECKING:
 l = logging.getLogger(__name__)
 
 
-class PhiAssignmentCollector(SequenceWalker):
+class PhiAssignmentCollector(SequenceWalker[ailment.Expr.Expression]):
     """
     PhiAssignmentCollector collects all phi variables and their corresponding source virtual variables in a
     SequenceNode.
@@ -52,7 +53,7 @@ class PhiAssignmentCollector(SequenceWalker):
                         self.phi_to_src[stmt.dst.varid].add(vvar.varid)
 
 
-class SeqNodeRewriter(SequenceWalker):
+class SeqNodeRewriter(SequenceWalker[ailment.Expr.Expression]):
     """
     SeqNodeRewriter rewrites a SequenceNode by replacing all phi variables with their corresponding source virtual
     variables.

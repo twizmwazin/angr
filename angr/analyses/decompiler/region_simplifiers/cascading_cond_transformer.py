@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from angr.ailment import Manager
 
 
-class CascadingConditionTransformer(SequenceWalker):
+class CascadingConditionTransformer[C: claripy.ast.Bool | ailment.Expr.Expression](SequenceWalker[C]):
     """
     Identifies and transforms `if { ... } else { if { ... } else { ... } }` to
     `if { ... } else if { ... } else if { ... }`.

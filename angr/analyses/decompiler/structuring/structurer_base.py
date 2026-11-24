@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from collections import OrderedDict, defaultdict
 from types import EllipsisType
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import networkx
 
@@ -27,6 +27,7 @@ from angr.analyses.decompiler.structurer_nodes import (
     IncompleteSwitchCaseNode,
     LoopNode,
     MultiNode,
+    Node,
     SequenceNode,
     SwitchCaseNode,
 )
@@ -88,7 +89,9 @@ class StructurerBase(Analysis):
         # store all virtualized edges (edges that are removed and replaced with a goto)
         self.virtualized_edges = set()
 
-        self.result = None
+        # the structured region, whose conditions are claripy Bools. a nested region that has not been structured
+        # yet is still an overlay.
+        self.result: Node[claripy.ast.Bool] | RegionOverlay | None = None
 
     def _analyze(self):
         raise NotImplementedError
@@ -484,7 +487,7 @@ class StructurerBase(Analysis):
                             # parent.cases[index] is a SequenceNode now
                             parent.cases[index].remove_node(node)
                         elif label == "default":
-                            parent.default_node.remove_node(node)
+                            cast("SequenceNode", parent.default_node).remove_node(node)
                         else:
                             raise TypeError(f"Unsupported label {label}.")
                     else:
@@ -659,7 +662,9 @@ class StructurerBase(Analysis):
                 cond = last_stmt.condition
                 target = last_stmt.true_target.value
                 new_node = ConditionalBreakNode(
-                    last_stmt.tags["ins_addr"], self.cond_proc.claripy_ast_from_ail_condition(cond), target
+                    last_stmt.tags["ins_addr"],
+                    self.cond_proc.claripy_ast_from_ail_condition(cond, must_bool=True),
+                    target,
                 )
             elif (false_target_value is not None and false_target_value in loop_successor_addrs) and (
                 true_target_value is None or true_target_value not in loop_successor_addrs
@@ -668,7 +673,9 @@ class StructurerBase(Analysis):
                 cond = ailment.Expr.UnaryOp(last_stmt.condition.idx, "Not", last_stmt.condition)
                 target = last_stmt.false_target.value
                 new_node = ConditionalBreakNode(
-                    last_stmt.tags["ins_addr"], self.cond_proc.claripy_ast_from_ail_condition(cond), target
+                    last_stmt.tags["ins_addr"],
+                    self.cond_proc.claripy_ast_from_ail_condition(cond, must_bool=True),
+                    target,
                 )
             elif (false_target_value is not None and false_target_value in loop_successor_addrs) and (
                 true_target_value is not None and true_target_value in loop_successor_addrs
@@ -918,7 +925,7 @@ class StructurerBase(Analysis):
         )
 
     @staticmethod
-    def _first_block(node: BaseNode | ailment.Block) -> ailment.Block | None:
+    def _first_block(node: Node) -> ailment.Block | None:
         while isinstance(node, (SequenceNode, MultiNode)):
             if not node.nodes:
                 return None
@@ -1182,7 +1189,7 @@ class StructurerBase(Analysis):
         return False
 
     @staticmethod
-    def has_nonlabel_nonphi_statements(node: BaseNode) -> bool:
+    def has_nonlabel_nonphi_statements(node: Node) -> bool:
         if isinstance(node, ailment.Block):
             return has_nonlabel_nonphi_statements(node)
         if isinstance(node, MultiNode):
@@ -1191,7 +1198,7 @@ class StructurerBase(Analysis):
             return any(StructurerBase.has_nonlabel_nonphi_statements(nn) for nn in node.nodes)
         return False
 
-    def _node_ending_with_jump_table_header(self, node: BaseNode) -> tuple[int | None, IndirectJump | None]:
+    def _node_ending_with_jump_table_header(self, node: Node) -> tuple[int | None, IndirectJump | None]:
         if isinstance(node, (ailment.Block, MultiNode, IncompleteSwitchCaseNode)):
             assert node.addr is not None
             return node.addr, self.jump_tables.get(node.addr, None)

@@ -1,14 +1,14 @@
 # pylint:disable=unused-argument
 from __future__ import annotations
 
-from angr import ailment
+from angr import ailment, claripy
 
 from .sequence_walker import SequenceWalker
-from .structurer_nodes import SequenceNode
+from .structurer_nodes import Node, SequenceNode
 from .utils import first_nonlabel_nonphi_statement
 
 
-class RedundantLabelRemover:
+class RedundantLabelRemover[C: claripy.ast.Bool | ailment.Expr.Expression]:
     """
     Remove redundant labels.
 
@@ -18,7 +18,7 @@ class RedundantLabelRemover:
     anywhere (determined by jump_targets), or (b) are deemed replaceable by the first pass.
     """
 
-    def __init__(self, node, jump_targets: set[tuple[int, int]]):
+    def __init__(self, node: Node[C], jump_targets: set[tuple[int, int]]):
         self.root = node
         self._jump_targets = jump_targets
 
@@ -28,7 +28,7 @@ class RedundantLabelRemover:
         handlers0 = {
             SequenceNode: self._handle_Sequence,
         }
-        self._walker0 = SequenceWalker(handlers=handlers0)
+        self._walker0: SequenceWalker[C] = SequenceWalker(handlers=handlers0)
         self._walker0.walk(self.root)
 
         # update jump targets
@@ -37,9 +37,9 @@ class RedundantLabelRemover:
         handlers1 = {
             ailment.Block: self._handle_Block,
         }
-        self._walker1 = SequenceWalker(handlers=handlers1)
+        self._walker1: SequenceWalker[C] = SequenceWalker(handlers=handlers1)
         self._walker1.walk(self.root)
-        self.result = self.root
+        self.result: Node[C] = self.root
 
     def _update_jump_targets(self) -> None:
         """

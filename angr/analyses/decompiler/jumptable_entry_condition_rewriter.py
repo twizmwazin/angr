@@ -6,7 +6,7 @@ from .sequence_walker import SequenceWalker
 from .structurer_nodes import CodeNode, ConditionNode
 
 
-class JumpTableEntryConditionRewriter(SequenceWalker):
+class JumpTableEntryConditionRewriter(SequenceWalker[claripy.ast.Bool]):
     """
     Remove artificial jump table entry conditions that ConditionProcessor introduced when dealing with jump tables.
     """

@@ -5,7 +5,7 @@ from angr import ailment
 from angr.analyses.decompiler.sequence_walker import SequenceWalker
 
 
-class NodeAddressFinder(SequenceWalker):
+class NodeAddressFinder(SequenceWalker[ailment.Expr.Expression]):
     """
     Walk the entire node and collect all addresses of nodes.
     """

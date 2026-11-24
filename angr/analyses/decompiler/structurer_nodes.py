@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Iterable
-from typing import Any
 
 import angr
 import angr.ailment.utils
@@ -12,6 +11,14 @@ from angr.ailment.block import Block
 from angr.utils.hashing import stable_hash
 
 INDENT_DELTA = 2
+
+# A structured tree holds its conditions in one of two forms. The structurers build them as claripy Bools, which can
+# be simplified and negated symbolically; ConditionProcessor.remove_claripy_bool_asts() then converts the finished tree
+# and everything downstream works on AIL expressions. Every node is generic over that condition type, so a tree is
+# either all-claripy or all-AIL.
+
+# Anything that can sit in a structured tree whose conditions are of type C.
+type Node[C: claripy.ast.Bool | ailment.Expr.Expression] = BaseNode[C] | Block | MultiNode
 
 
 class EmptyBlockNotice(Exception):
@@ -73,7 +80,11 @@ class MultiNode:
         return s
 
 
-class BaseNode:
+class BaseNode[C: claripy.ast.Bool | ailment.Expr.Expression]:
+    """
+    The base class of all structurer nodes. ``C`` is the type of the conditions in the tree this node belongs to.
+    """
+
     __slots__ = ("_hash", "addr")
 
     def __init__(self, addr: int):
@@ -115,31 +126,31 @@ class BaseNode:
         return " " * indent + f"## dbg_repr not implemented for {type(self).__name__}"
 
 
-class SequenceNode(BaseNode):
+class SequenceNode[C: claripy.ast.Bool | ailment.Expr.Expression](BaseNode[C]):
     __slots__ = ("nodes",)
 
-    def __init__(self, addr: int, nodes=None):
+    def __init__(self, addr: int, nodes: list[Node[C]] | None = None):
         super().__init__(addr)
-        self.nodes = nodes if nodes is not None else []
+        self.nodes: list[Node[C]] = nodes if nodes is not None else []
 
     def __repr__(self):
         if self.addr is None:
             return f"<SequenceNode, {len(self.nodes)} nodes>"
         return f"<SequenceNode {self.addr:#x}, {len(self.nodes)} nodes>"
 
-    def add_node(self, node):
+    def add_node(self, node: Node[C]):
         self.nodes.append(node)
 
-    def insert_node(self, pos, node):
+    def insert_node(self, pos: int, node: Node[C]):
         self.nodes.insert(pos, node)
 
-    def remove_node(self, node):
+    def remove_node(self, node: Node[C]):
         self.nodes.remove(node)
 
-    def node_position(self, node):
+    def node_position(self, node: Node[C]) -> int:
         return self.nodes.index(node)
 
-    def copy(self):
+    def copy(self) -> SequenceNode[C]:
         return SequenceNode(self.addr, nodes=self.nodes[::])
 
     def dbg_repr(self, indent=0):
@@ -151,17 +162,17 @@ class SequenceNode(BaseNode):
         return s
 
 
-class CodeNode(BaseNode):
+class CodeNode[C: claripy.ast.Bool | ailment.Expr.Expression](BaseNode[C]):
     __slots__ = (
         "idx",
         "node",
         "reaching_condition",
     )
 
-    def __init__(self, node: BaseNode | Block, reaching_condition, addr: int | None = None, idx: int | None = None):
+    def __init__(self, node: Node[C], reaching_condition: C | None, addr: int | None = None, idx: int | None = None):
         super().__init__(addr if addr is not None else node.addr)
-        self.node = node
-        self.reaching_condition = reaching_condition
+        self.node: Node[C] = node
+        self.reaching_condition: C | None = reaching_condition
         # addr and idx are captured at construction time so that they do not change when self.node is replaced
         self.idx = idx if idx is not None else getattr(node, "idx", None)
 
@@ -191,11 +202,11 @@ class CodeNode(BaseNode):
 
         return s
 
-    def copy(self):
+    def copy(self) -> CodeNode[C]:
         return CodeNode(self.node, self.reaching_condition, addr=self.addr, idx=self.idx)
 
 
-class ConditionNode(BaseNode):
+class ConditionNode[C: claripy.ast.Bool | ailment.Expr.Expression](BaseNode[C]):
     __slots__ = (
         "condition",
         "false_node",
@@ -204,12 +215,19 @@ class ConditionNode(BaseNode):
         "true_node",
     )
 
-    def __init__(self, addr, reaching_condition, condition, true_node, false_node=None):
+    def __init__(
+        self,
+        addr: int,
+        reaching_condition: C | None,
+        condition: C,
+        true_node: Node[C] | None,
+        false_node: Node[C] | None = None,
+    ):
         super().__init__(addr)
-        self.reaching_condition = reaching_condition
-        self.condition = condition
-        self.true_node = true_node
-        self.false_node = false_node
+        self.reaching_condition: C | None = reaching_condition
+        self.condition: C = condition
+        self.true_node: Node[C] | None = true_node
+        self.false_node: Node[C] | None = false_node
 
     def dbg_repr(self, indent=0):
         indent_str = indent * " "
@@ -228,7 +246,7 @@ class ConditionNode(BaseNode):
         return f"<ConditionNode ({self.true_node!r}|{self.false_node!r})>"
 
 
-class CascadingConditionNode(BaseNode):
+class CascadingConditionNode[C: claripy.ast.Bool | ailment.Expr.Expression](BaseNode[C]):
     __slots__ = (
         "condition_and_nodes",
         "else_node",
@@ -236,13 +254,13 @@ class CascadingConditionNode(BaseNode):
 
     def __init__(
         self,
-        addr,
-        condition_and_nodes: list[tuple[Any, BaseNode | ailment.Block | MultiNode]],
-        else_node: BaseNode | None = None,
+        addr: int,
+        condition_and_nodes: list[tuple[C, Node[C]]],
+        else_node: Node[C] | None = None,
     ):
         super().__init__(addr)
-        self.condition_and_nodes = condition_and_nodes
-        self.else_node = else_node
+        self.condition_and_nodes: list[tuple[C, Node[C]]] = condition_and_nodes
+        self.else_node: Node[C] | None = else_node
 
     def dbg_repr(self, indent=0):
         indent_str = indent * " "
@@ -260,7 +278,7 @@ class CascadingConditionNode(BaseNode):
         return s
 
 
-class LoopNode(BaseNode):
+class LoopNode[C: claripy.ast.Bool | ailment.Expr.Expression](BaseNode[C]):
     __slots__ = (
         "_continue_addr",
         "condition",
@@ -273,23 +291,23 @@ class LoopNode(BaseNode):
     def __init__(
         self,
         sort: str,
-        condition: ailment.Expr.Expression | None,
-        sequence_node: SequenceNode,
+        condition: C | None,
+        sequence_node: SequenceNode[C],
         addr: int | None = None,
         continue_addr: int | None = None,
-        initializer: ailment.Stmt.Assignment | None = None,
-        iterator: ailment.Stmt.Assignment | None = None,
+        initializer: ailment.Stmt.Statement | None = None,
+        iterator: ailment.Stmt.Statement | None = None,
     ):
         super().__init__(addr if addr is not None else sequence_node.addr)
         self.sort: str = sort
-        self.condition: ailment.Expr.Expression | None = condition
-        self.sequence_node: SequenceNode = sequence_node
-        self.initializer: ailment.Stmt.Assignment | None = initializer
-        self.iterator: ailment.Stmt.Assignment | None = iterator
+        self.condition: C | None = condition
+        self.sequence_node: SequenceNode[C] = sequence_node
+        self.initializer: ailment.Stmt.Statement | None = initializer
+        self.iterator: ailment.Stmt.Statement | None = iterator
         # addr is captured at construction time so that it does not change when self.sequence_node is replaced
         self._continue_addr: int | None = continue_addr
 
-    def copy(self):
+    def copy(self) -> LoopNode[C]:
         return LoopNode(
             self.sort,
             self.condition,
@@ -326,7 +344,7 @@ class LoopNode(BaseNode):
         )
 
 
-class BreakNode(BaseNode):
+class BreakNode[C: claripy.ast.Bool | ailment.Expr.Expression](BaseNode[C]):
     __slots__ = ("target",)
 
     def __init__(self, addr, target):
@@ -337,7 +355,7 @@ class BreakNode(BaseNode):
         return " " * indent + "BreakNode"
 
 
-class ContinueNode(BaseNode):
+class ContinueNode[C: claripy.ast.Bool | ailment.Expr.Expression](BaseNode[C]):
     __slots__ = ("target",)
 
     def __init__(self, addr, target):
@@ -348,12 +366,12 @@ class ContinueNode(BaseNode):
         return " " * indent + "ContinueNode"
 
 
-class ConditionalBreakNode(BreakNode):
+class ConditionalBreakNode[C: claripy.ast.Bool | ailment.Expr.Expression](BreakNode[C]):
     __slots__ = ("condition",)
 
-    def __init__(self, addr, condition, target):
+    def __init__(self, addr, condition: C, target):
         super().__init__(addr, target)
-        self.condition = condition
+        self.condition: C = condition
 
     def __repr__(self):
         return f"<ConditionalBreakNode {self.addr:#x} target:{self.target}>"
@@ -362,7 +380,7 @@ class ConditionalBreakNode(BreakNode):
         return " " * indent + "ConditionalBreakNode(condition={self.condition})"
 
 
-class SwitchCaseNode(BaseNode):
+class SwitchCaseNode[C: claripy.ast.Bool | ailment.Expr.Expression](BaseNode[C]):
     __slots__ = (
         "cases",
         "default_node",
@@ -372,14 +390,14 @@ class SwitchCaseNode(BaseNode):
     def __init__(
         self,
         switch_expr: ailment.Expression,
-        cases: OrderedDict[int | tuple[int, ...], SequenceNode],
-        default_node,
+        cases: OrderedDict[int | tuple[int, ...], SequenceNode[C]],
+        default_node: Node[C] | None,
         addr: int | None = None,
     ):
         super().__init__(addr if addr is not None else switch_expr.tags["ins_addr"])
         self.switch_expr = switch_expr
-        self.cases: OrderedDict[int | tuple[int, ...], SequenceNode] = cases
-        self.default_node = default_node
+        self.cases: OrderedDict[int | tuple[int, ...], SequenceNode[C]] = cases
+        self.default_node: Node[C] | None = default_node
 
     def dbg_repr(self, indent=0) -> str:
         return (
@@ -393,7 +411,7 @@ class SwitchCaseNode(BaseNode):
         )
 
 
-class IncompleteSwitchCaseNode(BaseNode):
+class IncompleteSwitchCaseNode[C: claripy.ast.Bool | ailment.Expr.Expression](BaseNode[C]):
     """
     Describes an incomplete set of switch-case nodes. Usually an intermediate result. Should always be restructured
     into a SwitchCaseNode by the end of structuring. Only used in Phoenix structurer.

@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from angr.ailment import Manager
 
 
-class FlipBooleanWalker(SequenceWalker):
+class FlipBooleanWalker(SequenceWalker[ailment.Expr.Expression]):
     """
     Walks a SequenceNode and handles every sequence.
     Uses the flip_size to determine when to flip the condition on large if-statement bodies.

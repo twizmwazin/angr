@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import itertools
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
+from angr import ailment, claripy
 from angr.analyses.analysis import Analysis, register_analysis
 from angr.analyses.decompiler.condition_processor import ConditionProcessor
 from angr.analyses.decompiler.empty_node_remover import EmptyNodeRemover
@@ -11,7 +12,7 @@ from angr.analyses.decompiler.jump_target_collector import JumpTargetCollector
 from angr.analyses.decompiler.jumptable_entry_condition_rewriter import JumpTableEntryConditionRewriter
 from angr.analyses.decompiler.redundant_label_remover import RedundantLabelRemover
 from angr.analyses.decompiler.region_overlay import RegionOverlay
-from angr.analyses.decompiler.structurer_nodes import BaseNode
+from angr.analyses.decompiler.structurer_nodes import BaseNode, Node
 from angr.utils.graph import GraphUtils
 
 from .dream import DreamStructurer
@@ -47,7 +48,10 @@ class RecursiveStructurer(Analysis):
         self.ail_manager = ail_manager
         self.cond_proc = cond_proc if cond_proc is not None else ConditionProcessor(self.project.arch, self.ail_manager)
 
-        self.result: BaseNode | None = None
+        # the final result, with AIL conditions
+        self.result: Node[ailment.Expr.Expression] | None = None
+        # what the structurers produced, with claripy conditions; _post_process_result() turns it into self.result
+        self._structured: Node[claripy.ast.Bool] | None = None
         self.result_incomplete: bool = False
         # addresses of the top-level regions whose structuring failed; their output misses code blocks
         self.structuring_failures: list[int] = []
@@ -121,11 +125,12 @@ class RecursiveStructurer(Analysis):
                                 "Structuring failed to complete (most likely due to bugs in structuring). The "
                                 "output will miss code blocks."
                             )
-                            self.result = self._pick_incomplete_result_from_region(current_region)
+                            self._structured = self._pick_incomplete_result_from_region(current_region)
                             self.result_incomplete = True
                             self.structuring_failures.append(current_region.addr)
                         else:
-                            self.result = st.result
+                            # the top-level region has been reduced to a single node, never to an overlay
+                            self._structured = cast("Node[claripy.ast.Bool]", st.result)
                         break
 
                     if st.result is None:
@@ -144,33 +149,36 @@ class RecursiveStructurer(Analysis):
             manager.commit(checkpoint)
 
     def _post_process_result(self):
-        if self.result is None:
+        result = self._structured
+        self._structured = None
+        if result is None:
             return
 
         if self.structurer_cls is DreamStructurer:
             # rewrite conditions in the result to remove all jump table entry conditions
             rewriter = JumpTableEntryConditionRewriter(set(itertools.chain(*self.cond_proc.jump_table_conds.values())))
-            rewriter.walk(self.result)  # update SequenceNodes in-place
+            rewriter.walk(result)  # update SequenceNodes in-place
 
             # remove all goto statements
             # TODO: Properly implement support for multi-entry regions
-            StructurerBase._remove_all_jumps(self.result)
+            StructurerBase._remove_all_jumps(result)
 
         else:
-            StructurerBase.remove_redundant_jumps(self.result, self.ail_manager)
+            StructurerBase.remove_redundant_jumps(result, self.ail_manager)
 
         # remove redundant labels
-        jtc = JumpTargetCollector(self.result)
-        self.result = RedundantLabelRemover(self.result, jtc.jump_targets).result
+        jtc = JumpTargetCollector(result)
+        result = RedundantLabelRemover(result, jtc.jump_targets).result
 
         # remove empty nodes (if any)
-        self.result = EmptyNodeRemover(self.result, self.ail_manager).result
+        result = EmptyNodeRemover(result, self.ail_manager).result
 
         if self.structurer_cls is DreamStructurer:
             # remove conditional jumps
-            StructurerBase._remove_conditional_jumps(self.result)
+            StructurerBase._remove_conditional_jumps(result)
 
-        self.result = self.cond_proc.remove_claripy_bool_asts(self.result)
+        # everything up to here worked on claripy conditions; everything after structuring works on AIL conditions
+        self.result = self.cond_proc.remove_claripy_bool_asts(result)
 
     def _get_switch_case_entries(self) -> dict[int, int]:
         if self.function is None:

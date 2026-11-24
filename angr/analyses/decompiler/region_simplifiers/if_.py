@@ -17,7 +17,7 @@ from angr.analyses.decompiler.structurer_nodes import (
 l = logging.getLogger(name=__name__)
 
 
-class IfSimplifier(SequenceWalker):
+class IfSimplifier(SequenceWalker[ailment.Expr.Expression]):
     """
     Remove unnecessary jump or conditional jump statements if they jump to the successor right afterwards.
     """

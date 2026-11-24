@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from collections import OrderedDict, defaultdict
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import networkx
 
@@ -25,6 +25,7 @@ from angr.analyses.decompiler.structurer_nodes import (
     EmptyBlockNotice,
     LoopNode,
     MultiNode,
+    Node,
     SequenceNode,
     SwitchCaseNode,
 )
@@ -126,7 +127,11 @@ class DreamStructurer(StructurerBase):
         loop_node = self._refine_loop(loop_node)
 
         seq = SequenceNode(
-            loop_head.addr, nodes=[loop_node] + [succ for succ in successors if succ in self._region.graph]
+            loop_head.addr,
+            nodes=cast(
+                "list[Node[claripy.ast.Bool]]",
+                [loop_node] + [succ for succ in successors if succ in self._region.graph],
+            ),
         )
 
         self.result = seq
@@ -326,7 +331,7 @@ class DreamStructurer(StructurerBase):
         structurer = self.project.analyses[DreamStructurer].prep()(
             region, condition_processor=self.cond_proc, func=self.function, jump_tables=self.jump_tables
         )
-        seq = structurer.result
+        seq = cast("SequenceNode[claripy.ast.Bool]", structurer.result)
 
         # traverse this node and rewrite all conditional jumps that go outside the loop to breaks
         self._rewrite_conditional_jumps_to_breaks(seq, loop_successor_addrs)
@@ -354,7 +359,10 @@ class DreamStructurer(StructurerBase):
         seq = SequenceNode(self._region.addr)
 
         for node in GraphUtils.quasi_topological_sort_nodes(self._region.graph):
-            seq.add_node(CodeNode(node, self.cond_proc.reaching_conditions.get(node, None)))
+            # the members of a region are its nodes for now; overlays are replaced as the nested regions are structured
+            seq.add_node(
+                CodeNode(cast("Node[claripy.ast.Bool]", node), self.cond_proc.reaching_conditions.get(node, None))
+            )
 
         if seq.nodes:
             seq.addr = seq.nodes[0].addr
@@ -1004,12 +1012,16 @@ class DreamStructurer(StructurerBase):
 
             if guarded_nodes is not None:
                 # keep the topological order of nodes in Sequence node
-                sorted_guarded_nodes = [node_ for node_ in seq.nodes[entry_node_idx + 1 :] if node_ in guarded_nodes]
+                sorted_guarded_nodes = cast(
+                    "list[CodeNode[claripy.ast.Bool]]",
+                    [node_ for node_ in seq.nodes[entry_node_idx + 1 :] if node_ in guarded_nodes],
+                )
                 for node_ in sorted_guarded_nodes:
                     if node_ is not entry_node and node_.addr not in entry_addrs_set:
                         # fix reaching condition
-                        reaching_condition_subexprs = set(get_ast_subexprs(node_.reaching_condition)).difference(
-                            set(cond_subexprs)
+                        reaching_condition_subexprs = cast(
+                            "set[claripy.ast.Bool]",
+                            set(get_ast_subexprs(node_.reaching_condition)).difference(set(cond_subexprs)),
                         )
                         new_reaching_condition = claripy.And(*reaching_condition_subexprs)
                         new_node = CodeNode(node_.node, new_reaching_condition)

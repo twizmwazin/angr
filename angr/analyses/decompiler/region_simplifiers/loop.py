@@ -19,7 +19,7 @@ from angr.analyses.decompiler.utils import has_nonlabel_nonphi_statements, is_st
 from angr.utils.ail import is_phi_assignment
 
 
-class LoopSimplifier(SequenceWalker):
+class LoopSimplifier(SequenceWalker[ailment.Expr.Expression]):
     """
     Simplifies loops.
     """

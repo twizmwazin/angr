@@ -20,7 +20,7 @@ from .node_address_finder import NodeAddressFinder
 l = logging.getLogger(name=__name__)
 
 
-class GotoSimplifier(SequenceWalker):
+class GotoSimplifier(SequenceWalker[ailment.Expr.Expression]):
     """
     Remove unnecessary Jump statements.
     This simplifier also has the side effect of detecting Gotos that can't be reduced in the

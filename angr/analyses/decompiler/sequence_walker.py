@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 
-from angr import ailment
+from angr import ailment, claripy
 from angr.errors import UnsupportedNodeTypeError
 from angr.rust.structuring.structurer_nodes import IfLetNode, PatternMatchNode
 
@@ -15,14 +15,18 @@ from .structurer_nodes import (
     IncompleteSwitchCaseNode,
     LoopNode,
     MultiNode,
+    Node,
     SequenceNode,
     SwitchCaseNode,
 )
 
 
-class SequenceWalker:
+class SequenceWalker[C: claripy.ast.Bool | ailment.Expr.Expression]:
     """
     Walks a SequenceNode and all its nodes, recursively.
+
+    ``C`` is the condition type of the tree being walked: ``claripy.ast.Bool`` while structuring, an AIL expression
+    afterwards. A walker that rebuilds nodes keeps them in the same form.
     """
 
     def __init__(
@@ -59,7 +63,7 @@ class SequenceWalker:
         if handlers:
             self._handlers.update(handlers)
 
-    def walk(self, sequence):
+    def walk(self, sequence: Node[C] | None):
         return self._handle(sequence)
 
     #
@@ -74,13 +78,13 @@ class SequenceWalker:
             raise UnsupportedNodeTypeError(f"Node type {type(node)} is not supported yet.")
         return None
 
-    def _handle_Code(self, node: CodeNode, **kwargs):
+    def _handle_Code(self, node: CodeNode[C], **kwargs):
         new_inner_node = self._handle(node.node, parent=node, index=0)
         if new_inner_node is None:
             return None
         return CodeNode(new_inner_node, node.reaching_condition)
 
-    def _handle_Sequence(self, node, **kwargs):
+    def _handle_Sequence(self, node: SequenceNode[C], **kwargs):
         nodes_copy = list(node.nodes)
         changed = False
 
@@ -112,7 +116,7 @@ class SequenceWalker:
             return node
         return SequenceNode(node.addr, nodes=nodes_copy)
 
-    def _handle_MultiNode(self, node, **kwargs):
+    def _handle_MultiNode(self, node: MultiNode, **kwargs) -> Node[C] | None:
         changed = False
         nodes = node.nodes if self._update_seqnode_in_place else list(node.nodes)
 
@@ -137,7 +141,7 @@ class SequenceWalker:
             return node
         return MultiNode(nodes, addr=node.addr, idx=node.idx)
 
-    def _handle_SwitchCase(self, node, **kwargs):
+    def _handle_SwitchCase(self, node: SwitchCaseNode[C], **kwargs):
         self._handle(node.switch_expr, parent=node, label="switch_expr")
 
         changed = False
@@ -164,7 +168,7 @@ class SequenceWalker:
 
         return None
 
-    def _handle_PatternMatch(self, node: PatternMatchNode, **kwargs):
+    def _handle_PatternMatch(self, node: PatternMatchNode[C], **kwargs):
         self._handle(node.scrutinee, parent=node, label="scrutinee")
 
         changed = False
@@ -190,7 +194,7 @@ class SequenceWalker:
 
         return None
 
-    def _handle_IfLet(self, node: IfLetNode, **kwargs):
+    def _handle_IfLet(self, node: IfLetNode[C], **kwargs):
         changed = False
 
         new_scrutinee = self._handle(node.scrutinee, parent=node, label="scrutinee")
@@ -227,7 +231,7 @@ class SequenceWalker:
 
         return None
 
-    def _handle_IncompleteSwitchCase(self, node: IncompleteSwitchCaseNode, **kwargs):
+    def _handle_IncompleteSwitchCase(self, node: IncompleteSwitchCaseNode[C], **kwargs):
         changed = False
         new_cases = []
         for idx, case in enumerate(node.cases):
@@ -251,7 +255,7 @@ class SequenceWalker:
 
         return None
 
-    def _handle_Loop(self, node: LoopNode, **kwargs) -> LoopNode | None:
+    def _handle_Loop(self, node: LoopNode[C], **kwargs) -> LoopNode[C] | None:
         new_initializer = self._handle(node.initializer) if node.initializer is not None else None
         new_iterator = self._handle(node.iterator) if node.iterator is not None else None
         new_condition = (
@@ -278,7 +282,7 @@ class SequenceWalker:
             )
         return None
 
-    def _handle_Condition(self, node, **kwargs):
+    def _handle_Condition(self, node: ConditionNode[C], **kwargs):
         new_true_node = self._handle(node.true_node, parent=node, index=0) if node.true_node is not None else None
 
         new_false_node = self._handle(node.false_node, parent=node, index=1) if node.false_node is not None else None
@@ -298,7 +302,7 @@ class SequenceWalker:
             false_node=node.false_node if new_false_node is None else new_false_node,
         )
 
-    def _handle_CascadingCondition(self, node: CascadingConditionNode, **kwargs):
+    def _handle_CascadingCondition(self, node: CascadingConditionNode[C], **kwargs):
         cond_nodes_changed = False
         new_condition_and_nodes = []
         for index, (cond, child_node) in enumerate(node.condition_and_nodes):
@@ -321,7 +325,7 @@ class SequenceWalker:
             )
         return None
 
-    def _handle_ConditionalBreak(self, node: ConditionalBreakNode, **kwargs):  # pylint:disable=no-self-use
+    def _handle_ConditionalBreak(self, node: ConditionalBreakNode[C], **kwargs):  # pylint:disable=no-self-use
         return None
 
     def _handle_Noop(self, *args, **kwargs):  # pylint:disable=no-self-use

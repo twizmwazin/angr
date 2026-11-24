@@ -5,6 +5,7 @@ import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
+from angr import ailment
 from angr.ailment.block import Block as AILBlock
 from angr.ailment.expression import BinaryOp, Expression
 from angr.ailment.statement import Statement
@@ -20,7 +21,7 @@ if TYPE_CHECKING:
 _l = logging.getLogger(__name__)
 
 
-class OuterWalker(SequenceWalker):
+class OuterWalker(SequenceWalker[ailment.Expr.Expression]):
     """
     A sequence walker that finds nodes and invokes expression replacer to replace expressions.
     """

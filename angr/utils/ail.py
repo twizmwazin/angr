@@ -239,7 +239,7 @@ def dirty_has_side_effects(expr: DirtyExpression) -> bool:
     return expr.mfx is not None and expr.callee not in _PURE_DIRTY_HELPERS
 
 
-def is_phi_assignment(stmt: Statement) -> bool:
+def is_phi_assignment(stmt: Statement | None) -> bool:
     return isinstance(stmt, _RustStatement) and stmt.is_phi_assignment
 
 

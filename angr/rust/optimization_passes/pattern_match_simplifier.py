@@ -31,7 +31,7 @@ class PatternMatchWalker(SequenceWalker, DFAMixin):
 
     @staticmethod
     def _find_first_block(node):
-        class BlockFinder(SequenceWalker):
+        class BlockFinder(SequenceWalker[ailment.Expr.Expression]):
             """Finds the first block in a sequence node."""
 
             def __init__(self):

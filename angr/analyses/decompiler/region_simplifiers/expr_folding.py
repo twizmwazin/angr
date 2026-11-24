@@ -157,7 +157,7 @@ class ConditionalBreakLocation(LocationBase):
         return isinstance(other, ConditionalBreakLocation) and self.node_addr == other.node_addr
 
 
-class LoopNodeFinder(SequenceWalker):
+class LoopNodeFinder(SequenceWalker[ailment.Expr.Expression]):
     """
     Returns all loops in a given region.
     """
@@ -252,7 +252,7 @@ class ExpressionUseFinder(AILBlockRewriter):
         return super()._handle_Load(expr_idx, expr, stmt_idx, stmt, block)
 
 
-class ExpressionCounter(SequenceWalker):
+class ExpressionCounter(SequenceWalker[ailment.Expr.Expression]):
     """
     Find all expressions that are assigned once and only used once.
     """
@@ -418,7 +418,7 @@ class ExpressionSpotter(VVarUsesCollector):
         return super()._handle_Load(expr_idx, expr, stmt_idx, stmt, block)
 
 
-class InterferenceChecker(SequenceWalker):
+class InterferenceChecker(SequenceWalker[ailment.Expr.Expression]):
     """
     Detect for every pair of definition (assignment) - use if there is anything that may interfere with the definition.
 
@@ -667,7 +667,7 @@ class ExpressionReplacer(AILBlockRewriter):
         return super()._handle_expr(expr_idx, expr, stmt_idx, stmt, block)
 
 
-class ExpressionFolder(SequenceWalker):
+class ExpressionFolder(SequenceWalker[ailment.Expr.Expression]):
     def __init__(self, assignments: dict[int, Any], uses: dict[int, Any], node, variable_map):
         handlers = {
             ailment.Block: self._handle_Block,
@@ -767,7 +767,7 @@ class ExpressionFolder(SequenceWalker):
         return super()._handle_SwitchCase(node, **kwargs)
 
 
-class StoreStatementFinder(SequenceWalker):
+class StoreStatementFinder(SequenceWalker[ailment.Expr.Expression]):
     """
     Determine if there are any Store statements between two given statements.
 

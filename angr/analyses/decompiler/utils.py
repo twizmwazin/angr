@@ -33,6 +33,7 @@ from .structurer_nodes import (
     IncompleteSwitchCaseNode,
     LoopNode,
     MultiNode,
+    Node,
     SequenceNode,
     SwitchCaseNode,
 )
@@ -173,7 +174,7 @@ def remove_last_statement(node):
         if node.nodes:
             stmt = remove_last_statement(node.nodes[-1])
             if BaseNode.test_empty_node(node.nodes[-1]):
-                node.nodes = node.nodes[:-1]
+                node.nodes = node.nodes[:-1]  # type: ignore[assignment]  # a MultiNode | SequenceNode union
     elif type(node) is ConditionNode:
         if node.true_node is None and node.false_node is not None:
             stmt = remove_last_statement(node.false_node)
@@ -201,7 +202,7 @@ def remove_last_statements(node) -> bool:
         if node.nodes:
             remove_last_statements(node.nodes[-1])
             if BaseNode.test_empty_node(node.nodes[-1]):
-                node.nodes = node.nodes[:-1]
+                node.nodes = node.nodes[:-1]  # type: ignore[assignment]  # a MultiNode | SequenceNode union
             return True
         return False
     if type(node) is ConditionNode:
@@ -861,7 +862,7 @@ def last_nonlabel_statement(block: ailment.Block) -> ailment.Stmt.Statement | No
     return None
 
 
-def last_node(node: BaseNode | Block) -> BaseNode | ailment.Block | None:
+def last_node(node: Node) -> Node | None:
     """
     Get the last node in a sequence or code node.
     """
@@ -874,7 +875,7 @@ def last_node(node: BaseNode | Block) -> BaseNode | ailment.Block | None:
     return node
 
 
-def first_nonlabel_node(seq: SequenceNode) -> BaseNode | ailment.Block | None:
+def first_nonlabel_node(seq: SequenceNode) -> Node | None:
     for node in seq.nodes:
         inner_node = node.node if isinstance(node, CodeNode) else node
         if isinstance(inner_node, ailment.Block) and not has_nonlabel_statements(inner_node):
@@ -883,7 +884,7 @@ def first_nonlabel_node(seq: SequenceNode) -> BaseNode | ailment.Block | None:
     return None
 
 
-def first_nonlabel_nonphi_node(seq: SequenceNode) -> BaseNode | ailment.Block | None:
+def first_nonlabel_nonphi_node(seq: SequenceNode) -> Node | None:
     for node in seq.nodes:
         inner_node = node.node if isinstance(node, CodeNode) else node
         if isinstance(inner_node, ailment.Block) and not has_nonlabel_nonphi_statements(inner_node):
@@ -959,9 +960,7 @@ def _find_node_in_graph(node: ailment.Block, graph: networkx.DiGraph) -> ailment
     return None
 
 
-def structured_node_has_multi_predecessors(
-    node: SequenceNode | MultiNode | ailment.Block, graph: networkx.DiGraph
-) -> bool:
+def structured_node_has_multi_predecessors(node: Node | None, graph: networkx.DiGraph) -> bool:
     if graph is None:
         return False
 
@@ -981,9 +980,7 @@ def structured_node_has_multi_predecessors(
     return False
 
 
-def structured_node_is_simple_return(
-    node: SequenceNode | MultiNode, graph: networkx.DiGraph, use_packed_successors=False
-) -> bool:
+def structured_node_is_simple_return(node: Node | None, graph: networkx.DiGraph, use_packed_successors=False) -> bool:
     """
     Check if a "simple return" is contained within the node. A simple return looks like this::
 
@@ -1043,7 +1040,7 @@ def structured_node_is_simple_return_strict(node: BaseNode | SequenceNode | Mult
     )
 
 
-def is_statement_terminating(stmt: ailment.statement.Statement, functions) -> bool:
+def is_statement_terminating(stmt: ailment.statement.Statement | BaseNode | None, functions) -> bool:
     if isinstance(stmt, ailment.Stmt.Return):
         return True
     if (
@@ -1513,7 +1510,7 @@ def find_block_by_addr_and_idx(graph: networkx.DiGraph, addr: int, idx: int | No
     raise ValueError("The block is not in the graph!")
 
 
-def sequence_to_blocks(seq: BaseNode) -> list[ailment.Block]:
+def sequence_to_blocks(seq: Node | None) -> list[ailment.Block]:
     """
     Converts a sequence node (BaseNode) to a list of ailment blocks contained in it and all its children.
     """
@@ -1523,7 +1520,7 @@ def sequence_to_blocks(seq: BaseNode) -> list[ailment.Block]:
 
 
 def sequence_to_statements(
-    seq: BaseNode, exclude=(ailment.statement.Jump, ailment.statement.Jump)
+    seq: Node | None, exclude=(ailment.statement.Jump, ailment.statement.Jump)
 ) -> list[ailment.statement.Statement]:
     """
     Converts a sequence node (BaseNode) to a list of ailment Statements contained in it and all its children.

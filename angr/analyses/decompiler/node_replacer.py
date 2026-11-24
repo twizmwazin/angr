@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+from typing import cast
+
+from angr import ailment, claripy
 from angr.ailment import Block
 
 from .sequence_walker import SequenceWalker
-from .structurer_nodes import BaseNode, MultiNode, SequenceNode
+from .structurer_nodes import BaseNode, MultiNode, Node, SequenceNode
 
 
-class NodeReplacer(SequenceWalker):
+class NodeReplacer[C: claripy.ast.Bool | ailment.Expr.Expression](SequenceWalker[C]):
     """
     Replaces nodes in a node with new nodes based on a mapping.
     """
@@ -18,12 +21,12 @@ class NodeReplacer(SequenceWalker):
         self.replacements = replacements
         self.result: BaseNode = self.walk(self.root)  # type: ignore
 
-    def _handle(self, node: BaseNode, **kwargs):
+    def _handle(self, node: Node[C], **kwargs):
         return self.replacements[node] if node in self.replacements else super()._handle(node, **kwargs)
 
     def _handle_MultiNode(self, node: MultiNode, **kwargs):
         changed = False
-        nodes_copy = list(node.nodes)
+        nodes_copy: list[Node[C]] = list(node.nodes)
 
         i = len(nodes_copy) - 1
         has_non_block = False
@@ -40,4 +43,4 @@ class NodeReplacer(SequenceWalker):
             return None
         if has_non_block:
             return SequenceNode(node.addr, nodes=nodes_copy)
-        return MultiNode(nodes_copy, addr=node.addr, idx=node.idx)
+        return MultiNode(cast("list[Block]", nodes_copy), addr=node.addr, idx=node.idx)

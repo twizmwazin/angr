@@ -29,6 +29,7 @@ from angr.analyses.decompiler.structurer_nodes import (
     IncompleteSwitchCaseNode,
     LoopNode,
     MultiNode,
+    Node,
     SequenceNode,
     SwitchCaseNode,
 )
@@ -150,7 +151,7 @@ class PhoenixStructurer(StructurerBase):
         # TestDecompiler.test_decompiling_abnormal_switch_case_within_a_loop_with_redundant_jump captures this case.
         self._matched_incomplete_switch_case_addrs: set[int] = set()
 
-        self._graph_helper: DirectedGraphHelper[Block | BaseNode] = None  # type: ignore[assignment]
+        self._graph_helper: DirectedGraphHelper[Node | RegionOverlay] = None  # type: ignore[assignment]
 
         self._use_multistmtexprs = use_multistmtexprs
         self._multistmtexpr_stmt_threshold = multistmtexpr_stmt_threshold
@@ -528,7 +529,7 @@ class PhoenixStructurer(StructurerBase):
 
     def _match_cyclic_while_with_single_successor(
         self, node, head, graph_raw, full_graph_raw
-    ) -> tuple[bool, LoopNode | None, BaseNode | None]:
+    ) -> tuple[bool, LoopNode | None, Node | None]:
         if self._initial_successors:
             return False, None, None
         if node is not head:
@@ -571,9 +572,10 @@ class PhoenixStructurer(StructurerBase):
 
         node_copy = node.copy()
         # replace the last node with the intended successor node
-        node_copy.nodes[-1] = (
-            node_copy.nodes[-1].false_node if succ_node_is_true_node else node_copy.nodes[-1].true_node
-        )
+        last_cond_node = node_copy.nodes[-1]
+        assert isinstance(last_cond_node, ConditionNode)
+        assert last_cond_node.true_node is not None and last_cond_node.false_node is not None
+        node_copy.nodes[-1] = last_cond_node.false_node if succ_node_is_true_node else last_cond_node.true_node
         # check if there is a cycle that starts with node and ends with node
         next_node = node
         seq_node = SequenceNode(node.addr, nodes=[node_copy])
@@ -606,7 +608,7 @@ class PhoenixStructurer(StructurerBase):
 
         return True, loop_node, successor_node
 
-    def _cyclic_while_with_single_successor_must_return(self, successor_node: SequenceNode) -> bool:
+    def _cyclic_while_with_single_successor_must_return(self, successor_node: Node) -> bool:
         try:
             last_stmts = self.cond_proc.get_last_statements(successor_node)
         except EmptyBlockNotice:
@@ -666,11 +668,16 @@ class PhoenixStructurer(StructurerBase):
                                     and sum(1 for stmt in stmts if not isinstance(stmt, Label))
                                     <= self._multistmtexpr_stmt_threshold
                                 ):
-                                    edge_cond_succhead = MultiStatementExpression(
-                                        self.ail_manager.next_atom(),
-                                        stmts,
-                                        self.cond_proc.convert_claripy_bool_ast(edge_cond_succhead),
-                                        ins_addr=succ.addr,
+                                    # the loop condition stays a claripy Bool like every other condition built
+                                    # here: an opaque one that converts back to the statement expression
+                                    edge_cond_succhead = self.cond_proc.claripy_ast_from_ail_condition(
+                                        MultiStatementExpression(
+                                            self.ail_manager.next_atom(),
+                                            stmts,
+                                            self.cond_proc.convert_claripy_bool_ast(edge_cond_succhead),
+                                            ins_addr=succ.addr,
+                                        ),
+                                        must_bool=True,
                                     )
                                 if not phi_stmts:
                                     drop_succ = True
@@ -4293,7 +4300,7 @@ class PhoenixStructurer(StructurerBase):
         return False
 
     @staticmethod
-    def _count_statements(node: BaseNode | Block) -> int:
+    def _count_statements(node: Node) -> int:
         if isinstance(node, Block):
             return sum(1 for stmt in node.statements if not isinstance(stmt, Label) and not is_phi_assignment(stmt))
         if isinstance(node, (MultiNode, SequenceNode)):

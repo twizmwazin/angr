@@ -15,7 +15,7 @@ from angr.analyses.decompiler.structurer_nodes import (
 from angr.analyses.decompiler.utils import is_empty_node, peephole_optimize_expr
 
 
-class CascadingIfsRemover(SequenceWalker):
+class CascadingIfsRemover(SequenceWalker[ailment.Expr.Expression]):
     """
     Coalesce cascading If constructs. Transforming the following construct::
 

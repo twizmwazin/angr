@@ -15,6 +15,7 @@ from angr.analyses.decompiler.structurer_nodes import (
     BreakNode,
     ConditionNode,
     MultiNode,
+    Node,
     SequenceNode,
     SwitchCaseNode,
 )
@@ -80,7 +81,7 @@ class SwitchCaseRegion:
         return f"<{self.variable} ({len(self.node.cases)} cases) @ {self.node.addr:#x}, parent node {self.parent}>"
 
 
-class SwitchClusterFinder(SequenceWalker):
+class SwitchClusterFinder(SequenceWalker[ailment.Expr.Expression]):
     """
     Find comparisons and switches in order to identify switch clusters.
     """
@@ -161,7 +162,7 @@ class SwitchClusterFinder(SequenceWalker):
                 self.var2condnodes[variable].append(cr)
 
 
-class SwitchClusterReplacer(SequenceWalker):
+class SwitchClusterReplacer(SequenceWalker[ailment.Expr.Expression]):
     """
     Replace an identified switch cluster with a newly created SwitchCase node.
     """
@@ -549,8 +550,8 @@ def simplify_lowered_switches_core(
         outermost_node.condition = negate(outermost_node.condition.operand, ail_manager)
 
     caseno_to_node = {}
-    default_node_candidates: list[tuple[BaseNode, BaseNode]] = []  # parent to default node candidate
-    stack: list[tuple[BaseNode, int, int]] = [(outermost_node, 0, 0xFFFF_FFFF_FFFF_FFFF)]
+    default_node_candidates: list[tuple[BaseNode, Node]] = []  # parent to default node candidate
+    stack: list[tuple[Node, int, int]] = [(outermost_node, 0, 0xFFFF_FFFF_FFFF_FFFF)]
     while stack:
         node, min_, max_ = stack.pop(0)
         if node not in node_to_condnode:
@@ -654,7 +655,7 @@ def simplify_lowered_switches_core(
     return True
 
 
-class FindFirstNodeInSet(SequenceWalker):
+class FindFirstNodeInSet(SequenceWalker[ailment.Expr.Expression]):
     """
     Find the first node out of a set of node appearing in a SequenceNode (and its tree).
     """
