@@ -10,7 +10,7 @@ import networkx
 from angr import ailment, claripy
 from angr.block import Block, BlockNode
 from angr.errors import AngrRuntimeError
-from angr.rustylib.ailment import claripy_ast_from_ail
+from angr.rustylib.ailment import ail_from_claripy_ast, claripy_ast_from_ail
 from angr.utils.ail import is_head_controlled_loop_block
 from angr.utils.graph import GraphUtils, dfs_preorder_nodes, dominates, inverted_idoms
 
@@ -55,11 +55,6 @@ class AILExprIdAnnotation(claripy.Annotation):
 
 
 _AIL_EXPR_ID_ANNOTATION = AILExprIdAnnotation()
-
-_FP_FLAGGED_OPS = frozenset({"CmpEQ", "CmpNE", "CmpLT", "CmpLE", "CmpGT", "CmpGE", "Add", "Sub", "Mul", "Div"})
-_CLARIPY_CMP_OPS = frozenset(
-    {"__eq__", "__ne__", "__lt__", "__le__", "__gt__", "__ge__", "SLT", "SLE", "SGT", "SGE", "ULT", "ULE", "UGT", "UGE"}
-)
 
 #
 # The ConditionProcessor class
@@ -633,31 +628,6 @@ class ConditionProcessor:
     # Expression conversion
     #
 
-    def _convert_extract(self, hi, lo, expr, tags):
-        # ailment does not support Extract. We translate Extract(hi, lo, expr) to a
-        # logical right shift by `lo` (dropping the low bits) followed by a Convert
-        # that truncates to the extracted width.
-        converted = self.convert_claripy_bool_ast(expr)
-        if lo != 0:
-            converted = ailment.Expr.BinaryOp(
-                self.ail_manager.next_atom(),
-                "Shr",
-                (
-                    converted,
-                    ailment.Expr.Const(self.ail_manager.next_atom(), lo, expr.size(), **tags),
-                ),
-                False,
-                **tags,
-            )
-        return ailment.Expr.Convert(
-            self.ail_manager.next_atom(),
-            expr.size(),
-            hi - lo + 1,
-            False,
-            converted,
-            **tags,
-        )
-
     def convert_claripy_bool_ast(self, cond):
         """
         Convert recovered reaching conditions from claripy ASTs to ailment Expressions.
@@ -669,6 +639,8 @@ class ConditionProcessor:
 
         Peephole rules are applied bottom-up as nodes are built: children are already optimized when their parent is
         converted, so only the new node needs checking, and the subtree is re-walked only when a rule rewrites it.
+
+        The conversion itself is implemented natively.
         """
 
         if not isinstance(cond, claripy.ast.Base):
@@ -683,148 +655,20 @@ class ConditionProcessor:
 
     def _convert_claripy_bool_ast(self, cond):
         assert self._conversion_memo is not None
-        key = cond.hash()
-        r = self._conversion_memo.get(key)
-        if r is None:
-            r = self.convert_claripy_bool_ast_core(cond)
-            optimized = peephole_optimize_expr_shallow(r, self._peephole_expr_optimizations)
-            if optimized is not r:
-                r = peephole_optimize_expr(optimized, self._peephole_expr_optimizations)
-            self._conversion_memo[key] = r
-        return r
-
-    def convert_claripy_bool_ast_core(self, cond):
-        if isinstance(cond, ailment.Expr.Expression):
-            return cond
-
-        if cond.op in {"BoolS", "BoolV"} and claripy.is_true(claripy.simplify(cond)):
-            return ailment.Expr.Const(self.ail_manager.next_atom(), True, 1)
-        if cond in self._condition_mapping:
-            return self._condition_mapping[cond]
-        if cond.op in {"BVS", "BoolS"} and cond.args[0] in self._condition_mapping:
-            return self._condition_mapping[cond.args[0]]
-
-        def _binary_op_reduce(op, args, tags, signed=False):
-            r = None
-            for arg in args:
-                if r is None:
-                    r = self.convert_claripy_bool_ast(arg)
-                else:
-                    r = ailment.Expr.BinaryOp(
-                        self.ail_manager.next_atom(),
-                        op,
-                        (r, self.convert_claripy_bool_ast(arg)),
-                        signed,
-                        **tags,
-                    )
-            return r
-
-        def _unary_op_reduce(op, arg, tags):
-            r = self.convert_claripy_bool_ast(arg)
-            # TODO: Keep track of tags
-            return ailment.Expr.UnaryOp(self.ail_manager.next_atom(), op, r, **tags)
-
-        def _cmp_reduce(op, cond_, tags):
-            # A bit test like `(base & 0b100) != 0` is canonicalized by clarirs into
-            # `Extract(hi, lo, base) != 0`. Lowering that extract literally yields `(base >> lo) & mask`;
-            # re-express the comparison against zero as the in-place mask `base & (mask << lo)` instead so
-            # it reads like the original `base & C`. This is only valid because comparing to zero makes it
-            # a boolean test (the shifted-down and in-place forms differ in value but not in truthiness).
-            # `lo == 0` extracts already lower to a clean `base & mask` and are left alone.
-            for ext, other in (cond_.args, cond_.args[::-1]):
-                if (
-                    ext.op == "Extract" and other.op == "BVV" and other.args[0] == 0 and ext.args[1] != 0  # lo
-                ):
-                    hi, lo, base = ext.args
-                    mask = ((1 << (hi - lo + 1)) - 1) << lo
-                    base_ail = self.convert_claripy_bool_ast(base)
-                    masked = ailment.Expr.BinaryOp(
-                        self.ail_manager.next_atom(),
-                        "And",
-                        (base_ail, ailment.Expr.Const(self.ail_manager.next_atom(), mask, base.size(), **tags)),
-                        False,
-                        **tags,
-                    )
-                    return ailment.Expr.BinaryOp(
-                        self.ail_manager.next_atom(),
-                        op,
-                        (masked, ailment.Expr.Const(self.ail_manager.next_atom(), 0, base.size(), **tags)),
-                        False,
-                        **tags,
-                    )
-            return _binary_op_reduce(op, cond_.args, tags)
-
-        _mapping = {
-            "Not": lambda cond_, tags: _unary_op_reduce("Not", cond_.args[0], tags),
-            "__neg__": lambda cond_, tags: _unary_op_reduce("Neg", cond_.args[0], tags),
-            "__invert__": lambda cond_, tags: _unary_op_reduce("BitwiseNeg", cond_.args[0], tags),
-            "And": lambda cond_, tags: _binary_op_reduce("LogicalAnd", cond_.args, tags),
-            "Or": lambda cond_, tags: _binary_op_reduce("LogicalOr", cond_.args, tags),
-            "__le__": lambda cond_, tags: _binary_op_reduce("CmpLE", cond_.args, tags, signed=True),
-            "SLE": lambda cond_, tags: _binary_op_reduce("CmpLE", cond_.args, tags, signed=True),
-            "__lt__": lambda cond_, tags: _binary_op_reduce("CmpLT", cond_.args, tags, signed=True),
-            "SLT": lambda cond_, tags: _binary_op_reduce("CmpLT", cond_.args, tags, signed=True),
-            "UGT": lambda cond_, tags: _binary_op_reduce("CmpGT", cond_.args, tags),
-            "UGE": lambda cond_, tags: _binary_op_reduce("CmpGE", cond_.args, tags),
-            "__gt__": lambda cond_, tags: _binary_op_reduce("CmpGT", cond_.args, tags, signed=True),
-            "__ge__": lambda cond_, tags: _binary_op_reduce("CmpGE", cond_.args, tags, signed=True),
-            "SGT": lambda cond_, tags: _binary_op_reduce("CmpGT", cond_.args, tags, signed=True),
-            "SGE": lambda cond_, tags: _binary_op_reduce("CmpGE", cond_.args, tags, signed=True),
-            "ULT": lambda cond_, tags: _binary_op_reduce("CmpLT", cond_.args, tags),
-            "ULE": lambda cond_, tags: _binary_op_reduce("CmpLE", cond_.args, tags),
-            "__eq__": lambda cond_, tags: _cmp_reduce("CmpEQ", cond_, tags),
-            "__ne__": lambda cond_, tags: _cmp_reduce("CmpNE", cond_, tags),
-            "__add__": lambda cond_, tags: _binary_op_reduce("Add", cond_.args, tags, signed=False),
-            "__sub__": lambda cond_, tags: _binary_op_reduce("Sub", cond_.args, tags),
-            "__mul__": lambda cond_, tags: _binary_op_reduce("Mul", cond_.args, tags),
-            "__xor__": lambda cond_, tags: _binary_op_reduce("Xor", cond_.args, tags),
-            "__or__": lambda cond_, tags: _binary_op_reduce("Or", cond_.args, tags, signed=False),
-            "__and__": lambda cond_, tags: _binary_op_reduce("And", cond_.args, tags),
-            "__lshift__": lambda cond_, tags: _binary_op_reduce("Shl", cond_.args, tags),
-            "__rshift__": lambda cond_, tags: _binary_op_reduce("Sar", cond_.args, tags),
-            "__floordiv__": lambda cond_, tags: _binary_op_reduce("Div", cond_.args, tags),
-            "__mod__": lambda cond_, tags: _binary_op_reduce("Mod", cond_.args, tags),
-            "LShR": lambda cond_, tags: _binary_op_reduce("Shr", cond_.args, tags),
-            "BVV": lambda cond_, tags: ailment.Expr.Const(
-                self.ail_manager.next_atom(), cond_.args[0], cond_.size(), **tags
-            ),
-            "BoolV": lambda cond_, tags: (
-                ailment.Expr.Const(self.ail_manager.next_atom(), True, 1, **tags)
-                if cond_.args[0] is True
-                else ailment.Expr.Const(self.ail_manager.next_atom(), False, 1, **tags)
-            ),
-            "Extract": lambda cond_, tags: self._convert_extract(*cond_.args, tags),
-            "ZeroExt": lambda cond_, tags: _binary_op_reduce(
-                "Concat", [claripy.BVV(0, cond_.args[0]), cond_.args[1]], tags
-            ),
-            "Concat": lambda cond_, tags: _binary_op_reduce("Concat", cond_.args, tags),
-        }
-
-        if cond.op in _mapping:
-            if cond in self._ast2annotations:
-                cond_tags = self._ast2annotations[cond]
-            elif claripy.Not(cond) in self._ast2annotations:
-                cond_tags = self._ast2annotations[claripy.Not(cond)]
-            else:
-                cond_tags = {}
-            if cond_tags.get("floating_point") is not True and cond.op in _CLARIPY_CMP_OPS:
-                # a comparison claripy derived by negating an FP comparison is an FP comparison too
-                negated_tags = self._ast2annotations.get(claripy.Not(cond))
-                if negated_tags is not None and negated_tags.get("floating_point") is True:
-                    cond_tags = {**cond_tags, "floating_point": True}
-            if cond_tags.get("floating_point") is True:
-                # claripy has no FP flavor of these operators; restore the flag on the rebuilt expression
-                cond_tags = {k: v for k, v in cond_tags.items() if k != "floating_point"}
-                r = _mapping[cond.op](cond, cond_tags)
-                if isinstance(r, ailment.Expr.BinaryOp) and r.op in _FP_FLAGGED_OPS and not r.floating_point:
-                    r = ailment.Expr.BinaryOp(
-                        r.idx, r.op, r.operands, r.signed, bits=r.bits, floating_point=True, **r.tags
-                    )
-                return r
-            return _mapping[cond.op](cond, cond_tags)
-        raise NotImplementedError(
-            f"Condition variable {cond} has an unsupported operator {cond.op}. Consider implementing."
+        return ail_from_claripy_ast(
+            cond,
+            self._condition_mapping,
+            self._ast2annotations,
+            self.ail_manager,
+            self._conversion_memo,
+            self._peephole_optimize,
         )
+
+    def _peephole_optimize(self, expr):
+        optimized = peephole_optimize_expr_shallow(expr, self._peephole_expr_optimizations)
+        if optimized is not expr:
+            optimized = peephole_optimize_expr(optimized, self._peephole_expr_optimizations)
+        return optimized
 
     def claripy_ast_from_ail_condition(
         self, condition, *, nobool: bool = False, must_bool: bool = False, ins_addr: int = 0

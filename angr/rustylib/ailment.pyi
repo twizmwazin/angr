@@ -15,7 +15,7 @@ The rustlib surface is intentionally minimal:
 * ``Block`` -- the AIL Block container
 * ``Manager`` -- atom-index allocation + per-conversion scratch state
 * ``VEXIRSBConverter`` -- the VEX -> AIL converter
-* ``claripy_ast_from_ail`` -- the AIL -> claripy AST conversion
+* ``claripy_ast_from_ail`` / ``ail_from_claripy_ast`` -- the AIL <-> claripy AST conversions
 * ``VirtualVariableCategory`` / ``ConvertType`` -- the AIL enums
 * ``TagsView`` / ``TagsKeyIter`` -- the tag plumbing
 
@@ -26,7 +26,7 @@ attribute is dispatched on the variant tag and raises
 ``AttributeError`` when called on the wrong variant.
 """
 
-from collections.abc import Iterator, MutableMapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, MutableMapping, Sequence
 from typing import Any, ClassVar, Self
 
 # ---------------------------------------------------------------------------
@@ -606,6 +606,20 @@ def claripy_ast_from_ail(
 
     Opaque symbols and converted constants are recorded in ``condition_mapping``, the tags of converted operators in
     ``ast2annotations``. A ``condition`` that already is a claripy AST is returned unchanged.
+    """
+
+def ail_from_claripy_ast(
+    cond: Any,
+    condition_mapping: Mapping[Any, Any],
+    ast2annotations: Mapping[Any, Any],
+    ail_manager: Manager,
+    memo: dict[int, Any],
+    optimize: Callable[[Expression], Expression],
+) -> Expression:
+    """Convert a claripy AST back into an AIL expression.
+
+    ``memo`` maps the claripy hash of every converted subtree to its AIL expression; ``optimize`` is applied to every
+    expression the conversion builds.
     """
 
 # ---------------------------------------------------------------------------

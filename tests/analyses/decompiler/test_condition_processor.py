@@ -164,18 +164,19 @@ class TestConditionProcessor(TestCase):
         cond = self._nested_condition(cp)
         with patch.object(
             ConditionProcessor,
-            "convert_claripy_bool_ast_core",
+            "_peephole_optimize",
             autospec=True,
-            side_effect=ConditionProcessor.convert_claripy_bool_ast_core,
-        ) as core:
+            side_effect=ConditionProcessor._peephole_optimize,
+        ) as node:
             r = cp.convert_claripy_bool_ast(cond)
-            # 14 distinct nodes converted once each; the repeated leaves (vvar_1 and 0) hit the memo
-            assert core.call_count == 14
+            # every converted node is optimized exactly once: 14 distinct nodes converted once each; the repeated
+            # leaves (vvar_1 and 0) hit the memo
+            assert node.call_count == 14
             # the memo does not outlive the call: a later conversion rebuilds the tree with fresh atom ids (AIL
             # equality includes idx), as a leaf may have been remapped in between
             assert cp._conversion_memo is None
             assert cp.convert_claripy_bool_ast(cond) != r
-            assert core.call_count == 28
+            assert node.call_count == 28
 
         # one remove_claripy_bool_asts() traversal shares a memo across all its nodes
         block = ailment.Block(0x400000, 0)
@@ -184,12 +185,12 @@ class TestConditionProcessor(TestCase):
         )
         with patch.object(
             ConditionProcessor,
-            "convert_claripy_bool_ast_core",
+            "_peephole_optimize",
             autospec=True,
-            side_effect=ConditionProcessor.convert_claripy_bool_ast_core,
-        ) as core:
+            side_effect=ConditionProcessor._peephole_optimize,
+        ) as node:
             out = cp.remove_claripy_bool_asts(seq)
-            assert core.call_count == 14
+            assert node.call_count == 14
         assert out.nodes[0].condition == out.nodes[1].condition
         assert cp._conversion_memo is None
 
@@ -201,15 +202,15 @@ class TestConditionProcessor(TestCase):
             patch.object(cp_mod, "peephole_optimize_expr", wraps=peephole_optimize_expr) as full,
             patch.object(
                 ConditionProcessor,
-                "convert_claripy_bool_ast_core",
+                "_peephole_optimize",
                 autospec=True,
-                side_effect=ConditionProcessor.convert_claripy_bool_ast_core,
-            ) as core,
+                side_effect=ConditionProcessor._peephole_optimize,
+            ) as node,
         ):
             dec = proj.analyses.Decompiler(func, cfg=cfg.model)
         assert dec.codegen is not None and "authenticate" in dec.codegen.text
-        assert core.call_count > 0
-        assert full.call_count < core.call_count
+        assert node.call_count > 0
+        assert full.call_count < node.call_count
 
 
 if __name__ == "__main__":
