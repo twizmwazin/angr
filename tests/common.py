@@ -238,6 +238,41 @@ def _plt_regions(main_object) -> list[tuple[int, int]]:
     return regions
 
 
+def _discover_call_tree(
+    proj: Project, roots: Sequence[int], window: int, depth: int, extra_regions: list[tuple[int, int]]
+) -> set[int]:
+    """
+    Find the transitive callees of ``roots`` inside the main object, at most ``depth`` rounds deep.
+
+    Each round recovers a CFG over the functions found by the previous round only, instead of over everything known
+    so far: a function's callees do not change once it has been scanned, so rescanning it every round only costs
+    time. Discovery runs on throwaway knowledge bases so partial results never leak into the Project's real one.
+    """
+    main_object = proj.loader.main_object
+    known: set[int] = set(roots)
+    frontier: set[int] = set(roots)
+    for _ in range(depth):
+        tmp_kb = angr.KnowledgeBase(proj)
+        proj.analyses[angr.analyses.CFGFast].prep(kb=tmp_kb)(
+            normalize=True,
+            regions=_merged_regions(frontier, window) + extra_regions,
+            start_at_entry=False,
+            function_starts=sorted(frontier),
+            symbols=False,
+            force_smart_scan=False,
+        )
+        callees: set[int] = set()
+        callgraph = tmp_kb.functions.callgraph
+        for addr in frontier:
+            if addr in callgraph:
+                callees |= networkx.descendants(callgraph, addr)
+        frontier = {addr for addr in callees - known if main_object.contains_addr(addr)}
+        if not frontier:
+            break
+        known |= frontier
+    return known
+
+
 def load_project_with_scoped_cfg(
     bin_path: str,
     func_addr: int,
@@ -285,25 +320,7 @@ def load_project_with_scoped_cfg(
     extra_regions = _plt_regions(main_object) if include_plt else []
 
     if expand_call_tree:
-        for _ in range(call_tree_depth):
-            tmp_kb = angr.KnowledgeBase(proj)
-            proj.analyses[angr.analyses.CFGFast].prep(kb=tmp_kb)(
-                normalize=True,
-                regions=_merged_regions(known, window) + extra_regions,
-                start_at_entry=False,
-                function_starts=sorted(known),
-                symbols=False,
-                force_smart_scan=False,
-            )
-            callees: set[int] = set()
-            callgraph = tmp_kb.functions.callgraph
-            for root in roots:
-                if root in callgraph:
-                    callees |= networkx.descendants(callgraph, root)
-            new_addrs = {addr for addr in callees - known if main_object.contains_addr(addr)}
-            if not new_addrs:
-                break
-            known |= new_addrs
+        known = _discover_call_tree(proj, roots, window, call_tree_depth, extra_regions)
 
     final_cfg_kwargs = {
         "normalize": True,
