@@ -4873,7 +4873,7 @@ impl Expression {
 
     // --- Repr ---------------------------------------------------------
 
-    fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
+    pub fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
         // A few variants render differently for repr vs str (matching the
         // legacy per-class pyclasses). Default to __str__ otherwise.
         match &self.expr.inner {

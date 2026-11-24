@@ -15,6 +15,7 @@ The rustlib surface is intentionally minimal:
 * ``Block`` -- the AIL Block container
 * ``Manager`` -- atom-index allocation + per-conversion scratch state
 * ``VEXIRSBConverter`` -- the VEX -> AIL converter
+* ``claripy_ast_from_ail`` -- the AIL -> claripy AST conversion
 * ``VirtualVariableCategory`` / ``ConvertType`` -- the AIL enums
 * ``TagsView`` / ``TagsKeyIter`` -- the tag plumbing
 
@@ -25,7 +26,7 @@ attribute is dispatched on the variant tag and raises
 ``AttributeError`` when called on the wrong variant.
 """
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, MutableMapping, Sequence
 from typing import Any, ClassVar, Self
 
 # ---------------------------------------------------------------------------
@@ -589,6 +590,23 @@ class VEXIRSBConverter:
 
 def _vexop_debug(op_int: int) -> dict[str, Any] | None:
     """Classify a VEX op integer via the Rust port; ``None`` if unsupported."""
+
+def claripy_ast_from_ail(
+    condition: Any,
+    condition_mapping: MutableMapping[Any, Any],
+    ast2annotations: MutableMapping[Any, Any],
+    ail_manager: Manager,
+    const_annotation: Any,
+    *,
+    nobool: bool = ...,
+    must_bool: bool = ...,
+    ins_addr: int = ...,
+) -> Any:
+    """Convert an AIL expression into a claripy AST.
+
+    Opaque symbols and converted constants are recorded in ``condition_mapping``, the tags of converted operators in
+    ``ast2annotations``. A ``condition`` that already is a claripy AST is returned unchanged.
+    """
 
 # ---------------------------------------------------------------------------
 # Expression variant marker classes

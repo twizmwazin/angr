@@ -17,6 +17,7 @@ pub mod convert_vex;
 pub mod enums;
 pub mod manager;
 pub mod tags;
+pub mod to_claripy;
 pub mod vex_ffi;
 pub mod vexop;
 pub mod vexop_names;
@@ -83,6 +84,9 @@ pub fn ailment(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // VEX -> AIL converter.
     m.add_class::<convert_vex::VEXIRSBConverter>()?;
+
+    // AIL -> claripy conversion (decompiler condition processing).
+    m.add_function(wrap_pyfunction!(to_claripy::claripy_ast_from_ail, m)?)?;
 
     // Debug helper (vexop classifier parity testing).
     m.add_function(wrap_pyfunction!(_vexop_debug, m)?)?;
