@@ -204,19 +204,9 @@ class TestRustCodegenHandlers(unittest.TestCase):
         assert "0x400200" in out
         assert PLACEHOLDER not in out
 
-    def test_bbbq_rust_flavor_has_no_placeholders(self):
-        bin_path = os.path.join(test_location, "x86_64", "bbbq")
-        proj, cfg = load_project_with_scoped_cfg(bin_path, 0x410920, expand_call_tree=False, run_ccc=False)
-        proj.analyses.RustSymbolRecovery()
-        proj.analyses.TypeDBLoader()
-        dec = proj.analyses[Decompiler].prep(fail_fast=True)(0x410920, cfg=cfg.model, flavor="rust")
-        assert dec.codegen is not None and dec.codegen.text is not None
-        print_decompilation_result(dec)
-
-        text = dec.codegen.text
-        assert PLACEHOLDER not in text
-        # the bit-insertions that used to be dropped are rendered now
-        assert "_INSERT(" in text
+    # The end-to-end check that a real Rust function (bbbq's sub_410920) renders without placeholders is piggybacked on
+    # test_phoenix_last_resort_isolation.py::test_bbbq_rust_root_region_structures_completely, which already decompiles
+    # that function; one decompilation of it takes the better part of a minute.
 
     def test_unmapped_register_vvar_renders_as_register(self):
         m = self._manager()

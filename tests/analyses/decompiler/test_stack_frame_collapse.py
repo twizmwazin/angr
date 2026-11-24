@@ -9,7 +9,6 @@ import re
 import unittest
 
 import angr
-from angr.sim_variable import SimStackVariable
 from tests.common import bin_location, print_decompilation_result
 
 test_location = os.path.join(bin_location, "tests")
@@ -34,18 +33,9 @@ class TestStackFrameCollapse(unittest.TestCase):
         print_decompilation_result(dec)
         return dec
 
-    def test_bzip2_o0_decompress_keeps_its_locals(self):
-        # two statements in this function are 14 levels deep, so the block simplifier used to refuse to replace
-        # the rbp register with sp-8 in them
-        dec = self._decompile("decbench_bzip2_O0", "BZ2_decompress")
-        assert dec.codegen is not None and dec.codegen.text is not None and dec.codegen.cfunc is not None
-        print_decompilation_result(dec)
-        text = dec.codegen.text
-
-        assert "&(&v" not in text
-        stack_vars = [var for var in dec.codegen.cfunc.get_unified_local_vars() if isinstance(var, SimStackVariable)]
-        assert len(stack_vars) >= 50
-        assert max(var.size for var in stack_vars) <= 8
+    # The check on bzip2's BZ2_decompress (its locals stay separate stack variables) is piggybacked on
+    # test_phoenix_goto_successors.py::test_bzip2_o0_decompress_structures_completely, which already decompiles that
+    # function; one decompilation of it takes over half a minute.
 
     def test_gzip_o0_fprint_off_reference_offset(self):
         # p = buf + sizeof buf: the reference must point past the end of the buffer, not before its start

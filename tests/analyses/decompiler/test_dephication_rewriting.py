@@ -12,7 +12,7 @@ from angr.ailment import Manager
 from angr.ailment.expression import ITE, Const, UnaryOp, VirtualVariable, VirtualVariableCategory
 from angr.ailment.statement import Assignment
 from angr.analyses.decompiler.dephication.rewriting_engine import SimEngineDephiRewriting
-from tests.common import bin_location, load_project_with_scoped_cfg, print_decompilation_result
+from tests.common import bin_location
 
 test_location = os.path.join(bin_location, "tests")
 
@@ -108,24 +108,9 @@ class TestDephicationRewriting(unittest.TestCase):
         assert out.iftrue.value == 0x11
         assert out.iffalse.value == 0xFFFFFFFF
 
-    def test_bbbq_rust_flavor_keeps_string_constants(self):
-        """
-        sub_410920 sets up a &str in a block whose only outward effect flows through a phi. With the remapped
-        destination dropped, RedundantBlockRemover deleted the block and the string with it.
-        """
-        bin_path = os.path.join(test_location, "x86_64", "bbbq")
-        # the window has to reach past the function: with a tighter scope the callee prototypes differ enough that the
-        # block holding this string survives even with the bug, and the test stops testing anything
-        proj, cfg = load_project_with_scoped_cfg(
-            bin_path, 0x410920, window=0x4000, expand_call_tree=False, run_ccc=False
-        )
-        proj.analyses.RustSymbolRecovery()
-        proj.analyses.TypeDBLoader()
-        dec = proj.analyses.Decompiler(0x410920, cfg=cfg.model, flavor="rust", fail_fast=True)
-        assert dec.codegen is not None and dec.codegen.text is not None
-        print_decompilation_result(dec)
-
-        assert "seed_hex is not valid hex" in dec.codegen.text
+    # The end-to-end check (bbbq's sub_410920 keeps its "seed_hex is not valid hex" string) is piggybacked on
+    # test_phoenix_last_resort_isolation.py::test_bbbq_rust_root_region_structures_completely, which already decompiles
+    # that function; one decompilation of it takes the better part of a minute.
 
 
 if __name__ == "__main__":

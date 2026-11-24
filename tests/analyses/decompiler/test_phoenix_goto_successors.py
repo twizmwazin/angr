@@ -9,6 +9,7 @@ import re
 import unittest
 
 import angr
+from angr.sim_variable import SimStackVariable
 from tests.common import bin_location, load_project_with_scoped_cfg, print_decompilation_result
 
 test_location = os.path.join(bin_location, "tests")
@@ -65,10 +66,11 @@ class TestPhoenixGotoSuccessors(unittest.TestCase):
                 covered.add(tags["ins_addr"])
         blocks = list(func.blocks)
         missing = [b for b in blocks if not (set(b.instruction_addrs) & covered)]
-        return dec.codegen.text, len(blocks), missing
+        return dec, len(blocks), missing
 
     def test_bzip2_o2_decompress_structures_completely(self):
-        text, nblocks, missing = self._decompile_bzip2_decompress("decbench_bzip2_O2_noinline")
+        dec, nblocks, missing = self._decompile_bzip2_decompress("decbench_bzip2_O2_noinline")
+        text = dec.codegen.text
         assert nblocks > 450
         assert len(missing) <= 30, [hex(b.addr) for b in missing]
         assert text.count("case ") >= 40
@@ -86,11 +88,24 @@ class TestPhoenixGotoSuccessors(unittest.TestCase):
         assert not re.search(r"goto LABEL_40b(2ec|255|2fb);", text)
 
     def test_bzip2_o0_decompress_structures_completely(self):
-        text, nblocks, missing = self._decompile_bzip2_decompress("decbench_bzip2_O0")
+        dec, nblocks, missing = self._decompile_bzip2_decompress("decbench_bzip2_O0")
+        text = dec.codegen.text
         assert nblocks > 500
         assert len(missing) <= 35, [hex(b.addr) for b in missing]
         assert text.count("case ") >= 40
         assert len(re.findall(r"\b(while|for) \(", text)) >= 60
+
+        # piggybacking: this decompilation takes over half a minute, so the stack-frame check below shares it rather
+        # than repeating it in test_stack_frame_collapse.py.
+        # At O0 every local lives in the stack frame and rbp holds sp-8. Two statements in this function are 14 levels
+        # deep, so the block simplifier used to refuse to replace the rbp register with sp-8 in them; ssailification
+        # then read the surviving ``rbp - N`` as an array spanning from the frame pointer, which merged every local of
+        # the function into one slot.
+        assert dec.codegen.cfunc is not None
+        assert "&(&v" not in text
+        stack_vars = [var for var in dec.codegen.cfunc.get_unified_local_vars() if isinstance(var, SimStackVariable)]
+        assert len(stack_vars) >= 50
+        assert max(var.size for var in stack_vars) <= 8
 
     def test_bzip2_o0_unrle_fast_loop_exit_is_the_only_entry_of_its_target(self):
         # unRLE_obuf_to_output_FAST: an inner while(1) loop with two exits, "goto return_notr" from the loop head

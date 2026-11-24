@@ -257,6 +257,20 @@ class TestPhoenixLastResortIsolation(unittest.TestCase):
         labels = set(re.findall(r"^\s*(LABEL_\w+):", text, re.MULTILINE))
         assert not set(re.findall(r"goto (LABEL_\w+);", text)) - labels
 
+        # piggybacking: decompiling this function takes the better part of a minute, so the checks below share this
+        # run instead of repeating it in their own test files.
+
+        # RustStructuredCodeGenerator has a handler for every node and expression that reaches it here, and the
+        # bit-insertions that used to be dropped are rendered
+        assert "unsupported instruction" not in text
+        assert "_INSERT(" in text
+
+        # sub_410920 sets up a &str in a block whose only outward effect flows through a phi. When dephication
+        # dropped a remapped assignment destination, RedundantBlockRemover deleted the block and the string with it.
+        # (This needs the window to reach past the function: with a scope that stops at the function's end the callee
+        # prototypes differ enough that the block survives even with the bug.)
+        assert "seed_hex is not valid hex" in text
+
 
 if __name__ == "__main__":
     unittest.main()
