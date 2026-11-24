@@ -597,6 +597,8 @@ class SimEngineRDAIL(SimEngineNostmtAIL[ReachingDefinitionsState, MultiValues, N
         self._expr(expr.operand)
         return self._top(expr.bits)
 
+    _handle_unop_AbsF = _handle_unop_Abs
+
     _handle_unop_Reference = _handle_unop_Default
     _handle_unop_Ctz = _handle_unop_Default
     _handle_unop_Dereference = _handle_unop_Default
@@ -661,14 +663,16 @@ class SimEngineRDAIL(SimEngineNostmtAIL[ReachingDefinitionsState, MultiValues, N
     def _handle_unop_Neg(self, expr) -> MultiValues:
         operand: MultiValues = self._expr(expr.operand)
         bits = expr.bits
-        if expr.floating_point:
-            return self._fp_op(bits, operator.neg, operand)
 
         operand_v = operand.one_value()
 
         if operand_v is not None and operand_v.concrete:
             return MultiValues(-operand_v)  # pylint:disable=invalid-unary-operand-type
         return MultiValues(self.state.top(bits))
+
+    @ail_unop_handler
+    def _handle_unop_NegF(self, expr) -> MultiValues:
+        return self._fp_op(expr.bits, operator.neg, self._expr(expr.operand))
 
     @ail_unop_handler
     def _handle_unop_BitwiseNeg(self, expr) -> MultiValues:
@@ -685,8 +689,6 @@ class SimEngineRDAIL(SimEngineNostmtAIL[ReachingDefinitionsState, MultiValues, N
     def _handle_binop_Add(self, expr) -> MultiValues:
         expr0, expr1 = self._expr(expr.operands[0]), self._expr(expr.operands[1])
         bits = expr.bits
-        if expr.floating_point:
-            return self._fp_op(bits, operator.add, expr0, expr1)
 
         r: MultiValues | None = None
         expr0_v = expr0.one_value()
@@ -722,8 +724,6 @@ class SimEngineRDAIL(SimEngineNostmtAIL[ReachingDefinitionsState, MultiValues, N
     def _handle_binop_Sub(self, expr) -> MultiValues:
         expr0, expr1 = self._expr(expr.operands[0]), self._expr(expr.operands[1])
         bits = expr.bits
-        if expr.floating_point:
-            return self._fp_op(bits, operator.sub, expr0, expr1)
 
         r: MultiValues | None = None
         expr0_v = expr0.one_value()
@@ -755,6 +755,21 @@ class SimEngineRDAIL(SimEngineNostmtAIL[ReachingDefinitionsState, MultiValues, N
         return r
 
     @ail_binop_handler
+    def _handle_binop_AddF(self, expr) -> MultiValues:
+        expr0, expr1 = self._expr(expr.operands[0]), self._expr(expr.operands[1])
+        return self._fp_op(expr.bits, operator.add, expr0, expr1)
+
+    @ail_binop_handler
+    def _handle_binop_SubF(self, expr) -> MultiValues:
+        expr0, expr1 = self._expr(expr.operands[0]), self._expr(expr.operands[1])
+        return self._fp_op(expr.bits, operator.sub, expr0, expr1)
+
+    @ail_binop_handler
+    def _handle_binop_MulF(self, expr) -> MultiValues:
+        expr0, expr1 = self._expr(expr.operands[0]), self._expr(expr.operands[1])
+        return self._fp_op(expr.bits, operator.mul, expr0, expr1)
+
+    @ail_binop_handler
     def _handle_binop_Default(self, expr) -> MultiValues:
         arg0, arg1 = expr.operands
 
@@ -769,11 +784,8 @@ class SimEngineRDAIL(SimEngineNostmtAIL[ReachingDefinitionsState, MultiValues, N
     _handle_binop_MulV = _handle_binop_Default
     _handle_binop_MulHiV = _handle_binop_Default
     _handle_binop_Mod = _handle_binop_Default
-    _handle_binop_AddF = _handle_binop_Default
     _handle_binop_DivF = _handle_binop_Default
     _handle_binop_DivV = _handle_binop_Default
-    _handle_binop_MulF = _handle_binop_Default
-    _handle_binop_SubF = _handle_binop_Default
     _handle_binop_SubV = _handle_binop_Default
     _handle_binop_InterleaveLOV = _handle_binop_Default
     _handle_binop_InterleaveHIV = _handle_binop_Default
@@ -802,8 +814,6 @@ class SimEngineRDAIL(SimEngineNostmtAIL[ReachingDefinitionsState, MultiValues, N
         expr0 = self._expr(expr.operands[0])
         expr1 = self._expr(expr.operands[1])
         bits = expr.bits
-        if expr.floating_point:
-            return self._fp_op(bits, operator.mul, expr0, expr1)
 
         expr0_v = expr0.one_value()
         expr1_v = expr1.one_value()

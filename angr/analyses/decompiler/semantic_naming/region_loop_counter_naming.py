@@ -197,7 +197,20 @@ class RegionLoopCounterNaming(RegionNamingBase):
             return None
 
         # Check for comparison operations
-        comparison_ops = {"CmpLT", "CmpLE", "CmpGT", "CmpGE", "CmpNE", "CmpEQ"}
+        comparison_ops = {
+            "CmpLT",
+            "CmpLE",
+            "CmpGT",
+            "CmpGE",
+            "CmpNE",
+            "CmpEQ",
+            "CmpLTF",
+            "CmpLEF",
+            "CmpGTF",
+            "CmpGEF",
+            "CmpNEF",
+            "CmpEQF",
+        }
         if condition.op not in comparison_ops:
             return None
 

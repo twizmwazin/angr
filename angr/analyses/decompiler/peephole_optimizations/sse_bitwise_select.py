@@ -87,7 +87,7 @@ class SSEBitwiseSelect(PeepholeOptimizationExprBase):
         # scalar comparison operands must keep their width: Extract(8, a) != Extract(8, b) is not a != b
         if isinstance(cond, BinaryOp) and all(op.bits > 64 for op in cond.operands):
             narrow_ops = [n(op, out_bits, ref_expr) for op in cond.operands]
-            cond = BinaryOp(cond.idx, cond.op, narrow_ops, False, floating_point=cond.floating_point, **cond.tags)
+            cond = BinaryOp(cond.idx, cond.op, narrow_ops, False, **cond.tags)
         return ITE(
             ref_expr.idx, cond, n(ite.iftrue, out_bits, ref_expr), n(ite.iffalse, out_bits, ref_expr), **ref_expr.tags
         )
@@ -191,31 +191,31 @@ class SSEBitwiseSelect(PeepholeOptimizationExprBase):
                 negated = True
 
         # Now expr should be a CmpF variant.  Lower vector comparisons
-        # (CmpLTV, CmpGEV, etc.) to scalar (CmpLT, CmpGE) since we're
+        # (CmpLTFV, CmpGEFV, etc.) to scalar (CmpLTF, CmpGEF) since we're
         # extracting a scalar boolean condition for the ITE.
         vector_to_scalar = {
-            "CmpLTV": "CmpLT",
-            "CmpLEV": "CmpLE",
-            "CmpGTV": "CmpGT",
-            "CmpGEV": "CmpGE",
-            "CmpEQV": "CmpEQ",
-            "CmpNEV": "CmpNE",
+            "CmpLTFV": "CmpLTF",
+            "CmpLEFV": "CmpLEF",
+            "CmpGTFV": "CmpGTF",
+            "CmpGEFV": "CmpGEF",
+            "CmpEQFV": "CmpEQF",
+            "CmpNEFV": "CmpNEF",
         }
         cmp_ops = set(vector_to_scalar.keys())
         if isinstance(expr, BinaryOp) and expr.op in cmp_ops:
             op = expr.op
             if negated:
                 negate_map = {
-                    "CmpLTV": "CmpGEV",
-                    "CmpGEV": "CmpLTV",
-                    "CmpLEV": "CmpGTV",
-                    "CmpGTV": "CmpLEV",
-                    "CmpEQV": "CmpNEV",
-                    "CmpNEV": "CmpEQV",
+                    "CmpLTFV": "CmpGEFV",
+                    "CmpGEFV": "CmpLTFV",
+                    "CmpLEFV": "CmpGTFV",
+                    "CmpGTFV": "CmpLEFV",
+                    "CmpEQFV": "CmpNEFV",
+                    "CmpNEFV": "CmpEQFV",
                 }
                 op = negate_map.get(op, op)
             # Lower to scalar
             scalar_op = vector_to_scalar.get(op, op)
-            return BinaryOp(expr.idx, scalar_op, list(expr.operands), False, floating_point=True, **expr.tags)
+            return BinaryOp(expr.idx, scalar_op, list(expr.operands), False, **expr.tags)
 
         return None

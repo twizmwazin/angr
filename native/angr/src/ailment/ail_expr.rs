@@ -229,7 +229,6 @@ pub enum ExprInner {
     UnaryOp {
         op: String,
         operand: Arc<AilExpression>,
-        floating_point: bool,
     },
     Convert {
         operand: Arc<AilExpression>,
@@ -253,7 +252,6 @@ pub enum ExprInner {
         op: String,
         operands: [Arc<AilExpression>; 2],
         signed: bool,
-        floating_point: bool,
         rounding_mode: Option<RoundingModeOrExpr>,
         vector_count: Option<i64>,
         vector_size: Option<i64>,
@@ -825,15 +823,9 @@ impl Hash for AilExpression {
                 category.hash(h);
                 oident.hash(h);
             }
-            ExprInner::UnaryOp {
-                op,
-                operand,
-                floating_point,
-                ..
-            } => {
+            ExprInner::UnaryOp { op, operand, .. } => {
                 op.hash(h);
                 operand.cached_hash_or_compute().hash(h);
-                floating_point.hash(h);
                 bits.hash(h);
             }
             ExprInner::Convert {
@@ -874,7 +866,6 @@ impl Hash for AilExpression {
                 op,
                 operands,
                 signed,
-                floating_point,
                 rounding_mode,
                 ..
             } => {
@@ -883,7 +874,6 @@ impl Hash for AilExpression {
                 operands[1].cached_hash_or_compute().hash(h);
                 bits.hash(h);
                 signed.hash(h);
-                floating_point.hash(h);
                 rounding_mode.hash(h);
             }
             ExprInner::Load { addr, endness, .. } => {
@@ -1195,11 +1185,7 @@ impl AilExpression {
             }
         };
         match &self.inner {
-            ExprInner::UnaryOp {
-                op,
-                operand,
-                floating_point,
-            } => {
+            ExprInner::UnaryOp { op, operand } => {
                 let (c, r) = walk(operand);
                 if !c {
                     return (false, self.clone());
@@ -1209,7 +1195,6 @@ impl AilExpression {
                     self.rebuilt(ExprInner::UnaryOp {
                         op: op.clone(),
                         operand: r,
-                        floating_point: *floating_point,
                     }),
                 )
             }
@@ -1267,7 +1252,6 @@ impl AilExpression {
                 op,
                 operands,
                 signed,
-                floating_point,
                 rounding_mode,
                 vector_count,
                 vector_size,
@@ -1283,7 +1267,6 @@ impl AilExpression {
                         op: op.clone(),
                         operands: [rl, rr],
                         signed: *signed,
-                        floating_point: *floating_point,
                         rounding_mode: rounding_mode.clone(),
                         vector_count: *vector_count,
                         vector_size: *vector_size,
@@ -1805,14 +1788,9 @@ impl AilExpression {
                     .map(|vec| vec.iter().map(|b| recurse(b)).collect::<PyResult<Vec<_>>>())
                     .transpose()?,
             },
-            ExprInner::UnaryOp {
-                op,
-                operand,
-                floating_point,
-            } => ExprInner::UnaryOp {
+            ExprInner::UnaryOp { op, operand } => ExprInner::UnaryOp {
                 op: op.clone(),
                 operand: recurse(operand)?,
-                floating_point: *floating_point,
             },
             ExprInner::Convert {
                 operand,
@@ -1850,7 +1828,6 @@ impl AilExpression {
                 op,
                 operands,
                 signed,
-                floating_point,
                 rounding_mode,
                 vector_count,
                 vector_size,
@@ -1858,7 +1835,6 @@ impl AilExpression {
                 op: op.clone(),
                 operands: [recurse(&operands[0])?, recurse(&operands[1])?],
                 signed: *signed,
-                floating_point: *floating_point,
                 rounding_mode: rounding_mode.clone(),
                 vector_count: *vector_count,
                 vector_size: *vector_size,
@@ -2144,16 +2120,13 @@ impl AilExpression {
                 ExprInner::UnaryOp {
                     op: a_op,
                     operand: a_op_,
-                    floating_point: a_fp,
                 },
                 ExprInner::UnaryOp {
                     op: b_op,
                     operand: b_op_,
-                    floating_point: b_fp,
                 },
             ) => {
                 a_op == b_op
-                    && a_fp == b_fp
                     && self.header.bits == other.header.bits
                     && a_op_.cmp_ail::<MODE>(b_op_)
             }
@@ -2218,7 +2191,6 @@ impl AilExpression {
                     op: op_a,
                     operands: ops_a,
                     signed: s_a,
-                    floating_point: fp_a,
                     rounding_mode: rm_a,
                     ..
                 },
@@ -2226,14 +2198,12 @@ impl AilExpression {
                     op: op_b,
                     operands: ops_b,
                     signed: s_b,
-                    floating_point: fp_b,
                     rounding_mode: rm_b,
                     ..
                 },
             ) => {
                 op_a == op_b
                     && s_a == s_b
-                    && fp_a == fp_b
                     && self.header.bits == other.header.bits
                     && RoundingModeOrExpr::opt_cmp_ail::<MODE>(rm_a, rm_b)
                     && ops_a[0].cmp_ail::<MODE>(&ops_b[0])
@@ -2824,13 +2794,12 @@ impl Expression {
     }
 
     #[staticmethod]
-    #[pyo3(signature = (idx, op, operand, *, bits=None, floating_point=false, **kwargs))]
+    #[pyo3(signature = (idx, op, operand, *, bits=None, **kwargs))]
     fn _new_unary_op(
         idx: i64,
         op: String,
         operand: AilExpression,
         bits: Option<u32>,
-        floating_point: bool,
         kwargs: Option<Tags>,
     ) -> PyResult<Self> {
         let tags = kwargs.unwrap_or_default();
@@ -2841,7 +2810,6 @@ impl Expression {
             inner: ExprInner::UnaryOp {
                 op,
                 operand: Arc::new(operand),
-                floating_point,
             },
         }))
     }
@@ -2911,8 +2879,7 @@ impl Expression {
     #[staticmethod]
     #[pyo3(signature = (
         idx, op, operands, signed=false, *,
-        bits=None, floating_point=false,
-        rounding_mode=None,
+        bits=None, rounding_mode=None,
         vector_count=None, vector_size=None, **kwargs
     ))]
     #[allow(clippy::too_many_arguments)]
@@ -2922,7 +2889,6 @@ impl Expression {
         operands: [AilExpression; 2],
         signed: bool,
         bits: Option<u32>,
-        floating_point: bool,
         rounding_mode: Option<RoundingModeOrExpr>,
         vector_count: Option<i64>,
         vector_size: Option<i64>,
@@ -2941,7 +2907,6 @@ impl Expression {
                 op,
                 operands: [Arc::new(lhs_ail), Arc::new(rhs_ail)],
                 signed,
-                floating_point,
                 rounding_mode,
                 vector_count,
                 vector_size,
@@ -3919,13 +3884,8 @@ impl Expression {
             ExprInner::VEXCCallExpression { callee, .. } => Ok(callee.clone()),
             ExprInner::Let { .. } => Ok("let".to_string()),
             ExprInner::UnaryOp { op, .. } => Ok(op.clone()),
-            ExprInner::BinaryOp {
-                op,
-                signed,
-                floating_point,
-                ..
-            } => {
-                if *signed && !*floating_point {
+            ExprInner::BinaryOp { op, signed, .. } => {
+                if *signed {
                     Ok(format!("{op}s"))
                 } else {
                     Ok(op.clone())
@@ -4484,18 +4444,6 @@ impl Expression {
         match &self.expr.inner {
             ExprInner::BinaryOp { signed, .. } => Ok(*signed),
             _ => Err(PyAttributeError::new_err("no 'signed' on this Expression")),
-        }
-    }
-
-    /// BinaryOp.floating_point
-    #[getter]
-    fn floating_point(&self) -> PyResult<bool> {
-        match &self.expr.inner {
-            ExprInner::BinaryOp { floating_point, .. }
-            | ExprInner::UnaryOp { floating_point, .. } => Ok(*floating_point),
-            _ => Err(PyAttributeError::new_err(
-                "no 'floating_point' on this Expression",
-            )),
         }
     }
 

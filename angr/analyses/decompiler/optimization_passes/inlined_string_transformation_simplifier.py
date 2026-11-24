@@ -419,6 +419,7 @@ class InlinedStringTransformationAILEngine(
     def _handle_unop_Default(self, expr: UnaryOp):
         return None
 
+    _handle_unop_AbsF = _handle_unop_Abs
     _handle_unop_Clz = _handle_unop_Default
     _handle_unop_Ctz = _handle_unop_Default
     _handle_unop_Dereference = _handle_unop_Default

@@ -998,7 +998,6 @@ class LoweredSwitchSimplifier(StructuringOptimizationPass):
                 cond = stmt.condition
                 if (
                     isinstance(cond, BinaryOp)
-                    and not cond.floating_point
                     and isinstance(cond.operands[0], VirtualVariable)
                     and isinstance(cond.operands[1], Const)
                     and cond.operands[1].is_int
@@ -1053,7 +1052,6 @@ class LoweredSwitchSimplifier(StructuringOptimizationPass):
                 cond = stmt.condition
                 if (
                     isinstance(cond, BinaryOp)
-                    and not cond.floating_point
                     and isinstance(cond.operands[0], VirtualVariable)
                     and isinstance(cond.operands[1], Const)
                     and cond.operands[1].is_int
@@ -1108,7 +1106,6 @@ class LoweredSwitchSimplifier(StructuringOptimizationPass):
                 cond = stmt.condition
                 if (
                     isinstance(cond, BinaryOp)
-                    and not cond.floating_point
                     and isinstance(cond.operands[0], VirtualVariable)
                     and isinstance(cond.operands[1], Const)
                     and cond.operands[1].is_int
@@ -1183,7 +1180,6 @@ class LoweredSwitchSimplifier(StructuringOptimizationPass):
                 if (
                     isinstance(cond, BinaryOp)
                     and not cond.signed
-                    and not cond.floating_point
                     and isinstance(cond.operands[0], BinaryOp)
                     and isinstance(cond.operands[1], Const)
                     and cond.operands[1].is_int

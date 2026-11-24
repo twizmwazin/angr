@@ -10,6 +10,7 @@ import networkx
 
 from angr.ailment.block import Block
 from angr.ailment.expression import (
+    FLOAT_OPS,
     BinaryOp,
     Call,
     Const,
@@ -780,7 +781,7 @@ class SPropagator:
         if isinstance(expr, Reinterpret):
             return expr.to_type == "F"
         if isinstance(expr, (BinaryOp, UnaryOp)):
-            return bool(expr.floating_point)
+            return expr.op in FLOAT_OPS
         return False
 
     @staticmethod

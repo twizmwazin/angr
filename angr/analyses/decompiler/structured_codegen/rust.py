@@ -1360,6 +1360,10 @@ class RustAssignment(RustStatement):
             "Sub": "-",
             "Mul": "*",
             "Div": "/",
+            "AddF": "+",
+            "SubF": "-",
+            "MulF": "*",
+            "DivF": "/",
             "And": "&",
             "Xor": "^",
             "Or": "|",
@@ -2106,6 +2110,7 @@ class RustUnaryOp(RustExpression, UnaryOpNode):
         OP_MAP = {
             "Not": self._c_repr_chunks_not,
             "Neg": self._c_repr_chunks_neg,
+            "NegF": self._c_repr_chunks_neg,
             "BitwiseNeg": self._c_repr_chunks_bitwiseneg,
             "Reference": self._c_repr_chunks_reference,
             "Dereference": self._c_repr_chunks_dereference,
@@ -2244,11 +2249,11 @@ class RustBinaryOp(RustExpression, BinaryOpNode):
             ["Or"],
             ["Xor"],
             ["And"],
-            ["CmpEQ", "CmpNE"],
-            ["CmpLE", "CmpLT", "CmpGT", "CmpGE"],
+            ["CmpEQ", "CmpNE", "CmpEQF", "CmpNEF"],
+            ["CmpLE", "CmpLT", "CmpGT", "CmpGE", "CmpLEF", "CmpLTF", "CmpGTF", "CmpGEF"],
             ["Shl", "Shr", "Sar"],
-            ["Add", "Sub"],
-            ["Mul", "Div"],
+            ["Add", "Sub", "AddF", "SubF"],
+            ["Mul", "Div", "MulF", "DivF"],
             # highest precedence
         ]
         for i, sublist in enumerate(precedence_list):
@@ -2287,6 +2292,16 @@ class RustBinaryOp(RustExpression, BinaryOpNode):
             "CmpGEs": self._c_repr_chunks_cmpge,
             "CmpEQ": self._c_repr_chunks_cmpeq,
             "CmpNE": self._c_repr_chunks_cmpne,
+            "AddF": self._c_repr_chunks_add,
+            "SubF": self._c_repr_chunks_sub,
+            "MulF": self._c_repr_chunks_mul,
+            "DivF": self._c_repr_chunks_div,
+            "CmpLEF": self._c_repr_chunks_cmple,
+            "CmpLTF": self._c_repr_chunks_cmplt,
+            "CmpGTF": self._c_repr_chunks_cmpgt,
+            "CmpGEF": self._c_repr_chunks_cmpge,
+            "CmpEQF": self._c_repr_chunks_cmpeq,
+            "CmpNEF": self._c_repr_chunks_cmpne,
             "Concat": self._c_repr_chunks_concat,
             "Rol": self._c_repr_chunks_rol,
             "Ror": self._c_repr_chunks_ror,
@@ -2319,10 +2334,10 @@ class RustBinaryOp(RustExpression, BinaryOpNode):
     def _c_repr_chunks(self, op):
         skip_op_and_rhs = False
         if self._cstyle_null_cmp and self._has_const_null_rhs():
-            if self.op == "CmpEQ":
+            if self.op in ("CmpEQ", "CmpEQF"):
                 skip_op_and_rhs = True
                 yield "!", None
-            elif self.op == "CmpNE":
+            elif self.op in ("CmpNE", "CmpNEF"):
                 skip_op_and_rhs = True
         # lhs
         if isinstance(self.lhs, RustBinaryOp) and self.op_precedence > self.lhs.op_precedence:
@@ -2338,7 +2353,7 @@ class RustBinaryOp(RustExpression, BinaryOpNode):
             yield op, self
             # rhs
             if isinstance(self.rhs, RustBinaryOp) and self.op_precedence > self.rhs.op_precedence - (
-                1 if self.op in ["Sub", "Div"] else 0
+                1 if self.op in ["Sub", "Div", "SubF", "DivF"] else 0
             ):
                 paren = RustClosingObject("(")
                 yield "(", paren

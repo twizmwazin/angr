@@ -41,25 +41,24 @@ class FPExactIdentities(PeepholeOptimizationExprBase):
     expr_classes = (BinaryOp,)
 
     def optimize(self, expr: BinaryOp, **kwargs):
-        if not expr.floating_point or len(expr.operands) != 2:
+        if len(expr.operands) != 2:
             return None
         lhs, rhs = expr.operands
         bits = expr.bits
 
-        if expr.op == "Mul":
+        if expr.op == "MulF":
             if _is_fp_one(rhs, bits) and lhs.bits == bits:
                 return lhs
             if _is_fp_one(lhs, bits) and rhs.bits == bits:
                 return rhs
             return None
 
-        if expr.op == "Add":
+        if expr.op == "AddF":
             for one, inner in ((rhs, lhs), (lhs, rhs)):
                 if (
                     _is_fp_one(one, bits)
                     and isinstance(inner, BinaryOp)
-                    and inner.op == "Sub"
-                    and inner.floating_point
+                    and inner.op == "SubF"
                     and inner.bits == bits
                     and _is_fp_one(inner.operands[1], bits)
                     and isinstance(inner.operands[0], UnaryOp)

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 from angr.ailment.block import Block
 from angr.ailment.block_walker import AILBlockViewer
 from angr.ailment.expression import (
+    FLOAT_OPS,
     BinaryOp,
     Call,
     Const,
@@ -61,15 +62,15 @@ def _is_fp128_op(expr: Expression) -> bool:
     if expr.bits != 128:
         return False
     if isinstance(expr, (UnaryOp, BinaryOp)):
-        return expr.floating_point and not (isinstance(expr, BinaryOp) and expr.vector_count is not None)
+        return expr.op in FLOAT_OPS and not (isinstance(expr, BinaryOp) and expr.vector_count is not None)
     return isinstance(expr, Convert) and expr.to_type == Convert.TYPE_FP and expr.vector_count is None
 
 
 def _fp128_operands(expr: Expression) -> list[Expression]:
     """Operands of an expression that are 128-bit floating-point values."""
-    if isinstance(expr, BinaryOp) and expr.floating_point and expr.vector_count is None:
+    if isinstance(expr, BinaryOp) and expr.op in FLOAT_OPS and expr.vector_count is None:
         return [op for op in expr.operands if op.bits == 128]
-    if isinstance(expr, UnaryOp) and expr.floating_point and expr.operand.bits == 128:
+    if isinstance(expr, UnaryOp) and expr.op in FLOAT_OPS and expr.operand.bits == 128:
         return [expr.operand]
     if isinstance(expr, Convert) and expr.from_type == Convert.TYPE_FP and expr.from_bits == 128:
         return [expr.operand]
