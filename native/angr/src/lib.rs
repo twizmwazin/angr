@@ -2,6 +2,7 @@ pub mod ailment;
 pub mod automaton;
 pub mod cfg_graph;
 pub mod claripy;
+pub mod fprm;
 pub mod function_graph;
 pub mod fuzzer;
 pub mod icicle;
@@ -69,6 +70,7 @@ fn rustylib(m: &Bound<'_, PyModule>) -> PyResult<()> {
         .set_item("angr.rustylib.claripy", claripy_module.clone())?;
     m.add("claripy", claripy_module)?;
 
+    m.add_class::<fprm::FPRM>()?;
     m.add_class::<segmentlist::Segment>()?;
     m.add_class::<segmentlist::SegmentList>()?;
     Ok(())

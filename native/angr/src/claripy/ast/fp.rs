@@ -5,87 +5,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use pyo3::types::PyTuple;
 
 use crate::claripy::prelude::*;
+pub use crate::fprm::FPRM as PyRM;
 
 static FPS_COUNTER: AtomicUsize = AtomicUsize::new(0);
-
-#[pyclass(
-    name = "RM",
-    module = "angr.rustylib.claripy.fp",
-    frozen,
-    eq,
-    hash,
-    from_py_object
-)]
-#[derive(Clone, PartialEq, Eq, Hash, Default)]
-#[allow(non_camel_case_types)]
-pub enum PyRM {
-    #[default]
-    RM_NearestTiesEven,
-    RM_NearestTiesAwayFromZero,
-    RM_TowardsZero,
-    RM_TowardsPositiveInf,
-    RM_TowardsNegativeInf,
-}
-
-#[pymethods]
-impl PyRM {
-    #[staticmethod]
-    #[allow(clippy::should_implement_trait)]
-    pub fn default() -> PyRM {
-        <PyRM as Default>::default()
-    }
-
-    pub fn __reduce__<'py>(
-        &self,
-        py: Python<'py>,
-    ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyTuple>)> {
-        let name = match self {
-            PyRM::RM_NearestTiesEven => "RM_NearestTiesEven",
-            PyRM::RM_NearestTiesAwayFromZero => "RM_NearestTiesAwayFromZero",
-            PyRM::RM_TowardsZero => "RM_TowardsZero",
-            PyRM::RM_TowardsPositiveInf => "RM_TowardsPositiveInf",
-            PyRM::RM_TowardsNegativeInf => "RM_TowardsNegativeInf",
-        };
-        let getattr = py.import("builtins")?.getattr("getattr")?;
-        Ok((getattr, (py.get_type::<PyRM>(), name).into_pyobject(py)?))
-    }
-}
-
-impl From<PyRM> for FPRM {
-    fn from(rm: PyRM) -> FPRM {
-        match rm {
-            PyRM::RM_NearestTiesEven => FPRM::NearestTiesToEven,
-            PyRM::RM_NearestTiesAwayFromZero => FPRM::NearestTiesToAway,
-            PyRM::RM_TowardsZero => FPRM::TowardZero,
-            PyRM::RM_TowardsPositiveInf => FPRM::TowardPositive,
-            PyRM::RM_TowardsNegativeInf => FPRM::TowardNegative,
-        }
-    }
-}
-
-impl From<FPRM> for PyRM {
-    fn from(rm: FPRM) -> PyRM {
-        match rm {
-            FPRM::NearestTiesToEven => PyRM::RM_NearestTiesEven,
-            FPRM::NearestTiesToAway => PyRM::RM_NearestTiesAwayFromZero,
-            FPRM::TowardZero => PyRM::RM_TowardsZero,
-            FPRM::TowardPositive => PyRM::RM_TowardsPositiveInf,
-            FPRM::TowardNegative => PyRM::RM_TowardsNegativeInf,
-        }
-    }
-}
-
-impl From<&FPRM> for PyRM {
-    fn from(rm: &FPRM) -> PyRM {
-        match rm {
-            FPRM::NearestTiesToEven => PyRM::RM_NearestTiesEven,
-            FPRM::NearestTiesToAway => PyRM::RM_NearestTiesAwayFromZero,
-            FPRM::TowardZero => PyRM::RM_TowardsZero,
-            FPRM::TowardPositive => PyRM::RM_TowardsPositiveInf,
-            FPRM::TowardNegative => PyRM::RM_TowardsNegativeInf,
-        }
-    }
-}
 
 #[pyclass(
     name = "FSort",

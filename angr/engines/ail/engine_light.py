@@ -10,7 +10,6 @@ from angr.engines.ail.callstack import AILCallStack
 from angr.engines.light.engine import SimEngineLightAIL, ail_binop_handler, ail_unop_handler
 from angr.engines.successors import SimSuccessors
 from angr.engines.vex.claripy import ccall
-from angr.rustylib.ailment import RoundingMode  # pylint:disable=import-error
 from angr.sim_state import SimState
 from angr.storage.memory_mixins.memory_mixin import MemoryMixin
 from angr.utils.constants import DEFAULT_STATEMENT
@@ -21,28 +20,18 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-# Map the AIL ``RoundingMode`` enum to claripy's ``fp.RM`` enum. The
-# integer ordering already matches VEX (0=NearestTiesEven, ...) but
-# claripy doesn't accept the AIL pyclass directly, so we translate at
-# the engine boundary.
-_AIL_RM_TO_CLARIPY = {
-    RoundingMode.RM_NearestTiesEven: claripy.fp.RM.RM_NearestTiesEven,
-    RoundingMode.RM_TowardsNegativeInf: claripy.fp.RM.RM_TowardsNegativeInf,
-    RoundingMode.RM_TowardsPositiveInf: claripy.fp.RM.RM_TowardsPositiveInf,
-    RoundingMode.RM_TowardsZero: claripy.fp.RM.RM_TowardsZero,
-}
 
+def _claripy_rm(rm: object) -> claripy.fp.RM:
+    """Resolve an AIL rounding mode to a ``claripy.fp.RM`` value.
 
-def _claripy_rm(rm: object) -> object:
-    """Resolve an AIL ``RoundingMode`` to a ``claripy.fp.RM`` value.
-
-    Falls back to claripy's default when ``rm`` is ``None`` or is still an
-    unresolved ``Expression`` (VEX sometimes carries the rounding mode in a
-    tmp that only becomes a constant later in the decompilation pipeline).
+    AIL and claripy share one rounding mode type, so a resolved mode is passed
+    through. Falls back to claripy's default when ``rm`` is ``None`` or is
+    still an unresolved ``Expression`` (VEX sometimes carries the rounding mode
+    in a tmp that only becomes a constant later in the decompilation pipeline).
     """
-    if not isinstance(rm, RoundingMode):
+    if not isinstance(rm, claripy.fp.RM):
         return claripy.fp.RM.default()
-    return _AIL_RM_TO_CLARIPY[rm]
+    return rm
 
 
 type StateType = SimState[int, claripy.ast.BV]

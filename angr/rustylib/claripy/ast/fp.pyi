@@ -1,8 +1,9 @@
 """Type stubs for ``angr.rustylib.claripy.ast.fp``."""
 
 from collections.abc import Sequence
-from typing import Any, ClassVar, overload
+from typing import Any, overload
 
+from angr.rustylib import FPRM
 from angr.rustylib.claripy.annotation import Annotation
 from angr.rustylib.claripy.ast.bits import Bits
 from angr.rustylib.claripy.ast.bool import Bool
@@ -10,17 +11,7 @@ from angr.rustylib.claripy.ast.bv import BV
 
 type _FPLike = FP | float
 
-class RM:
-    RM_NearestTiesEven: ClassVar[RM]
-    RM_NearestTiesAwayFromZero: ClassVar[RM]
-    RM_TowardsZero: ClassVar[RM]
-    RM_TowardsPositiveInf: ClassVar[RM]
-    RM_TowardsNegativeInf: ClassVar[RM]
-    @staticmethod
-    def default() -> RM: ...
-    def __eq__(self, value: object, /) -> bool: ...
-    def __ne__(self, value: object, /) -> bool: ...
-    def __hash__(self) -> int: ...
+RM = FPRM
 
 class FSort:
     @property

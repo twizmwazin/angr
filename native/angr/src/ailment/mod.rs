@@ -64,7 +64,7 @@ pub fn ailment(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Enums
     m.add_class::<enums::VirtualVariableCategory>()?;
     m.add_class::<enums::ConvertType>()?;
-    m.add_class::<enums::RoundingMode>()?;
+    m.add("RoundingMode", m.py().get_type::<enums::RoundingMode>())?;
     m.add_class::<enums::ExpressionKind>()?;
     m.add_class::<enums::StatementKind>()?;
 

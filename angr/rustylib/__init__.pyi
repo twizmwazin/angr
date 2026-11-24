@@ -1,4 +1,33 @@
+from typing import ClassVar
+
 from . import ailment, automaton, claripy, function_graph, fuzzer, icicle
+
+class FPRM:
+    """
+    A floating-point rounding mode.
+
+    This is the single rounding mode type shared by claripy and AIL: it is
+    also available as ``claripy.fp.RM`` and ``angr.ailment.RoundingMode``.
+    The integer values of the first four modes match VEX's IRRoundingMode.
+    """
+
+    RM_NearestTiesEven: ClassVar[FPRM]
+    RM_TowardsNegativeInf: ClassVar[FPRM]
+    RM_TowardsPositiveInf: ClassVar[FPRM]
+    RM_TowardsZero: ClassVar[FPRM]
+    RM_NearestTiesAwayFromZero: ClassVar[FPRM]
+    @staticmethod
+    def default() -> FPRM: ...
+    @property
+    def value(self) -> int: ...
+    @property
+    def name(self) -> str: ...
+    def __int__(self) -> int: ...
+    def __eq__(self, value: object, /) -> bool: ...
+    def __ne__(self, value: object, /) -> bool: ...
+    def __hash__(self) -> int: ...
+    @staticmethod
+    def _from_int_py(v: int) -> FPRM: ...
 
 class Segment:
     """

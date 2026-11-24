@@ -329,7 +329,7 @@ pub fn claripy(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // fp
     import_submodule(py, m, "angr.rustylib.claripy", "fp", |py, fp| {
-        fp.add_class::<ast::fp::PyRM>()?;
+        fp.add("RM", py.get_type::<ast::fp::PyRM>())?;
         fp.add_class::<ast::fp::PyFSort>()?;
         fp.add("FSORT_FLOAT", ast::fp::fsort_float())?;
         fp.add("FSORT_DOUBLE", ast::fp::fsort_double())?;

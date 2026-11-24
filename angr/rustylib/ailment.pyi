@@ -28,6 +28,10 @@ attribute is dispatched on the variant tag and raises
 from collections.abc import Iterator, Sequence
 from typing import Any, ClassVar, Self
 
+from angr.rustylib import FPRM
+
+RoundingMode = FPRM
+
 # ---------------------------------------------------------------------------
 # Tags
 # ---------------------------------------------------------------------------
@@ -139,20 +143,6 @@ class StatementKind:
     def __hash__(self) -> int: ...
     @staticmethod
     def _from_int_py(v: int) -> StatementKind: ...
-
-class RoundingMode:
-    RM_NearestTiesEven: ClassVar[RoundingMode]
-    RM_TowardsNegativeInf: ClassVar[RoundingMode]
-    RM_TowardsPositiveInf: ClassVar[RoundingMode]
-    RM_TowardsZero: ClassVar[RoundingMode]
-    @property
-    def value(self) -> int: ...
-    @property
-    def name(self) -> str: ...
-    def __int__(self) -> int: ...
-    def __hash__(self) -> int: ...
-    @staticmethod
-    def _from_int_py(v: int) -> RoundingMode: ...
 
 # ---------------------------------------------------------------------------
 # Expression -- single fat-enum pyclass
