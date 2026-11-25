@@ -299,9 +299,15 @@ class TestAMD64CondOverflowBinary(unittest.TestCase):
     def test_gzip_overflow_checks_have_no_ccall(self):
         # gzip has a size-computation helper guarded by jo on ADDQ and SMULQ
         bin_path = os.path.join(test_location, "x86_64", "gzip_gcc13.3.0_O2")
-        proj = angr.Project(bin_path, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(fail_fast=True, normalize=True)
-        dec = proj.analyses.Decompiler(cfg.functions[0x40F1B0], cfg=cfg)
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            0x40F1B0,
+            call_tree_depth=1,
+            include_plt=True,
+            run_ccc=False,
+            project_kwargs={"auto_load_libs": False},
+        )
+        dec = proj.analyses.Decompiler(cfg.functions[0x40F1B0], cfg=cfg.model)
         assert dec.codegen is not None and dec.codegen.text is not None
         assert "_ccall" not in dec.codegen.text
         assert "__OFADD__" in dec.codegen.text
@@ -310,10 +316,17 @@ class TestAMD64CondOverflowBinary(unittest.TestCase):
     def test_file_overflow_checks_have_no_ccall(self):
         # file has several allocation helpers guarded by jo on UMULQ
         bin_path = os.path.join(test_location, "x86_64", "file_gcc13.3.0_O2")
-        proj = angr.Project(bin_path, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(fail_fast=True, normalize=True)
-        for addr in (0x41E520, 0x41E5A0, 0x41EED0):
-            dec = proj.analyses.Decompiler(cfg.functions[addr], cfg=cfg)
+        addrs = (0x41E520, 0x41E5A0, 0x41EED0)
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            addrs[0],
+            extra_func_addrs=addrs[1:],
+            include_plt=True,
+            run_ccc=False,
+            project_kwargs={"auto_load_libs": False},
+        )
+        for addr in addrs:
+            dec = proj.analyses.Decompiler(cfg.functions[addr], cfg=cfg.model)
             assert dec.codegen is not None and dec.codegen.text is not None
             assert "_ccall" not in dec.codegen.text, f"{addr:#x} still leaks a ccall"
             assert "__OFUMUL__" in dec.codegen.text, f"{addr:#x} lost its overflow check"
@@ -665,9 +678,14 @@ class TestAMD64CCallRewriterRealBinaries(unittest.TestCase):
 
     def _assert_no_ccall(self, bin_name, addrs):
         bin_path = os.path.join(test_location, "x86_64", bin_name)
-        proj = angr.Project(bin_path, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions(cfg=cfg.model, recover_variables=True)
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            addrs[0],
+            extra_func_addrs=addrs[1:],
+            include_plt=True,
+            project_kwargs={"auto_load_libs": False},
+            ccc_kwargs={"cfg": None, "recover_variables": True},
+        )
         for addr in addrs:
             func = cfg.functions.get_by_addr(addr)
             dec = proj.analyses.Decompiler(func, cfg=cfg.model)

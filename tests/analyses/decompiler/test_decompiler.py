@@ -69,7 +69,6 @@ from tests.common import (
     WORKER,
     bin_location,
     broken,
-    complete_calling_conventions_for,
     load_project_with_scoped_cfg,
     print_decompilation_result,
     set_decompiler_option,
@@ -311,9 +310,13 @@ class TestDecompiler(unittest.TestCase):
 
     def _setup_decompiling_dir_gcc_O0_free_ent(self):
         bin_path = os.path.join(test_location, "x86_64", "dir_gcc_-O0")
-        p = angr.Project(bin_path, auto_load_libs=False, load_debug_info=True)
-
-        cfg = p.analyses[CFGFast].prep()(normalize=True)
+        p, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            "free_ent",
+            include_plt=True,
+            run_ccc=False,
+            project_kwargs={"auto_load_libs": False, "load_debug_info": True},
+        )
 
         f = cfg.functions["free_ent"]
         return p, cfg, f
@@ -846,8 +849,14 @@ class TestDecompiler(unittest.TestCase):
 
     def _setup_decompiling_true_mips64(self):
         bin_path = os.path.join(test_location, "mips64", "true")
-        p = angr.Project(bin_path, auto_load_libs=False, load_debug_info=False)
-        cfg = p.analyses[CFGFast].prep()(normalize=True, data_references=True)
+        p, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            "main",
+            include_plt=True,
+            run_ccc=False,
+            project_kwargs={"auto_load_libs": False, "load_debug_info": False},
+            cfg_kwargs={"data_references": True},
+        )
 
         all_optimization_passes = DECOMPILATION_PRESETS["full"].get_optimization_passes("MIPS64", "linux")
 
@@ -1231,9 +1240,14 @@ class TestDecompiler(unittest.TestCase):
 
     def _setup_decompilation_call_expr_folding_mips64_true(self):
         bin_path = os.path.join(test_location, "mips64", "true")
-        p = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = p.analyses[CFGFast].prep()(data_references=True, normalize=True)
+        p, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            "version_etc",
+            include_plt=True,
+            run_ccc=False,
+            project_kwargs={"auto_load_libs": False},
+            cfg_kwargs={"data_references": True},
+        )
 
         func_0 = cfg.functions["version_etc"]
         return p, cfg, func_0
@@ -1769,9 +1783,15 @@ class TestDecompiler(unittest.TestCase):
 
     def _setup_decompiling_morton_lib_handle__suback(self):
         bin_path = os.path.join(test_location, "x86_64", "decompiler", "morton.libmosquitto.so.1")
-        p = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = p.analyses[CFGFast].prep()(data_references=True, normalize=True)
+        p, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            "handle__suback",
+            expand_call_tree=False,
+            include_plt=True,
+            run_ccc=False,
+            project_kwargs={"auto_load_libs": False},
+            cfg_kwargs={"data_references": True},
+        )
 
         func = cfg.functions.function(name="handle__suback", plt=False)
         return p, cfg, func
@@ -3088,9 +3108,13 @@ class TestDecompiler(unittest.TestCase):
 
     def _setup_decompiling_sort_specify_nmerge(self):
         bin_path = os.path.join(test_location, "x86_64", "decompiler", "sort.o")
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(normalize=True, data_references=True)
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            "specify_nmerge",
+            run_ccc=False,
+            project_kwargs={"auto_load_libs": False},
+            cfg_kwargs={"data_references": True},
+        )
         f = proj.kb.functions["specify_nmerge"]
         return proj, cfg, f
 
@@ -5413,8 +5437,13 @@ class TestDecompiler(unittest.TestCase):
         bin_path = os.path.join(
             test_location, "x86_64", "windows", "1179ea5ceedaa1ae4014666f42a20e976701d61fe52f1e126fc78066fddab4b7.exe"
         )
-        proj = angr.Project(bin_path, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True, data_references=True)
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            0x140005980,
+            run_ccc=False,
+            project_kwargs={"auto_load_libs": False},
+            cfg_kwargs={"data_references": True},
+        )
         f = proj.kb.functions[0x140005980]
         return proj, cfg, f
 
@@ -5927,9 +5956,14 @@ class TestDecompiler(unittest.TestCase):
         bin_path = os.path.join(
             test_location, "i386", "windows", "00f53f8bf3df545f0422a7c68170ac379ec8d78bee9782b49ce05b14f8bcc7d5"
         )
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(normalize=True, data_references=True)
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            0x4011DE,
+            expand_call_tree=False,
+            run_ccc=False,
+            project_kwargs={"auto_load_libs": False},
+            cfg_kwargs={"data_references": True},
+        )
         f = proj.kb.functions[0x4011DE]
 
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
@@ -5962,9 +5996,14 @@ class TestDecompiler(unittest.TestCase):
         bin_path = os.path.join(
             test_location, "x86_64", "windows", "059ef54d0a97345369d236aafb051917c50680020a1bc532236072f4d341d9e3"
         )
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(force_smart_scan=False, normalize=True, data_references=True)
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            0x442300,
+            expand_call_tree=False,
+            run_ccc=False,
+            project_kwargs={"auto_load_libs": False},
+            cfg_kwargs={"data_references": True},
+        )
         f = proj.kb.functions[0x442300]
 
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
@@ -6005,9 +6044,12 @@ class TestDecompiler(unittest.TestCase):
         bin_path = os.path.join(
             test_location, "i386", "windows", "736cb27201273f6c4f83da362c9595b50d12333362e02bc7a77dd327cc6b045a"
         )
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(force_smart_scan=False, normalize=True)
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            0x41D560,
+            run_ccc=False,
+            project_kwargs={"auto_load_libs": False},
+        )
         f = proj.kb.functions[0x41D560]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         assert d.codegen is not None and d.codegen.text is not None
@@ -6024,9 +6066,12 @@ class TestDecompiler(unittest.TestCase):
         bin_path = os.path.join(
             test_location, "i386", "windows", "736cb27201273f6c4f83da362c9595b50d12333362e02bc7a77dd327cc6b045a"
         )
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(force_smart_scan=False, normalize=True)
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            0x41DCE0,
+            run_ccc=False,
+            project_kwargs={"auto_load_libs": False},
+        )
         f = proj.kb.functions[0x41DCE0]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         assert d.codegen is not None and d.codegen.text is not None
@@ -6146,9 +6191,14 @@ class TestDecompiler(unittest.TestCase):
         bin_path = os.path.join(
             test_location, "x86_64", "1cbbf108f44c8f4babde546d26425ca5340dccf878d306b90eb0fbec2f83ab51"
         )
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(normalize=True)
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            0x40B720,
+            call_tree_depth=1,
+            include_plt=True,
+            run_ccc=False,
+            project_kwargs={"auto_load_libs": False},
+        )
         f = proj.kb.functions[0x40B720]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
@@ -6163,9 +6213,14 @@ class TestDecompiler(unittest.TestCase):
         bin_path = os.path.join(
             test_location, "x86_64", "1cbbf108f44c8f4babde546d26425ca5340dccf878d306b90eb0fbec2f83ab51"
         )
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(normalize=True)
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            0x40BCF0,
+            expand_call_tree=False,
+            include_plt=True,
+            run_ccc=False,
+            project_kwargs={"auto_load_libs": False},
+        )
         f = proj.kb.functions[0x40BCF0]
         d = proj.analyses[Decompiler].prep(fail_fast=True)(f, cfg=cfg.model, options=decompiler_options)
         print_decompilation_result(d)
@@ -6275,10 +6330,12 @@ class TestDecompiler(unittest.TestCase):
     def test_decompiling_msvcrt_IsExceptionObjectToBeDestroyed(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "decompiler", "vcruntime_test.exe")
 
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions()
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            0x140015BC4,
+            call_tree_depth=1,
+            project_kwargs={"auto_load_libs": False},
+        )
 
         # IsExceptionObjectToBeDestroyed
         f = proj.kb.functions[0x140015BC4]
@@ -6292,10 +6349,12 @@ class TestDecompiler(unittest.TestCase):
     def test_decompiling_msvcrt_fclose_nolock_internal(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "decompiler", "vcruntime_test.exe")
 
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions()
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            0x14001D9A8,
+            call_tree_depth=1,
+            project_kwargs={"auto_load_libs": False},
+        )
 
         # fclose_nolock_internal
         f = proj.kb.functions[0x14001D9A8]
@@ -6309,13 +6368,12 @@ class TestDecompiler(unittest.TestCase):
     def test_decompiling_msvcrt_setsbuplow(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "decompiler", "vcruntime_test.exe")
 
-        # keep all functions and CFG nodes resident: the default size-derived limits spill most of this
-        # binary's 1579 functions to LMDB and the whole-graph CFG phases then miss on nearly every access
-        proj = angr.Project(bin_path, auto_load_libs=False, cache_limits={"functions": None, "cfg_nodes": None})
-
-        cfg = proj.analyses.CFGFast(normalize=True)
-        # decompiling setSBUpLow cannot be affected by prototypes of functions it never reaches
-        complete_calling_conventions_for(proj, [0x14002EC04])
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            0x14002EC04,
+            expand_call_tree=False,
+            project_kwargs={"auto_load_libs": False},
+        )
 
         # setSBUpLow
         f = proj.kb.functions[0x14002EC04]
@@ -7112,16 +7170,17 @@ class TestDecompiler(unittest.TestCase):
 
     def test_decompiling_rust_fmt_main(self, decompiler_options=None):
         bin_path = os.path.join(test_location, "x86_64", "decompiler", "fmt_rust")
-        # turning off cache for better speed
-        proj = angr.Project(
+        proj, cfg = load_project_with_scoped_cfg(
             bin_path,
-            cache_limits={"functions": None, "cfg_nodes": None},
+            0x469200,
+            call_tree_depth=1,
+            include_plt=True,
+            run_ccc=False,
         )
-        cfg = proj.analyses.CFG(normalize=True)
         func = proj.kb.functions[0x469200]
         decompiler_options = decompiler_options or []
         decompiler_options += [("prettify_thiscall", True)]
-        dec = proj.analyses.Decompiler(func, cfg=cfg, options=decompiler_options)
+        dec = proj.analyses.Decompiler(func, cfg=cfg.model, options=decompiler_options)
         assert dec.codegen is not None and dec.codegen.text is not None
         print_decompilation_result(dec)
 

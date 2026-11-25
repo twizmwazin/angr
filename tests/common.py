@@ -240,8 +240,8 @@ def _plt_regions(main_object) -> list[tuple[int, int]]:
 
 def load_project_with_scoped_cfg(
     bin_path: str,
-    func_addr: int,
-    extra_func_addrs: Sequence[int] = (),
+    func_addr: int | str,
+    extra_func_addrs: Sequence[int | str] = (),
     window: int = 0x2000,
     expand_call_tree: bool = True,
     include_plt: bool = False,
@@ -265,8 +265,8 @@ def load_project_with_scoped_cfg(
     Project's real knowledge base.
 
     :param bin_path:          Path of the binary to load.
-    :param func_addr:         Address of the function under test.
-    :param extra_func_addrs:  Additional function addresses that must be present in the CFG.
+    :param func_addr:         Address of the function under test, or the name of its symbol.
+    :param extra_func_addrs:  Additional function addresses (or symbol names) that must be present in the CFG.
     :param window:            Size in bytes of the region scanned after each function start; must cover
                               the function's full extent.
     :param expand_call_tree:  Also cover the transitive callees of the given functions.
@@ -280,7 +280,14 @@ def load_project_with_scoped_cfg(
     """
     proj = Project(bin_path, **(project_kwargs or {}))
     main_object = proj.loader.main_object
-    roots = [func_addr, *extra_func_addrs]
+    roots: list[int] = []
+    for addr_or_name in (func_addr, *extra_func_addrs):
+        if isinstance(addr_or_name, str):
+            symbol = main_object.get_symbol(addr_or_name)
+            assert symbol is not None, f"{addr_or_name} not found in {bin_path}"
+            roots.append(symbol.rebased_addr)
+        else:
+            roots.append(addr_or_name)
     known: set[int] = set(roots)
     extra_regions = _plt_regions(main_object) if include_plt else []
 

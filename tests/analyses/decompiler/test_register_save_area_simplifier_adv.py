@@ -8,7 +8,6 @@ import os
 import unittest
 from unittest.mock import patch
 
-import angr
 from angr.analyses.decompiler.optimization_passes.register_save_area_simplifier import RegisterSaveAreaSimplifier
 from tests.common import bin_location, load_project_with_scoped_cfg, print_decompilation_result
 
@@ -44,8 +43,15 @@ class TestRegisterSaveAreaSimplifierAdv(unittest.TestCase):
     @staticmethod
     def _decompile_recording_save_areas(bin_path: str, func_addr: int):
         """Decompile one function, returning the result and every save-area cache handed to the pass."""
-        proj = angr.Project(bin_path, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True, data_references=True)
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            func_addr,
+            call_tree_depth=1,
+            include_plt=True,
+            run_ccc=False,
+            project_kwargs={"auto_load_libs": False},
+            cfg_kwargs={"data_references": True},
+        )
         func = proj.kb.functions[func_addr]
 
         caches = []

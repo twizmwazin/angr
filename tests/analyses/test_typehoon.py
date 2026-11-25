@@ -80,7 +80,7 @@ from angr.sim_type import (
     SimTypePointer,
 )
 from angr.utils.constants import MAX_POINTSTO_BITS, MAX_TYPE_NESTING
-from tests.common import bin_location, print_decompilation_result
+from tests.common import bin_location, load_project_with_scoped_cfg, print_decompilation_result
 
 test_location = os.path.join(bin_location, "tests")
 
@@ -925,13 +925,13 @@ class TestTypehoon(unittest.TestCase):
 
     def test_type_inference_with_custom_label(self):
         bin_path = os.path.join(test_location, "x86_64", "windows", "ipnathlp.dll")
-        proj = angr.Project(bin_path, auto_load_libs=False)
-
-        cfg = proj.analyses.CFGFast(fail_fast=True, normalize=True)
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path, 0x18003CA70, call_tree_depth=1, run_ccc=False, project_kwargs={"auto_load_libs": False}
+        )
 
         func = cfg.functions[0x18003CA70]
         assert func is not None
-        dec = proj.analyses.Decompiler(func, cfg=cfg)
+        dec = proj.analyses.Decompiler(func, cfg=cfg.model)
         assert (
             dec.codegen is not None
             and dec.codegen.text is not None

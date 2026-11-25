@@ -56,8 +56,12 @@ class TestSSAStack(unittest.TestCase):
             "armel",
             "chall.bin",
         )
-        proj = angr.Project(bin_path, main_opts={"backend": "blob", "arch": "ARMEL", "base_addr": 0x0})
-        cfg = proj.analyses.CFG(normalize=True, show_progressbar=not WORKER)
+        proj, cfg = load_project_with_scoped_cfg(
+            bin_path,
+            0x35D,
+            run_ccc=False,
+            project_kwargs={"main_opts": {"backend": "blob", "arch": "ARMEL", "base_addr": 0x0}},
+        )
 
         func = cfg.functions[0x35D]
         dec = proj.analyses.Decompiler(func, fail_fast=True)

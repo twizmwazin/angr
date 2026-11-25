@@ -626,10 +626,13 @@ class TestClinicSerializationAboveFourGigabytes(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.proj = angr.Project(
-            os.path.join(test_location, "x86_64", "decompiler", "vcruntime_test.exe"), auto_load_libs=False
+        cls.proj, cls.cfg = load_project_with_scoped_cfg(
+            os.path.join(test_location, "x86_64", "decompiler", "vcruntime_test.exe"),
+            0x140001068,
+            call_tree_depth=1,
+            run_ccc=False,
+            project_kwargs={"auto_load_libs": False},
         )
-        cls.cfg = cls.proj.analyses.CFGFast(normalize=True)
         # a tail jump to a known function makes Clinic mint a new block address for this one
         cls.func = cls.proj.kb.functions[0x140001068]
         dec = cls.proj.analyses.Decompiler(cls.func, cfg=cls.cfg.model, generate_code=True)
