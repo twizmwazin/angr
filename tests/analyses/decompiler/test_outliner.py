@@ -16,7 +16,7 @@ from angr.analyses.decompiler.decompiler import Decompiler
 from angr.analyses.outliner import Outliner
 from angr.sim_type import SimStruct, SimTypeArray, SimTypeChar, SimTypeWideChar
 from angr.sim_variable import SimRegisterVariable, SimStackVariable
-from tests.common import bin_location
+from tests.common import bin_location, load_project_with_cached_cfg
 
 
 class TestOutliner(TestCase):
@@ -91,8 +91,7 @@ class TestOutliner(TestCase):
         # bin_path = r"F:\My Documents\Emotion Labs\ire\driver_samples\notepad.exe"
         if not os.path.exists(bin_path):
             raise unittest.SkipTest("Hey, you're not Fish...")
-        proj = angr.Project(bin_path, auto_load_libs=False)
-        cfg = proj.analyses.CFG(normalize=True)
+        proj, cfg = load_project_with_cached_cfg(bin_path)
         # proj.analyses.CompleteCallingConventions()
 
         func = proj.kb.functions[0x1400135D0]
@@ -193,8 +192,7 @@ class TestOutliner(TestCase):
         # bin_path = r"F:\My Documents\Emotion Labs\ire\driver_samples\notepad.exe"
         if not os.path.exists(bin_path):
             raise unittest.SkipTest("Hey, you're not Fish...")
-        proj = angr.Project(bin_path, auto_load_libs=False)
-        cfg = proj.analyses.CFG(normalize=True)
+        proj, cfg = load_project_with_cached_cfg(bin_path)
         # proj.analyses.CompleteCallingConventions()
 
         func = proj.kb.functions[0x1400135D0]

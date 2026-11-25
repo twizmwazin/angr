@@ -39,7 +39,7 @@ from angr.analyses.decompiler.known_patterns.context import MSVC, detect_cxx_run
 from angr.analyses.decompiler.known_patterns.dsl import PStmtSeq
 from angr.analyses.decompiler.optimization_passes import FpNegation, KnownPatternOutliner
 from angr.knowledge_plugins.functions.function import PrototypeSource
-from tests.common import bin_location, load_project_with_scoped_cfg
+from tests.common import bin_location, load_project_with_cached_cfg, load_project_with_scoped_cfg
 
 WDK_BIN = os.path.join(bin_location, "tests", "x86_64", "windows", "known_patterns_wdk_list.exe")
 LINUX_BIN = os.path.join(bin_location, "tests", "x86_64", "decompiler", "known_patterns_linux_list")
@@ -93,9 +93,7 @@ def _decompile(bin_path: str, func_name: str | None = None, addr: int | None = N
     # `fast` preset used to be pattern-free and is not any more, so what used to
     # be implicit has to be said. FpNegation is disabled for the same reason: it
     # rewrites the FP sign-flip XOR (the fneg/fnegf idiom) into a negation.
-    proj = angr.Project(bin_path, auto_load_libs=False)
-    cfg = proj.analyses.CFGFast(normalize=True)
-    proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+    proj, cfg = load_project_with_cached_cfg(bin_path, ccc_kwargs={})
     func = cfg.functions.function(name=func_name) if func_name is not None else cfg.functions.function(addr=addr)
     assert func is not None
     dec = proj.analyses[Decompiler].prep(fail_fast=True)(
@@ -312,9 +310,7 @@ class TestMsvcStringCstr(TestCase):
 
     def test_find_msvc_string_cstr(self):
         # the clean SSA form (no de-phi copies) is present right after Stage-1 SSA
-        proj = angr.Project(CSTR_BIN, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+        proj, cfg = load_project_with_cached_cfg(CSTR_BIN, ccc_kwargs={})
         func = cfg.functions.function(addr=self.CSTR_FUNC)
         assert func is not None
         dec = proj.analyses[Decompiler].prep(fail_fast=True)(
@@ -332,9 +328,7 @@ class TestMsvcStringCstr(TestCase):
         # matching the clean SSA form at BEFORE_VARIABLE_RECOVERY, outlining a
         # value-producing diamond, and the Outliner collapsing the frontier phi so
         # the subsequent de-phi succeeds. (Also pins c_str as enabled-by-default.)
-        proj = angr.Project(CSTR_BIN, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+        proj, cfg = load_project_with_cached_cfg(CSTR_BIN, ccc_kwargs={})
         func = cfg.functions.function(addr=self.CSTR_FUNC)
         assert func is not None
         dec = proj.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, preset="full")
@@ -350,9 +344,7 @@ def _assert_outlines_during(test, bin_path, targets):
     """Assert each (func-name-or-address, call-fragment) is outlined by the pass
     during a normal full-preset decompile (not only via a finder afterwards).
     The opt-in templates are force-enabled with the ``known_patterns`` option."""
-    proj = angr.Project(bin_path, auto_load_libs=False)
-    cfg = proj.analyses.CFGFast(normalize=True)
-    proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+    proj, cfg = load_project_with_cached_cfg(bin_path, ccc_kwargs={})
     for ref, frag in targets:
         with test.subTest(target=ref):
             func = cfg.functions.function(name=ref) if isinstance(ref, str) else cfg.functions.function(addr=ref)
@@ -428,9 +420,7 @@ class TestPosixMacros(TestCase):
     def test_s_istype_outlines_by_default(self):
         # these are default-on, so a plain full-preset decompile must outline them
         # without the opt-in templates being force-enabled
-        proj = angr.Project(GLIBC_BIN, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+        proj, cfg = load_project_with_cached_cfg(GLIBC_BIN, ccc_kwargs={})
         for func_name, _, macro in self._S_ISTYPES:
             with self.subTest(macro=macro):
                 func = cfg.functions.function(name=func_name)
@@ -475,9 +465,7 @@ class TestWaitStatusMacros(TestCase):
 
     def test_opt_in_macros_are_not_default_on(self):
         # WIFSTOPPED / WTERMSIG must not fire in a plain full-preset decompile
-        proj = angr.Project(GLIBC_BIN, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+        proj, cfg = load_project_with_cached_cfg(GLIBC_BIN, ccc_kwargs={})
         for func_name, _, macro in self._CASES[2:]:
             with self.subTest(macro=macro):
                 func = cfg.functions.function(name=func_name)
@@ -520,9 +508,7 @@ class TestContainingRecordPresentation(TestCase):
     _CALL = re.compile(r"CONTAINING_RECORD\(\s*([^,()]+?)\s*,\s*(\d+)\s*\)")
 
     def _calls(self, bin_path, ref):
-        proj = angr.Project(bin_path, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+        proj, cfg = load_project_with_cached_cfg(bin_path, ccc_kwargs={})
         func = cfg.functions.function(name=ref) if isinstance(ref, str) else cfg.functions.function(addr=ref)
         assert func is not None, ref
         dec = proj.analyses[Decompiler].prep(fail_fast=True)(
@@ -704,9 +690,7 @@ class TestLibmBitPatterns(TestCase):
 
     def test_copysign_takes_the_declared_return_width(self):
         # the idiom is matched at the 128-bit xmm width; the call must take the template's double, not uint128_t
-        proj = angr.Project(LIBM_BIN, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+        proj, cfg = load_project_with_cached_cfg(LIBM_BIN, ccc_kwargs={})
         func = cfg.functions.function(name="f_copysign")
         assert func is not None
         dec = proj.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model)
@@ -744,9 +728,7 @@ class TestWdkSharedDataPatterns(TestCase):
     ]
 
     def _full(self, bin_path, func_name):
-        proj = angr.Project(bin_path, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+        proj, cfg = load_project_with_cached_cfg(bin_path, ccc_kwargs={})
         func = cfg.functions.function(name=func_name)
         assert func is not None, func_name
         dec = proj.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, preset="full")
@@ -814,9 +796,7 @@ class TestWdkSharedDataPatterns(TestCase):
         assert "NT_SUCCESS" not in TEMPLATE_BY_CALL_NAME
 
     def test_no_false_positives_on_a_non_ksud_windows_binary(self):
-        proj = angr.Project(WDK_BIN, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+        proj, cfg = load_project_with_cached_cfg(WDK_BIN, ccc_kwargs={})
         total = 0
         for func in list(cfg.functions.values()):
             if func.is_plt or func.is_simprocedure or func.is_alignment:
@@ -871,9 +851,7 @@ class TestVectorExactDivSize(TestCase):
         assert exact_div_magic(12, 32) == (2, 0xAAAAAAAB)
 
     def test_struct_element_vector_sizes(self):
-        proj = angr.Project(STL2_BIN, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+        proj, cfg = load_project_with_cached_cfg(STL2_BIN, ccc_kwargs={})
         for n in self._SIZES:
             with self.subTest(elt_size=n):
                 func = cfg.functions.function(name=f"vec_size_s{n}")
@@ -890,9 +868,7 @@ class TestStlAccessors2(TestCase):
     # libstdc++ round two: the SSO capacity select, string back/front, vector back.
 
     def _full(self, func_name):
-        proj = angr.Project(STL2_BIN, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+        proj, cfg = load_project_with_cached_cfg(STL2_BIN, ccc_kwargs={})
         func = cfg.functions.function(name=func_name)
         assert func is not None, func_name
         dec = proj.analyses[Decompiler].prep(fail_fast=True)(
@@ -1081,9 +1057,7 @@ class TestBswapPeephole(TestCase):
         # bswap_64 lowers to a 3-level SWAR tree (byte/word/dword exchanges),
         # not the flat 4-way Or the bswap_32 matcher flattens for, so it used to
         # render as an 8-line mask tree.
-        proj = angr.Project(LIBM_BIN, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+        proj, cfg = load_project_with_cached_cfg(LIBM_BIN, ccc_kwargs={})
         for func_name, expected in (
             ("i_bswap32", "__builtin_bswap32("),
             ("i_bswap32_manual", "__builtin_bswap32("),
@@ -1129,9 +1103,7 @@ class TestKernelTargetGate(TestCase):
         assert "InitializeListHead(" in _text(dec), _text(dec)
 
     def test_user_space_binary_keeps_the_same_idiom_raw(self):
-        proj = angr.Project(LINUX_BIN, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+        proj, cfg = load_project_with_cached_cfg(LINUX_BIN, ccc_kwargs={})
         for func_name, call in (("lx_init", "InitializeListHead("), ("lx_is_empty", "IsListEmpty(")):
             with self.subTest(func=func_name):
                 func = cfg.functions.function(name=func_name)
@@ -1178,9 +1150,7 @@ class TestCorroborationGate(TestCase):
     def test_uncorroborated_front_stays_raw(self):
         # str_front(const std::string &s) { return s.front(); } has nothing else in
         # the function that says "string", so the gate stays shut
-        proj = angr.Project(STL2_BIN, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+        proj, cfg = load_project_with_cached_cfg(STL2_BIN, ccc_kwargs={})
         func = cfg.functions.function(name="str_front")
         assert func is not None
         gated = proj.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, preset="full")
@@ -1195,9 +1165,7 @@ class TestCorroborationGate(TestCase):
         # compared with zero, with nothing else in the function that says "string". length and empty are both
         # opt-in and gated on a string witness, so by default the function stays raw; selecting them by name
         # is the user's call and names the whole comparison
-        proj = angr.Project(STL_BIN, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+        proj, cfg = load_project_with_cached_cfg(STL_BIN, ccc_kwargs={})
         func = cfg.functions.function(name="str_empty")
         assert func is not None
         gated = proj.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, preset="full")

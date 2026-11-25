@@ -27,7 +27,7 @@ from angr.analyses.decompiler.edits import (
 )
 from angr.analyses.decompiler.edits.errors import AmbiguousFunctionError, InvalidNameError
 from angr.knowledge_plugins import CommentKind
-from tests.common import bin_location
+from tests.common import bin_location, load_project_with_cached_cfg
 
 test_location = os.path.join(bin_location, "tests")
 
@@ -36,9 +36,9 @@ FAUXWARE = os.path.join(test_location, "x86_64", "fauxware")
 
 def load(decompile: str | None = "authenticate"):
     """Load fauxware and optionally decompile one function. Roughly 1s."""
-    proj = angr.Project(FAUXWARE, auto_load_libs=False)
-    proj.analyses.CFGFast(normalize=True, data_references=True)
-    proj.analyses.CompleteCallingConventions(analyze_callsites=True)
+    proj, _ = load_project_with_cached_cfg(
+        FAUXWARE, cfg_kwargs={"normalize": True, "data_references": True}, ccc_kwargs={"analyze_callsites": True}
+    )
     func = proj.kb.functions[decompile] if decompile else None
     if func is not None:
         proj.analyses.Decompiler(func)

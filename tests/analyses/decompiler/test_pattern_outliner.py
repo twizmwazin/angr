@@ -10,7 +10,6 @@ import re
 import tempfile
 import unittest
 
-import angr
 from angr.analyses.decompiler.known_patterns import PAny, PCallStmt, PConst, PLoad, PReturn
 from angr.analyses.decompiler.known_patterns.edit import PatternEditor
 from angr.analyses.decompiler.known_patterns.generator import PatternGenerationError, PatternGenerator
@@ -21,15 +20,14 @@ from angr.analyses.decompiler.pattern_match.dedup import graph_problems
 from angr.analyses.decompiler.pattern_match.search import tokenize_for_templates
 from angr.analyses.outliner import Outliner
 from angr.knowledge_plugins.patterns import StoredPattern
-from tests.common import bin_location, load_project_with_scoped_cfg
+from tests.common import bin_location, load_project_with_cached_cfg, load_project_with_scoped_cfg
 
 BIN_PATH = os.path.join(bin_location, "tests")
 BINARY = os.path.join(BIN_PATH, "x86_64", "1after909")
 
 
 def _load():
-    proj = angr.Project(BINARY, auto_load_libs=False)
-    cfg = proj.analyses.CFG(normalize=True)
+    proj, cfg = load_project_with_cached_cfg(BINARY)
     return proj, cfg, proj.kb.functions["doit"]
 
 

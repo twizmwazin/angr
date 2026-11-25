@@ -324,6 +324,52 @@ def load_project_with_scoped_cfg(
     return proj, cfg
 
 
+_PICKLED_PROJECTS: dict[tuple[str, str, str, str], bytes] = {}
+
+
+def load_project_with_cached_cfg(
+    bin_path: str,
+    project_kwargs: dict | None = None,
+    cfg_kwargs: dict | None = None,
+    ccc_kwargs: dict | None = None,
+) -> tuple[Project, angr.analyses.cfg.CFGFast]:
+    """
+    Build a Project with a whole-binary CFGFast, reusing the result of an earlier call with the same arguments.
+
+    Many tests load the same binary and recover the same CFG (and calling conventions) before doing their own thing
+    with it. The first call for a given set of arguments does that work and keeps the result pickled; every call,
+    the first included, returns a fresh unpickled copy, so tests are free to modify what they get and cannot see
+    each other's changes. The cache lives for the lifetime of the process (one xdist worker).
+
+    Do not use this for tests whose subject is loading or CFG recovery itself, or that pass objects that cannot be
+    pickled or compared by ``repr`` (callables, hooks) in the keyword arguments.
+
+    :param bin_path:        Path of the binary to load.
+    :param project_kwargs:  Keyword arguments for angr.Project. Defaults to ``auto_load_libs=False``.
+    :param cfg_kwargs:      Keyword arguments for CFGFast. Defaults to ``normalize=True``.
+    :param ccc_kwargs:      Keyword arguments for CompleteCallingConventions, which runs only if this is not None.
+    :return:                A (project, cfg) tuple.
+    """
+    if project_kwargs is None:
+        project_kwargs = {"auto_load_libs": False}
+    if cfg_kwargs is None:
+        cfg_kwargs = {"normalize": True}
+    key = (
+        os.path.realpath(bin_path),
+        repr(sorted(project_kwargs.items())),
+        repr(sorted(cfg_kwargs.items())),
+        repr(None if ccc_kwargs is None else sorted(ccc_kwargs.items())),
+    )
+    pickled = _PICKLED_PROJECTS.get(key)
+    if pickled is None:
+        proj = Project(bin_path, **project_kwargs)
+        cfg = proj.analyses.CFGFast(show_progressbar=not WORKER, **cfg_kwargs)
+        if ccc_kwargs is not None:
+            proj.analyses.CompleteCallingConventions(cfg=cfg.model, show_progressbar=not WORKER, **ccc_kwargs)
+        pickled = _PICKLED_PROJECTS[key] = pickle.dumps((proj, cfg), pickle.HIGHEST_PROTOCOL)
+    return pickle.loads(pickled)
+
+
 def function_extents_from_eh_frame(proj: Project) -> dict[int, int]:
     """
     Read exact function extents (``{addr: size}``) out of the ELF ``.eh_frame`` FDE table. Returns an empty dict if the

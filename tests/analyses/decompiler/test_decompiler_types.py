@@ -20,7 +20,7 @@ from angr.sim_type import (
     SimTypeLongLong,
     SimTypePointer,
 )
-from tests.common import WORKER, bin_location, print_decompilation_result
+from tests.common import WORKER, bin_location, load_project_with_cached_cfg, print_decompilation_result
 
 test_location = os.path.join(bin_location, "tests")
 
@@ -144,8 +144,7 @@ class TestDecompilerTypes(unittest.TestCase):
 
     def test_prototype_ignores_arg_types_wider_than_the_arg(self):
         bin_path = os.path.join(test_location, "i386", "fauxware")
-        proj = angr.Project(bin_path, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
+        proj, cfg = load_project_with_cached_cfg(bin_path)
         func = proj.kb.functions["authenticate"]
         dec = proj.analyses.Decompiler(func, cfg=cfg.model)
         assert dec.clinic is not None

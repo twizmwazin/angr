@@ -29,7 +29,7 @@ from angr.analyses.decompiler.pattern_match.align import (
     refine_candidates,
 )
 from angr.utils.ail import is_phi_assignment
-from tests.common import bin_location
+from tests.common import bin_location, load_project_with_cached_cfg
 
 BIN_PATH = os.path.join(bin_location, "tests")
 
@@ -292,8 +292,7 @@ class TestTokenizer(TestCase):
         assert AILCanonicalizer.klass_of("St8(VR,C)") == "St8(V,C)"
 
     def test_tokenize_is_deterministic_and_covers_every_statement(self):
-        proj = angr.Project(os.path.join(BIN_PATH, "x86_64", "1after909"), auto_load_libs=False)
-        cfg = proj.analyses.CFG(normalize=True)
+        proj, cfg = load_project_with_cached_cfg(os.path.join(BIN_PATH, "x86_64", "1after909"))
         func = proj.kb.functions["verify_password"]
         dec = proj.analyses.Decompiler(func, cfg=cfg.model)
         assert dec.ail_graph is not None
@@ -348,8 +347,7 @@ class TestFuzzyPatternFinder(TestCase):
     """End to end on a real function."""
 
     def test_finder_runs_and_reports_outlinability(self):
-        proj = angr.Project(os.path.join(BIN_PATH, "x86_64", "1after909"), auto_load_libs=False)
-        cfg = proj.analyses.CFG(normalize=True)
+        proj, cfg = load_project_with_cached_cfg(os.path.join(BIN_PATH, "x86_64", "1after909"))
         func = proj.kb.functions["main"]
         dec = proj.analyses.Decompiler(func, cfg=cfg.model)
         assert dec.ail_graph is not None
@@ -423,8 +421,7 @@ class TestFuzzyPatternFinder(TestCase):
 
     def test_synthetic_duplicate_is_found(self):
         """A graph with a block sequence repeated three times must yield one pattern."""
-        proj = angr.Project(os.path.join(BIN_PATH, "x86_64", "1after909"), auto_load_libs=False)
-        cfg = proj.analyses.CFG(normalize=True)
+        proj, cfg = load_project_with_cached_cfg(os.path.join(BIN_PATH, "x86_64", "1after909"))
         func = proj.kb.functions["verify_password"]
         dec = proj.analyses.Decompiler(func, cfg=cfg.model)
         entry = next(b for b in dec.ail_graph if b.addr == func.addr)
@@ -459,8 +456,7 @@ class TestCheckpoint(TestCase):
         assert time.perf_counter() - start >= 0.01, "a low-priority checkpoint sleeps for its sleep"
 
     def _doit(self):
-        proj = angr.Project(os.path.join(BIN_PATH, "x86_64", "1after909"), auto_load_libs=False)
-        cfg = proj.analyses.CFG(normalize=True)
+        proj, cfg = load_project_with_cached_cfg(os.path.join(BIN_PATH, "x86_64", "1after909"))
         func = proj.kb.functions["doit"]
         dec = proj.analyses.Decompiler(func, cfg=cfg.model)
         return proj, func, dec
@@ -607,8 +603,7 @@ class TestStatementsModes(TestCase):
         assert split, "the halves either side of the boundary still pair up"
 
     def _doit(self):
-        proj = angr.Project(os.path.join(BIN_PATH, "x86_64", "1after909"), auto_load_libs=False)
-        cfg = proj.analyses.CFG(normalize=True)
+        proj, cfg = load_project_with_cached_cfg(os.path.join(BIN_PATH, "x86_64", "1after909"))
         func = proj.kb.functions["doit"]
         dec = proj.analyses.Decompiler(func, cfg=cfg.model)
         return proj, func, dec
@@ -663,8 +658,7 @@ class TestDeduplicateDoit(TestCase):
     def setUpClass(cls):
         from angr.analyses.decompiler.pattern_match import PatternDeduplicator  # pylint:disable=import-outside-toplevel
 
-        proj = angr.Project(os.path.join(BIN_PATH, "x86_64", "1after909"), auto_load_libs=False)
-        cfg = proj.analyses.CFG(normalize=True)
+        proj, cfg = load_project_with_cached_cfg(os.path.join(BIN_PATH, "x86_64", "1after909"))
         func = proj.kb.functions["doit"]
         dec = proj.analyses.Decompiler(func, cfg=cfg.model)
         assert dec.ail_graph is not None

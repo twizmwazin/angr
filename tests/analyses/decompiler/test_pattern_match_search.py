@@ -10,7 +10,6 @@ import unittest
 from collections import Counter
 from dataclasses import replace
 
-import angr
 from angr.analyses.decompiler.known_patterns import (
     PAny,
     PAnyStmt,
@@ -27,7 +26,7 @@ from angr.analyses.decompiler.pattern_match.align import AlignParams
 from angr.analyses.decompiler.pattern_match.search import find_template_occurrences, search, template_leaves, verify
 from angr.analyses.decompiler.pattern_match.template import Fit
 from angr.analyses.decompiler.pattern_match.tokenizer import AILCanonicalizer, TokenLoc, TokenStream
-from tests.common import bin_location
+from tests.common import bin_location, load_project_with_cached_cfg
 
 BIN_PATH = os.path.join(bin_location, "tests")
 
@@ -253,8 +252,7 @@ class TestVerifyOnARealFunction(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        proj = angr.Project(os.path.join(BIN_PATH, "x86_64", "1after909"), auto_load_libs=False)
-        cfg = proj.analyses.CFG(normalize=True)
+        proj, cfg = load_project_with_cached_cfg(os.path.join(BIN_PATH, "x86_64", "1after909"))
         func = proj.kb.functions["doit"]
         dec = proj.analyses.Decompiler(func, cfg=cfg.model)
         assert dec.ail_graph is not None and dec.codegen is not None

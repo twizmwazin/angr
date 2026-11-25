@@ -102,7 +102,7 @@ from angr.analyses.decompiler.known_patterns.stl_accessors2 import STD_STRING_FR
 from angr.analyses.decompiler.optimization_passes import KnownPatternOutliner
 from angr.knowledge_plugins.functions.function import PrototypeSource
 from angr.sim_type import SimStruct, SimTypeArray, SimTypePointer
-from tests.common import bin_location, load_project_with_scoped_cfg
+from tests.common import bin_location, load_project_with_cached_cfg, load_project_with_scoped_cfg
 
 STL_BIN = os.path.join(bin_location, "tests", "x86_64", "decompiler", "known_patterns_stl")
 # the glibc <ctype.h> table macros
@@ -174,9 +174,7 @@ def _decompile(
     scoped_addr: int | None = None,
 ):
     if scoped_addr is None:
-        proj = angr.Project(bin_path, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+        proj, cfg = load_project_with_cached_cfg(bin_path, ccc_kwargs={})
     else:
         proj, cfg = load_project_with_scoped_cfg(
             bin_path, scoped_addr, project_kwargs={"auto_load_libs": False}, include_plt=True
@@ -456,9 +454,11 @@ class TestRecognizeKnownPatternsOption(TestCase):
 
     @staticmethod
     def _swaps(options):
-        proj = angr.Project(TestRecognizeKnownPatternsOption.STL4_BIN, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True, data_references=True)
-        proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+        proj, cfg = load_project_with_cached_cfg(
+            TestRecognizeKnownPatternsOption.STL4_BIN,
+            cfg_kwargs={"normalize": True, "data_references": True},
+            ccc_kwargs={},
+        )
         func = cfg.functions.function(name="pair_swap")
         assert func is not None
         dec = proj.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, options=options)
@@ -1093,9 +1093,7 @@ class TestKnownPatternPipeline(TestCase):
         # a plain C binary decompiled with the full preset must not grow any
         # known-pattern calls
         bin_path = os.path.join(bin_location, "tests", "x86_64", "fauxware")
-        proj = angr.Project(bin_path, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+        proj, cfg = load_project_with_cached_cfg(bin_path, ccc_kwargs={})
         for func in cfg.functions.values():
             if func.is_simprocedure or func.is_plt or func.is_alignment:
                 continue
@@ -1165,9 +1163,7 @@ class TestLargestMatchWins(TestCase):
             ("superset first", [superset, subset]),
         ):
             with self.subTest(order=order_name):
-                proj = angr.Project(bin_path, auto_load_libs=False)
-                cfg = proj.analyses.CFGFast(normalize=True)
-                proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+                proj, cfg = load_project_with_cached_cfg(bin_path, ccc_kwargs={})
                 func = cfg.functions.function(name="k_list_del_init")
                 assert func is not None
                 dec = proj.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model)
@@ -1321,9 +1317,7 @@ class TestOutlinedResultIdentity(TestCase):
         TEMPLATE_BY_CALL_NAME.clear()
         TEMPLATE_BY_CALL_NAME.update({t.call_name: t for t in templates})
         try:
-            proj = angr.Project(self.KSUD_BIN, auto_load_libs=False)
-            cfg = proj.analyses.CFGFast(normalize=True)
-            proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+            proj, cfg = load_project_with_cached_cfg(self.KSUD_BIN, ccc_kwargs={})
             func = cfg.functions.function(name=func_name)
             assert func is not None
             dec = proj.analyses[Decompiler].prep(fail_fast=True)(func, cfg=cfg.model, preset="full")
@@ -1406,9 +1400,7 @@ class TestPITE(TestCase):
             params=(PatternParam("s"),),
             returnty="unsigned long long",
         )
-        proj = angr.Project(self.STL2_BIN, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+        proj, cfg = load_project_with_cached_cfg(self.STL2_BIN, ccc_kwargs={})
         func = cfg.functions.function(name="str_capacity")
         assert func is not None
         # matched by hand below, so the shipped outliner must not have got there first
@@ -1462,8 +1454,7 @@ class TestPatternSelection(TestCase):
     def test_decompiler_rejects_an_unknown_name(self):
         # the decompilation itself runs under _resilience() and retries with the
         # basic preset, so a bad name has to be rejected before that
-        proj = angr.Project(STL_BIN, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
+        proj, cfg = load_project_with_cached_cfg(STL_BIN)
         func = cfg.functions.function(name="str_index")
         assert func is not None
         with self.assertRaises(UnknownPatternError):
@@ -1773,9 +1764,7 @@ class TestSwapWidthsAndInterleaving(TestCase):
     @staticmethod
     def _decompile_pair_swap():
         """pair_swap, decompiled the way a real run does it."""
-        proj = angr.Project(TestSwapWidthsAndInterleaving.STL4_BIN, auto_load_libs=False)
-        cfg = proj.analyses.CFGFast(normalize=True)
-        proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+        proj, cfg = load_project_with_cached_cfg(TestSwapWidthsAndInterleaving.STL4_BIN, ccc_kwargs={})
         func = cfg.functions.function(name="pair_swap")
         assert func is not None
         dec = proj.analyses[Decompiler].prep(fail_fast=True)(

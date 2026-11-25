@@ -9,7 +9,6 @@ from unittest import TestCase
 
 import archinfo
 
-import angr
 from angr.analyses.decompiler.decompilation_options import options as dec_options
 from angr.analyses.decompiler.decompiler import Decompiler
 from angr.analyses.decompiler.stl_field_accessors import STD_BASIC_STRING, stl_accessor_name
@@ -26,7 +25,7 @@ from angr.sim_type import (
     SimTypeLongLong,
     SimTypePointer,
 )
-from tests.common import bin_location
+from tests.common import bin_location, load_project_with_cached_cfg
 
 STL_BIN = os.path.join(bin_location, "tests", "x86_64", "decompiler", "known_patterns_stl")
 STL2_BIN = os.path.join(bin_location, "tests", "x86_64", "decompiler", "known_patterns_stl2")
@@ -52,9 +51,7 @@ def _decompile_with_prototype(bin_path: str, func_name: str, arg_types, ret_type
     the test independent of which patterns happen to match this fixture.
     """
 
-    proj = angr.Project(bin_path, auto_load_libs=False)
-    cfg = proj.analyses.CFGFast(normalize=True)
-    proj.analyses.CompleteCallingConventions(cfg=cfg.model)
+    proj, cfg = load_project_with_cached_cfg(bin_path, ccc_kwargs={})
     func = cfg.functions.function(name=func_name)
     assert func is not None
     arch = proj.arch

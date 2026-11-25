@@ -7,7 +7,6 @@ __package__ = __package__ or "tests.analyses"  # pylint:disable=redefined-builti
 import os
 import unittest
 
-import angr
 from angr.analyses.decompiler.known_patterns import (
     PAny,
     PAnyStmt,
@@ -28,7 +27,7 @@ from angr.analyses.decompiler.known_patterns import (
 from angr.analyses.decompiler.known_patterns.generator import PatternGenerationError, PatternGenerator
 from angr.analyses.decompiler.pattern_match import tokenize
 from angr.analyses.decompiler.pattern_match.template import TEMPLATE_TOKENIZER, Fit, match_shape, parse_shape, shape_of
-from tests.common import bin_location
+from tests.common import bin_location, load_project_with_cached_cfg
 
 BIN_PATH = os.path.join(bin_location, "tests")
 
@@ -138,8 +137,7 @@ class TestMirrorsTheTokenizer(unittest.TestCase):
     real function. This is what keeps the two canonicalizations from drifting."""
 
     def test_every_statement_of_real_functions(self):
-        proj = angr.Project(os.path.join(BIN_PATH, "x86_64", "1after909"), auto_load_libs=False)
-        cfg = proj.analyses.CFG(normalize=True)
+        proj, cfg = load_project_with_cached_cfg(os.path.join(BIN_PATH, "x86_64", "1after909"))
 
         exact = wildcard = 0
         for name in ("doit", "convert"):
