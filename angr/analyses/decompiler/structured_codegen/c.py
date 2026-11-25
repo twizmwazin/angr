@@ -4858,7 +4858,7 @@ class CStructuredCodeGenerator(BaseStructuredCodeGenerator, Analysis, Serializab
             except UnsupportedNodeTypeError:
                 l.warning(
                     "Unsupported AIL statement or expression %s.",
-                    getattr(stmt, "kind", None) or type(stmt).__name__,
+                    stmt.kind_name,
                     exc_info=True,
                 )
                 cstmt = CUnsupportedStatement(stmt, codegen=self)

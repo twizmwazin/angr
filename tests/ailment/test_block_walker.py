@@ -32,8 +32,7 @@ class RecordingWalker(AILBlockWalker[None, None, list[str]]):
 
     def _stmt_top(self, stmt_idx: int, stmt: Statement, block: Block | None):
         del stmt_idx, block
-        kind = getattr(stmt, "kind", None)
-        self.seen.append(kind.name if kind is not None else type(stmt).__name__)
+        self.seen.append(stmt.kind.name)
 
     def _handle_block_end(self, stmt_results: list[None], block: Block):
         del stmt_results, block

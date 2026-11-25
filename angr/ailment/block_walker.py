@@ -7,7 +7,6 @@ from collections.abc import Callable
 from typing import Any, cast
 
 from angr.rustylib.ailment import Expression as _RustExpression  # pylint:disable=import-error
-from angr.rustylib.ailment import Statement as _RustStatement  # pylint:disable=import-error
 
 from . import Block
 from .expression import (
@@ -105,13 +104,10 @@ def _dispatch_key(obj):
     t = type(obj)
     if t is _RustExpression:
         return _EXPR_KIND_TO_MARKER.get(obj.pykind, _RustExpression)
-    if t is _RustStatement:
-        return _STMT_KIND_TO_MARKER.get(obj.pykind, _RustStatement)
-    # Slow path: pure-Python instances may not expose ``kind``.
-    kind = getattr(obj, "kind", None)
-    if kind is None:
-        return type(obj)
-    return _KIND_TO_MARKER.get(kind, type(obj))
+    if t is Statement:
+        return _STMT_KIND_TO_MARKER.get(obj.pykind, Statement)
+    # anything else (e.g., a structurer node) is keyed by its own type
+    return t
 
 
 _EXPR_MARKERS = (
@@ -160,21 +156,16 @@ _STMT_MARKERS = (
 )
 _EXPR_KIND_TO_MARKER: dict = {}
 _STMT_KIND_TO_MARKER: dict = {}
-_KIND_TO_MARKER: dict = {}
 _marker = None
 _kind_attr = None
 for _marker in _EXPR_MARKERS:
     _kind_attr = _marker.__dict__.get("_kind")
     if _kind_attr is not None:
         _EXPR_KIND_TO_MARKER.setdefault(_kind_attr, _marker)
-        _KIND_TO_MARKER.setdefault(_kind_attr, _marker)
 for _marker in _STMT_MARKERS:
     _kind_attr = _marker.__dict__.get("_kind")
     if _kind_attr is not None:
         _STMT_KIND_TO_MARKER.setdefault(_kind_attr, _marker)
-        # _KIND_TO_MARKER may have an EK collision here -- skip if so.
-        if _kind_attr not in _KIND_TO_MARKER:
-            _KIND_TO_MARKER.setdefault(_kind_attr, _marker)
 del _marker, _kind_attr
 
 
@@ -275,7 +266,7 @@ class AILBlockWalker[ExprType, StmtType, BlockType]:
             if func is None:
                 return self._stmt_top(stmt_idx, stmt, block)
             return func(self, stmt_idx, stmt, block)
-        handler = handlers.get(_STMT_KIND_TO_MARKER.get(stmt.pykind, _RustStatement))
+        handler = handlers.get(_STMT_KIND_TO_MARKER.get(stmt.pykind, Statement))
         if handler is None:
             return self._stmt_top(stmt_idx, stmt, block)
         return handler(stmt_idx, stmt, block)

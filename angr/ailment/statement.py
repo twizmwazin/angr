@@ -29,45 +29,18 @@ else:
     from angr.rustylib.ailment import StatementKind as SK
 
     class _AilStmtMarkerMeta(type):
-        """Metaclass for the Statement marker classes.
-
-        ``_kind`` (class attr) is the variant tag this marker matches.
-
-        ``_kinds`` is an optional frozenset for markers that match a union of variants (e.g. an abstract ``Statement``
-        parent marker).
-        """
+        """Metaclass for the Statement marker classes. ``_kind`` (class attr) is the variant tag this marker matches."""
 
         _kind: SK
-        _kinds: frozenset[SK]
-        _match_kinds: frozenset[SK]
-        _match_kind_ints: frozenset[int]
-        _match_kind_int_single: int | None
+        _kind_int: int
 
         def __init__(cls, name, bases, namespace, **kwargs):
             super().__init__(name, bases, namespace, **kwargs)
-            # See ``expression._AilMarkerMeta.__init__`` for rationale.
-            kinds = namespace.get("_kinds")
-            if kinds is None:
-                kind = namespace.get("_kind")
-                if kind is not None:
-                    cls._match_kinds = frozenset({kind})
-            else:
-                cls._match_kinds = kinds if isinstance(kinds, frozenset) else frozenset(kinds)
-            # Mirror as a plain-int frozenset; see
-            # ``expression._AilMarkerMeta`` for rationale.
-            if hasattr(cls, "_match_kinds"):
-                cls._match_kind_ints = frozenset(int(k) for k in cls._match_kinds)
-                cls._match_kind_int_single = (
-                    next(iter(cls._match_kind_ints)) if len(cls._match_kind_ints) == 1 else None
-                )
+            # a plain int: comparing ``pykind`` against it skips the Rust-side enum conversion
+            cls._kind_int = int(namespace["_kind"])
 
         def __instancecheck__(cls, instance: Any) -> bool:
-            if type(instance) is not _Statement:
-                return False
-            k = cls._match_kind_int_single
-            if k is not None:
-                return instance.pykind == k
-            return instance.pykind in cls._match_kind_ints
+            return type(instance) is _Statement and instance.pykind == cls._kind_int
 
         def __subclasscheck__(cls, subclass: type) -> bool:
             return subclass is cls
@@ -226,35 +199,8 @@ else:
         def __new__(cls, idx, switch_variable, case_addrs, **tags) -> _Statement:  # type: ignore[misc]
             return _Statement._new_incomplete_switch_case_head_statement(idx, switch_variable, case_addrs, **tags)
 
-    class _StatementMeta(type):
-        _MEMBERS = (
-            Assignment,
-            WeakAssignment,
-            Store,
-            Jump,
-            ConditionalJump,
-            SideEffectStatement,
-            Return,
-            CAS,
-            DirtyStatement,
-            Label,
-            NoOp,
-            IncompleteSwitchCaseHeadStatement,
-        )
-
-        def __instancecheck__(cls, instance):
-            return type(instance) is _Statement
-
-        def __subclasscheck__(cls, subclass):
-            return subclass is cls or issubclass(subclass, cls._MEMBERS)
-
-    class Statement(metaclass=_StatementMeta):
-        """Marker for ``isinstance(x, Statement)`` checks."""
-
-        @staticmethod
-        def from_bytes(data: bytes):
-            """Deserialize a Statement from bytes."""
-            return _Statement.from_bytes(data)
+    # every AIL statement is an instance of the one Rust class
+    Statement = _Statement
 
 
 __all__ = [
